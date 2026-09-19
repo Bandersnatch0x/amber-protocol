@@ -328,6 +328,10 @@ test("runner request, authorize, prepare, and settle form the governed execution
 		"evidence/rehearsal-cli",
 		"--rollback",
 		"runbook/staging-rollback",
+		// The context-runtime contract types the request stage as an
+		// approval-required Action (amber.runner.request); the CLI executes
+		// under the explicit confirmation flag.
+		"--yes",
 		"--target",
 		dir,
 		"--json",
@@ -436,6 +440,7 @@ test("runner request, authorize, prepare, and settle form the governed execution
 			request.requestHash,
 			"--receipt",
 			"receipt.json",
+			"--yes",
 			"--target",
 			dir,
 			"--json",

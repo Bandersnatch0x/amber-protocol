@@ -357,6 +357,15 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_REQUEST_MISSING"],
 	},
+	AMBER_E_CONTEXT_DOWNGRADE_REFUSED: {
+		title: "Classification downgrade without a recorded Decision",
+		cause:
+			"the payload relabels a restricted/secret page to a lower classification and carries no relabelDecision that resolves to a committed human Decision (context/runtime contract §3.1: downgrade is a governance change).",
+		remedy:
+			"Record a human Decision authorizing the relabel and ingest again with relabelDecision: {identity, revision}; upgrades and first labels need no Decision.",
+		layer: "Context",
+		related: ["AMBER_E_CONTEXT_REQUEST_MISMATCH"],
+	},
 	AMBER_E_CONTEXT_CLAIM_UNCITED: {
 		title: "Context page block cites an undeclared source",
 		cause:

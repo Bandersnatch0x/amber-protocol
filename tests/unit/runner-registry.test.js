@@ -1226,14 +1226,22 @@ test("tampered execution journal fails every read closed", () => {
 	);
 });
 
-test("the MCP seam exposes no runner execution surface", () => {
+test("the MCP seam exposes runner stages only as approval-required Actions", () => {
 	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
-	// Target-write execution is returned approval-required and never
-	// spawned (ADR-0022/F018): the MCP capability registry carries no
-	// runner verb at all, so no registry-proven read-only variant can ever
-	// auto-execute one.
-	const runnerCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
+	// Context/runtime contract §5.4: the Runtime loop is projected as thin,
+	// approval-required stage Actions (amber.runner.request / amber.runner.settle)
+	// — never compressed verbs, never spawned. No runner capability may carry a
+	// read-only direct-exec variant, so the MCP surface can never auto-execute
+	// a runner stage.
+	const runnerCapabilities = Object.entries(COMMAND_CAPABILITIES).filter(([key]) =>
 		key.split(/[\s.:/-]/).includes("runner"),
 	);
-	assert.deepEqual(runnerCapabilities, []);
+	assert.deepEqual(
+		runnerCapabilities.map(([key]) => key),
+		["runner/request", "runner/settle"],
+	);
+	for (const [, capability] of runnerCapabilities) {
+		assert.equal(capability.effect, "write");
+		assert.equal(capability.directReadOnlyExec, false);
+	}
 });

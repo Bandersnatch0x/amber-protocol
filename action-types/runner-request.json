@@ -1,0 +1,61 @@
+{
+	"actionTypeId": "amber.runner.request",
+	"version": 1,
+	"title": "Submit a governed runner request",
+	"goal": "Submit one Runtime capability request into the F052 registry: closed input validation, capability resolution, risk derivation, and the approval binding a human must grant — stage 1 of the real five-stage Runtime lifecycle (context/runtime contract §5). Amber never authorizes and never executes.",
+	"mode": "interactive",
+	"parameters": {
+		"runnerId": {
+			"type": "string",
+			"required": true,
+			"description": "Registered runner id (e.g. runner/ci)."
+		},
+		"runnerVersion": {
+			"type": "string",
+			"required": true,
+			"description": "Registered runner version the capability rides."
+		},
+		"capability": {
+			"type": "string",
+			"required": true,
+			"description": "Registered capability name."
+		},
+		"capabilityVersion": {
+			"type": "string",
+			"required": true,
+			"description": "Registered capability version."
+		},
+		"environment": {
+			"type": "string",
+			"required": true,
+			"description": "Execution environment profile (development | staging | production)."
+		}
+	},
+	"submissionCriteria": ["approval-required"],
+	"effects": {
+		"edits": [".amber/runner/requests.jsonl"],
+		"sideEffects": ["ledger-append"],
+		"rollback": false
+	},
+	"evidenceRequired": ["runner-request"],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#runner-registry",
+		"approver": ["human"],
+		"evidence": ["runner-request"],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "runner",
+		"subcommand": "request",
+		"args": [
+			{ "flag": "--runner-id", "source": "parameters.runnerId" },
+			{ "flag": "--runner-version", "source": "parameters.runnerVersion" },
+			{ "flag": "--capability", "source": "parameters.capability" },
+			{ "flag": "--capability-version", "source": "parameters.capabilityVersion" },
+			{ "flag": "--environment", "source": "parameters.environment" },
+			{ "flag": "--json", "flagOnly": true }
+		]
+	}
+}

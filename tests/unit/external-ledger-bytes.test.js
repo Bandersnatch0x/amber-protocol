@@ -70,11 +70,11 @@ const GOLDEN = Object.freeze({
 	executions: path.join(FIXTURES_DIR, "executions-lifecycle.golden.jsonl"),
 });
 const GOLDEN_SHA256 = Object.freeze({
-	effects: "602b3dcd60a50718c69c8c2979eb5367e916cdf3238b9a2d248704efe02e7568",
+	effects: "2704a45e8a1e901b1f857720f98c2d3a8247ec7be31a480fc227a6da7fa01c23",
 	proposals: "8ab1ecb82515393b27ceb267fc1124f9b02258d3a6a7b11d291d21f46acafb51",
 	executions: "da122483637da7abaadd30825d258b97eb197bd4f4cef69408291600cc7a7b43",
 });
-const GOLDEN_BYTES = Object.freeze({ effects: 1523, proposals: 2094, executions: 2472 });
+const GOLDEN_BYTES = Object.freeze({ effects: 1667, proposals: 2094, executions: 2472 });
 
 const NOW = new Date("2026-08-29T00:00:00.000Z");
 const HOUR_MS = 3_600_000;
@@ -322,6 +322,16 @@ function runLifecycle(dir) {
 
 test("the factory-assembled external ledgers are byte-identical to the pre-migration recording", () => {
 	const ledgers = runLifecycle(mkTarget("lifecycle"));
+	// The documented recording ritual (see the header comment): the env flag
+	// re-records the golden fixtures from the CURRENT writer — run it twice
+	// and verify both recordings are byte-identical before committing, then
+	// update GOLDEN_SHA256 / GOLDEN_BYTES to the fresh recording.
+	if (process.env.AMBER_RECORD_EXTERNAL_GOLDEN === "1") {
+		for (const [name, golden] of Object.entries(GOLDEN)) {
+			fs.copyFileSync(ledgers[name], golden);
+		}
+		return;
+	}
 	// Sanity on the scenario itself before any byte talk: every event kind
 	// each ledger owns, in the fixed append order.
 	assert.deepEqual(

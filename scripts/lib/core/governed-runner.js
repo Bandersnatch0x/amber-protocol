@@ -212,6 +212,17 @@ function frozenAdmissionProblem(targetRoot, frozen, resolvedCommand, globalRules
 		const drift = capabilityDriftProblem(targetRoot, frozen);
 		if (drift) return { refusal: "capability-drift", reason: drift };
 	}
+	// (3b) R-CA-3: a hard context expiry in the past at the consumption
+	// instant refuses — expiry is a boundary, not a warning.
+	if (typeof frozen.contextExpiresAt === "string") {
+		const expiry = Date.parse(frozen.contextExpiresAt);
+		if (Number.isNaN(expiry) || Date.now() >= expiry) {
+			return {
+				refusal: "context-expired",
+				reason: `the attempt's context authority expired at ${frozen.contextExpiresAt} (R-CA-3)`,
+			};
+		}
+	}
 	return null;
 }
 

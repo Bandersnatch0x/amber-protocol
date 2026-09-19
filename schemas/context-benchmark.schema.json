@@ -124,6 +124,18 @@
 								"type": "array",
 								"uniqueItems": true,
 								"items": { "type": "string" }
+							},
+							"classification": {
+								"enum": ["public", "internal", "confidential", "restricted", "secret", "unknown"]
+							},
+							"classificationSource": {
+								"enum": ["stored", "effective-default", "unlabeled"]
+							},
+							"purpose": {
+								"anyOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+							},
+							"expiresAt": {
+								"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
 							}
 						}
 					}
@@ -154,7 +166,8 @@
 							},
 							"path": { "type": "string", "minLength": 1 },
 							"rawHash": { "$ref": "#/definitions/hash" },
-							"words": { "type": "integer", "minimum": 0 }
+							"words": { "type": "integer", "minimum": 0 },
+							"classification": { "const": "internal" }
 						}
 					}
 				},

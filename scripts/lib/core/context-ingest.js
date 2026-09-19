@@ -14,6 +14,8 @@ const { loadRequest } = require("./context-request");
 const { checkSourceHealth, finding, stripRange } = require("./context-sources");
 const { resolvePathWithin } = require("./fs-utils");
 const { writePage, regenerateIndex, appendEvent, readPage } = require("./context-store");
+const { rankOf, CLASSIFICATION_RANK } = require("./classification");
+const { showArtifact } = require("./canonical-artifacts");
 const {
 	normalizeKnowledgeKind,
 	normalizePageIds,
@@ -137,6 +139,45 @@ function checkRequestBinding(targetRoot, request, payload) {
 		}
 	}
 	return { findings, blocked: findings.length > 0 };
+}
+
+// §3.1 downgrade gate: relabeling a source from `restricted`/`secret` to any
+// lower class requires an independent human Decision recorded before the page
+// hash changes — ingest refuses a downgrade that cannot show one. Upgrades and
+// first labels never require one. The new page's effective classification is
+// the payload's stored label, or the governed effective default `internal`
+// when the payload omits it (an omitted label after a protected one IS a
+// downgrade — never a silent reset).
+function classificationDowngradeProblem(targetRoot, existing, payload) {
+	const oldStored =
+		existing && typeof existing.classification === "string" ? existing.classification : null;
+	const oldRank = rankOf(oldStored);
+	if (oldRank === null || oldRank < CLASSIFICATION_RANK.restricted) return null;
+	const newClassification =
+		typeof payload.classification === "string" && CLASSIFICATION_RANK[payload.classification] !== undefined
+			? payload.classification
+			: "internal";
+	const newRank = rankOf(newClassification);
+	if (newRank === null || newRank >= oldRank) return null;
+	const relabel = payload.relabelDecision;
+	if (!relabel || typeof relabel.identity !== "string" || !Number.isInteger(relabel.revision)) {
+		return (
+			`the page's stored classification is "${oldStored}"; relabeling it to "${newClassification}" ` +
+			"requires a committed human Decision carried as relabelDecision (§3.1 downgrade gate)"
+		);
+	}
+	try {
+		const artifact = showArtifact(targetRoot, relabel.identity, {
+			type: "decision",
+			revision: relabel.revision,
+		});
+		if (!artifact) {
+			return `relabelDecision ${relabel.identity}@${relabel.revision} does not resolve to a committed decision artifact`;
+		}
+	} catch (error) {
+		return `relabelDecision could not be verified against the artifact store: ${error.message || String(error)}`;
+	}
+	return null;
 }
 
 function rebaseNoChangeSources(targetRoot, request, existing, pageId) {
@@ -348,6 +389,19 @@ function validateFullPage(context, payload) {
 			errors: validate.errors
 				.slice(0, 5)
 				.map((error) => `${error.instancePath || "/"} ${error.message}`),
+		};
+	}
+	// §3.1 downgrade gate: a restricted/secret page never loses its label
+	// without a committed human Decision riding the payload.
+	const existing = readPage(targetRoot, pageId);
+	const downgradeProblem = classificationDowngradeProblem(targetRoot, existing, payload);
+	if (downgradeProblem) {
+		return {
+			blocked: true,
+			findings: [
+				finding("AMBER_E_CONTEXT_DOWNGRADE_REFUSED", downgradeProblem, pageId),
+			],
+			errors: [downgradeProblem],
 		};
 	}
 	const binding = checkRequestBinding(targetRoot, request, payload);

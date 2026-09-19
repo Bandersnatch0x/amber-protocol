@@ -117,6 +117,13 @@ function renderDirtyPathsSection(classification) {
 	if (classification.outsideScope.length > 0) {
 		for (const p of classification.outsideScope) lines.push(`- ${p}`);
 		lines.push("- not booked to the focus feature — parallel work or unbooked; left untouched.");
+		// Evidence-class discipline (context/runtime contract §2.3 D2): the
+		// outside-scope read is an E3 fact about FILE STATE ONLY. The record
+		// never attributes an actor and never claims the absence of network
+		// or other unmediated effects — a diff cannot prove either.
+		lines.push(
+			"- D2 outside-scope fact (E3): file state observed outside the declared scope; actor unknown — no attribution; network and other unmediated effects unobserved. Recorded as a FAIL completeness fact, never as an assurance claim.",
+		);
 	}
 	if (classification.managed.length > 0) {
 		lines.push(

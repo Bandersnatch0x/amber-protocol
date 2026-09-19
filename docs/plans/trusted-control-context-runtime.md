@@ -1,7 +1,9 @@
 # Plan: Trusted Control Context / Runtime Boundary implementation
 
 Spec: `docs/specs/trusted-control-context-runtime-contract.md` (spec_id `trusted-control-context-runtime-contract`, status `proposed`, updated 2026-09-16)
-Status: proposed — **awaiting coordinator two-axis review; implementation NOT started**
+Feature: F062
+Status: implementation-ready
+User Confirmation: confirmed
 Revised 2026-09-16 (C0R repair): F056 payloadHash ceiling narrowed to declared-hash
 binding; session lease binding completed (full `ownerId`/`tokenHash`/`fence` proof at
 authorize + prepare + settle); classification stored-field vs effective-projection
@@ -9,6 +11,13 @@ distinction made explicit.
 Origin tickets: `issues/0047`, `issues/0053`, `issues/0058`, `issues/0059` (2026-09-15 rulings; corrections appended 2026-09-16)
 Baseline HEAD: `0a9cbeab85898bd043e1ab9f7c89ea71193cbb78`
 No new F-number is introduced; F064 and the feature catalog are untouched.
+
+## Context manifests
+
+Knowledge surfaces only; code paths ride F062's booked paths.
+
+- implement: docs/specs/trusted-control-context-runtime-contract.md, docs/plans/trusted-control-context-runtime.md, docs/specs/trusted-control-run-contract.md, docs/adr/0012-protocol-and-schema-versioning.md
+- review: docs/specs/trusted-control-context-runtime-contract.md, docs/plans/trusted-control-context-runtime.md, .scratch/orchestration/context-runtime-impl-2026-09-19/REVIEW-spec-plan.md
 
 ## Goal
 
@@ -46,7 +55,7 @@ ceiling needs labeled sources; the F052 binding fields (C) precede the Research 
 lands with the run-contract plan's Slice 1; MCP (D) and observation wiring (G) are
 independent of A-C except for the seam shapes they project.
 
-- [ ] **Slice A — Ingress metadata and snapshot extension (0053 §3.1-3.3).**
+- [x] **Slice A — Ingress metadata and snapshot extension (0053 §3.1-3.3).**
   Files: `schemas/context-page.schema.json` (page fields `classification`/`purpose`/`ttl`),
   `schemas/context-loadout.schema.json` (pages[] + required-artifact entries gain
   `classification`/`purpose`/`expiresAt`; top-level `redactions[]`; `excluded.reason`
@@ -63,7 +72,7 @@ independent of A-C except for the seam shapes they project.
   ("effective-default") — never a stored write-back, so pre-field pages gain no stored
   classification; downgrade without Decision refuses.
 
-- [ ] **Slice B — Egress declarations at the F056 seams (0053 §3.5 R-EG-1).**
+- [x] **Slice B — Egress declarations at the F056 seams (0053 §3.5 R-EG-1).**
   Files: `scripts/lib/core/external-registry.js` (`proposeExternalEffect` +
   `executeExternalEffect` gain `payloadSources[]` validation and re-derivation; effect
   registration gains `maxPayloadClassification`/`requiresPayloadProvenance`),
@@ -75,7 +84,7 @@ independent of A-C except for the seam shapes they project.
   no claim of actual payload-byte integrity, actual-payload identity, or leak
   prevention — the bytes actually sent are an executor claim (E2).
 
-- [ ] **Slice C — F052 request frozen bindings, lease, context authority (0059 §5.1-5.2).**
+- [x] **Slice C — F052 request frozen bindings, lease, context authority (0059 §5.1-5.2).**
   Files: `scripts/lib/core/runner-registry.js` (`REQUEST_INPUT_FIELDS` +
   `requestShapeProblem` gain optional `sessionBinding`/`contextAuthority`;
   Amber-computed `policyHash`/`capabilityHash`/`scopeHash` frozen on the `requested`
@@ -92,7 +101,7 @@ independent of A-C except for the seam shapes they project.
   requests with bindings refuse on policy drift; `contextAuthority` honors
   `expiresAt` (case 3 consumption half).
 
-- [ ] **Slice D — MCP projections (0059 §5.4).**
+- [x] **Slice D — MCP projections (0059 §5.4).**
   Files: `action-types/runner-request.json` + `action-types/runner-settle.json`
   (Action Types `amber.runner.request` → `amber runner request`, `amber.runner.settle` →
   `amber runner settle`), `scripts/lib/mcp-action-contracts.js` (capability entries,
@@ -113,7 +122,7 @@ independent of A-C except for the seam shapes they project.
   (claim stays `claimed`); the §6.5 end-to-end flow runs in a fixture; dependency guard
   (`tests/unit/core-domain-separation.test.js`) stays green; no directory moves (§6.4).
 
-- [ ] **Slice F — Run-contract context capture bridge (0053 §3.1 / spec §4).**
+- [x] **Slice F — Run-contract context capture bridge (0053 §3.1 / spec §4).**
   Files: `scripts/lib/session-stage-runner.js` **only as the run-contract plan's Slice 1
   lands** (shared write set — gated on that plan's adoption): `scopeInputs.context_scope`
   capture per spec §4 (constraints-only structure; `null` = honest absence),
@@ -122,7 +131,7 @@ independent of A-C except for the seam shapes they project.
   Acceptance: spec §8 cases 2, 3 at the session seam; R-CA-1 refresh-tolerance and
   R-CA-2 drift-refusal both observable in one story.
 
-- [ ] **Slice G — Evidence-class-corrected scope detection wiring (0047 §2.3 D2).**
+- [x] **Slice G — Evidence-class-corrected scope detection wiring (0047 §2.3 D2).**
   Files: the finish-time/handoff surface that consumes `classifyDirtyPaths`
   (`scripts/lib/core/dirty-paths.js` is pure and unchanged) — record the `outsideScope`
   classification as a FAIL fact with the §2.3 statement (file state observed, actor
@@ -169,10 +178,16 @@ independent of A-C except for the seam shapes they project.
 
 ## Resume Checkpoint
 
-- Resume Point: spec and plan proposed; zero slices started; run-contract container
-  resolved in the spec (§4) and the run-contract spec edited surgically.
-- Blockers: coordinator two-axis review of this spec/plan; 0056's rereview for Slice
-  A's timeline half; the run-contract plan's Slice 1 for Slice F.
-- Next Action: coordinator Standards + Spec review; then Slice A.
+- Resume Point: Slices A, B, C, D, F, G delivered 2026-09-19 (session `99dfee60-be06-44fc-a4e9-001daf738702`); full gates green on the final tree (root 3738/3738, manifests/doctor/gen:agents:check/typecheck/ESLint exit 0) — `.scratch/orchestration/context-runtime-impl-2026-09-19/` (`B9-dual-axis-review.md`, `root-npm-test.log`, `gates.log`, `eslint.log`). Implementation choices recorded there: relabel decisions verified against the canonical artifact store; ttl base = page ingest/refresh instant; ceiling = a build option; F052 requestHash excludes the sessionBinding/contextAuthority fields (contextAuthority is authority-relevant through its own frozen scopeHash); closed event validators split ALLOWED from REQUIRED for the additive fields.
+- Blockers: **Slice E is the remaining open slice** (Research adapter + citation store + R-EG-2 query seam + §6.5 e2e fixture) — deliberately not half-landed; the batch was locked green before it.
+- Next Action: implement Slice E against the real 0049 ExecutionBoundary interface, then re-run the full gates and the two-axis review for it.
+- Recovery Instructions: reopen this plan and continue at the first unchecked slice; do not regenerate unless the plan file is missing.
 - Recovery Instructions: reopen this plan and continue at the first unchecked slice;
   do not regenerate unless the plan file is missing.
+
+## Evidence Schema
+
+- Command: npm test / node scripts/run-tests.js tests/unit/<suite> / npm run manifests / npm run doctor / npm run gen:agents:check
+- Result: pass/fail counts + exit codes per gate, logged under .scratch/orchestration/context-runtime-impl-2026-09-19/
+- Date: 2026-09-19
+- Notes: per-slice targeted suite commands recorded beside the logs; dual-axis review verdict in the same directory.

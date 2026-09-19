@@ -1789,9 +1789,17 @@ test("the declared input schema is required, must compile, and legacy events fol
 	assert.deepEqual(registered.record.inputSchema, { type: "object", required: ["body"] });
 	// Rewrite the ledger as a schemaVersion-2 event without inputSchema --
 	// exactly what the committed T1 code wrote before the declaration
-	// existed -- re-chained validly.
+	// existed -- re-chained validly. The context-runtime egress ceilings
+	// (maxPayloadClassification/requiresPayloadProvenance) postdate the same
+	// era and are stripped with it.
 	const pristine = readEvents(effectsPath(dir));
-	const { hash: _hash, inputSchema: _schema, ...legacyBody } = pristine[0];
+	const {
+		hash: _hash,
+		inputSchema: _schema,
+		maxPayloadClassification: _ceiling,
+		requiresPayloadProvenance: _provenance,
+		...legacyBody
+	} = pristine[0];
 	const legacy = { ...legacyBody, schemaVersion: 2 };
 	legacy.hash = chainHash(legacy, legacy.prevHash);
 	writeEvents(effectsPath(dir), [legacy]);

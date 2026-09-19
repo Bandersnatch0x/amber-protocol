@@ -309,7 +309,11 @@ function freezeAttemptInputs(projectRoot, resolved, manifest, route, attemptNumb
 		capabilities: [resolved.capabilityPin],
 		targets: [stage.target],
 		constraints: null,
-		context_scope: null,
+		// §4 (context/runtime contract): the authorization-relevant constraints
+		// ride context_scope when the session manifest declares them — the
+		// closed four-field §4 shape. Absent remains the honest null (R-CA-4):
+		// no context-constraint check existed, never a defaulted value.
+		context_scope: manifest.context_scope ?? null,
 		side_effect_policy: {
 			defaultAction: rules?.defaultAction ?? "deny",
 			capabilityEffects: [...(capabilityRecord?.effects ?? [])].sort(),
@@ -406,6 +410,9 @@ function gateBindingOf(request) {
 		policyHash: frozen.hashes.policyHash,
 		capabilityHash: frozen.hashes.capabilityHash,
 		scopeHash: frozen.hashes.scopeHash,
+		// R-CA-3: the hard context expiry rides the binding so consumption
+		// refuses `context-expired` before any effect.
+		contextExpiresAt: frozen.scopeInputs?.context_scope?.constraints?.expiresAt ?? null,
 		attemptIdentity: {
 			capabilityPin: request.capabilityPin,
 			routeHash: request.routeHash,

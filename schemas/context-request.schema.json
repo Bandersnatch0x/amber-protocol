@@ -56,7 +56,11 @@
 					"normHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
 					"mutable": { "type": "boolean" },
 					"excerpt": { "type": "string" },
-					"excerptHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+					"excerptHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+					"classification": {
+						"description": "Request-author source label (context/runtime contract §3.1); `unknown` is an explicit legal value for tool outputs and ad-hoc content. Sources without a label carry `unknown` — never a silent default.",
+						"enum": ["public", "internal", "confidential", "restricted", "secret", "unknown"]
+					}
 				},
 				"allOf": [
 					{

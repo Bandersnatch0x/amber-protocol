@@ -66,10 +66,10 @@ const GOLDEN = Object.freeze({
 });
 const GOLDEN_SHA256 = Object.freeze({
 	registry: "a2493061687c1b8aa20897723eaf75bc10a47ed0cdce9aeaf0928ac68e6f545b",
-	requests: "ef667b68808a2104235947203c9c2b4a33915d979469130c54ddab6307a9caf1",
+	requests: "297d899e6d950e71416781affae45ef662f8640337743445f922298946b69371",
 	executions: "c597bf21bab2e30afcd6a1758c9406f41e052939ac660f61e58b785cf20e6cfb",
 });
-const GOLDEN_BYTES = Object.freeze({ registry: 1069, requests: 1469, executions: 1427 });
+const GOLDEN_BYTES = Object.freeze({ registry: 1069, requests: 1779, executions: 1427 });
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const NOW = new Date("2026-08-28T00:00:00.000Z");
@@ -272,6 +272,16 @@ function runLifecycle(dir) {
 
 test("the factory-assembled runner ledgers are byte-identical to the pre-migration recording", () => {
 	const ledgers = runLifecycle(mkTarget("lifecycle"));
+	// The documented recording ritual (header comment): the env flag
+	// re-records the golden fixtures from the CURRENT writer — run it twice,
+	// verify both recordings byte-identical, then update the pinned
+	// GOLDEN_SHA256 / GOLDEN_BYTES constants.
+	if (process.env.AMBER_RECORD_RUNNER_GOLDEN === "1") {
+		for (const [name, golden] of Object.entries(GOLDEN)) {
+			fs.copyFileSync(ledgers[name], golden);
+		}
+		return;
+	}
 	assert.deepEqual(
 		readEvents(ledgers.registry).map((event) => event.kind),
 		["runner", "capability"],

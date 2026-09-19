@@ -42,6 +42,9 @@ const VALUE_FLAGS = [
 	["revision", "--revision"],
 	["effectVal", "--effect"],
 	["payloadHash", "--payload-hash"],
+	["payloadSources", "--payload-sources"],
+	["maxPayloadClassification", "--max-payload-classification"],
+	["requiresPayloadProvenance", "--requires-payload-provenance"],
 	["approval", "--approval"],
 	["body", "--body"],
 	["traceVal", "--trace"],
@@ -162,6 +165,13 @@ const dispatch = defineCommand({
 				timeoutMs: timeoutMs.value,
 				adapter: { id: String(args.adapter), version: String(args.adapterVersion) },
 				decision: { identity: String(args.decisionIdentity), revision: revision.value },
+				// R-EG-1 egress ceilings (registration defaults apply when absent).
+				...(args.maxPayloadClassification !== undefined
+					? { maxPayloadClassification: String(args.maxPayloadClassification) }
+					: {}),
+				...(args.requiresPayloadProvenance !== undefined
+					? { requiresPayloadProvenance: args.requiresPayloadProvenance === "true" }
+					: {}),
 			});
 			return resultEnvelope(result);
 		},
@@ -200,11 +210,24 @@ const dispatch = defineCommand({
 			}
 			const effect = parseEffectPin(args.effectVal);
 			if (effect.error) return invalidArg(effect.error);
+			// R-EG-1: the declared payload sources ride the proposal (JSON list
+			// of {kind, ref, rawHash} entries).
+			let payloadSources = null;
+			if (args.payloadSources !== undefined) {
+				try {
+					payloadSources = JSON.parse(String(args.payloadSources));
+				} catch (error) {
+					return invalidArg(
+						`--payload-sources must be a JSON array of {kind, ref, rawHash} entries: ${error.message}`,
+					);
+				}
+			}
 			return resultEnvelope(
 				proposeExternalEffect(target.value, {
 					id: String(args.id),
 					effect: effect.value,
 					payloadHash: String(args.payloadHash),
+					payloadSources,
 				}),
 			);
 		},

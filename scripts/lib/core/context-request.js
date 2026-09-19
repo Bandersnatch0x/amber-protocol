@@ -70,10 +70,16 @@ function bundleSource(targetRoot, spec) {
 
 	const mutable = !isImmutable(parsed.ref);
 	const content = fs.readFileSync(full, "utf8");
+	// §3.1: the request author labels each source; a source without a label
+	// carries `unknown` — never a silent default.
+	const classification =
+		typeof spec.classification === "string" && spec.classification.length > 0
+			? spec.classification
+			: "unknown";
 
 	if (mutable) {
 		const { rawHash, normHash } = hashFile(full);
-		return { kind: kindOf(parsed.ref), ref: raw, rawHash, normHash, mutable: true };
+		return { kind: kindOf(parsed.ref), ref: raw, rawHash, normHash, mutable: true, classification };
 	}
 
 	// Immutable: snapshot the cited span; the full ref (including #Lx-Ly) is
@@ -86,6 +92,7 @@ function bundleSource(targetRoot, spec) {
 		mutable: false,
 		excerpt,
 		excerptHash: sha256(excerpt),
+		classification,
 	};
 }
 
