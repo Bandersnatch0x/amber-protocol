@@ -18,9 +18,9 @@
 //   - loop-contract: contract drafts for the loop typed-mutation surface
 //     (`schemas/loop-contract.schema.json`; manual + disabled trigger — a
 //     draft never schedules anything).
-//   - rules: BLOCKED — 0051 rules v2 has not landed. The deriver is not
-//     implemented and never invoked; the block is a visible named dependency
-//     (RULES_DERIVER_BLOCK, plan open dependency #1).
+//   - rules: rules.json v2 rule skeletons (unblocked 2026-09-20 — governance
+//     G-5 landed the v2 typed-mutation surface; the draft's decision is
+//     require_approval and the owner completes the match dimensions).
 //
 // Drafts never mutate anything: this module performs no writes and the draft
 // is an in-memory object the destination owner reviews and completes through
@@ -44,21 +44,40 @@ const DERIVER_DESTINATIONS = Object.freeze([
 ]);
 
 const DRAFT_KINDS = Object.freeze({
+	rules: "rules-v2-rule-draft",
 	"capability-registry": "registration-request-draft",
 	route: "route-definition-draft",
 	"loop-contract": "loop-contract-draft",
 });
 
-// The rules deriver is not implemented: its destination surface (rules.json
-// v2) does not exist yet (0051). Visible blocked dependency — plan open
-// dependency #1 — never a silent omission.
-const RULES_DERIVER_BLOCK = Object.freeze({
-	destination: "rules",
-	status: "blocked",
-	dependency: "0051 rules v2",
-	reason:
-		"the rules.json v2 typed-mutation surface has not landed; the rules deriver is implemented only when 0051 rules v2 exists",
-});
+// The rules deriver is IMPLEMENTED (unblocked 2026-09-20: governance G-5
+// landed the rules.json v2 typed-mutation surface — schemas/loop-policy.schema.json
+// + loop-policy.js v2 capability face). The draft is a v2 rule skeleton with
+// explicit nulls the owner completes through the 0051 Decision-bound typed
+// mutation — a draft never enters rules.json by itself and never auto-allows:
+// its decision is `require_approval` until a human narrows it.
+function rulesDraftBody(failureMode, fingerprint) {
+	return Object.freeze({
+		surface: "0051 rules.json v2 typed mutation (Decision-gated)",
+		ruleId: slugFromFinding(failureMode, fingerprint),
+		schemaVersion: 2,
+		decision: "require_approval",
+		match: Object.freeze({
+			capability: null,
+			target: null,
+			effect: null,
+			constraints: Object.freeze({
+				maxClassification: null,
+			}),
+		}),
+		ownerCompletes: Object.freeze([
+			"match.capability",
+			"match.target.pathPrefix",
+			"match.effect",
+			"match.constraints",
+		]),
+	});
+}
 
 // The exact rejection-record shape the contract §8.5 requires every
 // destination to carry for refused proposals — four correlation fields, no
@@ -95,7 +114,7 @@ const REJECTION_RECORD_DEPENDENCIES = Object.freeze({
 	rules: Object.freeze({
 		hasRecordPath: false,
 		missing:
-			"Gated on 0051 rules v2 (RULES_DERIVER_BLOCK): the v2 surface decides its own refusal-record shape per spec §8.5.",
+			"0051 rules v2 has landed (schemas/loop-policy.schema.json + the typed mutation), but no proposal-refusal record shape exists on the surface yet: a frozen record kind (e.g. \"rule-refused\") carrying exactly attributionFingerprint, reasonCode, recordedAt, summary (non-echoing) is the 0051 owner's decision (open dependency).",
 	}),
 });
 
@@ -181,6 +200,7 @@ function loopContractDraftBody(failureMode, fingerprint) {
 }
 
 const DRAFT_BODY_BUILDERS = Object.freeze({
+	rules: rulesDraftBody,
 	"capability-registry": () => capabilityRegistryDraftBody(),
 	route: routeDraftBody,
 	"loop-contract": loopContractDraftBody,
@@ -209,9 +229,6 @@ function deriveEvolutionDrafts(destination, findings, options) {
 		throw new Error(
 			`unknown deriver destination ${JSON.stringify(destination)}; the closed set is ${DERIVER_DESTINATIONS.join(", ")}`,
 		);
-	}
-	if (destination === "rules") {
-		return { destination, blocked: RULES_DERIVER_BLOCK, drafts: [], refusals: [] };
 	}
 	const targetRoot = options && options.targetRoot;
 	if (typeof targetRoot !== "string" || targetRoot.trim() === "") {
@@ -280,7 +297,6 @@ function deriveEvolutionDrafts(destination, findings, options) {
 module.exports = {
 	DERIVER_DESTINATIONS,
 	DRAFT_KINDS,
-	RULES_DERIVER_BLOCK,
 	REJECTION_RECORD_FIELDS,
 	REJECTION_RECORD_DEPENDENCIES,
 	attributionFingerprintOf,

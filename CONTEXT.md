@@ -8,6 +8,10 @@ A governance protocol whose Amber Core is repository-local and offline-capable. 
 The product: a governance layer for AI-assisted engineering whose Amber Core owns repository-local project state while optional distributed contexts add synchronization, shared projections, governed knowledge, visualization, and administration.
 _Avoid_: Coding Harness, framework, platform
 
+**Harness**:
+An architecture role name, not a product component: the layer responsibility spanning policy, capability, context, evidence, replay, and run, realized by Amber Core plus governed adapters. It names what the layer is responsible for; the installer remains Amber Setup and the product remains Amber Protocol.
+_Avoid_: agent framework, execution platform, runtime engine, Amber Setup
+
 **Governance Console**:
 Amber's operable surface in a target repository: CLI commands and artifact output. Not a hosted service or live agent runtime.
 _Avoid_: hosted platform, live agent runtime, dashboard
@@ -105,8 +109,8 @@ A durable governance artifact linking one feature to goal, vertical slices, veri
 _Avoid_: prompt, spec, ticket, design doc
 
 **Intent**:
-A durable governance artifact stating why a change or investigation is needed, its desired outcome, scope, constraints, non-goals, and origin. An accepted Intent may trigger a Spec; it does not authorize implementation or execution.
-_Avoid_: idea, request, ticket, prompt
+A durable governance artifact stating why a change or investigation is needed, its desired outcome, scope, constraints, non-goals, and origin. An accepted Intent may trigger a Spec; it does not authorize implementation or execution. An action-level request to run something is not this term: it keeps the runner-request vocabulary (requestHash, capability pin) — v3.1's action-level "Intent" reads as runner request here.
+_Avoid_: idea, request, ticket, prompt, Capability Request
 
 **Spec**:
 A durable governance artifact that refines an accepted Intent into requirements, design constraints, alternatives, and unresolved concerns. A Spec can be approved for planning without authorizing implementation or execution.

@@ -54,6 +54,22 @@ export function evaluateLifecycleNext(
 	options?: LifecycleNextOptions,
 ): LifecycleNextResult;
 
+/** Governance contract §9.4 — the session drift fold for the read-only badge. Null when the session has no captured attempts or the read fails. */
+export function sessionDriftFold(
+	targetRoot: string,
+	sessionId: string,
+): {
+	state: 'EXACT' | 'COMPATIBLE' | 'DRIFTED' | 'NON_REPLAYABLE';
+	report: {
+		evaluated: number;
+		exact: number;
+		compatible: number;
+		drifted: number;
+		nonReplayable: number;
+	};
+	rows: Array<{ runId: string; state: string; original: unknown; replayed: unknown }>;
+} | null;
+
 export type CompletionStatusOptions = {
 	strict?: boolean;
 	target?: string;
@@ -497,6 +513,7 @@ export const SUGGESTION_REVIEW: {
 /** Runtime module shape for createRequire cast — single SSOT with the functions above. */
 export type WebAdapter = {
 	evaluateLifecycleNext: typeof evaluateLifecycleNext;
+	sessionDriftFold: typeof sessionDriftFold;
 	getCompletionStatus: typeof getCompletionStatus;
 	runEvidenceCommand: typeof runEvidenceCommand;
 	getHandoffStatus: typeof getHandoffStatus;

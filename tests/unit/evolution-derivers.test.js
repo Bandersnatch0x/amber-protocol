@@ -51,17 +51,37 @@ function finding(overrides = {}) {
 	};
 }
 
-// ── rules: visible blocked dependency ──
+// ── rules: v2 rule skeletons (unblocked by governance G-5) ──
 
-test("the rules deriver is a visible blocked dependency, never implemented or invoked", () => {
-	const target = makeTarget("rules-blocked");
-	const outcome = deriveEvolutionDrafts("rules", [finding()], { targetRoot: target });
-	assert.deepEqual(outcome.drafts, []);
-	assert.deepEqual(outcome.refusals, []);
-	assert.equal(outcome.blocked, RULES_DERIVER_BLOCK);
-	assert.equal(outcome.blocked.status, "blocked");
-	assert.equal(outcome.blocked.dependency, "0051 rules v2");
-	assert.ok(RULES_DERIVER_BLOCK.reason.includes("0051 rules v2"));
+test("the rules deriver emits a require_approval v2 rule skeleton the owner completes", () => {
+	const target = makeTarget("rules-unblocked");
+	const rulesFinding = {
+		...finding(),
+		finding: "rules surface lacks a classification ceiling",
+		findingAttribution: {
+			entrySurface: "tool-output",
+			impactSurface: "governance-state",
+			failureMode: "rules surface lacks a classification ceiling",
+			responsibleArtifact: "rules",
+		},
+	};
+	const outcome = deriveEvolutionDrafts("rules", [rulesFinding], { targetRoot: target });
+	assert.equal(outcome.blocked, null);
+	assert.equal(outcome.drafts.length, 1);
+	const draft = outcome.drafts[0];
+	assert.equal(draft.kind, "rules-v2-rule-draft");
+	assert.equal(draft.draft.decision, "require_approval", "a draft never auto-allows");
+	assert.equal(draft.draft.schemaVersion, 2);
+	assert.ok(draft.draft.ruleId.length > 0);
+	assert.deepEqual(draft.draft.ownerCompletes, [
+		"match.capability",
+		"match.target.pathPrefix",
+		"match.effect",
+		"match.constraints",
+	]);
+	// Deterministic: the same finding derives the identical skeleton.
+	const again = deriveEvolutionDrafts("rules", [rulesFinding], { targetRoot: target });
+	assert.deepEqual(again.drafts, outcome.drafts);
 });
 
 test("rules is listed as a destination while its rejection-record shape stays 0051-gated", () => {

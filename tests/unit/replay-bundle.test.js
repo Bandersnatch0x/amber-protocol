@@ -270,3 +270,39 @@ describe("R1 decision replay (governance contract §9.2)", () => {
 		}
 	});
 });
+
+// ── G-10: the web-adapter drift fold (governance contract §9.4) ──
+
+describe("session drift fold (web-adapter seam, G-10)", () => {
+	const { sessionDriftFold } = require("../../scripts/lib/web-adapter");
+
+	it("folds a settled capture to EXACT; a rules change to DRIFTED; no attempts to null", async () => {
+		const root = makeTarget();
+		try {
+			assert.equal(sessionDriftFold(root, "s1"), null, "no captured attempts → null");
+
+			await runOnceToSettlement(root);
+			const settled = sessionDriftFold(root, "s1");
+			assert.equal(settled.state, "EXACT", JSON.stringify(settled.report));
+			assert.equal(settled.report.evaluated, 1);
+
+			// A rules change after capture: the fold reads DRIFTED.
+			fs.writeFileSync(
+				path.join(root, ".amber", "governance", "rules.json"),
+				JSON.stringify({
+					schemaVersion: 1,
+					defaultAction: "deny",
+					rules: [{ id: "deny-all", action: "deny", match: "prefix", pattern: "node" }],
+				}),
+			);
+			const drifted = sessionDriftFold(root, "s1");
+			assert.equal(drifted.state, "DRIFTED");
+			assert.equal(drifted.report.drifted, 1);
+
+			// An unknown session folds to null (badge renders nothing).
+			assert.equal(sessionDriftFold(root, "ghost"), null);
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true });
+		}
+	});
+});

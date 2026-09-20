@@ -413,6 +413,11 @@ function gateBindingOf(request) {
 		// R-CA-3: the hard context expiry rides the binding so consumption
 		// refuses `context-expired` before any effect.
 		contextExpiresAt: frozen.scopeInputs?.context_scope?.constraints?.expiresAt ?? null,
+		// §6.2/C0 §3.3: the PDP v2 classification face evaluates against the
+		// attempt's own declared context ceiling (R-AU-1) — null is the honest
+		// absence (R-CA-4) and never satisfies a ceiling rule.
+		contextClassification:
+			frozen.scopeInputs?.context_scope?.constraints?.maxClassification ?? null,
 		attemptIdentity: {
 			capabilityPin: request.capabilityPin,
 			routeHash: request.routeHash,

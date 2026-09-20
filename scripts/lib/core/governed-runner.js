@@ -310,7 +310,7 @@ function evaluateExecutionPolicy(
 	command,
 	subject,
 	contextRules,
-	{ globalRules: suppliedGlobalRules, commandId } = {},
+	{ globalRules: suppliedGlobalRules, commandId, v2Subject } = {},
 ) {
 	const globalRules = suppliedGlobalRules || loadPolicyRules(targetRoot, { required: true });
 	const namedCommand = commandId !== undefined;
@@ -326,7 +326,7 @@ function evaluateExecutionPolicy(
 		);
 	}
 	const ruleset = mergeRules(globalRules, contextRules);
-	const verdict = evaluateGovernedPolicy(command, ruleset);
+	const verdict = evaluateGovernedPolicy(command, ruleset, v2Subject ?? null);
 	if (!verdict.allowed)
 		return policyDenial(
 			targetRoot,
@@ -695,13 +695,26 @@ function runGovernedCommand({
 		}
 	}
 
+	// §6.2/C0 §3.3: the v2 subject feeds the classification-ceiling face — the
+	// capability NAME (the policy-rule vocabulary) and the attempt's own
+	// declared context ceiling (R-AU-1). Null classification is the honest
+	// absence (R-CA-4) and never satisfies a ceiling rule (fail-closed).
+	let v2Subject = null;
+	if (frozen) {
+		const pinParts = parseCapabilityPin(frozen.attemptIdentity.capabilityPin);
+		v2Subject = {
+			capability: pinParts ? pinParts.name : frozen.attemptIdentity.capabilityPin,
+			contextClassification: frozen.contextClassification ?? null,
+		};
+	}
+
 	const policyResult = evaluateExecutionPolicy(
 		targetRoot,
 		lp,
 		resolvedCommand,
 		executionSubject,
 		contextRules,
-		{ globalRules, ...(namedCommand ? { commandId } : {}) },
+		{ globalRules, ...(namedCommand ? { commandId } : {}), v2Subject },
 	);
 	if (policyResult && policyResult.errors.length > 0) return policyResult;
 	const matchedRule = namedCommand ? policyResult.matchedRule : undefined;

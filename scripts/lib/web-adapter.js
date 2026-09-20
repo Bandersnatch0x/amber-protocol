@@ -648,8 +648,35 @@ const SUGGESTION_REVIEW = Object.freeze({
 	CEILING_ENV_NAME: suggestionReview.CEILING_ENV_NAME,
 });
 
+/**
+ * Governance contract §9.4 — the session drift fold for the read-only web
+ * badge: runs the R1 comparison (replayPolicyDecisions) over the session's
+ * captured attempts and folds the per-attempt states to ONE badge state.
+ * Fold order: DRIFTED (a confirmed drift exists) > COMPATIBLE (decision
+ * stable, matched rule moved) > EXACT > NON_REPLAYABLE (nothing verifiable).
+ * No attempts, or a missing/failed read, fold to null — the badge renders
+ * nothing rather than a fabricated state. Read-only; degrades to null,
+ * never estimated.
+ */
+function sessionDriftFold(targetRoot, sessionId) {
+	try {
+		const { replayPolicyDecisions } = require("./core/handoff-bundle");
+		const outcome = replayPolicyDecisions(targetRoot, sessionId);
+		if (!outcome.ok || !outcome.report || outcome.report.evaluated === 0) return null;
+		const { drifted, nonReplayable, compatible, exact } = outcome.report;
+		let state = "NON_REPLAYABLE";
+		if (drifted > 0) state = "DRIFTED";
+		else if (compatible > 0) state = "COMPATIBLE";
+		else if (exact > 0) state = "EXACT";
+		return { state, report: outcome.report, rows: outcome.rows };
+	} catch {
+		return null;
+	}
+}
+
 module.exports = {
 	evaluateLifecycleNext,
+	sessionDriftFold,
 	getCompletionStatus,
 	runEvidenceCommand,
 	getHandoffStatus,

@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { computeConfidenceClasses } = require("./governance-readiness");
+const { admittedUnderCeiling } = require("./classification");
 
 const MAX_PATTERN_LEN = 200;
 
@@ -178,8 +179,15 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES, subject = null) {
 
 // The v2 capability face: a rule matches when every DECLARED dimension of
 // its `match` object agrees with the subject ({capability, target, effect,
-// constraints}). A rule without a `match` object is a v1-shaped record and
-// never matches on the v2 face.
+// constraints, contextClassification}). A rule without a `match` object is a
+// v1-shaped record and never matches on the v2 face.
+//
+// §6.2 / C0 §3.3 — the classification ceiling constraint: a rule declaring
+// `constraints.maxClassification` only matches a subject whose context
+// classification is at or under that ceiling. A subject with no declared
+// context classification (or `unknown`) NEVER satisfies any ceiling — the
+// rule simply doesn't match and the request falls to lower precision and the
+// fail-closed default (C0 §3.1: unknown is refused, never silently passed).
 function v2RuleMatches(rule, subject) {
 	if (!rule || typeof rule !== "object" || !rule.match || typeof rule.match !== "object") {
 		return false;
@@ -197,6 +205,28 @@ function v2RuleMatches(rule, subject) {
 				return prefix.endsWith("/") ? p.startsWith(prefix) : p === prefix || p.startsWith(`${prefix}/`);
 			});
 			if (!inside) return false;
+		}
+	}
+	if (
+		match.constraints &&
+		typeof match.constraints === "object" &&
+		match.constraints.maxClassification !== undefined &&
+		match.constraints.maxClassification !== null
+	) {
+		// §6.2/C0 §3.3 classification-ceiling constraint, direction per decision:
+		//   deny — GUARD semantics: fires when the subject exceeds the ceiling
+		//   (or is unknown/undeclared — fail-closed, C0 §3.1);
+		//   allow/require_approval/allow_with_limits — ADMISSION semantics: the
+		//   rule matches only when the subject is within the ceiling; unknown
+		//   never satisfies it and the request falls to the fail-closed default.
+		const violated = !admittedUnderCeiling(
+			subject.contextClassification ?? "unknown",
+			match.constraints.maxClassification,
+		).ok;
+		if (rule.decision === "deny") {
+			if (!violated) return false;
+		} else if (violated) {
+			return false;
 		}
 	}
 	return true;
@@ -302,8 +332,11 @@ function applyBuiltinDenies(command) {
 // are intentional semantic aliases over this single implementation — named
 // surfaces for evidence-runner vs governed-runner (loops + route command-stages),
 // not divergent logic. They were previously two byte-identical bodies that could
-// drift apart; one baseline cannot drift from itself.
-function evaluateWithBaseline(command, rules = DEFAULT_RULES) {
+// drift apart; one baseline cannot drift from itself. The optional `subject`
+// ({capability, target, effect, constraints, contextClassification}) feeds the
+// v2 capability face; null/absent (loops, verify) means no v2 match dimensions —
+// ceiling-carrying v2 rules never match (fail-closed).
+function evaluateWithBaseline(command, rules = DEFAULT_RULES, subject = null) {
 	const builtin = applyBuiltinDenies(command);
 	if (builtin) {
 		// Built-in un-removable denies are the most deterministic control on the
@@ -313,7 +346,7 @@ function evaluateWithBaseline(command, rules = DEFAULT_RULES) {
 		if (gating && gating.enabled !== false) return { ...builtin, confidence: "high" };
 		return builtin;
 	}
-	return evaluateCommandPolicy(command, rules);
+	return evaluateCommandPolicy(command, rules, subject);
 }
 const evaluateVerifyPolicy = evaluateWithBaseline;
 const evaluateGovernedPolicy = evaluateWithBaseline;

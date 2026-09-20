@@ -1,7 +1,19 @@
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
 import { resolveStatePath, readJsonSafe } from './artifact-store';
+import { resolveRepoRoot } from './repo-root';
 import type { SessionEvent } from '../types/session-events';
+
+// Governance contract §9.4 — the read-only drift fold through the web-adapter
+// seam (seam guard: no deep scripts/lib imports from apps/web/server).
+const requireCli = createRequire(import.meta.url);
+const adapter = requireCli('../../../../scripts/lib/web-adapter.js') as {
+  sessionDriftFold: (
+    targetRoot: string,
+    sessionId: string,
+  ) => { state: 'EXACT' | 'COMPATIBLE' | 'DRIFTED' | 'NON_REPLAYABLE'; report: Record<string, number> } | null;
+};
 
 export interface Session {
   id: string;
@@ -104,11 +116,17 @@ export function readSessionById(id: string): SessionDetail | null {
     timelineEvents = content.trim().split('\n').length;
   }
 
+  // Governance contract §9.4: the read-only drift badge projection. The fold
+  // returns null when the session has no captured attempts or the read fails
+  // — the badge renders nothing rather than a fabricated state.
+  const drift = adapter.sessionDriftFold(resolveRepoRoot(), id);
+
   return {
     ...toSession(id, manifest),
     manifest,
     timelineEvents,
     worktree: manifest.worktree as SessionDetail['worktree'],
+    driftState: drift?.state ?? null,
   };
 }
 
