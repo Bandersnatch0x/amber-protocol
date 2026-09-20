@@ -60,3 +60,11 @@ a doctor ratification-class warning.
 ### Sync repository identity resolution
 
 - repositoryId resolves in strict order: `.amber/identity.json` override, normalized `remote.origin.url` (scheme, credentials, `.git` suffix stripped; host lowercased), then the `local-repository` default. `path.basename(cwd)` is never used — "simplifying" back to it breaks cross-machine sync without an immediate red test.
+
+### Review residual observations re-verified against code
+
+- Review residual observations must be re-verified against the committed code before acting on them: the FINAL-ACCEPT recheck reported the Apply stale-branch rollback as unwrapped, but the committed code already routed it through the fail-closed catch — the close-out delivered regression tests plus a comment, not a behavior change. Post-land review claims get the same evidence discipline as review defects.
+
+### Authorization grants select by mutual binding
+
+- Authorization grants must be selected by mutual binding, not by recency: a grant bound to a denied attempt can never be consumed, so a latest-unconsumed selection lets an orphaned grant permanently block every later attempt. Select the grant bound to THIS attempt (or an explicitly unbound legacy grant) and evaluate eligibility refusals against the selected grant — run contract §5 R-AD-6 is what makes the orphaned grant inert instead of blocking.
