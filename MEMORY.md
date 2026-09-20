@@ -76,3 +76,7 @@ a doctor ratification-class warning.
 ### Code-pinned policy bumps invalidate byte-pinned goldens by design
 
 - Code-pinned policy versions invalidate by design, and their blast radius is byte-pinned fixtures: bumping RISK_POLICY_VERSION (1→2, the four-level escalation) changes every F052 requestHash, so every golden fixture whose records bind those hashes (release transactions, runner ledgers) must be re-recorded through its documented AMBER_RECORD_* ritual — run twice, verify byte-identical, then update the pinned constants with the reason. The drift is the designed invalidation, not a regression.
+
+### Plugin dependency ranges can be wider than bundled imports
+
+- A plugin's declared dependency range can be wider than what its bundled code actually imports: eslint-plugin-react-hooks 7.1.1 declares zod-validation-error ^3.5.0 || ^4.0.0 yet unconditionally requires the zod-validation-error/v4 subpath — npm resolves 3.5.4 and the plugin crashes at config load with ERR_PACKAGE_PATH_NOT_EXPORTED. Fix with a package.json overrides pin, not a downgrade. Verify exact latest versions (npm view) before installing; guessed ranges age fast.
