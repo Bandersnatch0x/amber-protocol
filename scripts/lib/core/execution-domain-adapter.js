@@ -17,6 +17,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { statePath } = require("../state-dir-resolver");
 
@@ -104,6 +105,90 @@ function validate(targetRoot) {
 
 // ── ExecutionBoundary mapping (§5.4) — the six boundary methods ─────────────
 
+// The §5.5 row 11 split (governance contract G-9): the governed-runner's
+// worktree+spawn EXECUTION semantics live HERE (the Coding domain boundary) —
+// Core's four gates delegate through the adapter seam. The exact contract is
+// the one governed-runner has always exposed: `{ result }` on success,
+// `{ error }` on worktree-creation failure, and the captureDigest switch
+// selecting raw bytes (named-command/F062 output digest) or the historical
+// UTF-8 envelope.
+function executeInWorktree(
+	targetRoot,
+	command,
+	label,
+	budgetMinutes,
+	{ captureDigest = false } = {},
+) {
+	const { createWorktree, removeWorktree } = require("../worktree-manager");
+	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
+	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+	const worktree = createWorktree(targetRoot, runId);
+	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
+	let result;
+	const startedAt = new Date().toISOString();
+	try {
+		const spawned = spawnSync(command, {
+			shell: true,
+			cwd: worktree.path,
+			// The legacy command seam intentionally keeps its historical UTF-8
+			// envelope.  Only the named-command/F062 seam needs raw bytes for the
+			// complete output digest.
+			encoding: captureDigest ? "buffer" : "utf8",
+			timeout: budgetMinutes * 60_000,
+		});
+		if (!captureDigest) {
+			result = {
+				command,
+				exitCode: spawned.status === null ? -1 : spawned.status,
+				stdout: (spawned.stdout || "").slice(-4000),
+				stderr: (spawned.stderr || "").slice(-2000),
+			};
+			return { result };
+		}
+		const stdout = Buffer.isBuffer(spawned.stdout)
+			? spawned.stdout
+			: Buffer.from(spawned.stdout || "", "utf8");
+		const stderr = Buffer.isBuffer(spawned.stderr)
+			? spawned.stderr
+			: Buffer.from(spawned.stderr || "", "utf8");
+		const timedOut = spawned.error?.code === "ETIMEDOUT";
+		const exitCode = spawned.status === null ? -1 : spawned.status;
+		const signal = spawned.signal || null;
+		const finishedAt = new Date().toISOString();
+		result = {
+			command,
+			exitCode,
+			signal,
+			timedOut,
+			startedAt,
+			finishedAt,
+			terminalStatus: timedOut ? "timed_out" : exitCode === 0 ? "succeeded" : "failed",
+			stdout,
+			stderr,
+		};
+	} catch (error) {
+		const finishedAt = new Date().toISOString();
+		result = {
+			command,
+			exitCode: -1,
+			...(captureDigest
+				? {
+						signal: error.signal || null,
+						timedOut: error.code === "ETIMEDOUT",
+						startedAt,
+						finishedAt,
+						terminalStatus: error.code === "ETIMEDOUT" ? "timed_out" : "failed",
+						stdout: Buffer.alloc(0),
+						stderr: Buffer.from(String(error.message || error), "utf8"),
+					}
+				: { stdout: "", stderr: String(error.message || error).slice(-2000) }),
+		};
+	} finally {
+		removeWorktree(targetRoot, runId);
+	}
+	return { result };
+}
+
 /**
  * prepare: create the isolated worktree (delegates to worktree-manager).
  */
@@ -166,6 +251,7 @@ module.exports = {
 	executions,
 	verifiers,
 	validate,
+	executeInWorktree,
 	prepare,
 	execute,
 	observe,

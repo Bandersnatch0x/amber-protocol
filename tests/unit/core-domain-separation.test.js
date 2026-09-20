@@ -40,18 +40,17 @@ const FORBIDDEN_CORE_TARGETS = new Set([
 ]);
 
 // Known-deviation allowlist (spec §5.5 disposition rows 4-11): the Core-marked
-// files that still contain git-semantics requires today. The guard is red
+// files that still contain adapter-module requires today. The guard is red
 // only on NEW violations — this list shrinks monotonically and each entry
 // names its state.
 //
-// G-9 progress: rows 4-10 (artifact-drift, ledger-seal, scaffold,
-// sync-session, sync-transport, team-governance-advisor) and row 5 (identity)
-// landed the injected-adapter split — their remaining git-semantics require
-// sits INSIDE the lazy adapter-injection function (Adapter-to-Adapter
-// composition at first use, never at module load). The AST scan is
-// scope-blind, so these stay listed with the split recorded; a future
-// scope-aware scan tightens them out. Row 11 (governed-runner worktree/
-// spawnSync) is the still-pending split.
+// G-9 progress: ALL rows landed the injected-adapter split (rows 4-10 lazy
+// git-semantics injection; row 11 governed-runner delegating worktree/spawn
+// through the execution-domain-adapter seam). Their remaining requires sit
+// INSIDE the lazy adapter-injection function (Adapter-to-Adapter composition
+// at first use, never at module load). The AST scan is scope-blind, so the
+// split files stay listed with the split state recorded; a scope-aware scan
+// tightens them out.
 const KNOWN_DEVIATIONS = new Set([
 	"artifact-drift.js", // §5.5 row 4 — split landed; lazy injection residual
 	"identity.js", // §5.5 row 5 — split landed; lazy injection residual
@@ -60,7 +59,7 @@ const KNOWN_DEVIATIONS = new Set([
 	"sync-session.js", // §5.5 row 8 — split landed; lazy injection residual
 	"sync-transport.js", // §5.5 row 9 — split landed; lazy injection residual
 	"team-governance-advisor.js", // §5.5 row 10 — split landed; lazy injection residual
-	"governed-runner.js", // §5.5 row 11 — worktree/spawnSync pending split
+	"governed-runner.js", // §5.5 row 11 — split landed; lazy adapter-injection residual
 ]);
 
 // Guard 2 (Adapter isolation): a Coding Adapter implementation must not be
@@ -136,32 +135,34 @@ describe("core/adapter dependency guards (governance contract §5.6)", () => {
 		}
 	});
 
-	test("the allowlist is monotone: every entry still requires a forbidden target at HEAD", () => {
-		// A stale allowlist entry (the split landed but the entry stayed) hides
-		// nothing but lies about the tree — the G-9 acceptance requires the
-		// allowlist to shrink. Fail on any entry that no longer violates. The
-		// probe covers BOTH corpora: `governed-runner.js` requires
-		// `../worktree-manager` (a lib-level sibling), which the core-only
-		// corpus does not resolve.
+	test("the allowlist is monotone: every entry still requires an adapter module at HEAD", () => {
+		// A stale allowlist entry (the split landed and no adapter require
+		// remains) hides nothing but lies about the tree — the G-9 acceptance
+		// requires the allowlist to shrink. Fail on any entry that no longer
+		// requires SOME adapter module (git-semantics family or the
+		// ExecutionBoundary seam). The probe covers BOTH corpora:
+		// `governed-runner.js` requires `../worktree-manager`/the seam (a
+		// lib-level sibling or core sibling), which the core-only corpus does
+		// not resolve.
 		const corpus = scan();
 		const libCorpus = extractCodeCorpus(LIB_ROOT);
-		const requiresForbidden = new Map();
+		const requiresAdapter = new Map();
 		const consider = (edge) => {
 			if (!edge.src || !edge.dst) return;
 			const src = edge.src.replace(/^core\//, "");
-			if (FORBIDDEN_CORE_TARGETS.has(edge.dst) || edge.dst === "worktree-manager.js") {
-				requiresForbidden.set(src, edge.dst);
+			if (ADAPTER_FILES.has(edge.dst)) {
+				requiresAdapter.set(src, edge.dst);
 			}
 		};
 		for (const edge of corpus.imports.values()) consider(edge);
 		for (const edge of libCorpus.imports.values()) {
 			if (edge.src && edge.src.startsWith("core/")) consider(edge);
 		}
-		const stale = [...KNOWN_DEVIATIONS].filter((entry) => !requiresForbidden.has(entry));
+		const stale = [...KNOWN_DEVIATIONS].filter((entry) => !requiresAdapter.has(entry));
 		assert.deepEqual(
 			stale,
 			[],
-			`stale allowlist entries (the split landed; remove them so the list keeps shrinking):\n${stale.join("\n")}`,
+			`stale allowlist entries (the split landed and no adapter require remains; remove them so the list keeps shrinking):\n${stale.join("\n")}`,
 		);
 	});
 

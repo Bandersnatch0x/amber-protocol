@@ -7,7 +7,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
 const { evaluateGovernedPolicy, loadPolicyRules } = require("./loop-policy");
 const {
@@ -18,7 +17,6 @@ const {
 	latestUnconsumedApprovalFor,
 } = require("./loop-ledger");
 const { codedError } = require("./error-catalog");
-const { createWorktree, removeWorktree } = require("../worktree-manager");
 const { recordEvidence } = require("./evidence-receipts");
 const { resolveRequestCapability } = require("./runner-registry");
 const {
@@ -416,6 +414,28 @@ function canonicalOutputDigest({
 	};
 }
 
+// §5.5 row 11 split (governance contract G-9): the FOUR GATES (policy,
+// approval, ledger, frozen-admission verification) are Core; the worktree +
+// spawnSync EXECUTION semantics are Adapter-injected (the Coding domain's
+// ExecutionBoundary in execution-domain-adapter.js). Core never imports
+// worktree-manager or child_process at module load (guard G1/G8) — the
+// adapter is lazily required at the boundary and injectable for tests.
+let executionBoundaryAdapter = null;
+function defaultExecutionAdapter() {
+	if (executionBoundaryAdapter === null) {
+		executionBoundaryAdapter = require("./execution-domain-adapter");
+	}
+	return executionBoundaryAdapter;
+}
+
+/**
+ * Test/adapter seam: inject the ExecutionBoundary adapter. Pass null to
+ * restore the default lazy Coding-domain adapter.
+ */
+function setExecutionAdapter(adapter) {
+	executionBoundaryAdapter = adapter;
+}
+
 function executeInWorktree(
 	targetRoot,
 	command,
@@ -423,73 +443,9 @@ function executeInWorktree(
 	budgetMinutes,
 	{ captureDigest = false } = {},
 ) {
-	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
-	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-	const worktree = createWorktree(targetRoot, runId);
-	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
-	let result;
-	const startedAt = new Date().toISOString();
-	try {
-		const spawned = spawnSync(command, {
-			shell: true,
-			cwd: worktree.path,
-			// The legacy command seam intentionally keeps its historical UTF-8
-			// envelope.  Only the named-command/F062 seam needs raw bytes for the
-			// complete output digest.
-			encoding: captureDigest ? "buffer" : "utf8",
-			timeout: budgetMinutes * 60_000,
-		});
-		if (!captureDigest) {
-			result = {
-				command,
-				exitCode: spawned.status === null ? -1 : spawned.status,
-				stdout: (spawned.stdout || "").slice(-4000),
-				stderr: (spawned.stderr || "").slice(-2000),
-			};
-			return { result };
-		}
-		const stdout = Buffer.isBuffer(spawned.stdout)
-			? spawned.stdout
-			: Buffer.from(spawned.stdout || "", "utf8");
-		const stderr = Buffer.isBuffer(spawned.stderr)
-			? spawned.stderr
-			: Buffer.from(spawned.stderr || "", "utf8");
-		const timedOut = spawned.error?.code === "ETIMEDOUT";
-		const exitCode = spawned.status === null ? -1 : spawned.status;
-		const signal = spawned.signal || null;
-		const finishedAt = new Date().toISOString();
-		result = {
-			command,
-			exitCode,
-			signal,
-			timedOut,
-			startedAt,
-			finishedAt,
-			terminalStatus: timedOut ? "timed_out" : exitCode === 0 ? "succeeded" : "failed",
-			stdout,
-			stderr,
-		};
-	} catch (error) {
-		const finishedAt = new Date().toISOString();
-		result = {
-			command,
-			exitCode: -1,
-			...(captureDigest
-				? {
-						signal: error.signal || null,
-						timedOut: error.code === "ETIMEDOUT",
-						startedAt,
-						finishedAt,
-						terminalStatus: error.code === "ETIMEDOUT" ? "timed_out" : "failed",
-						stdout: Buffer.alloc(0),
-						stderr: Buffer.from(String(error.message || error), "utf8"),
-					}
-				: { stdout: "", stderr: String(error.message || error).slice(-2000) }),
-		};
-	} finally {
-		removeWorktree(targetRoot, runId);
-	}
-	return { result };
+	return defaultExecutionAdapter().executeInWorktree(targetRoot, command, label, budgetMinutes, {
+		captureDigest,
+	});
 }
 
 function attachExecutionDigest(execution, subject = {}) {
@@ -871,4 +827,5 @@ module.exports = {
 	canonicalOutputDigest,
 	attachExecutionDigest,
 	eligibilityProblem,
+	setExecutionAdapter,
 };

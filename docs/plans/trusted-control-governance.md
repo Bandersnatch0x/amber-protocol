@@ -157,12 +157,14 @@ legacy surface tolerated as pre-field.
   (allowlist shrinks monotonically); F062/F052 suites green after the
   governed-runner split; `src/` untouched (second-consumer precondition
   unchanged).
-  **Progress (2026-09-19, B10): the seam + identity + rows 4-10 splits
-  landed; `governed-runner` (row 11, the largest blast radius) remains the
-  recorded continuation with its suites as the acceptance net. The AST guard
-  is scope-blind — the split files' lazy-injection requires stay on the
-  allowlist with the state recorded; a scope-aware scan is the tightening
-  path.**
+  **Progress (2026-09-19, B10 + the follow-up commit): ALL rows landed —
+  the seam module, the identity split, rows 4-10 lazy git-semantics
+  injection, AND row 11 (`governed-runner` now delegates worktree/spawnSync
+  through the seam's `executeInWorktree`; four gates stay Core, the
+  adapter is lazy-required and injectable via `setExecutionAdapter`). The
+  AST guard is scope-blind — every split file's lazy-injection require
+  stays on the allowlist with the state recorded; a scope-aware scan is
+  the tightening path. `src/` untouched.**
 
 - [x] **Slice G-10 — Web drift badge + R1 report link (read-only). (spec §9.4)**
   Files: `apps/web` run-detail projection.
@@ -256,8 +258,8 @@ legacy surface tolerated as pre-field.
 
 ## Resume Checkpoint
 
-- Resume Point: G-1…G-8, G-10, G-11 delivered in full; G-9 delivered as the seam module (`execution-domain-adapter.js`), the identity split, and the rows 4-10 injected-adapter splits — the `governed-runner` split (row 11) is the recorded continuation. Full gates green on the final tree (root 3756/3756, manifests/doctor/gen:agents:check/typecheck exit 0) — `.scratch/orchestration/governance-impl-2026-09-19/` (`B10-dual-axis-review.md`, `root-npm-test.log`, `gates.log`).
-- Blockers: none for the delivered set; the governed-runner split and a scope-aware guard scan are the named continuations.
+- Resume Point: ALL eleven slices delivered (G-9 row 11 — the governed-runner split through the ExecutionBoundary seam — landed in the follow-up commit). Full gates green on the final tree — `.scratch/orchestration/governance-impl-2026-09-19/`.
+- Blockers: none. A scope-aware guard scan (tightening the lazy-injection residuals out of the allowlist) is the named follow-up improvement.
 - Next Action: user approves the two human route gates of session `7e4e09ec`, then `amber session complete`.
 - Recovery Instructions: reopen this plan and continue at the first unchecked
   slice; do not regenerate unless the plan file is missing.
