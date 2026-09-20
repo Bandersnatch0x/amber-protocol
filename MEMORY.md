@@ -68,3 +68,11 @@ a doctor ratification-class warning.
 ### Authorization grants select by mutual binding
 
 - Authorization grants must be selected by mutual binding, not by recency: a grant bound to a denied attempt can never be consumed, so a latest-unconsumed selection lets an orphaned grant permanently block every later attempt. Select the grant bound to THIS attempt (or an explicitly unbound legacy grant) and evaluate eligibility refusals against the selected grant — run contract §5 R-AD-6 is what makes the orphaned grant inert instead of blocking.
+
+### Additive fields need the ALLOWED/REQUIRED validator split
+
+- Additive schema fields need a closed-validator split, not a closed-set edit: validators that treat every listed field as REQUIRED break pre-runtime ledgers the moment a new optional field lands. Split each closed set into ALLOWED (unknown keys refuse) and REQUIRED (per-era fields) so old records stay readable (ADR-0012). Also: identity-freezing hashes must exclude time-variant bindings — the F052 requestHash initially picked up sessionBinding/contextAuthority nulls while re-derivation omitted them, which would have failed every legacy request.
+
+### Code-pinned policy bumps invalidate byte-pinned goldens by design
+
+- Code-pinned policy versions invalidate by design, and their blast radius is byte-pinned fixtures: bumping RISK_POLICY_VERSION (1→2, the four-level escalation) changes every F052 requestHash, so every golden fixture whose records bind those hashes (release transactions, runner ledgers) must be re-recorded through its documented AMBER_RECORD_* ritual — run twice, verify byte-identical, then update the pinned constants with the reason. The drift is the designed invalidation, not a regression.
