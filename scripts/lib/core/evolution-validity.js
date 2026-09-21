@@ -226,7 +226,13 @@ function checkEvidence(targetRoot, evidenceReferences) {
 // ── V2 ──
 
 function normalizeOperationPath(value) {
-	return path.normalize(String(value)).split(path.sep).join("/").replace(/^\.\//, "").toLowerCase();
+	// Both separators are folded, not just the platform's. The path is
+	// untrusted declaration text, so `.amber\runner\registry.jsonl` must
+	// classify as the registry on every platform the validator runs on —
+	// splitting on `path.sep` did that on win32 only. Same over-approximation
+	// trade as the case fold above: refusing an oddly-named path that does not
+	// exist costs nothing, a slipped alias costs the registry.
+	return path.posix.normalize(String(value).replace(/\\/g, "/")).toLowerCase();
 }
 
 /**

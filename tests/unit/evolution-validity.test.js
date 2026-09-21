@@ -131,11 +131,17 @@ test("V1 fails on absolute, escaping, and unresolvable paths with explicit reaso
 	try {
 		writeFile(target, "docs/wiki/runbook.md", "# Runbook\n");
 		const cases = [
-			[{ kind: "path", path: "C:/windows/system32/config.sys" }, /absolute-path/],
 			[{ kind: "path", path: "/etc/passwd" }, /absolute-path/],
 			[{ kind: "path", path: "../outside.md" }, /escapes-root/],
 			[{ kind: "path", path: "docs/wiki/missing.md" }, /not-found/],
 		];
+		// The drive-letter form is absolute on win32 only; on POSIX it is a
+		// legal relative filename (containing a colon), so asserting
+		// /absolute-path/ for it there would be asserting a platform
+		// coincidence. Covered on the platform where it means something.
+		if (process.platform === "win32") {
+			cases.push([{ kind: "path", path: "C:/windows/system32/config.sys" }, /absolute-path/]);
+		}
 		for (const [ref, pattern] of cases) {
 			const result = validateEvolutionAdmission({
 				targetRoot: target,
