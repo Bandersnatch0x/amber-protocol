@@ -196,7 +196,7 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 | `Lifecycle`     | route、session、checkpoint 和 worktree 在本地组织工作。              | 中     |
 | `Context`       | starter 文档、wiki 骨架、manifest 和交接产物保持项目上下文显式。     | 中     |
 | `Tooling`       | CLI 命令、schema、validator、workflow pack 和 profile 暴露显式接口。 | 中     |
-| `Execution`     | 最小化——Amber 避免成为通用执行运行时或真实 agent 平台。              | 低     |
+| `Execution`     | 门禁化且绑定能力注册——受治理的命令执行存在于四道门 + 冻结的 per-attempt 准入之后；没有无门运行时，原生安装也未注册任何 capability。 | 低     |
 
 主线：强化 `Governance`、`Verification` 和 `Observability`；让 `Lifecycle` 保持仓库本地；避免漂移成完整的 agent 平台。[治理模型文档](./docs/architecture/governance-model.md)把每一层映射到具体命令。
 
@@ -219,8 +219,21 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 - 不自动执行目标项目命令
 - 不自动重写已有项目文档
 - 当前产品不执行 scheduled loop
+- 原生安装不执行任何受治理的 verb 阶段：实现拥有的 adapter 表出厂为**空**（无回退），`session run` 的 stage 一律 fail-closed，直到注册 capability——而注册是一次经过评审的代码变更，不是配置修改
 
 完整边界说明见 [SPEC.md](./SPEC.md)。
+
+### 治理信任层（trusted-control contracts）
+
+旅程表面之外，Amber 还附带一层经过合同级测试的信任层（[四份 canonical contracts](./docs/specs/)，均已交付）：
+
+- **受治理执行 attempt** —— `session run` 的每个 attempt 在任何效果之前冻结其准入输入（scope、policy、capability、请求摘要）；门禁对冻结值复验，授权 grant 绑定冻结三元组并单次消费。漂移在门上拒绝，先于执行。
+- **带保证级别的证据** —— 回执携带 `unavailable / observed / replayable / verified`；replay 包（`amber handoff bundle --replay-scope`）可离线重建授权链。
+- **受治理 memory** —— 可持续教训经 `amber memory`（request → ingest → 人工 approve → book）流转；`MEMORY.md` 保持人工策展并哈希注册。
+- **指令面 evals** —— `amber eval run` 重放确定性的、与模型无关的 agent 面检查。
+- **MCP Action Types** —— 20 个受治理动词的薄投影；变更类动作返回 `approvalRequired`，MCP 面从不执行。
+
+这些面是协议的参考实现：受治理 verb 阶段当前**fail-closed**（未注册 capability——见"它不会做什么"），canonical specs 在等待协调者复评。
 
 ## 文档
 
