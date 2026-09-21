@@ -849,9 +849,18 @@ it("booking keeps feature_list.json Prettier-clean (format:check contract)", () 
 	);
 
 	// The repo's CI contract is prettier --check on JSON files; run it for real.
+	// --config pins the repo's .prettierrc.json (same rationale as the
+	// feature-commands twin: temp fixtures fall back to prettier defaults
+	// without it; before F063 the old .gitignore skipped them entirely).
 	const prettier = require("node:child_process").spawnSync(
 		process.execPath,
-		[require.resolve("prettier/bin/prettier.cjs"), "--check", listPath.split(path.sep).join("/")],
+		[
+			require.resolve("prettier/bin/prettier.cjs"),
+			"--check",
+			listPath.split(path.sep).join("/"),
+			"--config",
+			path.join(__dirname, "..", "..", ".prettierrc.json"),
+		],
 		{ encoding: "utf8", cwd: path.join(__dirname, "..", "..") },
 	);
 	assert.equal(

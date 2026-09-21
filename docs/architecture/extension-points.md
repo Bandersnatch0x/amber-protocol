@@ -31,7 +31,7 @@ skills/<name>/
   examples.md    # Usage examples
 ```
 
-See [Skill API](../api/skill-api.md) for details.
+See [Skill API](../reference/skill-api.md) for details.
 
 ### Programmatic Skills
 

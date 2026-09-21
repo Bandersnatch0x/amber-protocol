@@ -110,14 +110,14 @@ The repository underwent a major rename from "Coding Harness" to "Amber Protocol
 
 ### Finding Historical Documentation
 
-Historical planning documents and phase notes (formerly tracked under `docs/superpowers/plans/`) now live in the internal archive and remain retrievable from Git history:
+Historical planning documents and phase notes (formerly tracked under `docs/legacy/plans/`) now live in the internal archive and remain retrievable from Git history:
 
 ```bash
 # List historical plan files and the commits that touched them
-git log --all --oneline -- "docs/superpowers/plans/"
+git log --all --oneline -- "docs/legacy/plans/"
 
 # Read a specific historical plan from history
-git show <commit>:docs/superpowers/plans/2026-06-10-phase-c-web-viewer.md
+git show <commit>:docs/legacy/plans/2026-06-10-phase-c-web-viewer.md
 ```
 
 Current implementation plans are tracked under `docs/plans/`.
@@ -142,7 +142,7 @@ git log --follow templates/docs/wiki/agent/amber.md
 Architecture decisions and rationale are recorded in:
 
 1. **Git commit messages** - Use `git log --grep="<keyword>"` to find relevant commits
-2. **Planning documents** - See `docs/plans/` for implementation plans (older phase notes live in Git history under `docs/superpowers/plans/`)
+2. **Planning documents** - See `docs/plans/` for implementation plans (older phase notes live in Git history under `docs/legacy/plans/`)
 3. **Architecture docs** - See `docs/architecture/` for extracted design documentation
 4. **CLAUDE.md** - Project overview and current architecture
 

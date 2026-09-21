@@ -7,7 +7,7 @@ import { useSettings } from '@/lib/settings-provider';
 
 export const Route = createFileRoute('/transcripts/')({ component: TranscriptsPage });
 
-function formatTimestamp(value: string | undefined, unknownLabel: string): string {
+function formattimestamp(value: string | undefined, unknownLabel: string): string {
   if (!value) return unknownLabel;
   return new Date(value).toLocaleString();
 }
@@ -199,7 +199,7 @@ function TranscriptsPage() {
                     </span>
                     <span>
                       {t('transcripts.lastUpdated', {
-                        time: formatTimestamp(transcript.lastTimestamp, t('transcripts.unknown')),
+                        time: formattimestamp(transcript.lastTimestamp, t('transcripts.unknown')),
                       })}
                     </span>
                   </div>

@@ -224,14 +224,26 @@ test("F059 clean git-ls-files corpus produces graph with no prior .amber/ state"
 	});
 	assert.equal(exitCode, 0, JSON.stringify(result.errors));
 	assert.equal(result.errors.length, 0);
+	// The committed corpus size is read from the manifest itself, not hardcoded:
+	// every knowledge context-sync of a new ADR/wiki page bumps it, and the
+	// test must track that, not a stale copy of the number.
+	const committedCorpusSize = JSON.parse(
+		fs.readFileSync(
+			path.join(REPO_ROOT, "docs", "knowledge-corpus", "knowledge-context-manifest.json"),
+			"utf8",
+		),
+	).counts.total;
 	const graph = JSON.parse(result.text);
-	assert.ok(graph.nodes.length >= 47, "must include at least the 47 committed corpus nodes");
-	// All 47 committed corpus nodes must have contextPage set via the committed manifest
+	assert.ok(
+		graph.nodes.length >= committedCorpusSize,
+		`must include at least the ${committedCorpusSize} committed corpus nodes`,
+	);
+	// All committed corpus nodes must have contextPage set via the committed manifest
 	const withContextPage = graph.nodes.filter((n) => n.contextPage);
 	assert.equal(
 		withContextPage.length,
-		47,
-		"exactly 47 nodes must have contextPage (the committed corpus)",
+		committedCorpusSize,
+		`exactly ${committedCorpusSize} nodes must have contextPage (the committed corpus)`,
 	);
 	// Byte-identical to tree-reader (parity seam)
 	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT)));
@@ -276,12 +288,20 @@ test("F059 git-archive clean clone: projection and tree-reader produce exact byt
 			treeBytes,
 			"projection and tree-reader must produce byte-identical output on clean archive",
 		);
-		// Exactly 47 nodes must have contextPage
+		// Exactly the archived manifest's count must have contextPage. This reads
+		// `git archive HEAD`, not the working tree, so the count comes from the
+		// archived manifest — the two counts agree because both sides read HEAD.
+		const archivedCorpusSize = JSON.parse(
+			fs.readFileSync(
+				path.join(archiveDir, "docs", "knowledge-corpus", "knowledge-context-manifest.json"),
+				"utf8",
+			),
+		).counts.total;
 		const withContextPage = projGraph.nodes.filter((n) => n.contextPage);
 		assert.equal(
 			withContextPage.length,
-			47,
-			"exactly 47 nodes must have contextPage on clean archive",
+			archivedCorpusSize,
+			`exactly ${archivedCorpusSize} nodes must have contextPage on clean archive`,
 		);
 	} finally {
 		fs.rmSync(archiveDir, { recursive: true, force: true });

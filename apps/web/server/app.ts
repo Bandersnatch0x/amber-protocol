@@ -1,8 +1,10 @@
 import express from 'express';
+import path from 'path';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from './app-router';
 import { handleSSE } from './routes/sse';
 import { handleErrorReport } from './routes/errors';
+import { resolveRepoRoot } from './lib/repo-root';
 
 export function createApp() {
   const app = express();
@@ -23,10 +25,12 @@ export function createApp() {
   app.post('/api/errors', express.json({ limit: '64kb' }), handleErrorReport);
 
   app.get('/api/health', (_req, res) => {
+    const repoRoot = resolveRepoRoot();
     res.json({
       ok: true,
       cwd: process.cwd(),
       amberRepoRoot: process.env.AMBER_REPO_ROOT || null,
+      repositoryName: path.basename(repoRoot),
     });
   });
 

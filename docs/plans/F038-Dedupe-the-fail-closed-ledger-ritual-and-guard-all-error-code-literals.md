@@ -10,15 +10,15 @@ jsonl.js owns the typed fail-closed ledger read (readLedgerFailClosed/foldLedger
 
 ## High Level Design
 
-- Context: survey Findings 5+6 (docs/reviews/architecture-survey-2026-08-24.md). The fail-closed ledger ritual exists as four verbatim copies; 37+ AMBER_E_* literals across 9 files are unguarded against catalog drift (a typo'd code renders without its `[CODE] → fix:` remedy and nothing fails).
+- Context: survey Findings 5+6 (docs/quality/reviews/architecture-survey-2026-08-24.md). The fail-closed ledger ritual exists as four verbatim copies; 37+ AMBER_E_* literals across 9 files are unguarded against catalog drift (a typo'd code renders without its `[CODE] → fix:` remedy and nothing fails).
 - Proposed approach: (a) `core/jsonl.js` gains `readLedgerFailClosed(filePath, code, label)` and `foldLedgerFailClosed(filePath, key, code, label)` — read/fold with `onCorrupt: "throw"`, rethrow carrying `.amberCode`; knowledge-base.js and organization-audit.js delete their byte-identical `corruptLedgerError` copies. (b) `command-helpers.js` gains `readFailure(args, err, fallbackCode)`; knowledge-commands.js and org-audit-commands.js delete their identical private copies. (c) Generalize the existing production-scan test (error-catalog.test.js:97 covers only `AMBER_E_CONTEXT_*`) to every `AMBER_E_[A-Z_]+` literal in scripts/lib, each resolving via `getEntry`.
 - Risks: message-format drift (tests pin code-in-message + non-empty, not the prefix — verified); the two command adapters' fallback codes differ (KB_CORRUPT vs ORG_CORRUPT), so readFailure must take the fallback explicitly. Mitigation: keep message templates byte-identical via label param; full-suite baseline comparison.
 
 ## Context manifests
 
 Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.
-- implement: docs/reviews/architecture-survey-2026-08-24.md
-- review: docs/reviews/architecture-survey-2026-08-24.md
+- implement: docs/quality/reviews/architecture-survey-2026-08-24.md
+- review: docs/quality/reviews/architecture-survey-2026-08-24.md
 
 ## Vertical Slices
 

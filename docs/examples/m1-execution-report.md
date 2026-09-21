@@ -73,8 +73,8 @@ Executed: `scripts/docs-migration.sh`
 
 **Files Moved (via git mv):**
 - `docs/phase-c-beta-guide.md` → `docs/guides/getting-started.md`
-- `docs/phase-c-ga-checklist.md` → `docs/superpowers/plans/phase-c-ga-checklist.md`
-- `docs/handoff-*.md` → `docs/superpowers/plans/handoffs/` (2 files)
+- `docs/phase-c-ga-checklist.md` → `docs/legacy/plans/phase-c-ga-checklist.md`
+- `docs/handoff-*.md` → `docs/legacy/plans/handoffs/` (2 files)
 
 **Link Updates:** Automatic internal link fixing applied
 
@@ -252,16 +252,16 @@ None. All steps completed as specified in M1 design spec.
 3. `README.md` - Removed phase references, added architecture links
 4. `docs/examples/adoptions-index.md` - Fixed broken links
 5. `docs/examples/sample-adoption-bundle/index.md` - Fixed broken links
-6. `docs/superpowers/plans/2026-06-11-amber-protocol-rename-and-governance.md` - Fixed link
-7. `docs/superpowers/plans/2026-06-11-phase-3-maintenance-automation.md` - Fixed link
+6. `docs/legacy/plans/2026-06-11-amber-protocol-rename-and-governance.md` - Fixed link
+7. `docs/legacy/plans/2026-06-11-phase-3-maintenance-automation.md` - Fixed link
 8. `docs/user-guide/tutorials/creating-first-skill.md` - Fixed relative path
 9. `docs/user-guide/tutorials/setting-up-pre-commit-hooks.md` - Fixed relative path
 10. `D:/code_space/oh-my-openagent-dev/oh-my-openagent-dev/AGENTS.md` - Added wiki routing
 
 ### Files Moved (via git mv)
 1. `docs/phase-c-beta-guide.md` → `docs/guides/getting-started.md`
-2. `docs/phase-c-ga-checklist.md` → `docs/superpowers/plans/phase-c-ga-checklist.md`
-3. `docs/handoff-*.md` → `docs/superpowers/plans/handoffs/` (2 files)
+2. `docs/phase-c-ga-checklist.md` → `docs/legacy/plans/phase-c-ga-checklist.md`
+3. `docs/handoff-*.md` → `docs/legacy/plans/handoffs/` (2 files)
 
 ---
 

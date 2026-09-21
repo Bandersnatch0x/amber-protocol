@@ -5,12 +5,19 @@ User input: {{args}}
 
 # Amber Journey Router
 
-Route the user's request, then tell them which journey is active and follow that journey's process.
-The deterministic `amber next --objective` result includes the `journeyId` selected by `scripts/lib/journey-router.js`; do not invent a fifth journey.
+**Index: the seven primary verbs** — `audit`, `init`, `doctor`, `next`, `plan`, `handoff`, `session`
 
-If intent spans journeys, start with diagnosis, then delivery. Use context-continuity only when the task needs durable knowledge or a verified Loadout.
+Start from the user's goal, run the deterministic `amber next --objective`
+advisor, then continue with exactly one of the four deep journeys:
+`amber-diagnosis-adoption`, `amber-delivery`, `amber-context-continuity`, or
+`amber-continuous-improvement`. The seven CLI verbs are operator fallback and
+debug surfaces, not a second skill topology.
 
-For any route choice, run `amber next --objective "<objective>" --target <repo>` and report its deterministic suggestion. Never infer or replace route matching with an LLM. A suggestion is advisory; the human or `session start --route` remains authoritative.
-
-Do not execute a mutating command merely because the router selected a journey. Preserve every approval, isolation, evidence, and ledger gate in the selected journey.
+The advisor's `journeyId` comes from `scripts/lib/journey-router.js`; do not
+replace route matching with an LLM. A route suggestion is advisory: keep the
+human authoritative, and never execute a mutating command merely because the
+router selected a journey. Preserve approval, isolation, evidence, and ledger
+gates in the selected journey. If no journey matches, ask for the missing goal
+or offer the closest read-only diagnosis path instead of sending the user to
+the CLI.
 """

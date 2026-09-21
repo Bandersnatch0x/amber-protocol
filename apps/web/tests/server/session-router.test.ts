@@ -41,19 +41,25 @@ describe('sessionRouter', () => {
 
   describe('byId', () => {
     it('returns the session when found', async () => {
-      const session = { id: 'session-1', goal: 'test', status: 'running' };
+      const session = {
+        id: '11111111-1111-4111-8111-111111111111',
+        goal: 'test',
+        status: 'running',
+      };
       readSessionById.mockReturnValue(session);
 
-      const result = await caller.byId({ id: 'session-1' });
+      const result = await caller.byId({ id: '11111111-1111-4111-8111-111111111111' });
 
       expect(result).toBe(session);
-      expect(readSessionById).toHaveBeenCalledWith('session-1');
+      expect(readSessionById).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
     });
 
     it('throws Session not found when the reader returns null', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.byId({ id: 'missing' })).rejects.toThrow('Session not found');
+      await expect(caller.byId({ id: '22222222-2222-4222-8222-222222222222' })).rejects.toThrow(
+        'Session not found',
+      );
     });
   });
 
@@ -62,10 +68,13 @@ describe('sessionRouter', () => {
       const events = [{ type: 'session_started' }];
       readTimelineEvents.mockReturnValue(events);
 
-      const result = await caller.timeline({ sessionId: 'session-1', limit: 5 });
+      const result = await caller.timeline({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        limit: 5,
+      });
 
       expect(result).toBe(events);
-      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', {
+      expect(readTimelineEvents).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', {
         limit: 5,
         tail: undefined,
       });
@@ -75,10 +84,13 @@ describe('sessionRouter', () => {
       const events = [{ type: 'session_completed' }];
       readTimelineEvents.mockReturnValue(events);
 
-      const result = await caller.timeline({ sessionId: 'session-1', tail: 50 });
+      const result = await caller.timeline({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        tail: 50,
+      });
 
       expect(result).toBe(events);
-      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', {
+      expect(readTimelineEvents).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', {
         limit: undefined,
         tail: 50,
       });
@@ -87,9 +99,9 @@ describe('sessionRouter', () => {
     it('passes undefined limit and tail when omitted', async () => {
       readTimelineEvents.mockReturnValue([]);
 
-      await caller.timeline({ sessionId: 'session-1' });
+      await caller.timeline({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', {
+      expect(readTimelineEvents).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', {
         limit: undefined,
         tail: undefined,
       });
@@ -99,24 +111,26 @@ describe('sessionRouter', () => {
   describe('auditSummary', () => {
     it('returns the durable audit summary for a session', async () => {
       const summary = {
-        sessionId: 'session-1',
+        sessionId: '11111111-1111-4111-8111-111111111111',
         ledger: {
-          path: '.amber/sessions/session-1/ledger.jsonl',
+          path: '.amber/sessions/11111111-1111-4111-8111-111111111111/ledger.jsonl',
           exists: true,
           verified: true,
           recordCount: 2,
         },
         timeline: {
-          path: '.amber/sessions/session-1/timeline.jsonl',
+          path: '.amber/sessions/11111111-1111-4111-8111-111111111111/timeline.jsonl',
           exists: true,
           eventCount: 3,
         },
       };
       readSessionAuditSummary.mockResolvedValue(summary);
 
-      const result = await caller.auditSummary({ sessionId: 'session-1' });
+      const result = await caller.auditSummary({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+      });
 
-      expect(readSessionAuditSummary).toHaveBeenCalledWith('session-1');
+      expect(readSessionAuditSummary).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
       expect(result).toBe(summary);
     });
   });

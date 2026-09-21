@@ -23,7 +23,7 @@ evidence）与「门」（approval、verify、ledger），但缺少一层让外�
 
 **目标**
 
-- 为外部 agent（Claude、Codex、Grok 等支持 MCP 的客户端）提供安全的
+- 为外部 agent（Claude、Codex、external-host 等支持 MCP 的客户端）提供安全的
   Amber 操作入口。
 - 每个操作可声明：参数、提交条件、副作用、回滚、证据要求、审批方。
 - 与现有产物完全兼容：`governed-runner.js` 门控、`ledger.jsonl`、

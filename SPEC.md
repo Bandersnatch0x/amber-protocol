@@ -1,6 +1,8 @@
 # Amber Protocol SPEC
 
-Status: draft v1
+**Status:** V1–V5.5 implemented (60 features accepted)  
+**Command Reference:** §4 command list superseded by docs/CLI_REFERENCE.md  
+**Roadmap:** §11 roadmap is historical; see docs/product/BACKLOG.md for current priorities
 
 This spec defines the first shippable shape of `amber-protocol`: a Codex + Claude Code Amber integration and verification toolkit.
 
@@ -10,8 +12,8 @@ It is based on:
 - OpenAI's repository-as-system-of-record pattern
 - Anthropic's Dynamic Workflows direction
 - Roundtable review using product-boundary grilling and technical review
-- Matt Van Horn's agentic-engineering workflow notes, interpreted as workflow mechanisms rather than tool dependencies
-- Loop-engineering and agent-observability notes, interpreted as declarative contracts, replay evidence, and regression proposals rather than live automation
+- external research notes, interpreted as workflow mechanisms rather than tool dependencies
+- Agent-observability research, interpreted as declarative contracts, replay evidence, and regression proposals rather than live automation
 
 ## 1. Product Positioning
 
@@ -93,7 +95,7 @@ Implemented commands include:
 - **Governance and execution boundaries:** `governance`, `execution`
 - **Security governance:** `security audit`
 
-These commands create or inspect repo-local artifacts. They do not execute dynamic workflows, dispatch live agents, run target-project commands automatically, or create external PRs. See [docs/api/cli-commands.md](./docs/api/cli-commands.md) for the full command reference.
+These commands create or inspect repo-local artifacts. They do not execute dynamic workflows, dispatch live agents, run target-project commands automatically, or create external PRs. See [docs/reference/cli-commands.md](./docs/reference/cli-commands.md) for the full command reference.
 
 ### `init`
 

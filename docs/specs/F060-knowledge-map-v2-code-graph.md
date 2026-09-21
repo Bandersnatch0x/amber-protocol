@@ -1,8 +1,8 @@
 # F060: Knowledge Map v2 — Code Graph & Interaction Upgrade
 
-**Status:** Proposed
+**Status:** Accepted (2026-08-30)
 **Depends on:** F059, ADR-0025, the F059 fix batch (#267)
-**Program:** [Amber Governed Capabilities](../roadmaps/amber-governed-capabilities-program.md)
+**Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)
 **Wayfinder map:** [#260](https://github.com/Bandersnatch0x/amber-protocol/issues/260) — every
 decision below carries its ticket lineage; this Spec is the content authority that supersedes
 those tickets for implementation.
@@ -184,14 +184,13 @@ single source of truth (`issues/0007-census-single-source.md`). This Spec assume
 census mechanism is current; adding ADRs alongside v2 work follows the corpus workflow of the
 day.
 
-`feature_list.json` registration (deferred to landing because the file is under active edit by
-a parallel effort):
+`feature_list.json` registration (accepted at landing and reflected in the current registry):
 
 ```json
 {
   "id": "F060",
   "title": "Knowledge Map v2 — code graph & interaction upgrade",
-  "status": "planned",
+  "status": "accepted",
   "spec": "docs/specs/F060-knowledge-map-v2-code-graph.md",
   "paths": [
     "scripts/lib/core/knowledge-graph.js",

@@ -45,7 +45,7 @@ When a friction or bug class recurs after a fix, `amber break-loop` scaffolds a 
      a CLI_REFERENCE section, and dogfood-weekly §5 gains one escalation line (friction
      that recurs → run break-loop; post-mortem linked from the new issue).
 - Risks:
-  - Taxonomy wording must stay original — the Trellis-mechanism analysis (P2-1) is AGPL and
+  - Taxonomy wording must stay original — the external workflow framework-mechanism analysis (P2-1) is AGPL and
     design-only; no phrasing may be copied from it.
   - Scaffold filename collisions (same date + slug) — refuse to overwrite rather than
     suffix-generate; the error names the existing file so the operator decides.

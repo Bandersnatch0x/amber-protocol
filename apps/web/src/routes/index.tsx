@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AmberField } from '@/components/experience/AmberField';
 import { StatusBadge } from '@/components/session/StatusBadge';
+import { deriveJourneyStage, recoverySessionStatuses } from '@/features/home/home-journey';
 import { isActiveStatus } from '@/features/sessions/sessions-view-model';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
@@ -15,9 +16,53 @@ const primarySurfaces = [
 ] as const;
 
 const secondarySurfaces = [
+  {
+    labelKey: 'nav.suggestions',
+    detailKey: 'home.surface.suggestions.detail',
+    to: '/suggestions',
+  },
   { labelKey: 'nav.routes', detailKey: 'home.surface.routes.detail', to: '/routes' },
   { labelKey: 'nav.transcripts', detailKey: 'home.surface.transcripts.detail', to: '/transcripts' },
   { labelKey: 'nav.settings', detailKey: 'home.surface.settings.detail', to: '/settings' },
+] as const;
+
+const coreJourneys = [
+  {
+    id: 'J0',
+    titleKey: 'home.journey.j0.title',
+    detailKey: 'home.journey.j0.detail',
+    to: '/governance',
+  },
+  {
+    id: 'J1',
+    titleKey: 'home.journey.j1.title',
+    detailKey: 'home.journey.j1.detail',
+    to: '/governance',
+  },
+  {
+    id: 'J2',
+    titleKey: 'home.journey.j2.title',
+    detailKey: 'home.journey.j2.detail',
+    to: '/sessions',
+  },
+  {
+    id: 'J3',
+    titleKey: 'home.journey.j3.title',
+    detailKey: 'home.journey.j3.detail',
+    to: '/sessions',
+  },
+  {
+    id: 'J4',
+    titleKey: 'home.journey.j4.title',
+    detailKey: 'home.journey.j4.detail',
+    to: '/sessions',
+  },
+  {
+    id: 'J5',
+    titleKey: 'home.journey.j5.title',
+    detailKey: 'home.journey.j5.detail',
+    to: '/gates',
+  },
 ] as const;
 
 const lifecycle = [
@@ -30,12 +75,12 @@ const lifecycle = [
 ] as const;
 
 const artifacts = [
-  'AGENTS.md',
-  'feature_list.json',
-  'PROGRESS.md',
-  'session-handoff.md',
-  'docs/wiki/',
-  '.workflow/continuous-improvement/state.json',
+  { path: 'AGENTS.md', to: '/governance' },
+  { path: 'feature_list.json', to: '/governance' },
+  { path: 'PROGRESS.md', to: '/sessions' },
+  { path: 'session-handoff.md', to: '/sessions' },
+  { path: 'docs/wiki/', to: '/knowledge' },
+  { path: '.workflow/continuous-improvement/state.json', to: '/suggestions' },
 ] as const;
 
 /** Lifecycle step ids emitted by scripts/lib/core/lifecycle.js (STEPS). */
@@ -71,6 +116,10 @@ function formatRefresh(value: number, fallback: string): string {
 function formatTime(value: string | undefined): string {
   if (!value) return '-';
   return new Date(value).toLocaleString();
+}
+
+interface RepositoryHealth {
+  repositoryName?: string;
 }
 
 /** Map live operator pressure to the lifecycle diagram stage index. */
@@ -194,17 +243,28 @@ function QueryFailure({
   detail,
   onRetry,
   retryLabel,
+  retrying = false,
 }: {
   title: string;
   detail: string;
   onRetry: () => void;
   retryLabel: string;
+  retrying?: boolean;
 }) {
   return (
-    <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
+    <div
+      role="alert"
+      aria-busy={retrying}
+      className="mt-4 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30"
+    >
       <p className="text-sm font-medium text-red-800 dark:text-red-200">{title}</p>
       <p className="mt-1 text-sm leading-6 text-red-700 dark:text-red-300">{detail}</p>
-      <button type="button" onClick={onRetry} className="btn-secondary mt-3 text-xs">
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={retrying}
+        className="btn-secondary mt-3 text-xs"
+      >
         {retryLabel}
       </button>
     </div>
@@ -217,6 +277,27 @@ function HomePage() {
   const gatesQuery = trpc.gate.list.useQuery();
   const nextActionQuery = trpc.lifecycle.next.useQuery({});
   const [fieldOpen, setFieldOpen] = useState(false);
+  const [repositoryName, setRepositoryName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/health', { headers: { accept: 'application/json' } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: RepositoryHealth | null) => {
+        if (!cancelled && typeof payload?.repositoryName === 'string') {
+          const name = payload.repositoryName.trim();
+          if (name) setRepositoryName(name);
+        }
+      })
+      .catch(() => {
+        // The repository label is supplemental; governed reads remain
+        // authoritative when health metadata is unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const sessions = useMemo(
     () => (Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []),
@@ -233,6 +314,15 @@ function HomePage() {
   );
 
   const pendingGates = useMemo(() => gates.filter((gate) => gate.status === 'pending'), [gates]);
+
+  const recoverySessions = useMemo(
+    () => sessions.filter((session) => recoverySessionStatuses.has(session.status)),
+    [sessions],
+  );
+  const historicalSessions = useMemo(
+    () => sessions.filter((session) => !isActiveStatus(session.status)).slice(0, 4),
+    [sessions],
+  );
 
   const loopStage = deriveLoopStage(activeSessions.length, pendingGates.length);
   const loopProgress = Math.min(
@@ -256,6 +346,25 @@ function HomePage() {
   const stepTitleKey = knownStep ? (`home.step.${knownStep}.title` as I18nKey) : null;
   const stepReasonKey = knownStep ? (`home.step.${knownStep}.reason` as I18nKey) : null;
   const hasRawStep = Boolean(!knownStep && nextAction.stepId);
+  const hasJourneyData =
+    !sessionsQuery.isLoading &&
+    !gatesQuery.isLoading &&
+    !nextActionQuery.isLoading &&
+    !sessionsQuery.error &&
+    !gatesQuery.error &&
+    !nextActionQuery.error &&
+    // A successful response can still be an empty repository. Do not invent
+    // a current Journey from deriveJourneyStage's neutral fallback when none
+    // of the three reads carries a live signal.
+    (Boolean(nextAction.stepId) || sessions.length > 0 || gates.length > 0);
+  const journeyStage = hasJourneyData
+    ? deriveJourneyStage({
+        stepId: nextAction.stepId,
+        activeSessionCount: activeSessions.length,
+        pendingGateCount: pendingGates.length,
+        recoverySessionCount: recoverySessions.length,
+      })
+    : null;
 
   return (
     <div className="page-container space-y-8">
@@ -266,6 +375,9 @@ function HomePage() {
         <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
           {t('home.description')}
         </p>
+        <p className="max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {t('home.viewerBoundary')}
+        </p>
       </header>
 
       {/* Block 1: overview */}
@@ -274,8 +386,11 @@ function HomePage() {
           <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="label">{t('home.repository')}</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
-                {t('home.repositoryName')}
+              <h2
+                data-testid="repository-name"
+                className="mt-1 text-lg font-semibold text-slate-900 dark:text-white"
+              >
+                {repositoryName ?? t('home.repositoryName')}
               </h2>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 {t('home.repositoryDetail')}
@@ -298,11 +413,71 @@ function HomePage() {
               </div>
             </dl>
           </div>
+
+          <div className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-700">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 id="core-journey-title" className="section-title">
+                  {t('home.journey.title')}
+                </h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {t('home.journey.detail')}
+                </p>
+              </div>
+              <p className="label shrink-0">
+                {t('home.journey.current')}:{' '}
+                {journeyStage === null
+                  ? t('home.journey.unavailable')
+                  : coreJourneys[journeyStage].id}
+              </p>
+            </div>
+
+            <ol
+              aria-labelledby="core-journey-title"
+              className="mt-4 grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-6 dark:border-slate-700 dark:bg-slate-700"
+            >
+              {coreJourneys.map((journey, index) => {
+                const isCurrent = journeyStage !== null && index === journeyStage;
+                return (
+                  <li key={journey.id} className="min-w-0 bg-white dark:bg-slate-800">
+                    <Link
+                      to={journey.to}
+                      aria-current={isCurrent ? 'step' : undefined}
+                      className={`block h-full min-h-28 min-w-0 rounded-md p-3 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
+                        isCurrent
+                          ? 'bg-blue-50 dark:bg-blue-950/40'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-900/40'
+                      }`}
+                    >
+                      <span
+                        className={`font-mono text-[11px] font-semibold ${
+                          isCurrent
+                            ? 'text-blue-700 dark:text-blue-300'
+                            : 'text-slate-400 dark:text-slate-400'
+                        }`}
+                      >
+                        {journey.id}
+                      </span>
+                      <span className="mt-2 block text-sm font-medium text-slate-900 dark:text-white">
+                        {t(journey.titleKey)}
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        {t(journey.detailKey)}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         </div>
       </section>
 
       {/* Block 2: next action */}
-      <section className="card p-5">
+      <section
+        className="card p-5"
+        aria-busy={nextActionQuery.isLoading || nextActionQuery.isFetching}
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="section-title">{t('home.nextAction.title')}</h2>
@@ -354,6 +529,7 @@ function HomePage() {
             detail={t('home.nextActionFailedDetail')}
             onRetry={() => nextActionQuery.refetch()}
             retryLabel={t('common.retry')}
+            retrying={nextActionQuery.isFetching}
           />
         ) : (
           <dl className="mt-4 grid gap-3 md:grid-cols-3">
@@ -383,7 +559,7 @@ function HomePage() {
 
       {/* Block 3 + 4: active sessions and pending gates */}
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="card p-5">
+        <div className="card p-5" aria-busy={sessionsQuery.isLoading || sessionsQuery.isFetching}>
           <div className="flex items-center justify-between gap-3">
             <h2 className="section-title">{t('home.activeSessions')}</h2>
             <Link
@@ -401,37 +577,70 @@ function HomePage() {
               detail={t('home.sessionsFailedDetail')}
               onRetry={() => sessionsQuery.refetch()}
               retryLabel={t('common.retry')}
+              retrying={sessionsQuery.isFetching}
             />
-          ) : activeSessions.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-              {t('home.nextAction.noAction')}
-            </p>
           ) : (
-            <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-700">
-              {activeSessions.slice(0, 4).map((session) => (
-                <li key={session.id}>
-                  <Link
-                    to="/sessions/$id"
-                    params={{ id: session.id }}
-                    className="-mx-2 flex min-w-0 items-start justify-between gap-3 rounded-md px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
-                        {session.goal || session.id}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                        {session.route.name} · {formatTime(session.updatedAt ?? session.createdAt)}
-                      </p>
-                    </div>
-                    <StatusBadge status={session.status} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              {activeSessions.length === 0 ? (
+                <p role="status" className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                  {historicalSessions.length > 0
+                    ? t('home.noActiveSessions')
+                    : t('home.nextAction.noAction')}
+                </p>
+              ) : (
+                <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-700">
+                  {activeSessions.slice(0, 4).map((session) => (
+                    <li key={session.id}>
+                      <Link
+                        to="/sessions/$id"
+                        params={{ id: session.id }}
+                        className="-mx-2 flex min-w-0 items-start justify-between gap-3 rounded-md px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                            {session.goal || session.id}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                            {session.route.name} ·{' '}
+                            {formatTime(session.updatedAt ?? session.createdAt)}
+                          </p>
+                        </div>
+                        <StatusBadge status={session.status} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {historicalSessions.length > 0 && (
+                <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+                  <h3 className="label">{t('home.recentSessions')}</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    {t('home.recentSessionsDetail')}
+                  </p>
+                  <ul className="mt-2 divide-y divide-slate-200 dark:divide-slate-700">
+                    {historicalSessions.map((session) => (
+                      <li key={session.id}>
+                        <Link
+                          to="/sessions/$id"
+                          params={{ id: session.id }}
+                          className="-mx-2 flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40"
+                        >
+                          <span className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300">
+                            {session.goal || session.id}
+                          </span>
+                          <StatusBadge status={session.status} />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div className="card p-5">
+        <div className="card p-5" aria-busy={gatesQuery.isLoading || gatesQuery.isFetching}>
           <div className="flex items-center justify-between gap-3">
             <h2 className="section-title">{t('home.pendingGates')}</h2>
             <Link
@@ -449,9 +658,10 @@ function HomePage() {
               detail={t('home.gatesFailedDetail')}
               onRetry={() => gatesQuery.refetch()}
               retryLabel={t('common.retry')}
+              retrying={gatesQuery.isFetching}
             />
           ) : pendingGates.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            <p role="status" className="mt-4 text-sm text-slate-500 dark:text-slate-400">
               {t('home.nextAction.noAction')}
             </p>
           ) : (
@@ -590,10 +800,15 @@ function HomePage() {
           <ul className="mt-4 space-y-2">
             {artifacts.map((artifact) => (
               <li
-                key={artifact}
+                key={artifact.path}
                 className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300"
               >
-                {artifact}
+                <Link
+                  to={artifact.to}
+                  className="underline decoration-slate-300 underline-offset-2 transition-colors duration-150 hover:text-blue-600 dark:decoration-slate-600 dark:hover:text-blue-400"
+                >
+                  {artifact.path}
+                </Link>
               </li>
             ))}
           </ul>

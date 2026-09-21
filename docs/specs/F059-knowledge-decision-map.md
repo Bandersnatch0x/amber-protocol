@@ -2,7 +2,7 @@
 
 **Status:** Proposed  
 **Depends on:** F049, F058  
-**Program:** [Amber Governed Capabilities](../roadmaps/amber-governed-capabilities-program.md)  
+**Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#246](https://github.com/Bandersnatch0x/amber-protocol/issues/246)
 
 ## Problem Statement
@@ -145,7 +145,7 @@ Spec, and the implementation.
 
 ### UI
 
-- `/knowledge` follows `.stitch/DESIGN.md` (Obsidian & Amber Pulse v10): master-detail with a
+- `/knowledge` follows `.design-tool/DESIGN.md` (Obsidian & Amber Pulse v10): master-detail with a
   right rail, amber/cobalt dual accents, dual theme, no new visual grammar.
 - Rendering: `@xyflow/react` v12 + `d3-force` (rationale recorded in the internal research
   archive: `docs/research/graph-rendering-library-choice.md`); the DTO stays renderer-agnostic.

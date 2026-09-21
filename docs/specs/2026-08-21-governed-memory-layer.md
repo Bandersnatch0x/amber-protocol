@@ -2,7 +2,7 @@
 type: spec
 title: Governed Memory Layer（受治理记忆层）实现 Spec
 description: 把 Amber 分散的记忆原语收敛为显式受治理记忆层：四层模型、条目 registry、写回闸门、晋升规则、dreaming 维护 loop 与动词表面的完整机械定义。
-status: draft-v1
+status: accepted
 date: 2026-08-21
 method: 六轮圆桌终审裁决（#171/#170/#172/#173/#174/#175，均 decision-complete）→ 忠实综合 + 裁决留白的最简机械落地
 tags: [memory, governance, promotion, dreaming, registry, mcp]
@@ -12,9 +12,11 @@ tags: [memory, governance, promotion, dreaming, registry, mcp]
 
 > 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、α/β/γ 预算闸门、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
 
-**Date:** 2026-08-21 ｜ **Status:** draft-v1（待评审）｜ **ADR:** [ADR-0018 Governed Memory Layer](../adr/0018-governed-memory-layer.md)
+**Date:** 2026-08-21 ｜ **Status:** accepted（与 ADR-0018 Accepted、F033/F034 accepted 对齐；批次 A + T1/T2 已落地）｜ **ADR:** [ADR-0018 Governed Memory Layer](../adr/0018-governed-memory-layer.md)
 
 **Tracker:** map [#169](https://github.com/Bandersnatch0x/amber-protocol/issues/169) · #171 业界调研 · [#170](https://github.com/Bandersnatch0x/amber-protocol/issues/170) 对象模型 · [#172](https://github.com/Bandersnatch0x/amber-protocol/issues/172) 写回闸门 · [#173](https://github.com/Bandersnatch0x/amber-protocol/issues/173) 晋升规则 · [#174](https://github.com/Bandersnatch0x/amber-protocol/issues/174) dreaming loop · [#175](https://github.com/Bandersnatch0x/amber-protocol/issues/175) 动词表面
+
+**Implementation status (2026-09):** Batch A (F033) and T1/T2 write-back mounting (F034) are **accepted**. Core verb surface (`request`/`ingest`/`approve`/`book`/`abandon`/`status`), registry, doctor rules, and MEMORY.md `## Entries` + `###` α-count shape are in tree. **Deferred (no code in this change):** dreaming loop enable (`memory-maintenance-dreaming` trigger remains `enabled: false`); maintenance verb surface (`collect`/`inspect` and product persistence path — §15.1 / #174-M6).
 
 ---
 

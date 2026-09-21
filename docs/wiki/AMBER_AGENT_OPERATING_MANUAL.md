@@ -135,7 +135,7 @@ never invent architecture, commands, or business rules — mark unknowns as "nee
 - New CLI command -> one definition in `scripts/lib/command-help.js` plus its handler binding in
   `scripts/lib/command-dispatcher.js`; startup rejects missing or orphaned handlers. Schema change ->
   sync `schemas/*.schema.json` with `scripts/validate-*.js`. New template -> `templates/` +
-  `scripts/lib/core/scaffolding.js`. New route -> `routes/*.route.json` per `schemas/route.schema.json`.
+  `scripts/lib/core/scaffold.js`. New route -> `routes/*.route.json` per `schemas/route.schema.json`.
 - Commits use conventional format: `feat|fix|refactor|docs|test|chore|perf|ci: <description>`.
 - Release: pushing a `v*.*.*` tag auto-publishes ONLY when all CI jobs pass and the tag has no
   `-rc`/`-beta` suffix; pre-release tags skip publish.

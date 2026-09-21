@@ -100,10 +100,10 @@ describe('R2 slash command (folded chip)', () => {
   it('folds multi-line Chinese args into a single line <= 80 chars', () => {
     const args = '请帮我审查\n这个分支的\n所有改动，重点关注 i18n 与时间轴';
     const result = classifyTurn({
-      text: `<command-name>/ask-matt</command-name>\n<command-message>ask-matt</command-message>\n<command-args>${args}</command-args>`,
+      text: `<command-name>/external-review</command-name>\n<command-message>external-review</command-message>\n<command-args>${args}</command-args>`,
     });
     expect(result.kind).toBe('slashCommand');
-    expect(result.chipParam).toBe('/ask-matt');
+    expect(result.chipParam).toBe('/external-review');
     expect(result.summary).toBe(collapseWhitespace(args));
     expect(result.summary.length).toBeLessThanOrEqual(SUMMARY_LIMIT_SHORT);
     expect(result.summary).not.toContain('\n');
@@ -111,9 +111,9 @@ describe('R2 slash command (folded chip)', () => {
 
   it('keeps plugin-prefixed command names', () => {
     const result = classifyTurn({
-      text: '<command-name>/mattpocock-skills:code-review</command-name><command-args></command-args>',
+      text: '<command-name>/external-review-skills:code-review</command-name><command-args></command-args>',
     });
-    expect(result.chipParam).toBe('/mattpocock-skills:code-review');
+    expect(result.chipParam).toBe('/external-review-skills:code-review');
   });
 
   it('attaches the stdout chip as secondary when both R2 and R3 match', () => {

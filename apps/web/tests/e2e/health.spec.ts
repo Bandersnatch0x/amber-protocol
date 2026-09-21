@@ -12,6 +12,7 @@ test.describe('Server availability', () => {
     const body = await resp.json();
     expect(body.ok).toBe(true);
     expect(path.resolve(body.amberRepoRoot)).toBe(path.resolve(process.env.AMBER_REPO_ROOT ?? ''));
+    expect(body.repositoryName).toBe(path.basename(body.amberRepoRoot));
 
     console.log('[health] cwd:', body.cwd);
     console.log('[health] AMBER_REPO_ROOT:', body.amberRepoRoot);

@@ -81,7 +81,7 @@ test("writeHandoff renders free-text string evidence instead of (none)", () => {
 	const f001 = data.features.find((f) => f.id === "F001");
 	assert.ok(f001, "scaffold seeds F001");
 	f001.status = "passing";
-	f001.evidence = ["npm test: 1158/0 passing across Node 18/20/22 CI matrix"];
+	f001.evidence = ["npm test: 1158/0 passing on the supported CI matrix (Node 20.x and 22.x)"];
 	// Also keep one structured record so both shapes coexist.
 	data.features.push({
 		id: "F010",
@@ -106,7 +106,7 @@ test("writeHandoff renders free-text string evidence instead of (none)", () => {
 
 	assert.match(
 		content,
-		/F001: npm test: 1158\/0 passing across Node 18\/20\/22 CI matrix/,
+		/F001: npm test: 1158\/0 passing on the supported CI matrix \(Node 20\.x and 22\.x\)/,
 		"free-text evidence must appear verbatim",
 	);
 	assert.doesNotMatch(

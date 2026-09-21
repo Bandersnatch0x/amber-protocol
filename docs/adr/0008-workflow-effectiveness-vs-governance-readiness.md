@@ -16,8 +16,8 @@ evidence surfaces, and safety boundaries installed and valid?* A repository can
 score 100/100 ready and still run an ineffective agent workflow — the readiness
 vocabulary has no way to express that gap.
 
-Research (`docs/quality/better-harness-reference-improvement-plan.md`) surveyed
-an external reference ("Better Harness") and recommended adding a second,
+Research (`docs/quality/external-framework-reference-improvement-plan.md`) surveyed
+an external reference ("external workflow reference") and recommended adding a second,
 separate read-only assessment: **Workflow Effectiveness Review** — "did the
 agent understand the task, use a controlled path, validate the result, deliver
 safely, and preserve learning?"
@@ -141,6 +141,6 @@ state, and must display distinctly from a readiness 0.
 - ADR-0004 (evidence-grade verification — evidence references and confidence)
 - ADR-0005 (experimental execution removal — no live agent dispatch)
 - ADR-0007 (web viewer role — supervised action viewer; web visualization deferred)
-- `docs/quality/better-harness-reference-improvement-plan.md` — research input
+- `docs/quality/external-framework-reference-improvement-plan.md` — research input
 - `schemas/workflow-assessment.schema.json` — report contract (P0)
 - `scripts/lib/workflow-assessment/` — assessment core (P1)

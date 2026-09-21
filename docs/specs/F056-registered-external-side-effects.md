@@ -2,7 +2,7 @@
 
 **Status:** Proposed  
 **Depends on:** F055  
-**Program:** [Amber Governed Capabilities](../roadmaps/amber-governed-capabilities-program.md)  
+**Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#216](https://github.com/Bandersnatch0x/amber-protocol/issues/216)
 
 ## Problem Statement

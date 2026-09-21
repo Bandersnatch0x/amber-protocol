@@ -1,0 +1,23 @@
+{
+	"name": "amber-upper-shell",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Upper Shell MVP: agent loop consuming Amber MCP (S1-S7)",
+	"type": "module",
+	"bin": {
+		"upper-shell": "./bin/upper-shell.mjs"
+	},
+	"scripts": {
+		"start": "node --import tsx src/index.ts",
+		"test": "node --import tsx --test test/*.test.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.0",
+		"tsx": "^4.19.2",
+		"typescript": "^5.7.2"
+	}
+}

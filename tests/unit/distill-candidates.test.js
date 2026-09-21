@@ -22,17 +22,9 @@ function writeFile(root, relativePath, content) {
 
 test("findDistillCandidates returns only repeated findings", () => {
 	const root = tempRoot();
-	writeFile(
-		root,
-		path.join("docs", "superpowers", "plans", "a.md"),
-		"# Fix auth\n\n## Add tests\n",
-	);
-	writeFile(
-		root,
-		path.join("docs", "superpowers", "plans", "b.md"),
-		"# Fix auth\n\n## Add tests\n",
-	);
-	writeFile(root, path.join("docs", "superpowers", "plans", "c.md"), "# Unique plan\n");
+	writeFile(root, path.join("docs", "legacy", "plans", "a.md"), "# Fix auth\n\n## Add tests\n");
+	writeFile(root, path.join("docs", "legacy", "plans", "b.md"), "# Fix auth\n\n## Add tests\n");
+	writeFile(root, path.join("docs", "legacy", "plans", "c.md"), "# Unique plan\n");
 
 	const candidates = findDistillCandidates(root);
 	const texts = candidates.map((c) => c.text);
@@ -43,8 +35,8 @@ test("findDistillCandidates returns only repeated findings", () => {
 
 test("writeDistillProposal writes a markdown report", () => {
 	const root = tempRoot();
-	writeFile(root, path.join("docs", "superpowers", "plans", "a.md"), "# Fix auth\n");
-	writeFile(root, path.join("docs", "superpowers", "plans", "b.md"), "# Fix auth\n");
+	writeFile(root, path.join("docs", "legacy", "plans", "a.md"), "# Fix auth\n");
+	writeFile(root, path.join("docs", "legacy", "plans", "b.md"), "# Fix auth\n");
 	const output = path.join(root, "docs", "maintenance", "distill-proposals.md");
 
 	const result = writeDistillProposal(root, output);

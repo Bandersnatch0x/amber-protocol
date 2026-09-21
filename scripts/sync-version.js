@@ -15,7 +15,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const TARGETS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
+const TARGETS = [
+	".claude-plugin/plugin.json",
+	".claude-plugin/settings.json",
+	".codex-plugin/plugin.json",
+];
 
 function syncJson(root, rel, update) {
 	const abs = path.join(root, rel);

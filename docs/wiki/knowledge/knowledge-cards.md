@@ -32,5 +32,5 @@ Concise, high-signal facts for rapid orientation.
 - Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
 - The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
 - JSON Schemas in schemas/ define contracts for knowledge-plan, loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
+- The project follows loop-engineering patterns. Continuous improvement is governed (see docs/product/LOOP.md and amber-continuous-improvement skill).
 - Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, session-handoff.md, session manifests, and ledgers.

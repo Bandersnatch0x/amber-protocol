@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 28,
+    "adr": 30,
     "wiki": 10,
     "architecture": 9,
-    "total": 47
+    "total": 49
   },
   "rows": [
     {
@@ -40,8 +40,8 @@
       "sourcePath": "docs/adr/0003-governance-gated-execution.md",
       "title": "Governance-Gated Execution (L2)",
       "source": {
-        "rawHash": "sha256:86d5c247dbf1216c1c3abd81806b783c961374e155726949d40c9d21a0aab68e",
-        "normHash": "sha256:ef9db620853647dd7335708c0bf76cd7fddbce06921a4042beef25daf78a9122"
+        "rawHash": "sha256:61a63e1db774469c6c708a315ca59ff0f8d79032f22d3c3b90732469d4b05585",
+        "normHash": "sha256:ee085ac3de5f95bdd80d0465476ded07b5fc6c83806fa28a5556be6b9614e7b2"
       }
     },
     {
@@ -64,8 +64,8 @@
       "sourcePath": "docs/adr/0005-experimental-execution-removal.md",
       "title": "Experimental Execution Removal — Supersedes ADR-0002 Preservation",
       "source": {
-        "rawHash": "sha256:1fd683c290cd5ec21f74232fb426291d448d419eeb2c60dfdd9285b4ea8e1d3d",
-        "normHash": "sha256:dca4c9107c9a34c171ad10e36cd3b12079cf007aa2e83d4932de5bb6a83f360f"
+        "rawHash": "sha256:f1323d55822eeaa2c100a23d9381b5306f23eeb269bfebf4eb9ae3523c12d375",
+        "normHash": "sha256:821f8099e5c482f61f5d09aeb199412408be1bc5b239472e220b157a88edd2e5"
       }
     },
     {
@@ -88,8 +88,8 @@
       "sourcePath": "docs/adr/0007-web-viewer-role.md",
       "title": "Web console role — supervised action viewer",
       "source": {
-        "rawHash": "sha256:76f5bd40566fb9de2922f4b796e9ec2cecf1af109d8fa3a68ddae19c08d92001",
-        "normHash": "sha256:fd7c8c0a1e8fc0da292e75a1d13184c77d1cf78ed95c6593fa627681dc2edcee"
+        "rawHash": "sha256:a624d79000cfcbdb4f4afca53f4ef3c1354d45c9a29afcd362bd958e9059fa7a",
+        "normHash": "sha256:3b3131d7df5126cecdc41219298055c6533901796f5a397e8f2003a10078fc5e"
       }
     },
     {
@@ -100,8 +100,8 @@
       "sourcePath": "docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
       "title": "Workflow Effectiveness Review — a separate read-only assessment beside Governance Readiness",
       "source": {
-        "rawHash": "sha256:c6c544be2c1509f3c99da82c78d97f813e8164fed3028a71db50aed96d937276",
-        "normHash": "sha256:2837f788f0d39183661064f85ab41e86210c840bde6aba592fd94100de9e0e73"
+        "rawHash": "sha256:b2716af3aea3761eefcf6c93f12fefadd8d6e846573f51f66505c8e51ad65bf1",
+        "normHash": "sha256:23450f9d2632ecfdd59e943e39a873c4b9752f0a19370bcffeac09a0788c98ed"
       }
     },
     {
@@ -124,8 +124,8 @@
       "sourcePath": "docs/adr/0010-context-loadout.md",
       "title": "Context Loadout — Amber Governs the Agent's Context Window",
       "source": {
-        "rawHash": "sha256:f7ca54d44422976ab45745ab06499ec369d06610ad838c3cb81791c208183f3b",
-        "normHash": "sha256:b019d6cf978657ce9701d39f7810962058ee143b3652edb536b061b626b9e272"
+        "rawHash": "sha256:16dcabf2fcf1f7dff4d60d4482a1a96db6b080c0990e444eee9eaafac85d6feb",
+        "normHash": "sha256:3de8c939c016ecb91b298a05716bc7cbcd410a98aa13274c9626a04563db0fa0"
       }
     },
     {
@@ -184,8 +184,8 @@
       "sourcePath": "docs/adr/0015-review-blocker-remediation-contracts.md",
       "title": "Review Blocker Remediation Contracts",
       "source": {
-        "rawHash": "sha256:9c7c6c4f1bd939989aff00154e4fc2a49317cfcbf5ab0d5d5ae6dbacd2b0ec12",
-        "normHash": "sha256:9fb88cfbb0623a7bc16842d83ccbde49b9bbaef3efa5609703cc32b9895375a1"
+        "rawHash": "sha256:0506531e7f5fa08b8c5aab140dc3ff55ebd44f7a338a365030674204cac77db1",
+        "normHash": "sha256:3089a049ee384b7e86e63d68b97e2f65e1ffe51ab04aaa5a3482374c57df9f79"
       }
     },
     {
@@ -345,6 +345,30 @@
       }
     },
     {
+      "id": "knowledge:adr:0029",
+      "category": "adr",
+      "sourceNodeId": "adr:0029",
+      "pageId": "knowledge-adr-0029",
+      "sourcePath": "docs/adr/0029-named-governed-commands-and-stage-verbs.md",
+      "title": "Named Governed Commands and Registered Stage Verbs",
+      "source": {
+        "rawHash": "sha256:dbaee65c1f87d46c74e8572ebed70c22f659011a4dfe6627f17b4e0fcbf7c1b1",
+        "normHash": "sha256:faa4dbfe91b93ca925e60b698c694d0d5227e94ad3d58077cbd3c732cdb2063f"
+      }
+    },
+    {
+      "id": "knowledge:adr:0030",
+      "category": "adr",
+      "sourceNodeId": "adr:0030",
+      "pageId": "knowledge-adr-0030",
+      "sourcePath": "docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
+      "title": "Coding-Agent-Enabled Repositories and Trusted Continuation",
+      "source": {
+        "rawHash": "sha256:5ac22b6432856df9e810b11e40cb9de4bdac7f3b6e3eca1ff74bb475a9a2eac1",
+        "normHash": "sha256:7b3279cfad6292b76f3e2fd9f1b73c013fe9c9305d3719c0272cbd367fb9f560"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -388,8 +412,8 @@
       "sourcePath": "docs/architecture/extension-points.md",
       "title": "Extension Points",
       "source": {
-        "rawHash": "sha256:f1409ffa526fdc6f148d2d4dbf7755ec4addd6e2dc13d5a4bcfa1d71dfd2c267",
-        "normHash": "sha256:13bde50114b96680de59e3fd8188a67566ac236f03519269ee0a431dabe4ca21"
+        "rawHash": "sha256:824d55f24c4fd6c7f54e9fc15dbc7081bd0fdc4b31d8ebbc4580e18452f82d32",
+        "normHash": "sha256:ebd4a0c65726eda10dd11e812e13d3729efbf6d69ed6495b104f4561265a392e"
       }
     },
     {
@@ -573,5 +597,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:32c0998cbd5cbfe13ef3b90a62f5f247fa5a6ef08c499836ffd292ffaa5b9795"
+  "manifestHash": "sha256:3949c47673b1139da21376e4039d54269497a9b144938fe169844241c232a517"
 }

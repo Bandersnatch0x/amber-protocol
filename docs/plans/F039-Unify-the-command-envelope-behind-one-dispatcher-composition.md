@@ -10,15 +10,15 @@ defineCommand (createSubcommandDispatcher + shapeResult composed) owns routing, 
 
 ## High Level Design
 
-- Context: survey Finding 1 (docs/reviews/architecture-survey-2026-08-24.md). `shapeResult` (command-helpers.js:27, 7 dispatcher call sites) and `createSubcommandDispatcher` (subcommand-dispatcher.js:23, 1 adapter) exist but ~113 envelope sites across 11 command modules hand-roll the envelope in four competing conventions, with ~64 hand-rolled routing branches and per-module exit-code derivation (`result.ok ? 0 : 1`, `errors.length ? 1 : 0`, hardcoded literals).
+- Context: survey Finding 1 (docs/quality/reviews/architecture-survey-2026-08-24.md). `shapeResult` (command-helpers.js:27, 7 dispatcher call sites) and `createSubcommandDispatcher` (subcommand-dispatcher.js:23, 1 adapter) exist but ~113 envelope sites across 11 command modules hand-roll the envelope in four competing conventions, with ~64 hand-rolled routing branches and per-module exit-code derivation (`result.ok ? 0 : 1`, `errors.length ? 1 : 0`, hardcoded literals).
 - Proposed approach: one composition, `defineCommand({ command, actions, aliases, handlers, unknown })`, where each handler returns only a body `{text|data, errors, warnings, code?, exitCode?}` and the dispatcher owns routing, alias resolution, the envelope (target from args, errors/warnings defaulted), and exit-code derivation in one place (explicit body.exitCode > body.ok === false > errors present > 0). Migrate modules in batches, smallest-first, each batch green before the next.
 - Risks: envelope byte-compatibility is pinned by tests everywhere; some sites deliberately set `bypassPrint: false` for JSON mode or hardcode exit codes; command-dispatcher.js:280-290 duplicates payload text into errors. Mitigation: pilot on the smallest module first to prove byte-compatibility; per-batch suite runs; full-suite baseline comparison after each batch.
 
 ## Context manifests
 
 Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.
-- implement: docs/reviews/architecture-survey-2026-08-24.md
-- review: docs/reviews/architecture-survey-2026-08-24.md
+- implement: docs/quality/reviews/architecture-survey-2026-08-24.md
+- review: docs/quality/reviews/architecture-survey-2026-08-24.md
 
 ## Vertical Slices
 

@@ -7,11 +7,11 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const DOC_ROOT = path.join(ROOT, "docs");
-const EXCLUDED_PARTS = new Set(["superpowers", "reviews"]);
+const EXCLUDED_PARTS = new Set(["legacy", "reviews"]);
 const ALLOW_AUTONOMOUS_MODE = new Set([
-	"docs/AUTONOMOUS_MODE_GUIDE.md",
+	"docs/guides/AUTONOMOUS_MODE_GUIDE.md",
 	"docs/CLI_REFERENCE.md",
-	"docs/TROUBLESHOOTING.md",
+	"docs/guides/TROUBLESHOOTING.md",
 	"docs/adr/0002-v2-execution-scope.md",
 	"docs/adr/0005-experimental-execution-removal.md",
 	"docs/architecture/session-lifecycle.md",
@@ -20,7 +20,7 @@ const ALLOW_AUTONOMOUS_MODE = new Set([
 // Session history (plans) may quote the refused flag when documenting refusals/fixes (#67).
 // Other boundary patterns below still apply to these directories.
 // Sharing materials quote historical commands when narrating the execution evolution.
-const ALLOW_AUTONOMOUS_MODE_DIRS = ["docs/plans/", "docs/sharing/"];
+const ALLOW_AUTONOMOUS_MODE_DIRS = ["docs/plans/", "docs/quality/sharing/"];
 
 function listMarkdown(dir) {
 	const entries = fs.readdirSync(dir, { withFileTypes: true });

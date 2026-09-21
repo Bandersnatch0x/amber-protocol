@@ -14,7 +14,11 @@ function fixture(pkgVersion, manifestVersion) {
 		path.join(dir, "package.json"),
 		JSON.stringify({ name: "amber-protocol", version: pkgVersion }),
 	);
-	for (const rel of [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
+	for (const rel of [
+		".claude-plugin/plugin.json",
+		".claude-plugin/settings.json",
+		".codex-plugin/plugin.json",
+	]) {
 		fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
 		fs.writeFileSync(
 			path.join(dir, rel),
@@ -29,9 +33,14 @@ test("syncVersions copies package.json version into the plugin manifests", () =>
 	const r = syncVersions(dir);
 	assert.deepEqual([...r.synced].sort(), [
 		".claude-plugin/plugin.json",
+		".claude-plugin/settings.json",
 		".codex-plugin/plugin.json",
 	]);
-	for (const rel of [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
+	for (const rel of [
+		".claude-plugin/plugin.json",
+		".claude-plugin/settings.json",
+		".codex-plugin/plugin.json",
+	]) {
 		const data = JSON.parse(fs.readFileSync(path.join(dir, rel), "utf8"));
 		assert.equal(data.version, "9.9.9", `${rel} synced`);
 	}
@@ -49,7 +58,7 @@ test("syncVersions skips a manifest that does not exist (no crash)", () => {
 	const dir = fixture("9.9.9", "1.0.0");
 	fs.rmSync(path.join(dir, ".codex-plugin", "plugin.json"));
 	const r = syncVersions(dir);
-	assert.deepEqual(r.synced, [".claude-plugin/plugin.json"]);
+	assert.deepEqual(r.synced, [".claude-plugin/plugin.json", ".claude-plugin/settings.json"]);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 

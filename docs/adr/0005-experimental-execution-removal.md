@@ -35,7 +35,7 @@ Six weeks later, a 2026-07-04 review verified the preservation had failed in pra
 - Removed the `daemon` command from the CLI surface and dispatcher.
 - Removed the `test:experimental` npm script; dropped `experimental` from the test-runner ignore set.
 - `--mode autonomous` is now refused at `session start` (exit 1, no manifest written) as well as `session continue`, with the refusal message citing ADR-0001/0005. This matches ADR-0002's stated intent — start previously accepted the mode and only continue refused.
-- See issue #4 and `docs/superpowers/plans/2026-07-04-amber-dead-code-and-facade-removal.md`.
+- See issue #4 and `docs/legacy/plans/2026-07-04-amber-dead-code-and-facade-removal.md`.
 
 ## Consequences
 

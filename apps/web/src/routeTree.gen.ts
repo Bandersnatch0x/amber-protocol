@@ -20,6 +20,8 @@ import { Route as RoutesIndexRouteImport } from './routes/routes/index'
 import { Route as RoutesIdRouteRouteImport } from './routes/routes/$id/route'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as SessionsIdRouteRouteImport } from './routes/sessions/$id/route'
+import { Route as SuggestionsIndexRouteImport } from './routes/suggestions/index'
+import { Route as SuggestionsIdRouteImport } from './routes/suggestions/$id'
 import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
 import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
 import { Route as RoutesIdIndexRouteImport } from './routes/routes/$id/index'
@@ -81,6 +83,18 @@ const SessionsIdRouteRoute = SessionsIdRouteRouteImport.update({
   path: '/$id',
   getParentRoute: () => SessionsRouteRoute,
 } as any)
+const SuggestionsIndexRoute = SuggestionsIndexRouteImport.update({
+  id: '/suggestions/',
+  path: '/suggestions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuggestionsIdRoute = SuggestionsIdRouteImport.update({
+  id: '/suggestions/$id',
+  path: '/suggestions/$id',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/suggestions/$id.lazy').then((d) => d.Route),
+)
 const TranscriptsIndexRoute = TranscriptsIndexRouteImport.update({
   id: '/transcripts/',
   path: '/transcripts/',
@@ -123,9 +137,11 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
+  '/suggestions/$id': typeof SuggestionsIdRoute
   '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/suggestions/': typeof SuggestionsIndexRoute
   '/transcripts/': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
@@ -137,9 +153,11 @@ export interface FileRoutesByTo {
   '/governance': typeof GovernanceRoute
   '/knowledge': typeof KnowledgeRoute
   '/settings': typeof SettingsRoute
+  '/suggestions/$id': typeof SuggestionsIdRoute
   '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes': typeof RoutesIndexRoute
   '/sessions': typeof SessionsIndexRoute
+  '/suggestions': typeof SuggestionsIndexRoute
   '/transcripts': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id': typeof RoutesIdIndexRoute
@@ -156,9 +174,11 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
+  '/suggestions/$id': typeof SuggestionsIdRoute
   '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/suggestions/': typeof SuggestionsIndexRoute
   '/transcripts/': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
@@ -176,9 +196,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
+    | '/suggestions/$id'
     | '/transcripts/$id'
     | '/routes/'
     | '/sessions/'
+    | '/suggestions/'
     | '/transcripts/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
@@ -190,9 +212,11 @@ export interface FileRouteTypes {
     | '/governance'
     | '/knowledge'
     | '/settings'
+    | '/suggestions/$id'
     | '/transcripts/$id'
     | '/routes'
     | '/sessions'
+    | '/suggestions'
     | '/transcripts'
     | '/sessions/$id/timeline'
     | '/routes/$id'
@@ -208,9 +232,11 @@ export interface FileRouteTypes {
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
+    | '/suggestions/$id'
     | '/transcripts/$id'
     | '/routes/'
     | '/sessions/'
+    | '/suggestions/'
     | '/transcripts/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
@@ -225,7 +251,9 @@ export interface RootRouteChildren {
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeRoute: typeof KnowledgeRoute
   SettingsRoute: typeof SettingsRoute
+  SuggestionsIdRoute: typeof SuggestionsIdRoute
   TranscriptsIdRoute: typeof TranscriptsIdRoute
+  SuggestionsIndexRoute: typeof SuggestionsIndexRoute
   TranscriptsIndexRoute: typeof TranscriptsIndexRoute
 }
 
@@ -307,6 +335,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/sessions/$id'
       preLoaderRoute: typeof SessionsIdRouteRouteImport
       parentRoute: typeof SessionsRouteRoute
+    }
+    '/suggestions/': {
+      id: '/suggestions/'
+      path: '/suggestions'
+      fullPath: '/suggestions/'
+      preLoaderRoute: typeof SuggestionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suggestions/$id': {
+      id: '/suggestions/$id'
+      path: '/suggestions/$id'
+      fullPath: '/suggestions/$id'
+      preLoaderRoute: typeof SuggestionsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/transcripts/': {
       id: '/transcripts/'
@@ -408,7 +450,9 @@ const rootRouteChildren: RootRouteChildren = {
   GovernanceRoute: GovernanceRoute,
   KnowledgeRoute: KnowledgeRoute,
   SettingsRoute: SettingsRoute,
+  SuggestionsIdRoute: SuggestionsIdRoute,
   TranscriptsIdRoute: TranscriptsIdRoute,
+  SuggestionsIndexRoute: SuggestionsIndexRoute,
   TranscriptsIndexRoute: TranscriptsIndexRoute,
 }
 export const routeTree = rootRouteImport

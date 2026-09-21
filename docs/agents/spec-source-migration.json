@@ -1,0 +1,4280 @@
+{
+  "manifest_version": "1.1",
+  "generated_at": "2026-09-01T17:25:00+08:00",
+  "repository": "Bandersnatch0x/amber-protocol",
+  "policy": {
+    "status": "ACTIVE_NORMATIVE",
+    "precedence": [
+      "1. Ratified local ADRs govern settled architectural decisions.",
+      "2. Canonical local specs govern behavior, contracts, and requirements.",
+      "3. feature_list.json governs lifecycle/acceptance status and verification claims; it does not erase stale spec metadata.",
+      "4. Local ticket files govern current planning, research, and wayfinding.",
+      "5. GitHub issues are historical provenance and migration evidence; they are never silently promoted over a local source."
+    ],
+    "cutoff_commit": "3e2c3747feb938cca5e7e613b8a5aedd63a060d3",
+    "cutoff_date": "2026-08-28T23:28:44+08:00"
+  },
+  "source_counts": {
+    "github_issues_total": 274,
+    "github_prs_total": 39,
+    "github_id_space_max": 313,
+    "github_bug_reports_total": 10,
+    "github_post_cutoff_non_bug_issues": 37,
+    "github_post_cutoff_bugs": 1,
+    "local_features_count": 59,
+    "local_specs_count": 20,
+    "local_adrs_count": 28,
+    "local_ticket_files_count": 17,
+    "local_ticket_files_range": "0007-0023",
+    "local_reserved_ticket_ids_count": 6,
+    "local_reserved_ticket_range": "0001-0006",
+    "internalized_research_archive_files": 37,
+    "internalized_legacy_archive_files": 26,
+    "unresolved_issue_rows": 0
+  },
+  "disposition_summary": {
+    "bug": 10,
+    "canonical-local-ADR": 3,
+    "historical-provenance": 80,
+    "canonical-local-spec": 181,
+    "unresolved": 0
+  },
+  "group_summary": {
+    "Independent Bug Reports": 2,
+    "Legacy Removal & Facade Teardown (#4)": 1,
+    "Wayfinder Map 1: Product Loop (#6-#34)": 29,
+    "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)": 10,
+    "Dogfooding & Governance Remediation (#46-#74)": 22,
+    "F001-F012 Dogfood Rituals & CLI Lifecycle (#75, #85-#102)": 19,
+    "F015-F020 Governed Loop & MCP Seam (#103-#124)": 19,
+    "F021-F035 Governed Memory & Sync Transport (#127-#176)": 57,
+    "F036-F048 Git Seam & Web Toolchain Upgrades (#199-#222)": 3,
+    "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)": 33,
+    "F059 Knowledge Map v1 (#237-#254, #267)": 19,
+    "F060 Knowledge Map v2 (#259-#266)": 8,
+    "Deployment Profiles & Transport Governance (#268-#273, #296)": 7,
+    "F053-F057 Capabilities Execution (#274-#295)": 20,
+    "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)": 16,
+    "Historical F013/F014 Registry Gap (#76-#84)": 9
+  },
+  "special_cases": {
+    "f060_status_drift": {
+      "status": "DOCUMENTED_CONFLICT_RESOLVED",
+      "spec_file": "docs/specs/F060-knowledge-map-v2-code-graph.md",
+      "spec_header_exact_value": "Status: Proposed",
+      "registry_exact_value": "status: accepted (priority 60, updated 2026-08-30)",
+      "shipped_commits": [
+        "4a84e5c",
+        "91cb463",
+        "7a43630"
+      ],
+      "normative_resolution": "feature_list.json is normative lifecycle authority. F060 is accepted and shipped in code. The spec header is retained as historical authoring drift."
+    },
+    "missing_local_0001_0006": {
+      "status": "PERMANENT_RESERVED_IDENTIFIERS",
+      "range": "0001-0006",
+      "files_present_on_disk": false,
+      "reason": "Consumed by pre-GitHub wayfinder drafting iterations before local ticket store standardization. Explicitly documented in issues/README.md. Never backfilled or reused."
+    },
+    "removed_docs_research_and_legacy": {
+      "status": "INTERNALIZED_ARCHIVE",
+      "cutoff_commit": "3e2c3747feb938cca5e7e613b8a5aedd63a060d3",
+      "docs_research_count": 37,
+      "docs_legacy_count": 26,
+      "reason": "Removed from HEAD git tracking to keep public repo lean; preserved in git history and local working trees; covered by .gitignore and tests/legacy-references.test.js."
+    },
+    "local_0007_0011_frontmatter": {
+      "status": "TRANSITIONAL_HISTORICAL_FORMAT",
+      "files": [
+        "0007-census-single-source.md",
+        "0008-rag-extraction-research.md",
+        "0009-document-index.md",
+        "0010-wiki-declarer-edges.md",
+        "0011-context-term-gaps.md"
+      ],
+      "reason": "Authored during transitional single-source research before docs/agents/issue-tracker.md formalized standard YAML frontmatter."
+    },
+    "feature_registry_gap_f013_f014": {
+      "status": "HISTORICAL_NUMBERING_GAP",
+      "skipped_ids": [
+        "F013",
+        "F014"
+      ],
+      "registered_ids": "F001-F012, F015-F061 (59 features total)",
+      "reason": "F013 and F014 were implemented and recorded as completed historical iterations, but omitted from the current feature registry. They are distinct from F015/F016; no registry backfill is assumed without a separate explicit decision."
+    },
+    "post_cutoff_37_non_bug_issues": {
+      "status": "GRANDFATHERED_CLOSED_TASKS",
+      "total_count": 37,
+      "issue_numbers": [
+        274,
+        275,
+        276,
+        277,
+        279,
+        280,
+        281,
+        282,
+        283,
+        284,
+        285,
+        286,
+        288,
+        289,
+        290,
+        291,
+        292,
+        293,
+        294,
+        295,
+        296,
+        297,
+        298,
+        299,
+        300,
+        301,
+        303,
+        304,
+        305,
+        306,
+        307,
+        308,
+        309,
+        310,
+        311,
+        312,
+        313
+      ],
+      "reason": "In-flight task slices and ADR enhancements grandfathered per docs/agents/issue-tracker.md; all 37 completed and closed naturally."
+    },
+    "issue_302_bug_disposition": {
+      "status": "COMPLIANT_BUG_FIXED",
+      "issue_number": 302,
+      "title": "dsh-bundle npm-pack ETIMEDOUT 在并发负载下惯性抖动(spawnSync 超时预算过紧)",
+      "created_at": "2026-08-30T09:31:21Z",
+      "closed_at": "2026-08-31T16:07:27Z",
+      "fix_commit": "e4095bb",
+      "reason": "Post-cutoff defect report fully compliant with GitHub bug-only tracking policy."
+    },
+    "local_issues_0013_0022_exclusion": {
+      "status": "POLICY_EXCLUDED_DOCUMENTED",
+      "issues": [
+        "0013",
+        "0014",
+        "0015",
+        "0016",
+        "0017",
+        "0018",
+        "0019",
+        "0020",
+        "0021",
+        "0022"
+      ],
+      "parent_map": "0012-public-documentation-site-spec-map.md",
+      "reason": "Part of external Public Documentation Site project in .codex-worktrees/amber-protocol/docs-*; excluded from core protocol spec-to-code compliance."
+    }
+  },
+  "conflict_register": [
+    {
+      "id": "CR-001",
+      "title": "F060 Status Header Drift",
+      "source_a": "docs/specs/F060-knowledge-map-v2-code-graph.md (Line 3: \"**Status:** Accepted (2026-08-30)\")",
+      "source_b": "feature_list.json (F060 status: \"accepted\", commits 4a84e5c, 91cb463, 7a43630)",
+      "resolution": "The spec header and embedded lifecycle status were synchronized to the accepted registry/evidence state; normative content was unchanged and no user feature-registry changes were overwritten.",
+      "state": "RESOLVED"
+    },
+    {
+      "id": "CR-002",
+      "title": "Local Tickets 0013–0022 Scope Boundary",
+      "source_a": "issues/0013–0022 (external public docs site prototype tickets)",
+      "source_b": "Core Amber Protocol spec-to-code compliance suite",
+      "resolution": "User-approved policy explicitly excludes 0013–0022 from downstream core protocol spec-to-code compliance.",
+      "state": "RESOLVED"
+    },
+    {
+      "id": "CR-003",
+      "title": "Post-Cutoff GitHub Tasks vs Bug-Only Tracker Policy",
+      "source_a": "docs/agents/issue-tracker.md (Public GitHub tracker carries bug reports only)",
+      "source_b": "37 post-cutoff task issues #274–#313 created after cutoff",
+      "resolution": "Not grandfathered: these are recorded as post-cutoff policy drift; all are closed, their substantive outcomes are mapped locally, and GitHub is retained as provenance.",
+      "state": "RESOLVED_AS_HISTORICAL_DRIFT"
+    },
+    {
+      "id": "CR-004",
+      "title": "Historical F013/F014 References vs Current Registry",
+      "source_a": "docs/wiki/engineering/harness-evolution.md and GitHub #76–#84",
+     "source_b": "feature_list.json has no F013/F014 and no standalone current spec was found",
+      "resolution": "Recovery of #76–#84, linked commits, local code/tests, and the evolution log resolves the source identity: all nine issues are completed F013/F014 historical work. Retain them as historical-only, leave the feature-registry omission in place for this reconciliation, and do not map them to F015/F016.",
+      "state": "RESOLVED_AS_HISTORICAL_ONLY"
+    }
+  ],
+  "uncertainty_register": [
+    {
+      "id": "UR-001",
+      "title": "Missing Local 0001–0006 Artifact Files",
+      "category": "PERMANENT_RESIDUAL_GAP",
+      "description": "Ticket files 0001 through 0006 do not exist on disk in issues/. Only reserved identifier notes in issues/README.md exist. Original source bytes are unreconstructed.",
+      "impact": "Zero runtime impact. Identifier range 0001-0006 remains permanently reserved."
+    },
+    {
+      "id": "UR-002",
+      "title": "Removed docs/research (37) & docs/legacy (26) Source Drift",
+      "category": "HISTORICAL_ONLY",
+      "description": "Historical docs/research (37) and docs/legacy (26) bytes are not present in a clean checkout; recover from Git history or an ignored local archive when available.",
+      "impact": "Current local canonical sources must not depend on untracked archive bytes.",
+      "status": "HISTORICAL_ONLY"
+    },
+    {
+      "id": "UR-003",
+      "title": "Transitional Local Tickets 0007–0011 Unparsed Schema",
+      "category": "HISTORICAL_FORMAT_VARIANCE",
+      "description": "Local ticket files 0007–0011 lack structured YAML frontmatter, unlike tickets 0012 onwards.",
+      "impact": "Local ticket tooling must support unstructured markdown headers for legacy tickets 0007-0011."
+    },
+    {
+      "id": "UR-004",
+      "title": "Feature Registry Numbering Gap F013 & F014",
+      "category": "HISTORICAL_REGISTRY_DRIFT",
+      "description": "Current feature_list.json intentionally jumps from F012 to F015, while GitHub #76–#84 and docs/wiki/engineering/harness-evolution.md retain F013/F014 references. Recovered commits, local production code, tests, and the evolution log confirm F013/F014 were completed historical iterations; this reconciliation records them as historical-only.",
+      "impact": "No issue rows remain unresolved for source mapping. F013/F014 are not added to feature_list.json and are not mapped to F015/F016; any future backfill requires a separate governed change with its own evidence.",
+      "status": "RESOLVED_HISTORICAL_ONLY"
+    },
+    {
+      "id": "UR-005",
+      "title": "Historical Narrative Drift in Early PRDs (#4, #14, #27)",
+      "category": "SUPERSEDED_HISTORICAL_NARRATIVE",
+      "description": "Early GitHub issue bodies (#4, #14, #27) contain verbatim PRD text and loop descriptions that evolved into subsequent ADRs (ADR-0001 through ADR-0008).",
+      "impact": "Issue text is retained as read-only historical provenance. Local ADRs strictly prevail."
+    },
+    {
+      "id": "UR-006",
+      "title": "F060 Lifecycle Metadata Drift",
+      "category": "CANONICAL_METADATA_CONFLICT",
+      "description": "feature_list.json, shipped evidence, and docs/specs/F060-knowledge-map-v2-code-graph.md now agree on the accepted lifecycle state; the spec content itself was not changed.",
+      "impact": "No downstream metadata conflict remains; future lifecycle changes must update the registry and spec metadata together.",
+      "status": "RESOLVED"
+    }
+  ],
+  "issues": [
+    {
+      "number": 1,
+      "title": "E2E tests: 21 tests failing with 'element(s) not found' errors",
+      "state": "CLOSED",
+      "createdAt": "2026-06-23T09:16:22Z",
+      "closedAt": "2026-06-23T10:39:26Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/1",
+      "group": "Independent Bug Reports",
+      "disposition": "bug",
+      "targetRef": "tests/e2e/ (historical fix)",
+      "notes": "Historical E2E test element lookup failure (F099 test suite fix)",
+      "labels": [
+        "bug"
+      ]
+    },
+    {
+      "number": 4,
+      "title": "PRD: 删除僵尸执行平台周边 + 拆除 amber-core.js facade (1.3.0)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-04T13:06:32Z",
+      "closedAt": "2026-07-04T16:08:41Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/4",
+      "group": "Legacy Removal & Facade Teardown (#4)",
+      "disposition": "canonical-local-ADR",
+      "targetRef": "docs/adr/0002-v2-execution-scope.md, docs/adr/0005-experimental-execution-removal.md",
+      "notes": "PRD for removing legacy execution platform and amber-core facade",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Wayfinder map: close the Amber product loop",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:00:03Z",
+      "closedAt": "2026-07-07T17:35:04Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/6",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 7,
+      "title": "Define the first complete Amber product loop",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:01:10Z",
+      "closedAt": "2026-07-07T17:08:05Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/7",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 8,
+      "title": "Decide the Web/CLI boundary for lifecycle actions",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:01:52Z",
+      "closedAt": "2026-07-07T17:12:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/8",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 9,
+      "title": "Define evidence semantics for Web-triggered lifecycle actions",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:01:52Z",
+      "closedAt": "2026-07-07T17:18:11Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/9",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 10,
+      "title": "Prototype the closed-loop Governance Console journey",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:01:52Z",
+      "closedAt": "2026-07-07T17:25:39Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/10",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 11,
+      "title": "Choose the first implementation slice for the closed loop",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:01:54Z",
+      "closedAt": "2026-07-07T17:32:07Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/11",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 12,
+      "title": "Map Amber CLI lifecycle commands to Web gaps",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:01:56Z",
+      "closedAt": "2026-07-07T17:23:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/12",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 13,
+      "title": "Design the first-slice Web lifecycle broker contract",
+      "state": "CLOSED",
+      "createdAt": "2026-07-07T17:12:48Z",
+      "closedAt": "2026-07-07T17:34:05Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/13",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 14,
+      "title": "Amber 价值闭环：从命令堆到真正帮上忙",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:52:41Z",
+      "closedAt": "2026-07-08T10:52:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/14",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 15,
+      "title": "定义目标用户与核心价值闭环",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:53:41Z",
+      "closedAt": "2026-07-08T02:19:59Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/15",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 16,
+      "title": "端到端实测：走查 init→accept 全程，产出断链清单",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:53:43Z",
+      "closedAt": "2026-07-08T02:12:22Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/16",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 17,
+      "title": "命令面普查：30 个顶层命令的脊柱/孤岛分类",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:53:46Z",
+      "closedAt": "2026-07-08T02:18:13Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/17",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 18,
+      "title": "脊柱裁决：砍哪些孤岛、修哪些断链、留哪条最小闭环",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:53:48Z",
+      "closedAt": "2026-07-08T02:33:32Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/18",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 19,
+      "title": "原型：一条完整闭环的端到端演示",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:53:50Z",
+      "closedAt": "2026-07-08T10:44:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/19",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 20,
+      "title": "Web 控制台的角色与治理边界",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T01:53:52Z",
+      "closedAt": "2026-07-08T10:43:58Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/20",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 21,
+      "title": "修复：会话归属特性与证据回流",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T02:28:41Z",
+      "closedAt": "2026-07-08T03:51:35Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/21",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 22,
+      "title": "修复：handoff 写实况而非安装模板",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T02:28:43Z",
+      "closedAt": "2026-07-08T04:34:58Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/22",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 23,
+      "title": "修复：accept 要求证据",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T02:28:45Z",
+      "closedAt": "2026-07-08T07:50:22Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/23",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 24,
+      "title": "修复：会话终态与 continue 语义",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T02:28:47Z",
+      "closedAt": "2026-07-08T09:40:33Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/24",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 25,
+      "title": "修复：引导一致性与文案失实批次",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T02:28:49Z",
+      "closedAt": "2026-07-08T10:43:54Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/25",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 26,
+      "title": "弃用孤岛命令簇（adoption/task/result/agent/team/profile）",
+      "state": "CLOSED",
+      "createdAt": "2026-07-08T02:28:52Z",
+      "closedAt": "2026-07-08T10:43:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/26",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 27,
+      "title": "验证 Amber 的运行闭环与实际价值",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:38:40Z",
+      "closedAt": "2026-07-10T18:12:10Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/27",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 28,
+      "title": "映射 Amber 从采用到接受交接的真实用户旅程",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:38:56Z",
+      "closedAt": "2026-07-10T17:43:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/28",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 29,
+      "title": "在全新目标仓库验证 Amber 治理闭环",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:39:16Z",
+      "closedAt": "2026-07-10T17:52:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/29",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 30,
+      "title": "测量 Amber 的人工治理开销与重复录入",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:39:32Z",
+      "closedAt": "2026-07-10T18:04:36Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/30",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 31,
+      "title": "核查 Amber 的外部采用与实际结果证据",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:39:48Z",
+      "closedAt": "2026-07-10T18:04:45Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/31",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 32,
+      "title": "比较 Amber 与无 Amber 基线的净增价值",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:40:10Z",
+      "closedAt": "2026-07-10T18:04:54Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/32",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 33,
+      "title": "设计关闭价值证据缺口的最小验证试点",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:41:33Z",
+      "closedAt": "2026-07-10T18:11:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/33",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 34,
+      "title": "裁决 Amber 的运行闭环与实际价值",
+      "state": "CLOSED",
+      "createdAt": "2026-07-10T16:41:33Z",
+      "closedAt": "2026-07-10T18:11:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/34",
+      "group": "Wayfinder Map 1: Product Loop (#6-#34)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/adr/0006-viewer-amber-only.md, docs/adr/0007-web-viewer-role.md, docs/specs/deployment-profiles.md",
+      "notes": "Product loop wayfinder exploration & grilling tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 35,
+      "title": "Wayfinder: fix Amber verify/governance defects from external-repo validation pilot",
+      "state": "CLOSED",
+      "createdAt": "2026-07-11T13:11:14Z",
+      "closedAt": "2026-07-12T16:15:09Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/35",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "External repo pilot verification and audit semantics exploration",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 36,
+      "title": "B1: custom verify-rules.json replaces built-in deny-destructive (silent security loss)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-11T13:13:07Z",
+      "closedAt": "2026-07-11T14:01:56Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/36",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "External repo pilot verification and audit semantics exploration",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 37,
+      "title": "C: accept --plan/--session mismatch not validated (accounting integrity)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-11T13:13:11Z",
+      "closedAt": "2026-07-11T16:10:47Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/37",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "External repo pilot verification and audit semantics exploration",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 38,
+      "title": "D: ledger verify-anchoring prints literal 'undefined' when unsealed",
+      "state": "CLOSED",
+      "createdAt": "2026-07-11T13:13:14Z",
+      "closedAt": "2026-07-11T16:10:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/38",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "External repo pilot verification and audit semantics exploration",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 39,
+      "title": "E: starter feature F001 repurposed & marked accepted; title never synced from plan",
+      "state": "CLOSED",
+      "createdAt": "2026-07-11T13:13:17Z",
+      "closedAt": "2026-07-11T16:10:59Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/39",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "External repo pilot verification and audit semantics exploration",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 40,
+      "title": "B2: verify allow-list bypassed by shell-composite commands (security)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-11T13:16:50Z",
+      "closedAt": "2026-07-11T14:01:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/40",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "External repo pilot verification and audit semantics exploration",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 41,
+      "title": "fix: make generated lifecycle commands target-safe",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T02:44:31Z",
+      "closedAt": "2026-07-13T06:55:11Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/41",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F001, F002), scripts/amber.js",
+      "notes": "Lifecycle commands target-safety fix",
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 42,
+      "title": "fix: connect verification discovery to lifecycle guidance",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T02:44:34Z",
+      "closedAt": "2026-07-13T06:55:15Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/42",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F001, F002), scripts/lib/core/governance.js",
+      "notes": "Verification discovery connection to lifecycle guidance",
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 43,
+      "title": "fix: restore read-only audit semantics",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T02:44:36Z",
+      "closedAt": "2026-07-13T06:55:18Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/43",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F001, F002), scripts/amber.js (audit command)",
+      "notes": "Read-only audit semantics restoration",
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 44,
+      "title": "fix: make governance remedies and handoff evidence truthful",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T02:44:39Z",
+      "closedAt": "2026-07-13T06:55:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/44",
+      "group": "Wayfinder Map 2: External Validation Pilot Fixes (#35-#44)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F001, F002), docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "notes": "Truthful governance remedies and handoff evidence",
+      "labels": [
+        "bug",
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 46,
+      "title": "release flow: local-only tag produces silent ghost version (v1.3.1)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T10:33:12Z",
+      "closedAt": "2026-07-13T10:44:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/46",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": []
+    },
+    {
+      "number": 47,
+      "title": "Automate CHANGELOG + release cut (evaluate release-please vs minimal script)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T10:57:38Z",
+      "closedAt": "2026-07-13T15:17:28Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/47",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 48,
+      "title": "Standardize session-start orientation as one command (dogfood amber status)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T10:58:28Z",
+      "closedAt": "2026-07-13T15:25:35Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/48",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 49,
+      "title": "Weekly self-dogfood: drive one real feature through the full amber session lifecycle",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T10:58:31Z",
+      "closedAt": "2026-07-13T15:15:28Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/49",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 50,
+      "title": "Verify amber next last-mile: dogfood doc flags it as a weakness but code comment says fixed",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T16:05:32Z",
+      "closedAt": "2026-07-13T16:42:14Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/50",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 51,
+      "title": "Verify complete-check rejects template/greenwash handoff in code (dogfood G2)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T16:05:58Z",
+      "closedAt": "2026-07-13T16:39:48Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/51",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 52,
+      "title": "changelog.js: detect BREAKING CHANGE in commit body footer, not just subject",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T16:06:05Z",
+      "closedAt": "2026-07-13T16:54:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/52",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 53,
+      "title": "changelog.js: first-release (no prior tag) only captures HEAD commit",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T17:06:56Z",
+      "closedAt": "2026-07-13T17:44:26Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/53",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 54,
+      "title": "Verify G1/G2 closure on a real TARGET repo — pilot evidence contradicts product-repo verdict",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T17:07:06Z",
+      "closedAt": "2026-07-13T17:44:27Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/54",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 55,
+      "title": "dogfood-weekly.md §7 candidate list is stale — B/C already closed or landed",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T17:07:09Z",
+      "closedAt": "2026-07-13T17:30:40Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/55",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 56,
+      "title": "Add regression test: complete-check --strict rejects init-scaffold/template handoff",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T18:01:03Z",
+      "closedAt": "2026-07-14T00:08:23Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/56",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 57,
+      "title": "Verify apps/web E2E runs on Windows now — playwright uses 127.0.0.1 (memory may be stale)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-13T18:01:09Z",
+      "closedAt": "2026-07-14T00:02:24Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/57",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 58,
+      "title": "Diagnose + fix continue-recovery flaky: 'finds most recent non-completed session' (Node 20 CI)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T01:19:53Z",
+      "closedAt": "2026-07-14T01:34:52Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/58",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 59,
+      "title": "adjudication json gaps mark G1/G2 'blocks 完整' but #54 verified them closed",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T01:19:59Z",
+      "closedAt": "2026-07-14T01:34:55Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/59",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 60,
+      "title": "governance audit/evidence-export hardcode .amber, miss legacy .harness state (Governance layer bug)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T15:48:36Z",
+      "closedAt": "2026-07-14T16:03:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/60",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F003-F008), scripts/lib/core/state-dir.js",
+      "notes": "State-dir hardcoding .amber missing legacy .harness fix",
+      "labels": [
+        "bug",
+        "ready-for-agent",
+        "next-up"
+      ]
+    },
+    {
+      "number": 61,
+      "title": "finding->action remediation library duplicated across governance-readiness + governance-report (drift risk)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T15:48:54Z",
+      "closedAt": "2026-07-14T16:45:06Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/61",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "enhancement",
+        "ready-for-agent",
+        "next-up"
+      ]
+    },
+    {
+      "number": 62,
+      "title": "vestigial autonomous-policy surface + POLICY.md template document removed autonomous mode (ADR-0001/0005 remnant)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T15:49:00Z",
+      "closedAt": "2026-07-14T16:54:47Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/62",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "needs-triage",
+        "next-up"
+      ]
+    },
+    {
+      "number": 63,
+      "title": "command-dispatcher.js past 1000-line split threshold (self-documented watch-item)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T15:49:18Z",
+      "closedAt": "2026-07-14T17:07:56Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/63",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "enhancement",
+        "ready-for-agent",
+        "next-up"
+      ]
+    },
+    {
+      "number": 64,
+      "title": "dogfood: ritual template §4 doesn't cover bugfix route and multi-gate approve",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T16:04:41Z",
+      "closedAt": "2026-07-14T16:54:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/64",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "documentation",
+        "next-up"
+      ]
+    },
+    {
+      "number": 65,
+      "title": "dogfood: amber handoff on product-repo prints 'Install Amber' as next step (misleading)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T16:04:46Z",
+      "closedAt": "2026-07-14T16:29:27Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/65",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F007, F008), scripts/amber.js",
+      "notes": "Misleading handoff recommendation fix",
+      "labels": [
+        "bug",
+        "ready-for-agent",
+        "next-up"
+      ]
+    },
+    {
+      "number": 66,
+      "title": "dogfood: at-most-one-in_progress feature invariant is documented but not enforced (doctor prints 0 errors while HEAD has 2)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-14T16:04:50Z",
+      "closedAt": "2026-07-14T16:40:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/66",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F007, F008), scripts/lib/core/doctor.js",
+      "notes": "Enforce at-most-one-in_progress feature invariant in doctor",
+      "labels": [
+        "bug",
+        "ready-for-agent",
+        "next-up"
+      ]
+    },
+    {
+      "number": 67,
+      "title": "dogfood: docs boundary scan fails plans that quote refused autonomous mode flag",
+      "state": "CLOSED",
+      "createdAt": "2026-07-22T03:11:46Z",
+      "closedAt": "2026-07-22T09:56:20Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/67",
+      "group": "Dogfooding & Governance Remediation (#46-#74)",
+      "disposition": "historical-provenance",
+      "targetRef": "feature_list.json (F003-F008), docs/adr/0009-contract-driven-context-distillation.md",
+      "notes": "Dogfooding rituals, state-dir fixes, template alignment",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 75,
+      "title": "dogfood: feature add cannot produce a doctor-valid feature on product-repo (no flags for user_visible_behavior/verification)",
+      "state": "CLOSED",
+      "createdAt": "2026-07-28T03:35:32Z",
+      "closedAt": "2026-07-28T08:07:04Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/75",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "next-up"
+      ]
+    },
+  {
+    "number": 76,
+      "title": "F013: Deepen Knowledge Plan module behind stable facade",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T08:56:00Z",
+      "closedAt": "2026-08-03T16:57:24Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/76",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F013 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commits, local implementation, tests, and evolution-log entry prove completed F013 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 77,
+      "title": "F014: Deepen Maintenance evidence seam with partial-state reporting",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:01:40Z",
+      "closedAt": "2026-08-03T17:59:06Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/77",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F014 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commits, local implementation, tests, and evolution-log entry prove completed F014 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 78,
+      "title": "F014-M1: Expose honest Maintenance evidence outcome",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:05:03Z",
+      "closedAt": "2026-08-03T17:31:16Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/78",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F014 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F014-M1 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 79,
+      "title": "F013-K1: Deepen read-only Knowledge Plan flows",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:05:12Z",
+      "closedAt": "2026-08-03T11:12:31Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/79",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F013 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F013-K1 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 80,
+      "title": "F013-K2: Deepen write-capable Knowledge Plan flows",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:06:13Z",
+      "closedAt": "2026-08-03T16:47:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/80",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F013 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F013-K2 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 81,
+      "title": "F014-M2: Propagate Maintenance partial state to Governance and Adoption",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:06:15Z",
+      "closedAt": "2026-08-03T17:39:30Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/81",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F014 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F014-M2 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 82,
+      "title": "F014-M3: Route every Maintenance command through one adapter",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:06:17Z",
+      "closedAt": "2026-08-03T17:50:38Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/82",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F014 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F014-M3 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 83,
+      "title": "F013-K3: Seal Knowledge Plan interface and deprecation contract",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:07:25Z",
+      "closedAt": "2026-08-03T16:57:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/83",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F013 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F013-K3 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+  {
+    "number": 84,
+      "title": "F014-M4: Seal Maintenance interface and deprecation contract",
+      "state": "CLOSED",
+      "createdAt": "2026-08-03T09:07:25Z",
+      "closedAt": "2026-08-03T17:59:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/84",
+      "group": "Historical F013/F014 Registry Gap (#76-#84)",
+    "disposition": "historical-provenance",
+    "targetRef": "docs/agents/f013-f014-recovery.md; docs/wiki/engineering/harness-evolution.md; F014 production code/tests; omitted from feature_list.json",
+    "notes": "Recovered GitHub issue, linked commit, local implementation, tests, and evolution-log entry prove completed F014-M4 historical work. The registry omission remains an explicit governance decision; do not map to F015/F016.",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 85,
+      "title": "Compounding context: closing the write path",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:00:55Z",
+      "closedAt": "2026-08-07T01:47:40Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/85",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 86,
+      "title": "Where does the generated wiki index live, and what is in it?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:01:59Z",
+      "closedAt": "2026-08-06T18:20:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/86",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 87,
+      "title": "Measure the normalised-hash filter rate before trusting it",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:02:03Z",
+      "closedAt": "2026-08-07T01:40:08Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/87",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 88,
+      "title": "What is a pageId, and what is its lifecycle?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:02:06Z",
+      "closedAt": "2026-08-06T18:19:41Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/88",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 89,
+      "title": "What is a distillation request's lifecycle?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:02:09Z",
+      "closedAt": "2026-08-07T01:41:37Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/89",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 90,
+      "title": "Do immutable source citations survive clean, gitignore, and archival?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:02:13Z",
+      "closedAt": "2026-08-06T18:18:26Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/90",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 91,
+      "title": "What does amber context stats record, and what does it report?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:02:16Z",
+      "closedAt": "2026-08-07T01:46:39Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/91",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 92,
+      "title": "How does a host agent learn to run the loop at all?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:02:19Z",
+      "closedAt": "2026-08-07T01:42:44Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/92",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 93,
+      "title": "PRD: amber context — contract-driven context distillation (write path)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-06T18:16:17Z",
+      "closedAt": "2026-08-07T00:29:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/93",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 94,
+      "title": "Compounding context: opening the read path (recall/loadout)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:35:44Z",
+      "closedAt": "2026-08-07T03:52:33Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/94",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 95,
+      "title": "T1 What drives loadout selection? (input signal)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:35:58Z",
+      "closedAt": "2026-08-07T03:42:20Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/95",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 96,
+      "title": "T2 Does a loadout live as a generated file or ephemeral output? (artifact form)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:36:13Z",
+      "closedAt": "2026-08-07T03:42:27Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/96",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 97,
+      "title": "T3 What are the budget and tiering rules? (allocator)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:36:27Z",
+      "closedAt": "2026-08-07T03:42:35Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/97",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 98,
+      "title": "T4 Is the freshness gate hard or soft?",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:36:37Z",
+      "closedAt": "2026-08-07T03:46:01Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/98",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 99,
+      "title": "T5 How do pages get route/feature scope? (tagging)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:36:48Z",
+      "closedAt": "2026-08-07T03:46:09Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/99",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 100,
+      "title": "T6 How does the loop avoid duplicate loading? (accounting)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:37:00Z",
+      "closedAt": "2026-08-07T03:46:23Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/100",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 101,
+      "title": "T7 When is freshness re-verified? (validation)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:37:13Z",
+      "closedAt": "2026-08-07T03:46:33Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/101",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": []
+    },
+    {
+      "number": 102,
+      "title": "External harness pattern absorption: triage all 11 points and produce artifacts",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:55:22Z",
+      "closedAt": "2026-08-07T08:16:01Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/102",
+      "group": "F001-F012 Dogfood Rituals & CLI Lifecycle (#75-#102)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F009-F012), docs/adr/0010-context-loadout.md, docs/adr/0011-safety-philosophy-upgrades.md",
+      "notes": "CLI reference documentation and dogfooding milestone F009-F012",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 103,
+      "title": "PRD: amber context load — context loadout (read path)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:55:54Z",
+      "closedAt": "2026-08-07T07:36:08Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/103",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 104,
+      "title": "T1: Safety philosophy — uncertainty-flows-down + fail-closed + swarm safety constraints",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:57:31Z",
+      "closedAt": "2026-08-07T06:49:48Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/104",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 105,
+      "title": "T2: Protocol & schema — versioned wire protocol + execution routing taxonomy + execution choice persistence",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:57:43Z",
+      "closedAt": "2026-08-07T06:50:01Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/105",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 106,
+      "title": "T3: No-progress detector — signal mapping prototype",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:57:56Z",
+      "closedAt": "2026-08-07T06:50:23Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/106",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 107,
+      "title": "T4: SQLite WAL event log — architecture research for web viewer replay",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:58:08Z",
+      "closedAt": "2026-08-07T06:50:37Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/107",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 108,
+      "title": "T5: Session model evolution — follow-up-as-new-run + coordinator chat routing",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:58:22Z",
+      "closedAt": "2026-08-07T06:50:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/108",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 109,
+      "title": "T6: Route extensions — DAG route templates",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T03:58:34Z",
+      "closedAt": "2026-08-07T06:51:08Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/109",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 110,
+      "title": "Implement T1: safety philosophy — ADR-0011 + confidence_gating + requires_approval",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T06:51:42Z",
+      "closedAt": "2026-08-07T08:14:44Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/110",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 111,
+      "title": "Implement T2: protocol & schema — ADR-0012 + versioned artifacts + execution_mode + execution_context",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T06:51:49Z",
+      "closedAt": "2026-08-07T08:15:04Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/111",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 112,
+      "title": "Implement T3: no-progress detector — ADR-0013 + workflow-assessment module",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T06:51:56Z",
+      "closedAt": "2026-08-07T08:15:22Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/112",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 113,
+      "title": "Implement T5.8: routing advisor — ADR-0014 + next --objective",
+      "state": "CLOSED",
+      "createdAt": "2026-08-07T06:52:06Z",
+      "closedAt": "2026-08-07T08:15:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/113",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 115,
+      "title": "PRD: governed Context knowledge lifecycle and quality assurance",
+      "state": "CLOSED",
+      "createdAt": "2026-08-09T16:18:02Z",
+      "closedAt": "2026-08-10T08:50:52Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/115",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 117,
+      "title": "Spec: installable dsh-amber-protocol bundle",
+      "state": "CLOSED",
+      "createdAt": "2026-08-13T16:43:53Z",
+      "closedAt": "2026-08-13T17:36:05Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/117",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 118,
+      "title": "dogfood: verify --execute evidence reflux stamps UTC date (off-by-one vs local day)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-14T18:33:46Z",
+      "closedAt": "2026-08-15T09:44:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/118",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 119,
+      "title": "dogfood: resolvePendingGate reports a next gate even when zero gates are pending",
+      "state": "CLOSED",
+      "createdAt": "2026-08-14T18:33:49Z",
+      "closedAt": "2026-08-15T09:44:31Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/119",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 120,
+      "title": "dogfood: CLI error output stream is inconsistent across hooks subcommands",
+      "state": "CLOSED",
+      "createdAt": "2026-08-14T18:34:05Z",
+      "closedAt": "2026-08-23T03:59:44Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/120",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 121,
+      "title": "dogfood: no CLI surface to book feature paths at completion; learnings trigger depends on them",
+      "state": "CLOSED",
+      "createdAt": "2026-08-15T01:34:19Z",
+      "closedAt": "2026-08-15T09:44:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/121",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 122,
+      "title": "residual UTC date stamps on accept/changelog paths (same class as #118)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-15T07:50:50Z",
+      "closedAt": "2026-08-15T08:43:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/122",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 123,
+      "title": "dogfood: learnings inspect prints 'review NOT booked' even when no triggers matched",
+      "state": "CLOSED",
+      "createdAt": "2026-08-15T08:46:10Z",
+      "closedAt": "2026-08-17T17:29:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/123",
+      "group": "F015-F020 Governed Loop & MCP Seam (#103-#124)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F015-F020), docs/adr/0013-no-progress-detection.md to 0016",
+      "notes": "No-progress loop detection, routing advisor, review blocker contracts, MCP isolation",
+      "labels": [
+        "next-up"
+      ]
+    },
+    {
+      "number": 124,
+      "title": "F022 breadcrumb installer originally wrote an invalid Claude Code hook shape (flat {type,command})",
+      "state": "CLOSED",
+      "createdAt": "2026-08-15T13:17:03Z",
+      "closedAt": "2026-08-15T13:17:41Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/124",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "bug",
+      "targetRef": "feature_list.json (F022), docs/specs/2026-08-15-workflow-state-breadcrumb.md",
+      "notes": "F022 breadcrumb Claude Code hook shape structure fix",
+      "labels": [
+        "bug"
+      ]
+    },
+    {
+      "number": 127,
+      "title": "First-class governance-loop e2e on a fresh target",
+      "state": "CLOSED",
+      "createdAt": "2026-08-17T09:38:37Z",
+      "closedAt": "2026-08-23T05:06:15Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/127",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 128,
+      "title": "Skill frontmatter lockstep with the Governance Console",
+      "state": "CLOSED",
+      "createdAt": "2026-08-17T09:38:37Z",
+      "closedAt": "2026-08-23T03:59:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/128",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 129,
+      "title": "Nightly host scenario: agent follows Amber on a fresh target",
+      "state": "CLOSED",
+      "createdAt": "2026-08-17T09:40:59Z",
+      "closedAt": "2026-08-23T19:49:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/129",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 130,
+      "title": "chore(web): add seam guard test for web-adapter-only CLI imports",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T02:51:05Z",
+      "closedAt": "2026-08-19T03:43:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/130",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 131,
+      "title": "[retroactive] 01 端口竞态根治：dev-bootstrap 单次预解析",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T02:52:19Z",
+      "closedAt": "2026-08-19T03:52:10Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/131",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 132,
+      "title": "[retroactive] 02 gates 页缺陷修复：feedback 双通道 / reviewer 收纳 / 筛选 URL 化 / 审计计数口径",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T02:52:23Z",
+      "closedAt": "2026-08-19T03:52:17Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/132",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 133,
+      "title": "[retroactive] 03 首页 IA 瘦身与失败态友好化",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T02:52:30Z",
+      "closedAt": "2026-08-19T03:52:25Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/133",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 134,
+      "title": "[retroactive] 04 会话详情工作台：审批误判 / 清单字段 / 主次分层",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T02:52:33Z",
+      "closedAt": "2026-08-19T03:52:33Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/134",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 135,
+      "title": "[retroactive] 05 governance 认知修复：导航 / 骨架 / 标签 / learnings / 分数口径",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T02:52:39Z",
+      "closedAt": "2026-08-19T03:52:40Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/135",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 136,
+      "title": "[retroactive] 06 transcript 时间轴重构：降噪规则 R1–R9 + 左轴连接线 + Markdown 启发式 + tool-only 徽章 + 骨架屏",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T03:01:54Z",
+      "closedAt": "2026-08-19T03:52:47Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/136",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 137,
+      "title": "[retroactive] 07 认知设计修复：页面互链 / 后端动态文案本地化 / 分数口径副标题 / 术语内联解释",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T03:02:20Z",
+      "closedAt": "2026-08-19T03:52:54Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/137",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 138,
+      "title": "[retroactive] 08 away_summary subtype 加固：两级判断 + 尾缀兜底钉死",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T03:02:37Z",
+      "closedAt": "2026-08-19T03:53:02Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/138",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 139,
+      "title": "[retroactive] 09 转录-会话推断关联：路径归一 + 闭区间相交 + 前端三态 + 诚实标注",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T03:03:13Z",
+      "closedAt": "2026-08-19T03:53:08Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/139",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 140,
+      "title": "[retroactive] 10 apps/web 格式门禁与一次性重排",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T03:03:29Z",
+      "closedAt": "2026-08-19T03:53:19Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/140",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F021-F032), apps/web/",
+      "notes": "Governance loop e2e, apps/web retroactive UI batches 01-10 (F031, F032)",
+      "labels": []
+    },
+    {
+      "number": 141,
+      "title": "Amber distributed governance: three deployment profiles and a synchronization runtime",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:28:36Z",
+      "closedAt": "2026-08-23T19:51:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/141",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 142,
+      "title": "Establish the Governance Graph capability baseline",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:18Z",
+      "closedAt": "2026-08-19T08:10:08Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/142",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 143,
+      "title": "Extract reusable state patterns for a non-executing synchronization runtime",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:20Z",
+      "closedAt": "2026-08-19T08:10:13Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/143",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 144,
+      "title": "Evaluate lifecycle-safe dynamic component assembly",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:23Z",
+      "closedAt": "2026-08-19T08:10:17Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/144",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 145,
+      "title": "Define distributed-governance bounded contexts and invariants",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:26Z",
+      "closedAt": "2026-08-19T08:48:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/145",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 146,
+      "title": "Define identity, tenancy, and deployment-profile semantics",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:28Z",
+      "closedAt": "2026-08-19T12:07:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/146",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 147,
+      "title": "Define authority, synchronization, and conflict invariants",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:32Z",
+      "closedAt": "2026-08-19T14:08:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/147",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 148,
+      "title": "Define the Governance Graph and provenance contract",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:35Z",
+      "closedAt": "2026-08-19T15:03:00Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/148",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 149,
+      "title": "Define Runtime extension, transport, and lifecycle contracts",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:37Z",
+      "closedAt": "2026-08-19T16:36:38Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/149",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 150,
+      "title": "Define storage projections, queries, subscriptions, and consistency",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:41Z",
+      "closedAt": "2026-08-20T09:34:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/150",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 151,
+      "title": "Define security, privacy, and tenant-isolation guarantees",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:44Z",
+      "closedAt": "2026-08-20T11:19:56Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/151",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 152,
+      "title": "Define compatibility, migration, and phased rollout",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:47Z",
+      "closedAt": "2026-08-20T13:09:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/152",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 153,
+      "title": "Prototype the three-profile governance tracer scenario",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:49Z",
+      "closedAt": "2026-08-20T14:49:59Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/153",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 154,
+      "title": "Set implementation acceptance and handoff criteria",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:29:53Z",
+      "closedAt": "2026-08-21T02:24:30Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/154",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 155,
+      "title": "Define governed knowledge accumulation and curation lifecycle",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:34:03Z",
+      "closedAt": "2026-08-20T15:47:12Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/155",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 156,
+      "title": "Define visualization projection and interaction contracts",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:34:06Z",
+      "closedAt": "2026-08-20T16:08:28Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/156",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 157,
+      "title": "Prototype the temporal and relationship knowledge workbench",
+      "state": "CLOSED",
+      "createdAt": "2026-08-19T07:34:09Z",
+      "closedAt": "2026-08-20T18:58:15Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/157",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 158,
+      "title": "Distributed governance implementation specification",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:43:39Z",
+      "closedAt": "2026-08-23T19:51:18Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/158",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 159,
+      "title": "Authoritative architecture baseline and ADR traceability",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:26Z",
+      "closedAt": "2026-08-21T04:02:38Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/159",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 160,
+      "title": "Deterministic fixture family and acceptance matrix",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:37Z",
+      "closedAt": "2026-08-23T08:27:33Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/160",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 161,
+      "title": "Personal Node offline tracer",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:41Z",
+      "closedAt": "2026-08-23T17:03:45Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/161",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 162,
+      "title": "Governance Graph projection and query contract",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:43Z",
+      "closedAt": "2026-08-23T18:26:38Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/162",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 163,
+      "title": "Governed Knowledge Base lifecycle",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:47Z",
+      "closedAt": "2026-08-23T18:56:23Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/163",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 164,
+      "title": "Visualization Workbench projections",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:53Z",
+      "closedAt": "2026-08-23T19:22:41Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/164",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 165,
+      "title": "Sync Runtime envelope and conflict semantics",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:46:58Z",
+      "closedAt": "2026-08-23T17:42:11Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/165",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 166,
+      "title": "Team Hub synchronization tracer",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:47:01Z",
+      "closedAt": "2026-08-23T17:54:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/166",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 167,
+      "title": "Organization Profile audit and policy tracer",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:47:05Z",
+      "closedAt": "2026-08-23T19:09:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/167",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 168,
+      "title": "Phase gate evidence and rollback and promotion harness",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:47:08Z",
+      "closedAt": "2026-08-23T19:36:58Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/168",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, ADR-0020, feature_list.json (F035)",
+      "notes": "Distributed governance, 3 deployment profiles, synchronization runtime",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 169,
+      "title": "Governed Memory Layer：记忆写回闸门、dreaming 维护与分层晋升规则的动词生命周期",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:47:41Z",
+      "closedAt": "2026-08-21T10:49:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/169",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 170,
+      "title": "Memory Layer 对象模型与分层分类",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:48:44Z",
+      "closedAt": "2026-08-21T04:03:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/170",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 171,
+      "title": "业界 agent memory 写回与维护机制调研",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:48:47Z",
+      "closedAt": "2026-08-21T03:07:38Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/171",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 172,
+      "title": "写回闸门：触发点与草稿契约设计",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:48:50Z",
+      "closedAt": "2026-08-21T06:58:09Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/172",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 173,
+      "title": "分层晋升规则与闸门形态",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:48:52Z",
+      "closedAt": "2026-08-21T07:39:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/173",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 174,
+      "title": "Dreaming 维护 loop 契约设计",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:48:57Z",
+      "closedAt": "2026-08-21T08:25:13Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/174",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 175,
+      "title": "Memory Layer 动词表面：Action Types、schemas 与治理接缝",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T02:49:00Z",
+      "closedAt": "2026-08-21T09:12:13Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/175",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, feature_list.json (F033, F034)",
+      "notes": "Governed Memory Layer model, write-back triggers, verb lifecycle",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 176,
+      "title": "Versioned contract registry and compatibility matrix",
+      "state": "CLOSED",
+      "createdAt": "2026-08-21T04:10:52Z",
+      "closedAt": "2026-08-21T05:44:52Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/176",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-ADR",
+      "targetRef": "docs/adr/0012-protocol-and-schema-versioning.md, registry/contract-registry.json",
+      "notes": "Versioned contract registry and compatibility matrix (ADR-0012)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 199,
+      "title": "F035-S1: Canonical artifact path and allowlist",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T10:33:02Z",
+      "closedAt": "2026-08-24T11:21:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/199",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/sync-envelope-contract.md, feature_list.json (F035)",
+      "notes": "F035 Sync envelope contract slices (S1-S6)",
+      "labels": [
+        "ready-for-agent",
+        "F035"
+      ]
+    },
+    {
+      "number": 200,
+      "title": "F035-S2: Schema SSOT and protocol compatibility",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T10:33:16Z",
+      "closedAt": "2026-08-24T13:52:02Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/200",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/sync-envelope-contract.md, feature_list.json (F035)",
+      "notes": "F035 Sync envelope contract slices (S1-S6)",
+      "labels": [
+        "ready-for-agent",
+        "F035"
+      ]
+    },
+    {
+      "number": 201,
+      "title": "F035-S3: Structural identity admission and conflict classification",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T10:33:32Z",
+      "closedAt": "2026-08-24T14:23:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/201",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/sync-envelope-contract.md, feature_list.json (F035)",
+      "notes": "F035 Sync envelope contract slices (S1-S6)",
+      "labels": [
+        "F035"
+      ]
+    },
+    {
+      "number": 202,
+      "title": "F035-S4: Remove ungoverned sync Git writes and persist refusals",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T10:33:47Z",
+      "closedAt": "2026-08-24T14:47:11Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/202",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/sync-envelope-contract.md, feature_list.json (F035)",
+      "notes": "F035 Sync envelope contract slices (S1-S6)",
+      "labels": [
+        "F035"
+      ]
+    },
+    {
+      "number": 203,
+      "title": "F035-S5: Fail closed on corrupt distributed read models",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T10:34:03Z",
+      "closedAt": "2026-08-24T13:52:06Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/203",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/sync-envelope-contract.md, feature_list.json (F035)",
+      "notes": "F035 Sync envelope contract slices (S1-S6)",
+      "labels": [
+        "ready-for-agent",
+        "F035"
+      ]
+    },
+    {
+      "number": 204,
+      "title": "F035-S6: Restore flat-at-rest Web input styling",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T10:34:18Z",
+      "closedAt": "2026-08-24T13:52:10Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/204",
+      "group": "F021-F035 Governed Memory & Sync Transport (#127-#176)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/sync-envelope-contract.md, feature_list.json (F035)",
+      "notes": "F035 Sync envelope contract slices (S1-S6)",
+      "labels": [
+        "ready-for-agent",
+        "F035"
+      ]
+    },
+    {
+      "number": 205,
+      "title": "F036-S1: Fix legacy .harness sessions bug (audit counts zero)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T17:30:58Z",
+      "closedAt": "2026-08-24T17:49:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/205",
+      "group": "F036-F048 Git Seam & Web Toolchain Upgrades (#199-#222)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F036)",
+      "notes": "F036 State-dir abstraction slices (S1-S2)",
+      "labels": []
+    },
+    {
+      "number": 206,
+      "title": "F036-S2: Add statePath verbs and migrate all hardcoded .amber joins",
+      "state": "CLOSED",
+      "createdAt": "2026-08-24T17:31:07Z",
+      "closedAt": "2026-08-24T18:39:19Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/206",
+      "group": "F036-F048 Git Seam & Web Toolchain Upgrades (#199-#222)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F036)",
+      "notes": "F036 State-dir abstraction slices (S1-S2)",
+      "labels": []
+    },
+    {
+      "number": 207,
+      "title": "apps/web: staged major-dependency upgrades (eslint 8 EOL first, then tRPC 11 + Query 5, React 19, build chain)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-25T01:23:50Z",
+      "closedAt": "2026-08-25T16:47:06Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/207",
+      "group": "F036-F048 Git Seam & Web Toolchain Upgrades (#199-#222)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "feature_list.json (F043-F046), docs/plans/F043-apps-web-eslint-10-flat-config-issue-207-batch-1.md to F046",
+      "notes": "Apps/web major dependency upgrade plan (eslint 10, tRPC 11, React 19, build chain)",
+      "labels": [
+        "needs-triage"
+      ]
+    },
+    {
+      "number": 208,
+      "title": "[Program] Amber Governed Capabilities",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:30:43Z",
+      "closedAt": "2026-08-29T05:12:05Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/208",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md to F058, docs/roadmaps/amber-governed-capabilities-program.md",
+      "notes": "Program charter: Amber Governed Capabilities",
+      "labels": []
+    },
+    {
+      "number": 209,
+      "title": "[Spec] F049 Canonical Planning Artifacts",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:12Z",
+      "closedAt": "2026-08-27T04:11:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/209",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md",
+      "notes": "Feature specification definition for F049",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 210,
+      "title": "[Spec] F050 Decisions, Gates & Evidence Assurance",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:15Z",
+      "closedAt": "2026-08-27T21:40:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/210",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md",
+      "notes": "Feature specification definition for F050",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 211,
+      "title": "[Spec] F051 Read-only Adapters & Explicit Cutover",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:18Z",
+      "closedAt": "2026-08-28T09:58:38Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/211",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F051-read-only-adapters-explicit-cutover.md",
+      "notes": "Feature specification definition for F051",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 212,
+      "title": "[Spec] F052 Controlled Runner & Environment Boundaries",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:22Z",
+      "closedAt": "2026-08-28T15:57:06Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/212",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F052-controlled-runner-environment-boundaries.md",
+      "notes": "Feature specification definition for F052",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 213,
+      "title": "[Spec] F053 Release Prepare, Deploy & Rollback",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:25Z",
+      "closedAt": "2026-08-28T18:33:32Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/213",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F053-release-prepare-deploy-rollback.md",
+      "notes": "Feature specification definition for F053",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 214,
+      "title": "[Spec] F054 Deterministic Maintain & Intent Re-entry",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:27Z",
+      "closedAt": "2026-08-28T21:04:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/214",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F054-deterministic-maintain-intent-reentry.md",
+      "notes": "Feature specification definition for F054",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 215,
+      "title": "[Spec] F055 Retention, Coordinated Deletion & Proof",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:29Z",
+      "closedAt": "2026-08-29T01:10:06Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/215",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F055-retention-coordinated-deletion-proof.md",
+      "notes": "Feature specification definition for F055",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 216,
+      "title": "[Spec] F056 Registered External Side Effects",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:32Z",
+      "closedAt": "2026-08-29T03:28:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/216",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F056-registered-external-side-effects.md",
+      "notes": "Feature specification definition for F056",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 217,
+      "title": "[Spec] F057 Break-glass Authorization",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T01:49:34Z",
+      "closedAt": "2026-08-29T05:10:13Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/217",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F057-break-glass-authorization.md",
+      "notes": "Feature specification definition for F057",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 218,
+      "title": "[F049] T1: Intent admission tracer bullet",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T02:33:37Z",
+      "closedAt": "2026-08-27T00:27:35Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/218",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 219,
+      "title": "[F049] T2: Compare-and-swap and idempotent admission",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T02:34:00Z",
+      "closedAt": "2026-08-27T00:27:41Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/219",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 220,
+      "title": "[F049] T3: Spec/Plan types and typed Trace lineage",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T02:34:05Z",
+      "closedAt": "2026-08-27T00:27:49Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/220",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 221,
+      "title": "[F049] T4: Fail-closed admission integrity hardening",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T02:34:29Z",
+      "closedAt": "2026-08-27T00:27:55Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/221",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 222,
+      "title": "[F049] T5: Governance Graph projection of artifact revisions",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T02:34:46Z",
+      "closedAt": "2026-08-27T00:28:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/222",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 223,
+      "title": "[F049] T6: Version negotiation, namespaces, resource ceilings",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T02:35:00Z",
+      "closedAt": "2026-08-27T04:11:02Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/223",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 224,
+      "title": "[Spec] F058 Instruction-Surface Adversarial Evals",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T17:48:06Z",
+      "closedAt": "2026-08-27T03:56:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/224",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 225,
+      "title": "[F058] Align tests to the public Eval suite seam",
+      "state": "CLOSED",
+      "createdAt": "2026-08-26T17:49:30Z",
+      "closedAt": "2026-08-26T17:49:58Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/225",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F049-canonical-planning-artifacts.md, feature_list.json (F049), ADR-0021, ADR-0023",
+      "notes": "F049 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 226,
+      "title": "[F050] T1: Principal registry & Decision tracer bullet",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:04:17Z",
+      "closedAt": "2026-08-27T07:49:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/226",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 227,
+      "title": "[F050] T2: Evidence receipts & Assurance levels",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:04:40Z",
+      "closedAt": "2026-08-27T09:44:01Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/227",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 228,
+      "title": "[F050] T3: Gate Contracts & deterministic evaluation",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:05:03Z",
+      "closedAt": "2026-08-27T16:01:52Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/228",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 229,
+      "title": "[F050] T4: Approval atomicity & lifecycle",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:05:26Z",
+      "closedAt": "2026-08-27T12:14:09Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/229",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 230,
+      "title": "[F050] T5: Policy ceiling & separation of duties",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:05:50Z",
+      "closedAt": "2026-08-27T18:54:17Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/230",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 231,
+      "title": "[F050] T6: Staleness propagation & strict queries",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:06:13Z",
+      "closedAt": "2026-08-27T21:38:52Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/231",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 232,
+      "title": "[F050] T7: Canonical Eval admission",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:06:36Z",
+      "closedAt": "2026-08-27T20:32:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/232",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F050-decisions-gates-evidence-assurance.md, feature_list.json (F050)",
+      "notes": "F050 implementation tasks (T1-T7)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 233,
+      "title": "[F051] T1: Read-only Adapter tracer bullet",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:09:31Z",
+      "closedAt": "2026-08-27T22:47:04Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/233",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F051-read-only-adapters-explicit-cutover.md, feature_list.json (F051), ADR-0024",
+      "notes": "F051 implementation tasks (T1-T4)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 234,
+      "title": "[F051] T2: Adapter states & migration candidates",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:09:57Z",
+      "closedAt": "2026-08-28T01:33:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/234",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F051-read-only-adapters-explicit-cutover.md, feature_list.json (F051), ADR-0024",
+      "notes": "F051 implementation tasks (T1-T4)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 235,
+      "title": "[F051] T3: Shadow comparison & coverage",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:11:59Z",
+      "closedAt": "2026-08-28T05:44:12Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/235",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F051-read-only-adapters-explicit-cutover.md, feature_list.json (F051), ADR-0024",
+      "notes": "F051 implementation tasks (T1-T4)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 236,
+      "title": "[F051] T4: Explicit Cutover & rollback",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T04:12:21Z",
+      "closedAt": "2026-08-28T09:57:19Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/236",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F051-read-only-adapters-explicit-cutover.md, feature_list.json (F051), ADR-0024",
+      "notes": "F051 implementation tasks (T1-T4)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 237,
+      "title": "Chart: Knowledge & Decision Map feature (wayfinder map)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T07:48:05Z",
+      "closedAt": "2026-08-27T13:47:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/237",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 238,
+      "title": "Decision: v1 node & edge data model for Knowledge Map",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T07:49:43Z",
+      "closedAt": "2026-08-27T09:01:40Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/238",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 239,
+      "title": "Decision: cited QA (read-only Q&A) contract",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T07:49:51Z",
+      "closedAt": "2026-08-27T13:45:36Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/239",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 240,
+      "title": "Prototype: Knowledge Map layout & interaction",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T07:50:45Z",
+      "closedAt": "2026-08-27T13:36:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/240",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 241,
+      "title": "Decision: Recent & Drift panel data contract",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T07:51:16Z",
+      "closedAt": "2026-08-27T09:27:36Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/241",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 242,
+      "title": "Research: graph rendering library choice (resolved)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T07:53:12Z",
+      "closedAt": "2026-08-27T07:54:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/242",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 243,
+      "title": "Decision: web-server LLM provider abstraction",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T09:02:39Z",
+      "closedAt": "2026-08-27T09:33:03Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/243",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 244,
+      "title": "Decision: context-pages batch distillation strategy",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T09:03:15Z",
+      "closedAt": "2026-08-27T09:38:42Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/244",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 245,
+      "title": "Decision: semantic layer cache & refresh semantics",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T09:03:22Z",
+      "closedAt": "2026-08-27T09:42:00Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/245",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 246,
+      "title": "Implementation handoff: Knowledge & Decision Map (all contracts frozen)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T13:47:00Z",
+      "closedAt": "2026-08-28T10:13:59Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/246",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, docs/research/ (internal archive)",
+      "notes": "F059 Knowledge Map v1 wayfinder map #237, grilling and prototype tickets",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 247,
+      "title": "[F059] T1: Deterministic knowledge-graph parser + amber knowledge graph --json",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:24:51Z",
+      "closedAt": "2026-08-27T17:12:24Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/247",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 248,
+      "title": "[F059] T2: Web real-data wiring — read-only tRPC knowledge router",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:04Z",
+      "closedAt": "2026-08-27T18:42:25Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/248",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 249,
+      "title": "[F059] T3: Recent & Drift panel with real jump links",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:08Z",
+      "closedAt": "2026-08-27T19:47:36Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/249",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 250,
+      "title": "[F059] T4: Read-time LLM semantic layer",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:13Z",
+      "closedAt": "2026-08-27T21:35:56Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/250",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 251,
+      "title": "[F059] T5: Cited QA over the deterministic snapshot",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:18Z",
+      "closedAt": "2026-08-27T22:57:45Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/251",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 252,
+      "title": "[F059] T6: Eval extension — QA contract-surface model-independence scan",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:24Z",
+      "closedAt": "2026-08-27T23:50:16Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/252",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 253,
+      "title": "[F059] T7: Projection unification — 43 knowledge artifacts as context pages",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:30Z",
+      "closedAt": "2026-08-28T07:48:00Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/253",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 254,
+      "title": "[F059] T8: Close-out — feature_list entry, live-data verification, parent closure",
+      "state": "CLOSED",
+      "createdAt": "2026-08-27T14:25:36Z",
+      "closedAt": "2026-08-28T10:09:44Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/254",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 implementation tasks (T1-T8)",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 255,
+      "title": "[F052] T1: Runner & capability registry",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T10:02:39Z",
+      "closedAt": "2026-08-28T12:43:40Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/255",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F052-controlled-runner-environment-boundaries.md, feature_list.json (F052)",
+      "notes": "F052 Controlled Runner implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 256,
+      "title": "[F052] T2: Execution requests & policy-derived risk",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T10:03:22Z",
+      "closedAt": "2026-08-28T14:07:42Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/256",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F052-controlled-runner-environment-boundaries.md, feature_list.json (F052)",
+      "notes": "F052 Controlled Runner implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 257,
+      "title": "[F052] T3: Environment profiles & boundaries",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T10:03:24Z",
+      "closedAt": "2026-08-28T15:00:54Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/257",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F052-controlled-runner-environment-boundaries.md, feature_list.json (F052)",
+      "notes": "F052 Controlled Runner implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 258,
+      "title": "[F052] T4: Execution settlement, receipts & assurance separation",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T10:03:57Z",
+      "closedAt": "2026-08-28T15:56:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/258",
+      "group": "F049-F058 Governed Capabilities Program (#208-#236, #255-#258)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F052-controlled-runner-environment-boundaries.md, feature_list.json (F052)",
+      "notes": "F052 Controlled Runner implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 259,
+      "title": "Research: JS graph-analytics ecosystem for knowledge-map v2 (community detection & centrality)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T10:53:36Z",
+      "closedAt": "2026-08-28T11:23:49Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/259",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 260,
+      "title": "Chart: Knowledge Map v2 — code-level graph & interaction upgrade (wayfinder map)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:00:43Z",
+      "closedAt": "2026-08-28T17:56:34Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/260",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 261,
+      "title": "Decision: AST symbol-graph data model & merge semantics with the knowledge graph",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:02:19Z",
+      "closedAt": "2026-08-28T13:15:07Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/261",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 262,
+      "title": "Research: tree-sitter integration path for a Node monorepo (JS/TS grammars, incremental indexing)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:02:23Z",
+      "closedAt": "2026-08-28T12:28:59Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/262",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:research"
+      ]
+    },
+    {
+      "number": 263,
+      "title": "Decision: god-node & anomalous-connection surfacing",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:02:27Z",
+      "closedAt": "2026-08-28T17:04:35Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/263",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 264,
+      "title": "Prototype: merged code+knowledge graph over real repo data",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:02:33Z",
+      "closedAt": "2026-08-28T16:50:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/264",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:prototype"
+      ]
+    },
+    {
+      "number": 265,
+      "title": "Decision: interaction upgrade scope — drag, neighbor expansion, search recall",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:02:38Z",
+      "closedAt": "2026-08-28T17:51:47Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/265",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "historical-provenance",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:grilling"
+      ]
+    },
+    {
+      "number": 266,
+      "title": "Task: draft the Knowledge Map v2 feature spec (F0XX)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:02:42Z",
+      "closedAt": "2026-08-28T17:55:50Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/266",
+      "group": "F060 Knowledge Map v2 (#259-#266)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F060-knowledge-map-v2-code-graph.md, docs/adr/0025-code-nodes-and-anchors-edges.md, feature_list.json (F060)",
+      "notes": "F060 Knowledge Map v2 wayfinder map #260, research, decisions and spec drafting task",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 267,
+      "title": "F059 knowledge map v1 fix batch: 15 adjudicated findings (P0/P1/P2)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T11:07:08Z",
+      "closedAt": "2026-08-28T18:36:16Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/267",
+      "group": "F059 Knowledge Map v1 (#237-#254, #267)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F059-knowledge-decision-map.md, feature_list.json (F059)",
+      "notes": "F059 Knowledge Map v1 fix batch: 15 adjudicated findings (P0/P1/P2)",
+      "labels": []
+    },
+    {
+      "number": 268,
+      "title": "Deployment-profile spec 合规修复批（M1-M3 + 文档漂移）",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T13:54:09Z",
+      "closedAt": "2026-08-30T01:47:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/268",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, docs/adr/0020-governed-live-git-transport.md",
+      "notes": "Deployment-profile spec & transport governance compliance/drift fixes (M1-M3, L1-L7)",
+      "labels": [
+        "wayfinder:map"
+      ]
+    },
+    {
+      "number": 269,
+      "title": "M2: 档位声明 fail-closed——坏 JSON 不再静默默认、pack 拒绝无效声明",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T13:55:20Z",
+      "closedAt": "2026-08-30T01:01:14Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/269",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, docs/adr/0020-governed-live-git-transport.md",
+      "notes": "Deployment-profile spec & transport governance compliance/drift fixes (M1-M3, L1-L7)",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 270,
+      "title": "M3: phase 门与档位校验器对齐——hasProfile 改走 readProfileFile",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T13:55:23Z",
+      "closedAt": "2026-08-30T01:01:40Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/270",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, docs/adr/0020-governed-live-git-transport.md",
+      "notes": "Deployment-profile spec & transport governance compliance/drift fixes (M1-M3, L1-L7)",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 271,
+      "title": "M1: ADR-0020 'attempt' 语义裁定——identity 门退出与传输账本的关系",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T13:55:26Z",
+      "closedAt": "2026-08-30T01:01:43Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/271",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, docs/adr/0020-governed-live-git-transport.md",
+      "notes": "Deployment-profile spec & transport governance compliance/drift fixes (M1-M3, L1-L7)",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 272,
+      "title": "L1-L4: 治理文档漂移修复（baseline 矩阵 / ADR-0020 pathspec / agents.md / ADR-0019）",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T13:55:29Z",
+      "closedAt": "2026-08-30T01:01:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/272",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, docs/adr/0020-governed-live-git-transport.md",
+      "notes": "Deployment-profile spec & transport governance compliance/drift fixes (M1-M3, L1-L7)",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 273,
+      "title": "L5-L7+UNDOC: 档位声明机制文档化（后续批）",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T13:55:33Z",
+      "closedAt": "2026-08-30T01:47:26Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/273",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/deployment-profiles.md, docs/specs/sync-envelope-contract.md, docs/adr/0019-distributed-governance-stage1-decisions.md, docs/adr/0020-governed-live-git-transport.md",
+      "notes": "Deployment-profile spec & transport governance compliance/drift fixes (M1-M3, L1-L7)",
+      "labels": [
+        "wayfinder:task"
+      ]
+    },
+    {
+      "number": 274,
+      "title": "[F053] T1: Release candidate preparation",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T16:25:50Z",
+      "closedAt": "2026-08-28T16:56:07Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/274",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F053-release-prepare-deploy-rollback.md, feature_list.json (F053)",
+      "notes": "F053 Release Prepare & Deploy implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 275,
+      "title": "[F053] T2: Staging & production release authorization",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T16:26:28Z",
+      "closedAt": "2026-08-28T17:46:07Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/275",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F053-release-prepare-deploy-rollback.md, feature_list.json (F053)",
+      "notes": "F053 Release Prepare & Deploy implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 276,
+      "title": "[F053] T3: Deployment & rollback execution binding",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T16:26:30Z",
+      "closedAt": "2026-08-28T18:13:22Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/276",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F053-release-prepare-deploy-rollback.md, feature_list.json (F053)",
+      "notes": "F053 Release Prepare & Deploy implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 277,
+      "title": "[F053] T4: Release receipts, audit projection & MCP boundary",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T16:26:55Z",
+      "closedAt": "2026-08-28T18:33:04Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/277",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F053-release-prepare-deploy-rollback.md, feature_list.json (F053)",
+      "notes": "F053 Release Prepare & Deploy implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 279,
+      "title": "[F054] T1: Control Band detectors & deterministic Findings",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T18:34:38Z",
+      "closedAt": "2026-08-28T19:19:02Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/279",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F054-deterministic-maintain-intent-reentry.md, feature_list.json (F054)",
+      "notes": "F054 Maintain & Intent Re-entry implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 280,
+      "title": "[F054] T2: Trigger Proposals & cooldown dedup",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T18:35:13Z",
+      "closedAt": "2026-08-28T19:53:58Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/280",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F054-deterministic-maintain-intent-reentry.md, feature_list.json (F054)",
+      "notes": "F054 Maintain & Intent Re-entry implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 281,
+      "title": "[F054] T3: Owner triage & governed Intent re-entry",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T18:35:15Z",
+      "closedAt": "2026-08-28T20:28:48Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/281",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F054-deterministic-maintain-intent-reentry.md, feature_list.json (F054)",
+      "notes": "F054 Maintain & Intent Re-entry implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 282,
+      "title": "[F054] T4: Staleness, Eval write-back & deterministic rollups",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T18:35:42Z",
+      "closedAt": "2026-08-28T21:04:23Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/282",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F054-deterministic-maintain-intent-reentry.md, feature_list.json (F054)",
+      "notes": "F054 Maintain & Intent Re-entry implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 283,
+      "title": "[F055] T1: Retention classes & deterministic expiry evaluation",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T21:06:03Z",
+      "closedAt": "2026-08-28T21:39:28Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/283",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F055-retention-coordinated-deletion-proof.md, docs/adr/0026-deletion-execution-gate.md, feature_list.json (F055)",
+      "notes": "F055 Retention & Deletion Proof implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 284,
+      "title": "[F055] T2: Legal Hold registry with human-only lifecycle",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T21:06:39Z",
+      "closedAt": "2026-08-28T22:04:20Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/284",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F055-retention-coordinated-deletion-proof.md, docs/adr/0026-deletion-execution-gate.md, feature_list.json (F055)",
+      "notes": "F055 Retention & Deletion Proof implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 285,
+      "title": "[F055] T3: Deletion candidates, Holder registry & bounded approval",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T21:06:41Z",
+      "closedAt": "2026-08-28T22:40:16Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/285",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F055-retention-coordinated-deletion-proof.md, docs/adr/0026-deletion-execution-gate.md, feature_list.json (F055)",
+      "notes": "F055 Retention & Deletion Proof implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 286,
+      "title": "[F055] T4: Coordinated settlement, Deletion Proof & tombstones",
+      "state": "CLOSED",
+      "createdAt": "2026-08-28T21:07:10Z",
+      "closedAt": "2026-08-29T01:09:36Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/286",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F055-retention-coordinated-deletion-proof.md, docs/adr/0026-deletion-execution-gate.md, feature_list.json (F055)",
+      "notes": "F055 Retention & Deletion Proof implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 288,
+      "title": "[F056] T1: External effect registry with pinned Adapter contracts",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T01:10:57Z",
+      "closedAt": "2026-08-29T01:47:32Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/288",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F056-registered-external-side-effects.md, docs/adr/0027-external-write-activation-gate.md, feature_list.json (F056)",
+      "notes": "F056 External Side Effects implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 289,
+      "title": "[F056] T2: External Effect proposals & drift-bound authorization",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T01:11:32Z",
+      "closedAt": "2026-08-29T02:17:14Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/289",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F056-registered-external-side-effects.md, docs/adr/0027-external-write-activation-gate.md, feature_list.json (F056)",
+      "notes": "F056 External Side Effects implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 290,
+      "title": "[F056] T3: Adapter execution, settlement & credential boundary",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T01:11:33Z",
+      "closedAt": "2026-08-29T02:57:12Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/290",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F056-registered-external-side-effects.md, docs/adr/0027-external-write-activation-gate.md, feature_list.json (F056)",
+      "notes": "F056 External Side Effects implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 291,
+      "title": "[F056] T4: Compensation effects, MCP non-execution & transport isolation",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T01:11:58Z",
+      "closedAt": "2026-08-29T03:27:29Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/291",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F056-registered-external-side-effects.md, docs/adr/0027-external-write-activation-gate.md, feature_list.json (F056)",
+      "notes": "F056 External Side Effects implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 292,
+      "title": "[F057] T1: Break-glass grant registry with human-only emergency authorization",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T03:29:33Z",
+      "closedAt": "2026-08-29T03:59:56Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/292",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F057-break-glass-authorization.md, feature_list.json (F057)",
+      "notes": "F057 Break-glass authorization implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 293,
+      "title": "[F057] T2: Atomic one-use consumption bound to the underlying admission",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T03:29:34Z",
+      "closedAt": "2026-08-29T04:27:47Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/293",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F057-break-glass-authorization.md, feature_list.json (F057)",
+      "notes": "F057 Break-glass authorization implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 294,
+      "title": "[F057] T3: Outcome settlement linkage & mandatory post-review",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T03:29:36Z",
+      "closedAt": "2026-08-29T04:56:21Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/294",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F057-break-glass-authorization.md, feature_list.json (F057)",
+      "notes": "F057 Break-glass authorization implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 295,
+      "title": "[F057] T4: No-force semantics, MCP non-execution & boundary integrity",
+      "state": "CLOSED",
+      "createdAt": "2026-08-29T03:29:38Z",
+      "closedAt": "2026-08-29T05:09:28Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/295",
+      "group": "F053-F057 Capabilities Execution (#274-#295)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F057-break-glass-authorization.md, feature_list.json (F057)",
+      "notes": "F057 Break-glass authorization implementation tasks (T1-T4)",
+      "labels": []
+    },
+    {
+      "number": 296,
+      "title": "identity 门退出记账——消除审计盲区(#271 可选增强,先决策后实现)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T02:39:04Z",
+      "closedAt": "2026-09-01T03:45:46Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/296",
+      "group": "Deployment Profiles & Transport Governance (#268-#273, #296)",
+      "disposition": "canonical-local-ADR",
+      "targetRef": "docs/adr/0020-governed-live-git-transport.md (ADR-0020, commit 216761d)",
+      "notes": "Identity gate exit accounting enhancement to eliminate audit blind spots",
+      "labels": []
+    },
+    {
+      "number": 297,
+      "title": "F061: Ledger Family Factory & Decision Primitives (mirror)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T06:54:39Z",
+      "closedAt": "2026-08-30T09:30:55Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/297",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 defineLedgerFamily factory definition and tasks T1-T4",
+      "labels": []
+    },
+    {
+      "number": 298,
+      "title": "F061 T1: Decision 原语单源化(snapshot/hash/spend-scan 内核)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T06:54:41Z",
+      "closedAt": "2026-08-30T08:03:31Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/298",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 defineLedgerFamily factory definition and tasks T1-T4",
+      "labels": []
+    },
+    {
+      "number": 299,
+      "title": "F061 T2: defineLedgerFamily 工厂骨架(ledger-family.js)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T06:54:43Z",
+      "closedAt": "2026-08-30T08:47:26Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/299",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 defineLedgerFamily factory definition and tasks T1-T4",
+      "labels": []
+    },
+    {
+      "number": 300,
+      "title": "F061 T3: breakglass tracer 迁移(字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T06:54:45Z",
+      "closedAt": "2026-08-30T09:17:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/300",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 defineLedgerFamily factory definition and tasks T1-T4",
+      "labels": []
+    },
+    {
+      "number": 301,
+      "title": "F061 T4: landing(AGENTS.md 宣称 + 注册 + learnings)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T06:54:47Z",
+      "closedAt": "2026-08-30T09:30:51Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/301",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 defineLedgerFamily factory definition and tasks T1-T4",
+      "labels": []
+    },
+    {
+      "number": 302,
+      "title": "dsh-bundle npm-pack ETIMEDOUT 在并发负载下惯性抖动(spawnSync 超时预算过紧)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T09:31:21Z",
+      "closedAt": "2026-08-31T16:07:27Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/302",
+      "group": "Independent Bug Reports",
+      "disposition": "bug",
+      "targetRef": "tests/unit/dsh-bundle.test.js (commit e4095bb)",
+      "notes": "Post-cutoff defect: npm pack spawnSync timeout budget in test harness (ADR-0013 / dsh-bundle)",
+      "labels": []
+    },
+    {
+      "number": 303,
+      "title": "F061 迁移:external 家族经 defineLedgerFamily 组装(字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T09:35:28Z",
+      "closedAt": "2026-08-30T10:03:30Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/303",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #303",
+      "labels": []
+    },
+    {
+      "number": 304,
+      "title": "F061 迁移:maintain 家族经 defineLedgerFamily 组装(字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T10:04:19Z",
+      "closedAt": "2026-08-30T10:28:37Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/304",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #304",
+      "labels": []
+    },
+    {
+      "number": 305,
+      "title": "F061 迁移:retention 家族经 defineLedgerFamily 组装(字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T10:29:07Z",
+      "closedAt": "2026-08-30T10:58:05Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/305",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #305",
+      "labels": []
+    },
+    {
+      "number": 306,
+      "title": "F061 迁移:principal 家族升级至全量编排并经 defineLedgerFamily 组装(字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T10:58:39Z",
+      "closedAt": "2026-08-30T12:15:31Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/306",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #306",
+      "labels": []
+    },
+    {
+      "number": 307,
+      "title": "F061 迁移:approval 家族升级并经 defineLedgerFamily 组装(字节等价,沿用 preLink)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T12:15:55Z",
+      "closedAt": "2026-08-30T14:44:00Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/307",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #307",
+      "labels": []
+    },
+    {
+      "number": 308,
+      "title": "F061 迁移:evidence-receipts 家族升级并经 defineLedgerFamily 组装(字节等价,沿用 preLink/chainWording)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T14:50:04Z",
+      "closedAt": "2026-08-30T15:05:31Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/308",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #308",
+      "labels": []
+    },
+    {
+      "number": 309,
+      "title": "F061 迁移:adapter 家族升级并经 defineLedgerFamily 组装(四账本,字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T15:15:15Z",
+      "closedAt": "2026-08-30T15:33:45Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/309",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #309",
+      "labels": []
+    },
+    {
+      "number": 310,
+      "title": "F061 迁移:runner 家族升级并经 defineLedgerFamily 组装(三账本,字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T15:36:52Z",
+      "closedAt": "2026-08-30T16:37:01Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/310",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #310",
+      "labels": []
+    },
+    {
+      "number": 311,
+      "title": "F061 迁移:release 家族升级并经 defineLedgerFamily 组装(三账本,字节等价)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T16:40:51Z",
+      "closedAt": "2026-08-30T20:05:57Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/311",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #311",
+      "labels": []
+    },
+    {
+      "number": 312,
+      "title": "F061 migration: assemble gate-evaluation through defineLedgerFamily (outcome ledger, byte equivalence)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T20:07:47Z",
+      "closedAt": "2026-08-30T22:49:45Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/312",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #312",
+      "labels": []
+    },
+    {
+      "number": 313,
+      "title": "F061 migration: assemble policy-evaluation through defineLedgerFamily (Policy Outcome ledger, byte equivalence)",
+      "state": "CLOSED",
+      "createdAt": "2026-08-30T22:59:16Z",
+      "closedAt": "2026-08-31T03:44:09Z",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/313",
+      "group": "F061 Ledger Family Factory & Migrations (#297-#301, #303-#313)",
+      "disposition": "canonical-local-spec",
+      "targetRef": "docs/specs/F061-ledger-family-factory.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, feature_list.json (F061)",
+      "notes": "F061 ledger family migration slice: #313",
+      "labels": []
+    }
+  ],
+  "working_tree_overlay": {
+    "baseRevision": "260c6ac44b9c1626827f55ae784626c5c9649130",
+    "checkout": "D:/code_space/coding-harness",
+    "note": "Migration worker used a clean isolated checkout. The main checkout had an uncommitted overlay at review time; it is not silently included in this migration snapshot.",
+    "modifiedFiles": [
+      "CLAUDE.md",
+      "CONTEXT.md",
+      "docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md",
+      "feature_list.json",
+      "tests/unit/handoff-writer.test.js",
+      "tests/unit/knowledge-graph.test.js"
+    ]
+  }
+}

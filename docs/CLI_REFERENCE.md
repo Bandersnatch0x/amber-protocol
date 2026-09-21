@@ -4,10 +4,15 @@
 
 Complete command reference for Amber Protocol CLI.
 
-Running `amber` or `amber --help` shows the journey and core governance projection.
-Run `amber --all` to list every deprecated and expert compatibility command. Hidden commands
-remain callable and retain `amber <command> --help`; F019 changes discovery, not command removal.
-For agent-guided work, invoke the `amber` router skill, which selects one of four deep journeys.
+Running `amber` or `amber --help` shows the seven primary verbs — `audit`, `init`,
+`doctor`, `next`, `plan`, `handoff`, `session` — with a one-line product statement.
+Run `amber --all` to list every governance, platform, deprecated, and expert
+command. Hidden commands remain callable and retain `amber <command> --help`;
+visibility tiers change discovery, never command removal (F019 introduced the
+tier registry; F063 tuned it to the seven-verb surface). For agent-guided work,
+invoke the `amber` router skill or the thin verb skills (`amber-start`,
+`amber-check`, `amber-done`); the four deep journey skills remain for the full
+process.
 
 ## Global Options
 
@@ -217,12 +222,83 @@ ledger. `verify` and `approve` also mirror the event into a hash-chain ledger
 
 ```bash
 node scripts/amber.js session verify   --session <id> --command "npm test" --result pass  --target . --confirm
+node scripts/amber.js session verify   --session <id> --command "npm test" --execute --budget-minutes 15 --target . --confirm
 node scripts/amber.js session approve  --session <id> [--gate <gate-id>] --yes            --target .
 node scripts/amber.js session verify-ledger --session <id>                                --target .
 ```
 
+`verify --execute` runs the command against the working copy and records its real exit code,
+bounded by a verification budget: 5 minutes by default, `--budget-minutes <n>` per invocation
+(integer 1–60), or the `AMBER_VERIFY_BUDGET_MINUTES` environment override for the default. A
+command killed by the budget records exit -1 and never counts as passed.
+
 `verify-ledger` recomputes the session ledger's hash chain and reports `AMBER_E_LEDGER_TAMPERED` on
 any broken link.
+
+For a Route containing `verb` stages, `session verify` refuses outright and points at
+`session run`/`session settle`: the verb cursor advances only through the governed seam, and a
+legacy verify write to `completedStages` would corrupt its contiguous-prefix invariant (F062).
+
+### session run / settle
+
+Advance a session by at most one `verb` stage ([F062](specs/F062-route-stage-verbs-named-commands.md),
+[ADR-0029](adr/0029-named-governed-commands-and-stage-verbs.md)). The session ledger is the only
+cursor; `manifest.completedStages` and `currentStage` are projections of it.
+
+```bash
+# dry-run (default): resolve the current stage, capability, and adapter. Nothing is written.
+node scripts/amber.js session run --session <id> --target .
+
+# execute: record an attempt. Requires owner + lease proof and explicit approval.
+node scripts/amber.js session run --session <id> --execute \
+  --owner-id <agent> --token-hash <sha256> --lease-fence <n> --yes --target .
+
+# settle a pending host-agent request; only `succeeded` with an Evidence id advances the cursor.
+# The settlement binds one exact attempt: --attempt-id and --request-hash must match the
+# request returned by `session run` (the request hash is its idempotency key).
+node scripts/amber.js session settle --session <id> --request-id <request> \
+  --attempt-id <attempt> --request-hash <hash> \
+  --result '{"status":"succeeded","exitCode":0,"evidenceId":"evidence/<id>"}' \
+  --owner-id <agent> --token-hash <sha256> --lease-fence <n> --yes --target .
+```
+
+The caller supplies only session identity, the pending request's own binding (request id, attempt
+id, request hash), lease proof, and dry-run/execute intent. There is no `--stage`,
+`--target-capability`, `--command`, or provider selector: passing `--stage` or `--command` to
+`session run`/`session settle` is refused — stage selection, capability resolution, and adapter
+choice all come from the session's own state.
+
+A lease is minted by `amber session start --agent <id>`: the raw token is printed exactly once and
+never stored — only its SHA-256 digest reaches the manifest. Compute the digest and pass it as
+`--token-hash` within the lease's five-minute window. When the window passes, the owner reacquires
+explicitly — `amber session lease --session <id> --owner-id <agent> --token-hash <digest> --yes`
+mints a fresh token and a new fence for the same session; a request created under an older fence
+can never settle.
+
+`--result` statuses are `succeeded | skipped | failed | cancelled | unknown | timed_out | rejected`.
+Only `succeeded` (with an Evidence binding) — or `skipped` on a stage declared `optional` — advances
+the cursor. A `succeeded` paired with a non-zero exit code, or without an Evidence id, is refused.
+Re-submitting the identical result is idempotent; a different result for the same attempt is a
+conflict, not an update. Retrying a failed stage creates a fresh attempt number and request id.
+
+**Bounded commands are read-only.** A `bounded-command` stage runs inside a disposable git worktree
+that is force-removed as soon as the command exits — only the exit code, output digest, and Evidence
+receipt survive. Any stage that must *produce files* is a `host-agent` stage, not a bounded command.
+Wiring an implement-type stage to a bounded command silently discards its output.
+
+#### Provider classes and the adapter table
+
+A `verb` stage's `target` is the capability pin `runnerId@version#capability@version`, resolved
+against the F052 runner/capability registry. The pin's provider class comes from the
+implementation-owned adapter table in `scripts/lib/session-stage-runner.js` (ADR-0029 §7): a
+reviewed code change, **not** a target-repository record — a Route supplies only the pin and can
+never select or override its adapter, and no CLI flag reaches the table. The four provider classes
+are `native`, `bounded-command`, `host-agent`, and `external`. A pin with no table entry fails closed
+(`AMBER_E_STAGE_ADAPTER_UNAVAILABLE`); `external` is refused by `session run`
+(`AMBER_E_STAGE_EXTERNAL_LIFECYCLE_REQUIRED`) and must go through the F056 external-effect lifecycle.
+
+A `host-agent` run records a pending request and stops: **Amber never starts the Agent.** The agent
+does the work and reports back through `session settle`.
 
 ## Route Commands
 
@@ -2750,6 +2826,6 @@ exits non-zero. CI runs it on pull requests and as a nightly dispatch job. Detai
 
 ## Next Steps
 
-- Return to [Autonomous Mode Guide](AUTONOMOUS_MODE_GUIDE.md)
-- Review [Policy Configuration](POLICY_CONFIGURATION.md)
-- Check [Troubleshooting Guide](TROUBLESHOOTING.md)
+- Return to [Autonomous Mode Guide](guides/AUTONOMOUS_MODE_GUIDE.md)
+- Review [Policy Configuration](guides/POLICY_CONFIGURATION.md)
+- Check [Troubleshooting Guide](guides/TROUBLESHOOTING.md)

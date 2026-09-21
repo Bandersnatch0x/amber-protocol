@@ -92,5 +92,5 @@ auto-execution remains disallowed.
 
 - ADR-0001 (governance-first, artifact-first)
 - ADR-0002 (V2 execution scope — experimental isolation)
-- Design spec: `docs/superpowers/specs/2026-06-30-amber-governed-loop-execution-design.md`
+- Design spec: `docs/legacy/specs/2026-06-30-amber-governed-loop-execution-design.md`
 - `LOOP.md` (L1→L2→L3 rollout)

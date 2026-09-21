@@ -1,21 +1,201 @@
 ---
 type: product
 title: User Scenarios
-description: Primary user scenarios and journeys.
-tags: [product]
-updated: 2026-06-17
+description: Core, conditional, and expert journeys for Coding-Agent-Enabled Repositories.
+tags: [product, journey, trusted-continuation]
+updated: 2026-09-04
 ---
 
 # User Scenarios
 
-## Scenario Template
+Amber 的目标环境是 **Coding-Agent-Enabled Repository**，主要用户是对仓库结果负责的 Repository Maintainer，次要用户是执行工作的 agent-assisted developer 与做 go/no-go 决策的 reviewer。
 
-- User:
-- Situation:
-- Goal:
-- Successful outcome:
-- Failure mode:
+核心问题不是“如何让 agent 写更多代码”，而是：一次 AI 编码工作换人、换 agent 或换会话后，后继者无法只凭仓库状态可靠判断发生了什么、什么已获批准、证据是否足够，以及下一步是什么。
+
+Amber 的核心价值是 **Trusted Continuation**：另一个上下文不读旧聊天，仍能正确继续下一步，并让 reviewer 看见依据。
+
+## 旅程分层
+
+| 层级 | Journey | 进入方式 |
+| --- | --- | --- |
+| 核心 | J0 资格判断、J1 安全接入、J2 首次可信续接、J3 日常治理交付、J4 失败恢复、J5 审查验收 | 默认产品路径 |
+| 条件 | J6 上下文修复、J7 持续改进、J8 团队扩展 | 由可观察缺口触发 |
+| 专家 | J9 高保证治理 | 显式专家需求与审批 |
+
+所有交付类旅程共享一个前台顺序：
+
+```text
+Frame → Authorize → Work → Prove → Review → Handoff / Accept
+```
+
+Feature、Bugfix 与 Refactor 的差异由后台 Route 表达，不拆成三套用户心智。
+
+## J0 — 资格判断
+
+**触发**：维护者已经在真实项目中持续使用 Coding Agent，但交接、审查或恢复开始依赖聊天记录和个人记忆。
+
+**用户要完成的工作**：在修改仓库之前，判断 Amber 是否能解决当前风险，而不是为了“治理”本身安装工具。
+
+**主路径**：
+
+1. 描述一个真实交付目标和最近一次续接失败。
+2. 运行 `amber audit --target <repo>` 做只读检查。
+3. 对照缺口判断：是否存在跨上下文续接、证据或审批问题。
+4. 明确选择采用、暂缓或不适用。
+
+**完成证据**：审计结果、适配理由和下一条安全动作清晰；仓库业务文件未被修改。
+
+**失败恢复**：如果问题只是一次性试用或纯个人实验，停止采用，不把 Amber 变成无目标的流程负担。
+
+## J1 — 安全接入
+
+**触发**：J0 证明项目适配，维护者允许建立最小仓库本地治理表面。
+
+**用户要完成的工作**：不覆盖现有文件、不引入外部托管依赖地完成接入。
+
+**主路径**：
+
+1. 预览 `amber init --target <repo>` 的改动边界。
+2. 经明确批准后执行初始化；已有文件保持不变。
+3. 运行 `amber doctor --target <repo>`。
+4. 修复 doctor 指出的最小 setup 缺口。
+
+**完成证据**：doctor 结果可复验，新增文件与跳过文件均可解释。
+
+**失败恢复**：发现命名冲突、损坏状态或未知来源文件时停止，不用强制覆盖绕过冲突。
+
+## J2 — 首次 Trusted Continuation
+
+**触发**：Amber 已接入，项目有一项真实且边界清楚的交付工作。
+
+**用户要完成的工作**：证明新上下文能仅凭仓库内状态继续，而不是只证明命令运行成功。
+
+**主路径**：
+
+1. 用自然语言表达目标，由 Agent 入口或 `amber next --objective "<goal>" --target <repo>` 给出确定性建议。
+2. 形成计划与范围，人工确认后进入工作。
+3. 在 session 中记录阶段、验证与阻塞项。
+4. 运行 `amber handoff --target <repo>` 生成续接材料。
+5. 切换到一个不读取旧聊天的新会话、人或 agent。
+6. 后继者说明当前状态并正确执行一条下一步动作。
+
+**完成证据**：步骤 6 成功，并且下一步可以追溯到计划、session、证据或 handoff，而不是口头提示。
+
+**失败恢复**：如果后继者必须追问旧聊天，记录缺失的 Required Artifact，转入 J6；不得把文件生成数量算作激活成功。
+
+## J3 — 日常治理交付
+
+**触发**：项目已完成 J2，新的 feature、bugfix 或 refactor 需要交付。
+
+**用户要完成的工作**：在保持统一心智的同时，让不同工作类型走各自安全 Route。
+
+**主路径**：
+
+1. **Frame**：明确目标、约束、范围和验收。
+2. **Authorize**：确认计划以及需要人工判断的关卡。
+3. **Work**：在约定边界内实现；Route 在后台选择 `feature-standard`、`bugfix-quick` 或 `refactor-safe`。
+4. **Prove**：记录真实命令、退出结果、环境和产物。
+5. **Review**：区分代码标准、需求符合性和残余风险。
+6. **Handoff / Accept**：未完成则可恢复交接；完成则在证据通过后验收。
+
+**完成证据**：仓库内能回答“做了什么、为什么、验证了什么、谁作出决定、下一步是什么”。
+
+**失败恢复**：实现或验证失败停留在当前阶段；后续阶段不能以声明替代证据。
+
+## J4 — 失败与中断恢复
+
+**触发**：命令失败、session 暂停、上下文接近上限、维护者换人，或 agent 无法继续。
+
+**用户要完成的工作**：恢复到正确阶段，而不是重新构造一份更好看的成功叙事。
+
+**主路径**：
+
+1. 读取 `amber session status --target <repo>` 和当前 handoff。
+2. 确认最后一个已完成阶段、失败证据、dirty paths 与未决批准。
+3. 由 `amber next` 给出受当前状态约束的下一步。
+4. 修复最小阻塞后继续原 Route。
+
+**完成证据**：失败事件仍存在，恢复动作与其对应，后继者没有跳过审批或验证。
+
+**失败恢复**：状态损坏、来源不明或证据缺失时 fail closed；需要知识修复则转入 J6。
+
+## J5 — 审查与验收
+
+**触发**：实现完成声明已出现，需要 reviewer 作出 go/no-go 决定。
+
+**用户要完成的工作**：不依赖旧聊天，判断结果是否满足计划、标准和证据要求。
+
+**主路径**：
+
+1. 检查计划范围、实际 diff 与未提交状态。
+2. 分开审查 Standards 与 Spec，不把测试通过等同于需求符合。
+3. 查看真实验证、审批、Gate 与失败记录。
+4. 关闭阻断项后才接受；否则退回明确阶段。
+5. 生成最终 handoff，供后续维护或下一项工作使用。
+
+**完成证据**：reviewer 能指出接受或拒绝所依据的仓库内证据，验收记录与交付范围一致。
+
+**失败恢复**：证据过期、验证不可重放或审查不独立时，不接受并返回 Prove/Review。
+
+## J6 — 上下文修复（条件旅程）
+
+**触发**：J2–J5 暴露 Required Artifact 缺失、过期、相互矛盾或来源不明。
+
+**主路径**：提出上下文请求，绑定来源与范围，摄取并验证页面；只有经人工审查的持久知识才进入 memory 流程。
+
+**完成证据**：原旅程的具体阻塞被解除，且新上下文带来源、时效与适用范围。
+
+**边界**：不做无缺口证明的全仓知识搬运，也不让模型直接改写 `MEMORY.md`。
+
+## J7 — 学习与持续改进（条件旅程）
+
+**触发**：同类摩擦至少跨两个会话重复，且存在可观察证据。
+
+**主路径**：检测重复 → 形成建议 → 人工审查 → 选择修复、排期或驳回 → 通过正常交付旅程实现。
+
+**完成证据**：建议能追溯到重复 Finding，实施结果重新进入 J3/J5；Web Suggestions 仅是此旅程的可选触点。
+
+**边界**：单次不便不自动晋级；Amber 不自动派发或执行改进。
+
+## J8 — 团队扩展（条件旅程）
+
+**触发**：至少完成一个 2×10 试点，并出现第二个独立团队的同类续接需求。
+
+**主路径**：比较两个团队的共同结果与不同约束，复制最小边界、角色和证据合同，再逐仓执行 J0–J2。
+
+**完成证据**：第二个仓库也完成真实 J2，而不是只复制 starter 文件。
+
+**边界**：不以“功能已经实现”为由前置组织级同步、策略或外部系统能力。
+
+## J9 — 高保证治理（专家场景）
+
+**触发**：工作涉及受控执行、发布/回滚、外部副作用、保留删除或 break-glass。
+
+**主路径**：注册能力与身份 → 固定范围和策略 → 获取单次人工批准 → 执行或结算 → 独立验证 → 必要时补偿或复盘。
+
+**完成证据**：Approval、Decision、Evidence、Policy/Gate outcome 与实际 receipt 形成闭环；未知结果不被视为成功。
+
+**边界**：J9 不进入默认 README 漏斗，不用 `--yes` 或 `--force` 绕过人类授权。
+
+## 旅程指标
+
+| 指标 | 定义 |
+| --- | --- |
+| North Star | 新人或新 agent 不读旧聊天仍正确继续的真实工作比例 |
+| Activation | 完成至少一次 J2 的接入项目比例 |
+| Time to Trusted Continuation | 从 J0 到首次通过 J2 的时间 |
+| Recovery Success | J4 在不重建全部上下文下恢复正确阶段的比例 |
+| Review Confidence | reviewer 无需旧聊天即可做出 go/no-go 决定的比例 |
+| Surface Load | 完成 J0–J2 前必须直接理解的概念和命令数量 |
+
+## 验证状态
+
+- J0/J1 的基础命令已有仓库测试与 dogfood 证据，但本文的新版端到端叙事仍需纳入 2×10 field pilot。
+- J2 的激活标准必须通过真实“新上下文续接”观察验证，不能由单元测试或文件存在性替代。
+- J8/J9 保持条件/专家定位，直到试点与独立团队需求提供解锁证据。
 
 ## Unknowns / Needs Confirmation
 
-- Confirm the real user roles, situations, success outcomes, and failure modes.
+- 2×10 field pilot 尚未给出真实 J2 成功率、Time to Trusted Continuation 与跨人/跨 agent 的差异。
+- Web Viewer 的 Journey 推断目前只使用 lifecycle next、活跃 Session、恢复态 Session 与 pending Gate；更细的 J2/J4 区分需要实际试点证明，而不是继续增加启发式规则。
+- J8/J9 的解锁条件已定义，但尚无两个独立团队的同类需求证据。

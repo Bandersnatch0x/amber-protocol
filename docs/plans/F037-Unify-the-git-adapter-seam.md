@@ -10,15 +10,15 @@ git-exec.js becomes the single git invocation seam; sync-session, identity, and 
 
 ## High Level Design
 
-- Context: architecture survey 2026-08-24 Finding 4 (docs/reviews/architecture-survey-2026-08-24.md). `git-exec.js` is canonical for 4 modules but bypassed by 3, with three incompatible failure shapes in flight: `null` (gitOutput), `""` (identity's gitConfig), `{exitCode: -1}` (sync-session's private git — brand-new F035 code).
+- Context: architecture survey 2026-08-24 Finding 4 (docs/quality/reviews/architecture-survey-2026-08-24.md). `git-exec.js` is canonical for 4 modules but bypassed by 3, with three incompatible failure shapes in flight: `null` (gitOutput), `""` (identity's gitConfig), `{exitCode: -1}` (sync-session's private git — brand-new F035 code).
 - Proposed approach: extend `git-exec.js` with `gitExec(targetRoot, args) -> {ok, status, stdout, stderr}` (superset; sync-session's shape maps exactly) plus thin conveniences `isRepository(targetRoot)` and `configGet(targetRoot, key)` ("" on failure, preserving identity's policy). Migrate sync-session.js, identity.js, worktree-manager.js onto it; delete the three private wrappers.
 - Risks: observable-behavior drift during migration (each wrapper has its own trim/empty policies); tests may pin exact envelope shapes. Mitigation: red-first per-module behavior tests before touching each module; full-suite baseline comparison (58 known failures).
 
 ## Context manifests
 
 Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.
-- implement: docs/reviews/architecture-survey-2026-08-24.md
-- review: docs/reviews/architecture-survey-2026-08-24.md
+- implement: docs/quality/reviews/architecture-survey-2026-08-24.md
+- review: docs/quality/reviews/architecture-survey-2026-08-24.md
 
 ## Vertical Slices
 

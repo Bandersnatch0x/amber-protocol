@@ -6,7 +6,7 @@
 
 Real usage is Amber's highest-yield bug channel — the [external pilot map #35](https://github.com/Bandersnatch0x/amber-protocol/issues/35) found 5 real defects, but pilots are episodic and expensive, and CI only dogfoods `amber drift` (non-blocking). This ritual replaces episodic pilots with a **repeatable weekly run** that drives one real piece of work through the entire governed lifecycle and converts every UX friction into a `next-up` issue.
 
-This is a **process / ritual** document. It adds nothing to code or `package.json`. It complements [LOOP.md](../LOOP.md) (loop engineering) and the [Amber Agent Operating Manual](wiki/AMBER_AGENT_OPERATING_MANUAL.md).
+This is a **process / ritual** document. It adds nothing to code or `package.json`. It complements [LOOP.md](product/LOOP.md) (loop engineering) and the [Amber Agent Operating Manual](wiki/AMBER_AGENT_OPERATING_MANUAL.md).
 
 ---
 
@@ -27,7 +27,7 @@ A weekly ritual keeps the **real** lifecycle exercised continuously, so the path
 - **Weekly**, ideally at the start of the week's first working session — before context has decayed.
 - **One feature per week.** Not more. The point is the full path, not throughput.
 - **Skip only if** there is genuinely nothing in the backlog (then the ritual's job is to *find* the next candidate — see §7).
-- Pair it with the existing [Daily Amber Triage](../LOOP.md) loop: triage surfaces candidates, the weekly ritual drives one to `accepted`.
+- Pair it with the existing [Daily Amber Triage](product/LOOP.md) loop: triage surfaces candidates, the weekly ritual drives one to `accepted`.
 
 ---
 

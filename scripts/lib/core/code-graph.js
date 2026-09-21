@@ -65,17 +65,33 @@ const JS_TO_TS = Object.freeze({
 
 let tsModule = null;
 
+// TypeScript 7+ (native / typescript-go) no longer exports the classic
+// compiler API (`createSourceFile`, `readConfigFile`, …). The code-graph
+// extractor is syntax-only over that API, so we load the JS-line package
+// aliased as `typescript-js` (npm:typescript@6.x). Prefer it; fall back to
+// `typescript` when a classic build is still installed under that name.
+const TS_COMPILER_API_CANDIDATES = Object.freeze(["typescript-js", "typescript"]);
+
 function loadTypeScript() {
 	if (tsModule) return tsModule;
-	try {
-		tsModule = require("typescript");
-		return tsModule;
-	} catch {
-		throw typedError(
-			ERROR_CODES.toolchain,
-			"the knowledge graph code layer requires the TypeScript compiler API and no `typescript` module is installed — run `npm install` at the amber-protocol root",
-		);
+	const errors = [];
+	for (const id of TS_COMPILER_API_CANDIDATES) {
+		try {
+			const mod = require(id);
+			if (typeof mod.createSourceFile === "function" && typeof mod.readConfigFile === "function") {
+				tsModule = mod;
+				return tsModule;
+			}
+			errors.push(`${id} lacks classic compiler API (version ${mod.version || "unknown"})`);
+		} catch (err) {
+			errors.push(`${id}: ${err.message}`);
+		}
 	}
+	throw typedError(
+		ERROR_CODES.toolchain,
+		"the knowledge graph code layer requires the TypeScript classic compiler API (`createSourceFile` / `readConfigFile`); install `typescript-js` (npm:typescript@6.x) or a classic `typescript` at the amber-protocol root — " +
+			errors.join("; "),
+	);
 }
 
 /** The exact compiler version recorded in graph provenance (`toolchain.typescript`). */

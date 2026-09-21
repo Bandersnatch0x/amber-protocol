@@ -28,7 +28,7 @@ The research consensus mirrors the write-path finding, inverted: **the read path
 write path is worth.** Anthropic's stale-tool-result eviction cut tokens 84% over 100 turns and its
 context-management primitives beat baseline by 39% — context-window governance is independently
 valuable. Redis catalogues five failure modes of retrieval in agentic loops (paraphrase mismatch,
-cross-document stitching, query drift, no-accounting, poisoned steps), all of which reduce to
+cross-document design tooling, query drift, no-accounting, poisoned steps), all of which reduce to
 "context silently contains the wrong or stale thing." ElliotOne shows deterministic selection is
 achievable without embeddings: priority-tagged blocks, stable ordering, out-of-budget exclusion with
 recorded reasons, fail-fast on required overflow.
