@@ -59,11 +59,26 @@ describe("team-governance-advisor", () => {
 
 	it("flags personal patterns missing from .gitignore", () => {
 		const { missing } = generateGitignoreAdvice("node_modules/\n*.log\n");
-		assert.ok(missing.includes(".amber/sessions/"));
-		assert.ok(missing.includes("PROGRESS.md"));
+		assert.ok(missing.includes("/.amber/sessions/"));
+		assert.ok(missing.includes("/PROGRESS.md"));
 	});
 
-	it("reports nothing missing when all personal patterns are present", () => {
+	it("advises root-anchored patterns so they cannot swallow nested files", () => {
+		const { missing } = generateGitignoreAdvice("");
+		for (const pattern of missing) {
+			assert.ok(pattern.startsWith("/"), `Advised pattern must be root-anchored, got: ${pattern}`);
+		}
+		assert.deepEqual(missing, [
+			"/.amber/sessions/",
+			"/PROGRESS.md",
+			"/session-handoff.md",
+			"/notes.md",
+		]);
+	});
+
+	it("accepts unanchored rules a repository already has as covering", () => {
+		// Pre-anchoring advice is already in the wild; an unanchored rule ignores
+		// the root file too, so re-flagging it would be a false positive.
 		const content = [
 			"node_modules/",
 			".amber/sessions/",
@@ -78,9 +93,9 @@ describe("team-governance-advisor", () => {
 
 	it("treats a broad .amber/ rule as covering .amber/sessions/", () => {
 		const { missing } = generateGitignoreAdvice(".amber/\n");
-		assert.ok(!missing.includes(".amber/sessions/"));
+		assert.ok(!missing.includes("/.amber/sessions/"));
 		// A directory rule must not falsely cover unrelated file patterns.
-		assert.ok(missing.includes("PROGRESS.md"));
+		assert.ok(missing.includes("/PROGRESS.md"));
 	});
 
 	it("recommends CONTRIBUTING.md only when it is absent", () => {

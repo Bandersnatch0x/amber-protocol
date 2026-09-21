@@ -74,7 +74,12 @@
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write . && npm --prefix apps/web run format",
 		"format:check": "prettier --check . && npm --prefix apps/web run format:check",
-		"typecheck": "npm --prefix apps/web run typecheck"
+		"typecheck": "npm --prefix apps/web run typecheck && npm --prefix apps/docs run typecheck",
+		"docs:build": "npm --prefix apps/docs run build",
+		"docs:gen": "node scripts/gen-docs-cli.js",
+		"docs:gen:check": "node scripts/gen-docs-cli.js --check",
+		"docs:verify": "node scripts/verify-public-docs.js",
+		"docs:test": "node scripts/run-tests.js tests/public-docs-seam.test.js"
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,json,md,yml,yaml}": "prettier --write",

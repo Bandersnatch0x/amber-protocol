@@ -1,5 +1,7 @@
 # CLI Reference
 
+> **Notice**: For the authoritative, single-source public CLI reference generated from the command registry, see the [Public Documentation Site](../apps/docs/docs/reference/cli/index.md) or run `amber <command> --help`.
+
 Complete command reference for Amber Protocol CLI.
 
 Running `amber` or `amber --help` shows the seven primary verbs — `audit`, `init`,

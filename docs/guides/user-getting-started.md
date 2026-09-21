@@ -1,5 +1,7 @@
 # Getting Started with Amber Protocol
 
+> **Notice**: For the curated public documentation and the official First Governed Workflow, see the [Public Documentation Site](../../apps/docs/docs/start-here/index.md).
+
 Amber Protocol is a repo-local AI coding governance console for engineering teams. It helps teams prepare, review, verify, hand off, and audit AI-assisted coding work inside a repository. It does not run live agents, execute project commands automatically, or replace human review.
 
 ## Prerequisites

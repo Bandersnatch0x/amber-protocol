@@ -12,6 +12,7 @@ build/
 .cache/
 .turbo/
 .vite/
+.docusaurus/
 *.tsbuildinfo
 *.timestamp-*.mjs
 npm-pack-dry-run.json
@@ -36,7 +37,6 @@ issues/
 .playwright-cli/
 .tanstack/
 apps/web/screenshots/
-apps/web/output/
 .claude/settings.local.json
 .claude/worktrees/
 .claude/plans/
@@ -66,8 +66,14 @@ tests/fixtures/worktree-test-repo/
 docs/research/
 docs/legacy/
 *.log
-notes.md
-.release-checklist.md
-session-handoff.md
-tasks/
-问题清单.md
+# Root-anchored: an unanchored basename rule also matches the same name at any
+# depth, which can silently swallow a committed artifact — an unanchored
+# `MEMORY.md` hid the generated `apps/docs/docs/reference/cli/memory.md` on
+# case-insensitive filesystems, leaving it invisible to `git status`. `tasks/`
+# is the live case: `templates/tasks/README.md` is tracked, so new files beside
+# it would vanish from `git status` without saying anything.
+/notes.md
+/.release-checklist.md
+/session-handoff.md
+/tasks/
+/问题清单.md

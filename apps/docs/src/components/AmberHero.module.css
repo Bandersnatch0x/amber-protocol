@@ -1,0 +1,558 @@
+/* Amber Protocol Full-Screen Hero Section Styles */
+
+.heroSection {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 700px;
+  overflow: hidden;
+  background: #000000;
+  color: #ffffff;
+  user-select: none;
+}
+
+.heroSection::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 160px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(5, 7, 13, 0.6) 50%, var(--ifm-background-color, #09090b) 100%);
+  pointer-events: none;
+  z-index: 12;
+}
+
+.crystalCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.contentLayer {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+}
+
+/* 7. Top Navigation */
+.nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 20px 20px;
+  z-index: 20;
+}
+
+@media (min-width: 768px) {
+  .nav {
+    padding: 27px 35px;
+  }
+}
+
+.navLeftGroup {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.wordmark {
+  font-family: 'Graphik LCG Regular Regular', 'Graphik LCG', sans-serif;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 21px;
+  white-space: nowrap;
+  font-weight: 700;
+  text-decoration: none !important;
+}
+
+@media (min-width: 768px) {
+  .wordmark {
+    font-size: 21px;
+  }
+}
+
+.wordmark span {
+  color: #f59e0b;
+}
+
+.navLinks {
+  display: none;
+  align-items: center;
+  gap: 40px;
+}
+
+@media (min-width: 1024px) {
+  .navLinks {
+    display: flex;
+  }
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none !important;
+}
+
+.navNumber {
+  font-family: 'Manrope', sans-serif;
+  color: rgba(245, 158, 11, 0.8);
+  font-size: 13px;
+  line-height: 15.6px;
+  font-weight: 600;
+}
+
+.navLabel {
+  font-family: 'Manrope', sans-serif;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 15.6px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  font-weight: 500;
+}
+
+.navItem:hover .navLabel {
+  color: #f59e0b;
+}
+
+.navRightGroup {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+@media (min-width: 1024px) {
+  .navRightGroup {
+    display: flex;
+  }
+}
+
+.agentText {
+  font-family: 'Manrope', sans-serif;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 15.6px;
+}
+
+.governedBadge {
+  font-family: 'Manrope', sans-serif;
+  color: #f59e0b;
+  font-size: 13px;
+  line-height: 15.6px;
+  font-weight: 700;
+}
+
+.statusLabel {
+  font-family: 'Manrope', sans-serif;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 15.6px;
+  margin-left: 20px;
+}
+
+.chip {
+  background: #f59e0b;
+  border-radius: 3px;
+  padding: 2px 5px;
+  color: #000000;
+  font-family: 'Manrope', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 15.6px;
+  letter-spacing: 0.02em;
+}
+
+/* Hamburger Button */
+.hamburgerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #ffffff;
+}
+
+@media (min-width: 1024px) {
+  .hamburgerBtn {
+    display: none;
+  }
+}
+
+/* Mobile Menu Overlay */
+.mobileMenu {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  transition: all 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.menuVisible {
+  visibility: visible;
+  opacity: 1;
+}
+
+.menuHidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.menuBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.94);
+  backdrop-filter: blur(12px);
+  transition: opacity 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.menuPanel {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 96px 20px 40px;
+  transition: all 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.mobileNavList {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.mobileNavItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none !important;
+}
+
+.mobileNavNum {
+  font-family: 'Manrope', sans-serif;
+  color: rgba(245, 158, 11, 0.8);
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.mobileNavLabel {
+  font-family: 'Manrope', sans-serif;
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mobileStatusBlock {
+  margin-top: auto;
+  padding-top: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobileStatusRow1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mobileStatusRow2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 9. Main Heading */
+.heading {
+  font-family: 'Graphik LCG Regular Regular', 'Graphik LCG', sans-serif;
+  color: #ffffff;
+  font-weight: normal;
+  line-height: 1em;
+  position: absolute;
+  font-size: 32px;
+  top: 140px;
+  left: 20px;
+  max-width: 320px;
+  z-index: 15;
+}
+
+@media (min-width: 640px) {
+  .heading {
+    font-size: 48px;
+    top: 160px;
+    max-width: 460px;
+  }
+}
+
+@media (min-width: 768px) {
+  .heading {
+    font-size: 68px;
+    top: 178px;
+    left: 35px;
+    max-width: 620px;
+  }
+}
+
+/* 10. Grid Lines & Plus Marks */
+.gridLinesContainer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.vLine {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 1px;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.hLine {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.plusMark {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+}
+
+.plusH {
+  position: absolute;
+  width: 10px;
+  height: 1px;
+  background: rgba(245, 158, 11, 0.7);
+  transform: translate(-50%, -50%);
+}
+
+.plusV {
+  position: absolute;
+  width: 1px;
+  height: 10px;
+  background: rgba(245, 158, 11, 0.7);
+  transform: translate(-50%, -50%);
+}
+
+/* 11. Central Nodes */
+.centralNodes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .centralNodes {
+    display: block;
+  }
+}
+
+.nodeSquare {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border: 1px solid rgba(245, 158, 11, 0.75);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+}
+
+@media (min-width: 1024px) {
+  .nodeSquare {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+.nodeLabelBlock {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.nodeLabelTitle {
+  font-family: 'Manrope', sans-serif;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 15.6px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.nodeLabelDesc {
+  font-family: 'Manrope', sans-serif;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  line-height: 14px;
+  margin-top: 4px;
+}
+
+/* 12. Bottom Row */
+.bottomRow {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  z-index: 20;
+}
+
+@media (min-width: 768px) {
+  .bottomRow {
+    bottom: 35px;
+    left: 35px;
+    right: 35px;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0;
+  }
+}
+
+.ctaBtn {
+  background: #f59e0b;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none !important;
+}
+
+@media (min-width: 768px) {
+  .ctaBtn {
+    padding: 12px 20px;
+  }
+}
+
+.ctaBtn:hover {
+  background: #fcd34d;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+.ctaGlyph {
+  color: #000000;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.ctaText {
+  font-family: 'Manrope', sans-serif;
+  color: #000000;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 15.6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@media (min-width: 768px) {
+  .ctaText {
+    font-size: 13px;
+  }
+}
+
+/* Right Info Card */
+.infoCardWrapper {
+  position: relative;
+  max-width: 280px;
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .infoCardWrapper {
+    display: block;
+  }
+}
+
+.cardBadge {
+  font-family: 'Manrope', sans-serif;
+  color: #000000;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 15.6px;
+  background: #f59e0b;
+  padding: 2px 6px;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.cardBody {
+  position: relative;
+  padding: 20px;
+}
+
+.cardPolygon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.cardText {
+  position: relative;
+  font-family: 'Manrope', sans-serif;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 18px;
+  margin-bottom: 18px;
+}
+
+.cardLink {
+  position: relative;
+  font-family: 'Manrope', sans-serif;
+  color: #f59e0b;
+  font-size: 13px;
+  line-height: 15.6px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cardLink:hover {
+  text-decoration: underline;
+}

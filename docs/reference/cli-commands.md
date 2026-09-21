@@ -1,5 +1,7 @@
 # CLI Commands Reference
 
+> **Notice**: For the authoritative, single-source public CLI reference generated from the command registry, see the [Public Documentation Site](../../apps/docs/docs/reference/cli/index.md) or run `amber <command> --help`.
+
 Complete reference for Amber Protocol CLI commands (Phase B v1.0.0).
 
 ## Global Flags

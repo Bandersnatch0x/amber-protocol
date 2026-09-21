@@ -178,6 +178,24 @@ When adding new commands or features:
 3. Update `CLAUDE.md` if changing core architecture
 4. Add architecture documentation for significant new components
 
+## Public Documentation Site & Corpus Governance
+
+Public documentation (`apps/docs/`) is an independent, statically built Docusaurus site published with zero third-party telemetry.
+
+### Corpus Layering (A/B/C)
+
+- **Layer A (Public Allowlist)**: Curated documents in `apps/docs/docs/` registered in `apps/docs/docs-manifest.json`.
+- **Layer B (Rewrite Input Only)**: Internal ADRs, specs, and wiki drafts. Must be distilled and reviewed before entering Layer A.
+- **Layer C (Strictly Denied)**: Internal agent files (`AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, `LOOP.md`), `.amber/` state ledgers, draft reviews, and private credentials. Must never be linked or published.
+
+### Generated CLI Reference
+
+CLI reference pages under `apps/docs/docs/reference/cli/` are generated from `scripts/lib/command-registry.js`.
+
+- Do not edit generated reference files manually.
+- Run `npm run docs:gen` to update generated pages when modifying command definitions.
+- Run `npm run docs:gen:check` and `npm run docs:verify` to verify publication gates.
+
 ## Pull Request Process
 
 1. Create a feature branch: `git checkout -b feat/my-feature`

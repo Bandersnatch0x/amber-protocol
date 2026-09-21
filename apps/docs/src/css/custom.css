@@ -1,0 +1,191 @@
+/**
+ * Amber Protocol Documentation Design System Tokens & Styles
+ * Compliant with Tickets 0013, 0018, 0020, 0022, 0024.
+ */
+
+:root {
+  --ifm-color-primary: #d97706;
+  --ifm-color-primary-dark: #b45309;
+  --ifm-color-primary-darker: #92400e;
+  --ifm-color-primary-darkest: #78350f;
+  --ifm-color-primary-light: #f59e0b;
+  --ifm-color-primary-lighter: #fbbf24;
+  --ifm-color-primary-lightest: #fef3c7;
+  --ifm-color-primary-contrast-background: #fffbeb;
+  --ifm-color-primary-contrast-foreground: #78350f;
+
+  --ifm-code-font-size: 92%;
+  --ifm-font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ifm-font-family-monospace: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  --ifm-navbar-background-color: #ffffff;
+  --ifm-navbar-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --ifm-background-color: #ffffff;
+  --ifm-background-surface-color: #f8fafc;
+  --ifm-footer-background-color: #0f172a;
+  --ifm-footer-color: #cbd5e1;
+
+  --amber-badge-bg-readonly: #f0fdf4;
+  --amber-badge-text-readonly: #166534;
+  --amber-badge-border-readonly: #bbf7d0;
+
+  --amber-badge-bg-write: #fef3c7;
+  --amber-badge-text-write: #92400e;
+  --amber-badge-border-write: #fde68a;
+
+  --amber-badge-bg-target: #f1f5f9;
+  --amber-badge-text-target: #334155;
+  --amber-badge-border-target: #cbd5e1;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #f59e0b;
+  --ifm-color-primary-dark: #d97706;
+  --ifm-color-primary-darker: #b45309;
+  --ifm-color-primary-darkest: #92400e;
+  --ifm-color-primary-light: #fbbf24;
+  --ifm-color-primary-lighter: #fcd34d;
+  --ifm-color-primary-lightest: #fef3c7;
+  --ifm-color-primary-contrast-background: #451a03;
+  --ifm-color-primary-contrast-foreground: #fef3c7;
+
+  --ifm-background-color: #09090b;
+  --ifm-background-surface-color: #18181b;
+  --ifm-navbar-background-color: #09090b;
+  --ifm-navbar-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --ifm-footer-background-color: #09090b;
+  --ifm-footer-color: #a1a1aa;
+
+  --amber-badge-bg-readonly: #052e16;
+  --amber-badge-text-readonly: #86efac;
+  --amber-badge-border-readonly: #14532d;
+
+  --amber-badge-bg-write: #451a03;
+  --amber-badge-text-write: #fde68a;
+  --amber-badge-border-write: #78350f;
+
+  --amber-badge-bg-target: #1e293b;
+  --amber-badge-text-target: #cbd5e1;
+  --amber-badge-border-target: #334155;
+}
+
+/* Zero page-level horizontal overflow guarantee */
+html, body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* Visible focus rings */
+:focus-visible {
+  outline: 2px solid var(--ifm-color-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Touch targets min-size (44px) */
+.navbar__item,
+.navbar__link,
+.menu__link,
+.pagination-nav__link,
+.theme-edit-this-page,
+button.clean-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.menu__link {
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Code block container local horizontal scroll */
+pre,
+.theme-code-block {
+  max-width: 100%;
+  overflow-x: auto;
+  contain: paint;
+}
+
+/* 4-Element Command Block Styling */
+.amber-command-block {
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-background-surface-color);
+  overflow: hidden;
+}
+
+.amber-command-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--ifm-color-emphasis-100);
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+  font-size: 0.825rem;
+}
+
+.amber-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+}
+
+.amber-badge-target {
+  background: var(--amber-badge-bg-target);
+  color: var(--amber-badge-text-target);
+  border-color: var(--amber-badge-border-target);
+}
+
+.amber-badge-readonly {
+  background: var(--amber-badge-bg-readonly);
+  color: var(--amber-badge-text-readonly);
+  border-color: var(--amber-badge-border-readonly);
+}
+
+.amber-badge-write {
+  background: var(--amber-badge-bg-write);
+  color: var(--amber-badge-text-write);
+  border-color: var(--amber-badge-border-write);
+}
+
+.amber-command-body {
+  padding: 0.75rem 1rem;
+  background: var(--ifm-pre-background, #1e1e1e);
+  color: #f8fafc;
+  font-family: var(--ifm-font-family-monospace);
+  overflow-x: auto;
+}
+
+.amber-command-output {
+  padding: 0.6rem 1rem;
+  background: var(--ifm-background-surface-color);
+  border-top: 1px dashed var(--ifm-color-emphasis-300);
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-800);
+}
+
+.amber-command-output strong {
+  color: var(--ifm-color-emphasis-900);
+}
+
+/* Machine generated reference banner */
+.amber-generated-banner {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 6px;
+  background: var(--ifm-color-primary-contrast-background);
+  color: var(--ifm-color-primary-contrast-foreground);
+  border-left: 4px solid var(--ifm-color-primary);
+  font-size: 0.875rem;
+}
+
+/* Search input touch accessibility */
+.navbar__search-input {
+  min-height: 40px;
+}

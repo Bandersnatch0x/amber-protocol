@@ -34,3 +34,7 @@
 
 # Package manifest
 /package.json               @Bandersnatch0x
+
+# Public Documentation Site
+/apps/docs/                 @Bandersnatch0x
+

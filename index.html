@@ -1,0 +1,2845 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amber Protocol (琥珀协议) — 智能体工程确定性治理与审计证据层</title>
+  <meta name="description" content="面向智能体辅助工程的本地确定性治理层。凝固真实，坚如琥珀。提供不可篡改哈希链账本、四级保证证据收据、否定优先策略引擎与单次使用人类门禁。">
+  
+  <!-- 字体预加载 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Three.js CDN for Dynamic 3D Amber Crystal -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            serif: ['Fraunces', 'Cinzel', 'Georgia', 'serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+            cinzel: ['Cinzel', 'serif'],
+          },
+          colors: {
+            obsidian: {
+              950: '#030508',
+              900: '#06090E',
+              850: '#0B0F16',
+              800: '#101620',
+              700: '#18212F',
+              600: '#222C3E',
+            },
+            amber: {
+              50: '#FFFDF5',
+              100: '#FFF9E5',
+              200: '#FEEDBD',
+              300: '#FDE08A',
+              400: '#F5BE38',
+              500: '#E59E15',
+              600: '#C77D0A',
+              700: '#9E5B08',
+              800: '#75400B',
+              900: '#522C0C',
+              950: '#2A1404',
+            },
+            fringe: {
+              gold: '#FBBF24',
+              glow: '#F59E0B',
+              crystal: '#FDE68A',
+              darkamber: '#78350F',
+            }
+          },
+          animation: {
+            'amber-pulse': 'amberPulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float-slow': 'float 6s ease-in-out infinite',
+            'float-reverse': 'floatRev 7s ease-in-out infinite',
+            'crystal-spin': 'crystalSpin 24s linear infinite',
+            'shimmer': 'shimmer 2.5s infinite linear',
+            'beam-flow': 'beamFlow 2.5s linear infinite',
+          },
+          keyframes: {
+            amberPulse: {
+              '0%, 100%': { opacity: '0.25', transform: 'scale(1)' },
+              '50%': { opacity: '0.65', transform: 'scale(1.04)' },
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-6px)' },
+            },
+            floatRev: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(6px)' },
+            },
+            crystalSpin: {
+              '0%': { transform: 'rotate(0deg)' },
+              '100%': { transform: 'rotate(360deg)' },
+            },
+            shimmer: {
+              '0%': { backgroundPosition: '-200% 0' },
+              '100%': { backgroundPosition: '200% 0' },
+            },
+            beamFlow: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(100%)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* 极致平滑渲染优化 - 消除任何卡顿与重排 */
+    * {
+      box-sizing: border-box;
+    }
+    
+    ::selection {
+      background-color: #E59E15;
+      color: #030508;
+    }
+
+    /* 硬件加速层，杜绝动态 filter: blur() 引发的 GPU 卡顿 */
+    .gpu-layer {
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      perspective: 1000px;
+      will-change: transform, opacity;
+    }
+
+    .amber-glass {
+      background: linear-gradient(135deg, rgba(16, 22, 32, 0.85) 0%, rgba(10, 14, 22, 0.92) 100%);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(245, 190, 56, 0.16);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(254, 237, 189, 0.15);
+    }
+
+    .amber-glass-card {
+      position: relative;
+      background: linear-gradient(180deg, rgba(18, 24, 36, 0.75) 0%, rgba(10, 14, 22, 0.9) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+    .amber-glass-card:hover {
+      border-color: rgba(245, 190, 56, 0.45);
+      box-shadow: 0 12px 35px -10px rgba(245, 158, 11, 0.22), inset 0 1px 0 0 rgba(254, 237, 189, 0.25);
+      transform: translateY(-2px);
+    }
+
+    /* FRINGE 标志性立体 3D 浮空文字 (Fringe 3D Embedded In-Scene Typography) */
+    .fringe-3d-text {
+      font-family: 'Cinzel', serif;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #FFFDF5;
+      text-shadow: 
+        0 1px 0 #F5BE38,
+        0 2px 0 #E59E15,
+        0 3px 0 #C77D0A,
+        0 4px 0 #9E5B08,
+        0 6px 15px rgba(0, 0, 0, 0.9),
+        0 0 25px rgba(245, 190, 56, 0.6);
+      transform: perspective(600px) rotateX(12deg);
+      display: inline-block;
+    }
+
+    /* FRINGE 琥珀封存标本舱 (The Amber 31422 Quarantine Specimen) */
+    .amber-specimen-chamber {
+      position: relative;
+      background: radial-gradient(ellipse at 45% 35%, rgba(254, 243, 199, 0.35) 0%, rgba(245, 190, 56, 0.5) 25%, rgba(199, 125, 10, 0.75) 60%, rgba(69, 26, 3, 0.92) 100%);
+      box-shadow: 
+        0 0 45px 10px rgba(245, 190, 56, 0.3),
+        inset 0 0 35px rgba(254, 240, 138, 0.4),
+        inset -10px -10px 30px rgba(30, 12, 2, 0.9),
+        inset 8px 8px 25px rgba(255, 255, 255, 0.5);
+      border: 1.5px solid rgba(254, 240, 138, 0.6);
+      backdrop-filter: blur(5px);
+      overflow: hidden;
+    }
+
+    /* 封存在琥珀内的远古捕获微气泡 */
+    .amber-trapped-bubble {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(254, 240, 138, 0.5) 40%, rgba(180, 83, 9, 0.1) 80%);
+      box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.9), 0 0 6px rgba(245, 190, 56, 0.6);
+      pointer-events: none;
+    }
+
+    /* 琥珀内部应力折射金光裂纹 */
+    .amber-fracture-glint {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+      height: 1px;
+      transform: rotate(-25deg);
+      opacity: 0.6;
+      filter: drop-shadow(0 0 4px rgba(245, 190, 56, 0.8));
+      pointer-events: none;
+    }
+
+    /* Fringe 警戒色斑马条纹 */
+    .fringe-hazard-stripe {
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(245, 190, 56, 0.3),
+        rgba(245, 190, 56, 0.3) 8px,
+        rgba(10, 14, 22, 0.7) 8px,
+        rgba(10, 14, 22, 0.7) 16px
+      );
+    }
+
+    .fringe-sub-glyph {
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-size: 10px;
+      color: #FDE08A;
+      text-shadow: 0 0 10px rgba(245, 190, 56, 0.7);
+    }
+
+    /* 3D 琥珀封印晶石胶囊 (The Amber Specimen) */
+    .amber-crystal-core {
+      position: relative;
+      background: radial-gradient(circle at 35% 30%, #FFFBEB 0%, #FDE08A 20%, #F5BE38 45%, #C77D0A 75%, #522C0C 100%);
+      box-shadow: 
+        0 0 45px 12px rgba(245, 190, 56, 0.5),
+        inset -6px -6px 18px rgba(42, 20, 4, 0.9),
+        inset 6px 6px 14px rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(254, 240, 138, 0.6);
+    }
+
+    /* 按钮与发光动效 */
+    .amber-glow-btn {
+      background: linear-gradient(180deg, #F5BE38 0%, #E59E15 50%, #C77D0A 100%);
+      color: #030508;
+      font-weight: 700;
+      box-shadow: 0 0 25px -2px rgba(245, 190, 56, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .amber-glow-btn:hover {
+      box-shadow: 0 0 35px 4px rgba(245, 190, 56, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      transform: translateY(-1px);
+    }
+
+    .resin-tag {
+      background: rgba(245, 190, 56, 0.08);
+      border: 1px solid rgba(245, 190, 56, 0.3);
+      color: #FDE08A;
+    }
+
+    .hero-mask {
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+    }
+
+    .bg-grid-amber {
+      background-size: 36px 36px;
+      background-image: 
+        linear-gradient(to right, rgba(245, 190, 56, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(245, 190, 56, 0.03) 1px, transparent 1px);
+    }
+
+    /* Fringe 经典发光密码点 (The Yellow Cipher Dot) */
+    .fringe-cipher-dot {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: #FDE047;
+      box-shadow: 0 0 10px 2px #F5BE38, 0 0 20px #E59E15;
+    }
+
+    /* Fringe 叶脉发光导流卡片 */
+    .fringe-glyph-card {
+      position: relative;
+      background: rgba(6, 9, 14, 0.85);
+      border: 1px solid rgba(245, 190, 56, 0.18);
+      backdrop-filter: blur(16px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    .fringe-glyph-card:hover {
+      border-color: rgba(245, 190, 56, 0.55);
+      box-shadow: 0 12px 40px -10px rgba(245, 190, 56, 0.25);
+      transform: translateY(-3px);
+    }
+    .fringe-glyph-card:hover .vein-glow-path {
+      stroke: rgba(253, 224, 71, 0.9);
+      filter: drop-shadow(0 0 6px rgba(245, 190, 56, 0.9));
+    }
+
+    /* 各章节离开/进入视窗时的平滑过渡切换 */
+    .chapter-section {
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s ease;
+    }
+    .chapter-section:not(.in-viewport) {
+      opacity: 0.88;
+    }
+    .chapter-section.in-viewport {
+      opacity: 1;
+    }
+
+    /* ==================== FRINGE 平行宇宙 (ALTERNATE OVER THERE) 红色血珀主题 ==================== */
+    body.universe-alternate {
+      --fringe-primary-glow: rgba(239, 68, 68, 0.6);
+    }
+    body.universe-alternate .amber-glass {
+      border-color: rgba(239, 68, 68, 0.3);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(254, 202, 202, 0.15);
+    }
+    body.universe-alternate .amber-glass-card:hover {
+      border-color: rgba(239, 68, 68, 0.55);
+      box-shadow: 0 12px 35px -10px rgba(220, 38, 38, 0.35);
+    }
+    body.universe-alternate .fringe-hud-track .hud-diamond-node.active,
+    body.universe-alternate .fringe-hud-track .hud-diamond-node:hover {
+      background-color: #EF4444;
+      border-color: #F87171;
+      box-shadow: 0 0 16px #DC2626;
+    }
+    body.universe-alternate .amber-glow-btn {
+      background: linear-gradient(180deg, #EF4444 0%, #DC2626 50%, #991B1B 100%);
+      box-shadow: 0 0 25px -2px rgba(239, 68, 68, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+    body.universe-alternate .amber-glow-btn:hover {
+      box-shadow: 0 0 35px 4px rgba(239, 68, 68, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    body.universe-alternate .fringe-cipher-dot {
+      background-color: #F87171;
+      box-shadow: 0 0 10px 2px #EF4444, 0 0 20px #DC2626;
+    }
+    body.universe-alternate .fringe-glyph-card:hover {
+      border-color: rgba(239, 68, 68, 0.6);
+      box-shadow: 0 12px 40px -10px rgba(239, 68, 68, 0.35);
+    }
+    body.universe-alternate .vein-glow-path {
+      stroke: #EF4444 !important;
+    }
+    body.universe-alternate .amber-crystal-core {
+      background: radial-gradient(circle at 35% 30%, #FFF1F2 0%, #FECDD3 20%, #F43F5E 45%, #BE123C 75%, #4C0519 100%);
+      box-shadow: 0 0 45px 12px rgba(244, 63, 94, 0.6), inset -6px -6px 18px rgba(76, 5, 25, 0.9), inset 6px 6px 14px rgba(255, 255, 255, 0.7);
+    }
+
+    /* 键盘可访问性与对焦轮廓优化 */
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid #F5BE38;
+      outline-offset: 2px;
+    }
+
+    /* 滚动条 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #06090E;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #18212F;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #E59E15;
+    }
+
+    /* 上浮帷幕层 */
+    .curtain-sheet {
+      background: #05070B;
+      box-shadow: 0 -40px 100px 10px rgba(0, 0, 0, 0.98), 0 -2px 0 0 rgba(245, 190, 56, 0.4);
+    }
+
+    /* FRINGE 琥珀时空导航标尺系统 (Amber Quantum Temporal Conduit) */
+    .fringe-hud-track {
+      position: fixed;
+      left: 20px;
+      top: 140px;
+      bottom: 60px;
+      width: 44px;
+      pointer-events: none;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+    @media (max-width: 1024px) {
+      .fringe-hud-track {
+        display: none;
+      }
+    }
+
+    .hud-diamond-node {
+      pointer-events: auto;
+      width: 24px;
+      height: 24px;
+      transform: rotate(45deg);
+      background: #0B0F16;
+      border: 1px solid rgba(245, 190, 56, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+    .hud-diamond-node::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: #F5BE38;
+      border-radius: 2px;
+      transition: all 0.3s ease;
+      opacity: 0.5;
+    }
+    .hud-diamond-node.active {
+      background: #E59E15;
+      border-color: #FFFBEB;
+      box-shadow: 0 0 25px 4px rgba(245, 190, 56, 0.9);
+      transform: rotate(45deg) scale(1.3);
+    }
+    .hud-diamond-node.active::after {
+      background: #FFFFFF;
+      opacity: 1;
+      transform: scale(1.2);
+    }
+
+    /* 章节进入视口时的琥珀晶化边框高亮 */
+    .amber-quarantine-active {
+      border-color: rgba(245, 190, 56, 0.5) !important;
+      box-shadow: 0 0 40px -5px rgba(245, 158, 11, 0.25) !important;
+    }
+  </style>
+</head>
+
+<body class="bg-obsidian-950 text-slate-200 antialiased font-sans min-h-screen selection:bg-amber-500 selection:text-black overflow-x-hidden">
+
+  <!-- 背景轻量动态 Canvas (低负载、高帧率) -->
+  <canvas id="amber-dust-canvas" class="fixed inset-0 pointer-events-none z-0 opacity-40"></canvas>
+
+  <!-- 顶部氛围微光 -->
+  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[450px] bg-gradient-to-b from-amber-500/15 via-amber-600/5 to-transparent blur-[120px] pointer-events-none z-0"></div>
+
+  <!-- ==================== HEADER / FLOATING NAVBAR (Z-50) ==================== -->
+  <header class="fixed top-4 inset-x-0 z-50 px-4 sm:px-8 max-w-7xl mx-auto">
+    <nav class="amber-glass rounded-2xl px-4 py-3 flex items-center justify-between shadow-2xl transition-all duration-300">
+      
+      <!-- LOGO -->
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="relative w-9 h-9 rounded-xl bg-gradient-to-br from-amber-200 via-amber-500 to-amber-950 p-[1.5px] shadow-[0_0_15px_rgba(245,190,56,0.4)]">
+          <div class="w-full h-full bg-obsidian-900 rounded-[10px] flex items-center justify-center relative overflow-hidden group-hover:bg-obsidian-850 transition-colors">
+            <div class="w-4 h-4 rotate-45 bg-gradient-to-tr from-amber-500 to-amber-100 shadow-[0_0_10px_rgba(253,224,138,0.9)] opacity-95 transition-transform duration-500 group-hover:rotate-90"></div>
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="font-serif text-lg font-extrabold tracking-tight text-white group-hover:text-amber-300 transition-colors">AMBER</span>
+            <span class="text-[9px] uppercase font-mono tracking-widest px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">SPEC 31422</span>
+          </div>
+          <span class="text-[9px] text-slate-400 font-mono -mt-0.5">Deterministic Governance</span>
+        </div>
+      </a>
+
+      <!-- 导航链接 -->
+      <div class="hidden md:flex items-center gap-1 bg-obsidian-900/80 border border-white/5 rounded-full px-3 py-1.5 backdrop-blur-md">
+        <a href="#hero-stage" class="px-3.5 py-1 text-xs font-medium text-slate-300 hover:text-amber-300 hover:bg-white/5 rounded-full transition-all">实时 Sidecar</a>
+        <a href="#pipeline" class="px-3.5 py-1 text-xs font-medium text-slate-300 hover:text-amber-300 hover:bg-white/5 rounded-full transition-all">治理四阶流</a>
+        <a href="#architecture" class="px-3.5 py-1 text-xs font-medium text-slate-300 hover:text-amber-300 hover:bg-white/5 rounded-full transition-all">四大防线</a>
+        <a href="#simulator" class="px-3.5 py-1 text-xs font-medium text-slate-300 hover:text-amber-300 hover:bg-white/5 rounded-full transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+          交互式审计台
+        </a>
+        <a href="#bento" class="px-3.5 py-1 text-xs font-medium text-slate-300 hover:text-amber-300 hover:bg-white/5 rounded-full transition-all">矩阵规格</a>
+      </div>
+
+      <!-- 右侧操作栏 -->
+      <div class="flex items-center gap-2.5">
+        
+        <!-- Fringe 平行宇宙时空相位切换按钮 (PRIME GOLD ⇄ OVER THERE RED) -->
+        <button id="btn-universe-toggle" class="px-2.5 py-1.5 rounded-xl border border-amber-500/30 bg-obsidian-900/90 hover:border-amber-400 text-[10px] font-mono flex items-center gap-1.5 transition-all group" title="切换 Fringe 宇宙相位：主宇宙金珀 ⇄ 备择宇宙血珀" aria-label="Toggle Alternate Universe">
+          <span id="universe-dot" class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#F5BE38] group-hover:scale-125 transition-transform"></span>
+          <span id="universe-label" class="text-slate-300 group-hover:text-amber-200 hidden xl:inline">PRIME TIMELINE</span>
+        </button>
+
+        <!-- 科幻微音效开关 (Web Audio 原生合成，0 外部音频请求) -->
+        <button id="btn-audio-toggle" class="p-1.5 rounded-xl border border-white/10 bg-obsidian-900/90 hover:border-amber-500/40 text-slate-400 hover:text-amber-300 transition-all" title="科幻音效：开启/静音" aria-label="Toggle Sound Effects">
+          <i data-lucide="volume-2" class="w-3.5 h-3.5" id="audio-icon"></i>
+        </button>
+
+        <div class="hidden sm:flex items-center gap-2 text-[11px] font-mono text-slate-400 border border-amber-500/25 bg-amber-950/40 px-2.5 py-1 rounded-lg">
+          <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#F5BE38]"></span>
+          <span>Quarantine: <strong class="text-amber-300 font-bold">SEALED</strong></span>
+        </div>
+
+        <a href="#simulator" class="amber-glow-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer font-semibold">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-black"></i>
+          <span>启动沙盒</span>
+        </a>
+      </div>
+    </nav>
+  </header>
+
+
+  <!-- ==================== FRINGE 风格 3D 琥珀时空导航标尺 (固定左侧 HUD 导轨) ==================== -->
+  <div class="fringe-hud-track">
+    <!-- FRINGE 经典标志：带有 DELTA 三角洲几何脉络的发光树叶 -->
+    <div class="mb-3 relative group cursor-pointer" title="Fringe Delta Leaf // The Sacred Botanical Glyph">
+      <svg class="w-6 h-6 text-amber-400 drop-shadow-[0_0_8px_#F5BE38]" viewBox="0 0 40 48" fill="none" stroke="currentColor">
+        <!-- 树叶外轮廓 -->
+        <path d="M20,2 C32,10 38,24 34,38 C30,46 22,46 20,46 C18,46 10,46 6,38 C2,24 8,10 20,2 Z" stroke-width="1.8" fill="rgba(245, 190, 56, 0.12)"/>
+        <!-- 树叶主脉 -->
+        <path d="M20,4 L20,46" stroke-width="1.5" stroke-linecap="round"/>
+        <!-- 经典 Fringe 三角洲几何脉络 (Delta Vein) -->
+        <path d="M20,12 L30,22 L10,22 Z" stroke-width="1.6" stroke="rgba(253, 224, 71, 0.95)" fill="rgba(245, 190, 56, 0.25)"/>
+        <!-- 侧脉分叉 -->
+        <path d="M20,22 L32,32 M20,22 L8,32 M20,32 L28,40 M20,32 L12,40" stroke-width="1.2" stroke-linecap="round"/>
+        <!-- Fringe 原剧经典黄色密码点 -->
+        <circle cx="34" cy="6" r="1.8" fill="#FDE047" class="animate-ping"/>
+        <circle cx="34" cy="6" r="1.8" fill="#FDE047"/>
+      </svg>
+    </div>
+
+    <!-- 顶部时间戳 -->
+    <div class="text-[8px] font-mono text-amber-500/70 tracking-tighter -rotate-90 mb-4 whitespace-nowrap">
+      AMBER-31422 // TIMELINE
+    </div>
+
+    <!-- 垂直金色能量束导轨 -->
+    <div class="relative w-0.5 flex-1 bg-gradient-to-b from-amber-500/20 via-amber-400/40 to-amber-600/10 flex flex-col items-center justify-between py-6">
+      
+      <!-- 动态能量光脉流线 -->
+      <div class="absolute inset-x-0 w-full h-24 bg-gradient-to-b from-transparent via-amber-300 to-transparent animate-beam-flow opacity-70"></div>
+
+      <!-- 节点 01: 身份权责 -->
+      <div class="hud-diamond-node active" data-nav="pipeline" title="01 // PRINCIPAL & IDENTITY">
+        <span class="absolute -right-24 top-1/2 -translate-y-1/2 -rotate-45 text-[9px] font-mono text-amber-300 tracking-wider whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity bg-obsidian-900 px-2 py-0.5 rounded border border-amber-500/40">
+          01 · IDENTITY
+        </span>
+      </div>
+
+      <!-- 刻度线 -->
+      <div class="text-[7px] font-mono text-amber-500/40 tracking-widest my-2 select-none">|||||</div>
+
+      <!-- 节点 02: 策略门禁 -->
+      <div class="hud-diamond-node" data-nav="architecture" title="02 // DENY-WINS GATES">
+        <span class="absolute -right-24 top-1/2 -translate-y-1/2 -rotate-45 text-[9px] font-mono text-amber-300 tracking-wider whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity bg-obsidian-900 px-2 py-0.5 rounded border border-amber-500/40">
+          02 · GATES
+        </span>
+      </div>
+
+      <div class="text-[7px] font-mono text-amber-500/40 tracking-widest my-2 select-none">|||||</div>
+
+      <!-- 节点 03: 实时审计沙盒 -->
+      <div class="hud-diamond-node" data-nav="simulator" title="03 // LIVE SANDBOX">
+        <span class="absolute -right-24 top-1/2 -translate-y-1/2 -rotate-45 text-[9px] font-mono text-amber-300 tracking-wider whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity bg-obsidian-900 px-2 py-0.5 rounded border border-amber-500/40">
+          03 · SANDBOX
+        </span>
+      </div>
+
+      <div class="text-[7px] font-mono text-amber-500/40 tracking-widest my-2 select-none">|||||</div>
+
+      <!-- 节点 04: 六维矩阵 -->
+      <div class="hud-diamond-node" data-nav="bento" title="04 // LEDGER MATRIX">
+        <span class="absolute -right-24 top-1/2 -translate-y-1/2 -rotate-45 text-[9px] font-mono text-amber-300 tracking-wider whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity bg-obsidian-900 px-2 py-0.5 rounded border border-amber-500/40">
+          04 · MATRIX
+        </span>
+      </div>
+
+      <div class="text-[7px] font-mono text-amber-500/40 tracking-widest my-2 select-none">|||||</div>
+
+      <!-- 节点 05: CLI 入口 -->
+      <div class="hud-diamond-node" data-nav="cli-section" title="05 // CLI ENTRY">
+        <span class="absolute -right-24 top-1/2 -translate-y-1/2 -rotate-45 text-[9px] font-mono text-amber-300 tracking-wider whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity bg-obsidian-900 px-2 py-0.5 rounded border border-amber-500/40">
+          05 · CLI
+        </span>
+      </div>
+
+    </div>
+
+    <!-- 底部状态码 -->
+    <div class="text-[8px] font-mono text-amber-400 tracking-tighter mt-4">
+      FAIL_CLOSED
+    </div>
+  </div>
+
+
+  <!-- ==================== HERO PINNED BASEBOARD (底板层 Z-10，高帧率 GPU 硬件加速) ==================== -->
+  <div class="relative w-full z-10">
+    <div id="hero-pinned-board" class="sticky top-0 min-h-screen flex flex-col justify-start pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden gpu-layer">
+      
+      <!-- 硬件加速渐隐黑幕（通过纯 opacity 调节变暗，彻底替代性能昂贵的 filter: blur） -->
+      <div id="hero-darken-mask" class="absolute inset-0 bg-obsidian-950 pointer-events-none z-20 opacity-0 transition-opacity duration-75"></div>
+
+      <!-- 暮色雪山与日落霞光背景层 (纯净背景，彻底移除所有悬浮文字干扰) -->
+      <div class="absolute inset-x-0 top-0 h-full hero-mask pointer-events-none z-0 overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-b from-[#2e1305] via-[#160e11] to-obsidian-950 opacity-95"></div>
+        
+        <svg class="absolute bottom-6 inset-x-0 w-full h-[480px] opacity-20 text-amber-600/25" preserveAspectRatio="none" viewBox="0 0 1440 480" fill="currentColor">
+          <path d="M0,280 L180,180 L360,260 L540,120 L720,240 L900,100 L1080,210 L1260,140 L1440,290 L1440,480 L0,480 Z" opacity="0.4"/>
+          <path d="M0,340 L220,240 L440,320 L660,190 L880,310 L1100,220 L1320,330 L1440,270 L1440,480 L0,480 Z" opacity="0.6"/>
+          <path d="M0,400 L300,310 L600,390 L900,290 L1200,380 L1440,330 L1440,480 L0,480 Z" fill="#030508"/>
+        </svg>
+
+        <div class="absolute top-8 left-1/2 -translate-x-1/2 w-[700px] h-[320px] bg-gradient-to-b from-amber-400/20 via-amber-600/8 to-transparent rounded-full blur-[90px]"></div>
+      </div>
+
+      <!-- ==================== 首屏核心：动态自然 3D 琥珀 + 产品名 + 极简标语 ==================== -->
+      <div class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-2 sm:pt-4 pb-4">
+        
+        <!-- 动态自然 3D 琥珀 (有机鹅卵水滴形温润树脂 + 内部封存物) -->
+        <div class="flex flex-col items-center justify-center mb-3">
+          <div class="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center">
+            <!-- 3D WebGL 容器 -->
+            <div id="amber-3d-gem-container" class="w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center"></div>
+            <!-- 琥珀内聚光环与焦散微光 -->
+            <div class="absolute inset-1 bg-amber-500/25 rounded-full blur-xl pointer-events-none animate-pulse"></div>
+          </div>
+
+          <!-- 产品名 -->
+          <div class="flex items-center gap-2 mt-1">
+            <span class="font-serif text-2xl sm:text-3xl font-extrabold tracking-widest text-white uppercase">AMBER</span>
+            <span class="text-[10px] font-mono tracking-widest px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">PROTOCOL</span>
+          </div>
+        </div>
+
+        <!-- 极简主标题 (解决孤字折行，舒展大气) -->
+        <h1 class="font-serif text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white leading-tight mb-2.5 max-w-4xl mx-auto">
+          面向编码智能体的确定性治理层
+        </h1>
+
+        <!-- 极简单行副标 -->
+        <p class="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto mb-5 font-light">
+          不可篡改哈希链账本 · 否定优先策略门禁 · 单次人类授权
+        </p>
+
+        <!-- 极简 CTA 按钮 -->
+        <div class="flex items-center justify-center gap-3 mb-6">
+          <a href="#simulator" class="amber-glow-btn px-6 py-2.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-xl group">
+            <i data-lucide="play" class="w-3.5 h-3.5 text-black"></i>
+            <span>启动治理沙盒 (Sandbox)</span>
+          </a>
+          <a href="#architecture" class="px-4 py-2.5 rounded-full text-xs font-medium text-slate-300 bg-obsidian-900/80 hover:bg-obsidian-850 border border-white/10 hover:border-amber-400/30 transition-all">
+            协议公约
+          </a>
+        </div>
+
+      </div>
+
+      <!-- ==================== 首屏中央：极简纯净的产品界面图 (CLEAN PRODUCT UI DASHBOARD) ==================== -->
+      <div id="hero-stage" class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 w-full pb-8">
+        
+        <!-- 外层布局：中央产品主窗口 + 左右两侧自然错落的悬浮微卡片 (对齐 Blume 布局) -->
+        <div class="relative">
+          
+          <!-- 左下侧悬浮小卡片 (Cursor 状态) -->
+          <div class="hidden lg:flex absolute -left-12 -bottom-4 z-20 w-60 rounded-2xl p-3.5 amber-glass border border-white/10 shadow-2xl backdrop-blur-xl animate-float-slow items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center font-bold text-xs text-indigo-300 shrink-0">
+              Cu
+            </div>
+            <div class="text-left overflow-hidden">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-semibold text-white">Cursor</span>
+                <span class="text-[9px] px-1.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">Passed</span>
+              </div>
+              <div class="text-[10px] text-slate-400 font-mono truncate">ADR-0028 verified OK</div>
+            </div>
+          </div>
+
+          <!-- 右上侧悬浮小卡片 (Claude Code 琥珀封印状态) -->
+          <div class="hidden lg:flex absolute -right-10 -top-6 z-20 w-64 rounded-2xl p-3.5 bg-gradient-to-r from-amber-500/20 to-obsidian-900/90 border border-amber-400/50 shadow-2xl backdrop-blur-xl animate-float-reverse items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/30 border border-amber-300 flex items-center justify-center font-bold text-xs text-amber-200 shrink-0 shadow-[0_0_10px_#F5BE38]">
+              CC
+            </div>
+            <div class="text-left overflow-hidden">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-semibold text-white">Claude Code</span>
+                <span class="text-[9px] px-1.5 rounded bg-amber-400 text-black font-mono font-bold">Sealed</span>
+              </div>
+              <div class="text-[10px] text-amber-200/90 font-mono truncate">Live push halted in amber</div>
+            </div>
+          </div>
+
+          <!-- 中央核心：极净毛玻璃产品主界面窗口 (Clean Console Dashboard) -->
+          <div class="rounded-3xl border border-amber-500/30 bg-obsidian-900/95 p-5 sm:p-7 shadow-[0_25px_80px_rgba(0,0,0,0.85)] relative backdrop-blur-2xl">
+            
+            <!-- 顶栏：macOS 风格圆点与状态 -->
+            <div class="flex items-center justify-between pb-4 mb-6 border-b border-white/10">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span>
+                <span class="w-3 h-3 rounded-full bg-amber-500/80 inline-block"></span>
+                <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
+                <span class="text-xs font-mono font-medium text-slate-300 ml-2">Amber Sidecar · Governance Monitor</span>
+              </div>
+              <div class="flex items-center gap-2 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Active Protection: 100% Fail-Closed</span>
+              </div>
+            </div>
+
+            <!-- 核心：3 个精美干净的指标卡 (借鉴 Blume 圆盘式清晰层级) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              
+              <div class="bg-obsidian-950/80 rounded-2xl p-4 border border-white/5 text-left">
+                <div class="text-[11px] font-mono text-slate-400 mb-1 flex items-center justify-between">
+                  <span>策略合规率</span>
+                  <span class="text-emerald-400 font-bold">100%</span>
+                </div>
+                <div class="text-lg font-bold text-white font-serif mb-2">Deny-Wins</div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-emerald-400 h-full w-full"></div>
+                </div>
+              </div>
+
+              <div class="bg-obsidian-950/80 rounded-2xl p-4 border border-amber-500/20 text-left bg-amber-500/[0.02]">
+                <div class="text-[11px] font-mono text-amber-300/80 mb-1 flex items-center justify-between">
+                  <span>保证可信级别</span>
+                  <span class="text-amber-300 font-bold">Level 3</span>
+                </div>
+                <div class="text-lg font-bold text-amber-200 font-serif mb-2">Verified Seal</div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-amber-400 h-full w-[95%]"></div>
+                </div>
+              </div>
+
+              <div class="bg-obsidian-950/80 rounded-2xl p-4 border border-white/5 text-left">
+                <div class="text-[11px] font-mono text-slate-400 mb-1 flex items-center justify-between">
+                  <span>凭证泄露阻断</span>
+                  <span class="text-cyan-300 font-bold">0 Leaks</span>
+                </div>
+                <div class="text-lg font-bold text-white font-serif mb-2">Zero-Trust</div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-cyan-400 h-full w-full"></div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- 底部：受控智能体与哈希链流 (干净清爽列表) -->
+            <div class="space-y-2 font-mono text-xs text-left">
+              <div class="p-2.5 rounded-xl bg-obsidian-950/90 border border-white/5 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                  <span class="text-white font-semibold">Cursor (Sonnet 3.7)</span>
+                  <span class="text-slate-400 text-[11px]">Task: Refactor ledger-family.js</span>
+                </div>
+                <span class="text-emerald-400 text-[11px] font-bold">Gate Passed ✓</span>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-amber-500/[0.06] border border-amber-500/30 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                  <span class="text-amber-200 font-semibold">Claude Code</span>
+                  <span class="text-slate-400 text-[11px]">Op: Live Git Push Diverted</span>
+                </div>
+                <span class="text-amber-300 text-[11px] font-bold">Single-Use Human Approval Required</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ==================== OVERLAPPING CONTENT SHEET (上浮内容帷幕层 Z-20) ==================== -->
+  <main id="content-sheet" class="curtain-sheet relative z-20 rounded-t-[40px] md:rounded-t-[56px] border-t-2 border-amber-500/40 transition-transform duration-100 -mt-12 md:-mt-16 overflow-hidden">
+    
+    <!-- 顶部微光拉手 -->
+    <div class="w-full flex flex-col items-center justify-center pt-7 pb-4 cursor-pointer group">
+      <div class="w-20 h-1.5 rounded-full bg-amber-500/40 group-hover:bg-amber-400 transition-all duration-300 group-hover:w-32 group-hover:shadow-[0_0_20px_rgba(245,190,56,0.8)] mb-3"></div>
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono tracking-widest uppercase">
+        <i data-lucide="chevrons-up" class="w-4 h-4 text-amber-400"></i>
+        <span>深入 Amber 确定性治理体系</span>
+      </div>
+    </div>
+
+
+    <!-- ==================== CHAPTER 01: 治理四阶闭环 ==================== -->
+    <section id="pipeline" class="chapter-section py-20 relative bg-obsidian-900/40 border-b border-amber-500/15 lg:pl-16 transition-all duration-300 overflow-hidden" data-chapter="pipeline">
+      
+      <!-- FRINGE 开场 3D 空间浮空科学大词 -->
+      <div class="absolute top-8 left-6 text-[10px] font-cinzel font-bold tracking-[0.35em] text-amber-400/20 uppercase pointer-events-none select-none hidden md:block">
+        // PARALLEL TIMELINES · TRANSHUMANISM
+      </div>
+      <div class="absolute top-10 right-10 text-[10px] font-cinzel font-bold tracking-[0.35em] text-amber-400/20 uppercase pointer-events-none select-none hidden md:block">
+        // NEURAL QUARANTINE · BIO-STASIS
+      </div>
+
+      <!-- 背景微光生物叶脉脉络网络 (Vein Conduit) -->
+      <svg class="absolute -left-20 top-20 w-96 h-96 opacity-10 pointer-events-none" viewBox="0 0 200 200" fill="none" stroke="#F5BE38">
+        <path d="M10,190 Q90,130 180,20" stroke-width="2" class="vein-glow-path"/>
+        <path d="M60,150 Q110,130 150,160 M100,110 Q140,80 180,100 M130,80 Q120,40 160,20" stroke-width="1.2" class="vein-glow-path"/>
+      </svg>
+
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        
+        <div class="text-center max-w-3xl mx-auto mb-14">
+          <!-- Fringe 风格章节大字悬浮标识 -->
+          <div class="mb-2">
+            <span class="fringe-sub-glyph text-amber-400">// PROTOCOL REVELATION 01</span>
+          </div>
+          <h2 class="font-serif text-3xl sm:text-4xl font-bold text-white mb-4">
+            从自由狂奔到密码学可信证明：<br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-500">
+              Amber 确定性治理四阶生命周期
+            </span>
+          </h2>
+          <p class="text-slate-400 text-sm sm:text-base leading-relaxed">
+            不依赖黑盒大模型的主观置信度，每一行代码变更必须穿透严格的人格权责、确定性策略门禁与物理哈希链。
+          </p>
+        </div>
+
+        <!-- 4 步骤交互联动网格 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          
+          <!-- 左侧 4 个交互式卡片 -->
+          <div class="lg:col-span-5 space-y-4" id="step-nav-container">
+            
+            <!-- Step 1 -->
+            <div class="step-card active amber-glass-card rounded-2xl p-5 cursor-pointer border-l-4 border-l-amber-400 transition-all" data-step="1">
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 font-mono font-bold flex items-center justify-center text-sm shrink-0 border border-amber-500/30">
+                  01
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+                    主体注册与权责隔离
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">Principal Registry</span>
+                  </h3>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    严格区分人类维护者（Human Maintainer）与自动化智能体（Agent Identity）。执行者、审批者与验证者必须物理隔离（Separation of Duties）。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-card amber-glass-card rounded-2xl p-5 cursor-pointer border-l-4 border-l-slate-700 hover:border-l-amber-400/60 transition-all opacity-75 hover:opacity-100" data-step="2">
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center text-sm shrink-0 border border-slate-700">
+                  02
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+                    否定优先策略与确定门禁
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">Deny-Wins Gate</span>
+                  </h3>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    组织与租户策略构成不可逾越的安全上限。缺少证据、陈旧证据或冲突策略即刻拒绝执行（Fail-Closed），杜绝越权。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-card amber-glass-card rounded-2xl p-5 cursor-pointer border-l-4 border-l-slate-700 hover:border-l-amber-400/60 transition-all opacity-75 hover:opacity-100" data-step="3">
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center text-sm shrink-0 border border-slate-700">
+                  03
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+                    防篡改哈希链与单次批准
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">Single-Use Approval</span>
+                  </h3>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    人类授权具备严格半开时间窗口 `[validAt, validUntil)`，单次使用即作废，禁止重放。所有事件记入不可逆 SHA-256 哈希链。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="step-card amber-glass-card rounded-2xl p-5 cursor-pointer border-l-4 border-l-slate-700 hover:border-l-amber-400/60 transition-all opacity-75 hover:opacity-100" data-step="4">
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center text-sm shrink-0 border border-slate-700">
+                  04
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+                    四级可信收据与独立验证
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">Assurance L3 Seal</span>
+                  </h3>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    Unavailable ➔ Observed ➔ Replayable ➔ Verified。最高级别 Verified 必须由独立第三方 Principal 签名提升，不可自证其信。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 右侧联动高保真 Dashboard 演示区 -->
+          <div class="lg:col-span-7">
+            <div class="amber-glass rounded-3xl p-6 border border-amber-500/25 shadow-2xl relative overflow-hidden min-h-[460px] flex flex-col justify-between">
+              
+              <!-- 动态步骤展示器 -->
+              <div id="step-display-content">
+                
+                <!-- 初始 Step 1 内容 -->
+                <div class="step-pane" id="pane-1">
+                  <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
+                      <span class="font-mono text-xs font-bold text-white">PRINCIPAL DIRECTORY & SOD MATRIX</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Enforced: Strict Separation</span>
+                  </div>
+
+                  <div class="space-y-3 font-mono text-xs mb-4">
+                    <div class="bg-obsidian-950 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-300 font-bold">H</div>
+                        <div>
+                          <div class="text-white font-semibold">human:sarah@security.org</div>
+                          <div class="text-[10px] text-slate-400">Role: Security Auditor | Scope: [policies/*, breakglass/*]</div>
+                        </div>
+                      </div>
+                      <span class="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">Human Only Slot</span>
+                    </div>
+
+                    <div class="bg-obsidian-950 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold">A</div>
+                        <div>
+                          <div class="text-white font-semibold">agent:claude-code-runner-01</div>
+                          <div class="text-[10px] text-slate-400">Role: Code Producer | Scope: [src/*, tests/*]</div>
+                        </div>
+                      </div>
+                      <span class="px-2 py-0.5 text-[10px] bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30">Cannot Self-Approve</span>
+                    </div>
+
+                    <div class="bg-obsidian-950 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-300 font-bold">V</div>
+                        <div>
+                          <div class="text-white font-semibold">service:deterministic-eval-v2</div>
+                          <div class="text-[10px] text-slate-400">Role: Independent Verifier | Scope: [evidence/evals/*]</div>
+                        </div>
+                      </div>
+                      <span class="px-2 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">Verifier ≠ Producer</span>
+                    </div>
+                  </div>
+
+                  <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-200">
+                    <strong>Amber 权责公约：</strong> 任何由智能体提议的生产环境敏感操作，其 Approval 与 Verification 槽位绝对禁止注入智能体身份，杜绝智能体自编自导。
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- 底部操作导航 -->
+              <div class="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs font-mono text-slate-400">
+                <span id="step-indicator">Step 1 of 4: Principal & Identity</span>
+                <div class="flex gap-2">
+                  <button id="btn-prev-step" class="px-3 py-1 rounded bg-obsidian-900 hover:bg-obsidian-800 text-slate-300 border border-white/10">上一步</button>
+                  <button id="btn-next-step" class="px-3 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30">下一步</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ==================== CHAPTER 02: TABBED ARCHITECTURE DEEP DIVE ==================== -->
+    <section id="architecture" class="chapter-section py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:pl-16 transition-all duration-300" data-chapter="architecture">
+      
+      <div class="text-center max-w-3xl mx-auto mb-14">
+        <div class="mb-2">
+          <span class="fringe-sub-glyph text-amber-400">// PROTOCOL REVELATION 02</span>
+        </div>
+        <h2 class="font-serif text-3xl sm:text-4xl font-bold text-white mb-4">
+          全景技术架构与严苛公约
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base">
+          四大确定性防线，为现代智能体开发提供可数学验证的安全边界。
+        </p>
+      </div>
+
+      <!-- 顶部选项卡 -->
+      <div class="flex justify-center mb-10 overflow-x-auto pb-2">
+        <div class="inline-flex p-1.5 rounded-2xl bg-obsidian-900/90 border border-white/10 backdrop-blur-xl gap-1">
+          <button class="tab-btn active px-4 py-2 rounded-xl text-xs font-semibold text-obsidian-950 bg-amber-400 shadow-md transition-all flex items-center gap-2" data-tab="tab-gate">
+            <i data-lucide="shield-alert" class="w-4 h-4"></i>
+            <span>1. 确定性门禁 (Gate Contracts)</span>
+          </button>
+          <button class="tab-btn px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2" data-tab="tab-ledger">
+            <i data-lucide="link" class="w-4 h-4"></i>
+            <span>2. 哈希链账本 (Tamper-Evident Ledger)</span>
+          </button>
+          <button class="tab-btn px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2" data-tab="tab-evidence">
+            <i data-lucide="file-check-2" class="w-4 h-4"></i>
+            <span>3. 四级可信收据 (Evidence Receipts)</span>
+          </button>
+          <button class="tab-btn px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2" data-tab="tab-breakglass">
+            <i data-lucide="flame" class="w-4 h-4"></i>
+            <span>4. 应急熔断 (Break-Glass)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 选项卡对应内容卡片 -->
+      <div class="amber-glass rounded-3xl p-8 border border-amber-500/20 shadow-2xl relative">
+        
+        <!-- Tab 1: Gate Contracts -->
+        <div id="tab-gate" class="tab-content grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div>
+            <div class="inline-block px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px] mb-3">
+              F050 / ADR-0023 Specification
+            </div>
+            <h3 class="font-serif text-2xl font-bold text-white mb-3">
+              基于客观公约裁决，绝非大模型玄学置信度
+            </h3>
+            <p class="text-slate-300 text-sm leading-relaxed mb-6">
+              Gate Contract 是规范的注册制品。门禁准入条件由明确的证据类型要求、时效性约束（Freshness Bounds）以及注册比较器组成。
+            </p>
+            <ul class="space-y-3 text-xs text-slate-300">
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>AllOf 确定性收敛：</strong> 任何过期、缺失或状态未达标的证据均直接判负（Exit 0 记录失败事实，非静默报错）。</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>不可篡改评估结果：</strong> 每次运行向 <code class="text-amber-300 bg-black/40 px-1 py-0.5 rounded">.amber/gates/outcomes.jsonl</code> 物理追加一条只读事件。</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>否定优先安全顶盖：</strong> 组织策略高于一切，严禁智能体自行向下松绑。</span>
+              </li>
+            </ul>
+          </div>
+          <div class="bg-obsidian-950 rounded-2xl p-5 border border-white/10 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner">
+            <div class="text-slate-500 text-[11px] mb-2">// Gate Contract Evaluation Output</div>
+            <pre class="text-amber-200/90 leading-relaxed"><code>{
+  "contract": "gate:deploy-prod-ceiling@v2",
+  "evaluatedAt": "2026-09-03T00:33:24Z",
+  "verdict": "DENY",
+  "reasons": [
+    "MISSING_INDEPENDENT_VERIFIER_SIGNATURE",
+    "EVAL_QA_INDEPENDENCE_NOT_REPLAYED"
+  ],
+  "requiredEvidence": ["evidence:qa-replayable", "evidence:security-scan"],
+  "appendLedgerHash": "sha256:4d817b...c09f",
+  "failClosed": true
+}</code></pre>
+          </div>
+        </div>
+
+        <!-- Tab 2: Hash Chain Ledger -->
+        <div id="tab-ledger" class="tab-content hidden grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div>
+            <div class="inline-block px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px] mb-3">
+              ADR-0028 defineLedgerFamily
+            </div>
+            <h3 class="font-serif text-2xl font-bold text-white mb-3">
+              统一防篡改账本核心：原地改动直接封死
+            </h3>
+            <p class="text-slate-300 text-sm leading-relaxed mb-6">
+              Amber 所有治理家族（maintain, retention, external, breakglass）均构建于 <code class="text-amber-300">registry-ledger.js</code> 之上，拥有排他追加锁、严格字段闭集校验与防凭证泄露审查。
+            </p>
+            <ul class="space-y-3 text-xs text-slate-300">
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>只读失效闭合：</strong> 读取时若发现任一哈希断裂，整套治理系统直接 Fail-Closed 拒载。</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>单次花销扫描（Spend-Scan）：</strong> 杜绝任何批准凭证的双花与重放攻击。</span>
+              </li>
+            </ul>
+          </div>
+          <div class="bg-obsidian-950 rounded-2xl p-5 border border-white/10 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner">
+            <div class="text-slate-500 text-[11px] mb-2">// Ledger Verification Ritual</div>
+            <pre class="text-emerald-300/90 leading-relaxed"><code>$ node scripts/amber.js doctor --target .
+[PASS] Principal registry tamper-check: OK (12 entries)
+[PASS] Policy outcome chain hash: OK (48 entries)
+[PASS] Approval spend-scan uniqueness: 100% Valid
+[PASS] Credential leak scanner: 0 leaks detected
+✓ Ledger Family integrity: 100.00% (Fail-closed ready)</code></pre>
+          </div>
+        </div>
+
+        <!-- Tab 3: Evidence Receipts -->
+        <div id="tab-evidence" class="tab-content hidden grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div>
+            <div class="inline-block px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px] mb-3">
+              F050 Assurance Standard
+            </div>
+            <h3 class="font-serif text-2xl font-bold text-white mb-3">
+              四级保证契约：拒绝智能体自说自话
+            </h3>
+            <p class="text-slate-300 text-sm leading-relaxed mb-6">
+              智能体产生的任何测试结果只能记录为 <code class="text-amber-300">Observed</code> 或提供确定性环境命令的 <code class="text-amber-300">Replayable</code>。顶级 <code class="text-amber-300">Verified</code> 必须由另一位独立注册的主体显式背书。
+            </p>
+            <ul class="space-y-3 text-xs text-slate-300">
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>不可伪造的 Verified 阶梯：</strong> 产生者 ID 必须严格异于验证者 ID。</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span><strong>确定性回放套件：</strong> 包含工具描述、QA 合约无依赖性、引用边界等防注入验证。</span>
+              </li>
+            </ul>
+          </div>
+          <div class="bg-obsidian-950 rounded-2xl p-5 border border-white/10 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner">
+            <div class="text-slate-500 text-[11px] mb-2">// Evidence Receipt Schema Pin</div>
+            <pre class="text-cyan-300/90 leading-relaxed"><code>{
+  "receiptId": "evid_01HYZ99824AKLM",
+  "producer": "principal:agent-claude-01",
+  "assurance": "replayable",
+  "verifiedBy": "principal:human-bob@amber.org",
+  "effectiveAssurance": "verified",
+  "replayCommand": "node scripts/amber.js eval run --suite f058",
+  "hash": "sha256:99c1f0...b112"
+}</code></pre>
+          </div>
+        </div>
+
+        <!-- Tab 4: Break-Glass -->
+        <div id="tab-breakglass" class="tab-content hidden grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div>
+            <div class="inline-block px-2.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono text-[11px] mb-3">
+              F057 Emergency Mechanism
+            </div>
+            <h3 class="font-serif text-2xl font-bold text-white mb-3">
+              一次性人类紧急破窗与强制事后审查
+            </h3>
+            <p class="text-slate-300 text-sm leading-relaxed mb-6">
+              在线上发生紧急重大事故时，允许人类签发最长不超过 24 小时的单次使用应急授权（Break-Glass Grant），执行后必须按期提交事后审查。
+            </p>
+            <ul class="space-y-3 text-xs text-slate-300">
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                <span><strong>严禁免死金牌：</strong> 破窗绝不接受 <code class="text-rose-300">--force</code>，仅允许绑定具体事故与风险。</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i data-lucide="check" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                <span><strong>超期审查自动阻断：</strong> 逾期未完成事后审查，系统将触发 <code class="text-rose-300">denyBreakGlassOverdueReview</code> 全局封锁。</span>
+              </li>
+            </ul>
+          </div>
+          <div class="bg-obsidian-950 rounded-2xl p-5 border border-white/10 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner">
+            <div class="text-slate-500 text-[11px] mb-2">// Break-Glass Grant Record</div>
+            <pre class="text-rose-300/90 leading-relaxed"><code>{
+  "grantId": "bg_grant_2026_0903",
+  "incident": "INC-4099-PROD-OUTAGE",
+  "targetScope": "scripts/hotfix-deploy.js",
+  "validityWindow": "[2026-09-03T00:00Z, 2026-09-03T04:00Z)",
+  "reviewDeadline": "2026-09-04T12:00Z",
+  "status": "USED_TERMINAL",
+  "spentWithReceipt": "evid_hotfix_signed"
+}</code></pre>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ==================== FRINGE 经典发光叶脉能量导轨分隔带 (Bioluminescent Vein Divider) ==================== -->
+    <div class="relative py-10 flex items-center justify-center overflow-hidden">
+      <!-- 左侧延展的主脉与分叉叶脉 -->
+      <div class="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-amber-400 relative">
+        <svg class="absolute right-0 bottom-0 w-36 h-12 text-amber-400/40 pointer-events-none" viewBox="0 0 120 40" fill="none" stroke="currentColor">
+          <path d="M120,40 C80,30 40,15 0,0" stroke-width="1.2" stroke-dasharray="2 2"/>
+          <path d="M70,25 C50,35 30,30 10,20" stroke-width="0.8"/>
+        </svg>
+      </div>
+
+      <!-- 中央：Fringe 核心 Delta 树叶徽章与黄色发光密码点 -->
+      <div class="relative mx-4 sm:mx-6 px-4 py-2 rounded-2xl bg-obsidian-950/90 border border-amber-500/40 shadow-[0_0_25px_rgba(245,190,56,0.25)] flex items-center gap-3">
+        <!-- 黄色密码点 -->
+        <div class="w-2 h-2 rounded-full bg-yellow-300 shadow-[0_0_8px_#FDE047] animate-pulse"></div>
+
+        <!-- 带有三角洲脉络的树叶 -->
+        <svg class="w-6 h-6 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2C17 6 19 12 17 18c-2 4-4 4-5 4s-3 0-5-4c-2-6 0-12 5-16z"/>
+          <path d="M12 3v18"/>
+          <path d="M12 8l4 5h-8z" fill="rgba(245,190,56,0.3)"/>
+        </svg>
+
+        <span class="text-xs font-mono tracking-widest text-amber-200 uppercase font-semibold hidden sm:inline">
+          DELTA VEIN // CONDUIT
+        </span>
+
+        <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          GLYPH 01 · LEAF
+        </span>
+      </div>
+
+      <!-- 右侧延展的主脉与分叉叶脉 -->
+      <div class="flex-1 h-px bg-gradient-to-l from-transparent via-amber-500/30 to-amber-400 relative">
+        <svg class="absolute left-0 bottom-0 w-36 h-12 text-amber-400/40 pointer-events-none" viewBox="0 0 120 40" fill="none" stroke="currentColor">
+          <path d="M0,40 C40,30 80,15 120,0" stroke-width="1.2" stroke-dasharray="2 2"/>
+          <path d="M50,25 C70,35 90,30 110,20" stroke-width="0.8"/>
+        </svg>
+      </div>
+    </div>
+
+
+    <!-- ==================== CHAPTER 03: 实时审计体验沙盒 ==================== -->
+    <section id="simulator" class="chapter-section py-24 bg-gradient-to-b from-obsidian-950 via-obsidian-900/80 to-obsidian-950 border-t border-amber-500/20 lg:pl-16 transition-all duration-300" data-chapter="simulator">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <div class="mb-2">
+            <span class="fringe-sub-glyph text-amber-400">// PROTOCOL REVELATION 03</span>
+          </div>
+          <h2 class="font-serif text-3xl sm:text-5xl font-bold text-white mb-4">
+            体验智能体操作的<br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-500">
+              确定性拦截与审计封存
+            </span>
+          </h2>
+          <p class="text-slate-400 text-sm sm:text-base">
+            点击下方模拟场景，亲眼见证 Amber Protocol 如何在毫秒级执行策略拦截、单次批准并铸造防篡改证据。
+          </p>
+        </div>
+
+        <!-- 沙盒交互面板 -->
+        <div class="amber-glass rounded-3xl p-6 sm:p-8 border border-amber-500/30 shadow-2xl">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 左侧：场景选择与操作触发 -->
+            <div class="lg:col-span-4 space-y-4">
+              <h4 class="text-xs font-mono font-bold text-amber-300 uppercase tracking-wider mb-2">选择智能体拟发起的动作</h4>
+              
+              <button class="sim-action-btn active w-full text-left p-4 rounded-xl amber-glass-card border border-amber-500/40 bg-amber-500/10 transition-all" data-scenario="git-push">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i data-lucide="git-pull-request" class="w-3.5 h-3.5 text-amber-400"></i>
+                    ADR-0020 Git Push 动作
+                  </span>
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">Quarantine Intercept</span>
+                </div>
+                <p class="text-[11px] text-slate-400">智能体试图执行外部推送代码，将被 Amber 强制拦截</p>
+              </button>
+
+              <button class="sim-action-btn w-full text-left p-4 rounded-xl amber-glass-card border border-white/5 hover:border-amber-500/30 transition-all" data-scenario="env-secret">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i data-lucide="key" class="w-3.5 h-3.5 text-amber-400"></i>
+                    修改 .env 生产凭证
+                  </span>
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">Blocked</span>
+                </div>
+                <p class="text-[11px] text-slate-400">触发凭证泄露保护，无注册合约立即拒绝</p>
+              </button>
+
+              <button class="sim-action-btn w-full text-left p-4 rounded-xl amber-glass-card border border-white/5 hover:border-amber-500/30 transition-all" data-scenario="safe-refactor">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                    <i data-lucide="code-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    本地代码重构与测试
+                  </span>
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Safe Auto</span>
+                </div>
+                <p class="text-[11px] text-slate-400">在安全白名单范围内，自动完成 L2 证据链登记</p>
+              </button>
+
+              <div class="pt-4">
+                <button id="btn-run-simulation" class="w-full amber-glow-btn py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+                  <i data-lucide="play" class="w-4 h-4"></i>
+                  <span>执行拦截与证据铸造测试</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 右侧：实时治理拦截雷达与控制台流水 -->
+            <div class="lg:col-span-8 bg-obsidian-950 rounded-2xl border border-white/10 p-5 flex flex-col justify-between font-mono">
+              
+              <div>
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 text-xs">
+                  <div class="flex items-center gap-2 text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>AMBER GOVERNANCE ENGINE TERMINAL</span>
+                  </div>
+                  <span id="sim-status-badge" class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">
+                    IDLE / READY
+                  </span>
+                </div>
+
+                <!-- 控制台模拟输出 -->
+                <div id="sim-console-output" class="text-xs space-y-2 text-slate-300 h-[260px] overflow-y-auto p-2 bg-black/40 rounded-xl border border-white/5">
+                  <div class="text-slate-500">// 点击左侧“执行测试”观察 Amber Protocol 治理判定流程...</div>
+                  <div class="text-slate-400">$ node scripts/amber.js gate evaluate --target . --action "transport-sync"</div>
+                  <div class="text-amber-300">▶ [POLICY] Deny-wins evaluation against org-ceiling.json...</div>
+                  <div class="text-emerald-400">✓ Principal verified: agent:claude-code (Role: Producer)</div>
+                  <div class="text-rose-400 font-bold">⚠ QUARANTINE: Live 'git push' is strictly forbidden by Amber Governance Policy.</div>
+                  <div class="text-amber-200">▶ [ADR-0020] Diverting to Stage A Governed Local Commit behind single-use human approval.</div>
+                  <div class="text-cyan-300">⚡ Signed Evidence Receipt: #EVID-2026-9921 appended to hash-chain ledger.</div>
+                </div>
+              </div>
+
+              <!-- 底部状态与动态琥珀封印化石 -->
+              <div class="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-3">
+                  <!-- 微型琥珀化石印章 -->
+                  <div class="w-8 h-8 rounded-lg amber-crystal-core flex items-center justify-center border border-amber-300 shadow-[0_0_12px_rgba(245,190,56,0.6)] relative overflow-hidden">
+                    <div class="amber-trapped-bubble w-1.5 h-1.5 top-1 left-1.5"></div>
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-obsidian-950 font-bold relative z-10"></i>
+                  </div>
+                  <div>
+                    <div class="text-white font-bold flex items-center gap-1.5">
+                      <span>防篡改哈希链证据：</span>
+                      <span class="text-emerald-400 font-mono">100% Sealed In Amber</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono">Fossil Specimen #EV-2026-9921 · Immutable</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-mono text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 font-bold">
+                  Exit Code: 0 (Deterministic)
+                </span>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ==================== CHAPTER 04: 6 宫格矩阵规格 ==================== -->
+    <section id="bento" class="chapter-section py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:pl-16 transition-all duration-300" data-chapter="bento">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <div class="mb-2">
+          <span class="fringe-sub-glyph text-amber-400">// PROTOCOL REVELATION 04</span>
+        </div>
+        <h2 class="font-serif text-3xl sm:text-4xl font-bold text-white mb-4">
+          如琥珀般坚固的六维治理能力
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base">
+          专为企业级多智能体协同设计的全量技术组件。
+        </p>
+      </div>
+
+      <!-- 6 宫格 Fringe Glyphs 矩阵 (融合经典叶脉脉络与黄色密码点) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- Glyph 1: 斐波那契黄金螺旋海马 (The Fibonacci Seahorse) -> 防篡改哈希链账本 -->
+        <div class="fringe-glyph-card rounded-3xl p-6 flex flex-col justify-between group">
+          <!-- 经典黄色密码点 -->
+          <div class="fringe-cipher-dot top-4 right-4"></div>
+
+          <!-- 背景金色发光叶脉脉络 -->
+          <svg class="absolute -right-6 -bottom-6 w-44 h-44 opacity-10 pointer-events-none group-hover:opacity-30 transition-opacity" viewBox="0 0 100 100" fill="none" stroke="#F5BE38">
+            <path d="M10,90 Q40,60 85,15" stroke-width="1.8" class="vein-glow-path"/>
+            <path d="M30,70 Q55,65 75,75 M48,52 Q70,42 90,50 M62,38 Q50,22 60,10" stroke-width="1.0" class="vein-glow-path"/>
+          </svg>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <!-- 海马 Glyph 徽标 -->
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-[0_0_15px_rgba(245,190,56,0.15)] group-hover:shadow-[0_0_20px_rgba(245,190,56,0.4)] transition-all">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <!-- 海马身躯与斐波那契黄金螺旋 -->
+                  <path d="M14 3c-1.5 0-3 1-3 2.5 0 1 .5 1.5 1 2-1 1.5-2 3-1.5 5 .5 2 2.5 3 2.5 5 0 2-1.5 3.5-3.5 3.5-1.5 0-2.5-1-2.5-2 0-1.5 1.5-2 2.5-1.5"/>
+                  <path d="M12 7.5c2 .5 3 1.5 3 3 0 1.5-1 3-2.5 3.5" stroke-dasharray="1 1"/>
+                  <circle cx="13" cy="4.5" r="0.8" fill="currentColor"/>
+                </svg>
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70 border border-amber-500/20 px-2 py-0.5 rounded-full bg-amber-500/5">
+                GLYPH // SEAHORSE
+              </span>
+            </div>
+
+            <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <span>防篡改哈希链账本</span>
+              <span class="text-xs font-serif text-amber-400/80 font-normal">· 斐波那契递归</span>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              如海马骨骼中的黄金比例螺旋，每个治理家族（Ledger Family）自带 SHA-256 紧密链式校验与排他追加锁，任何原地改动立即造成全局 Fail-Closed。
+            </p>
+          </div>
+          <div class="bg-obsidian-950/80 p-2.5 rounded-xl border border-white/5 font-mono text-[10px] text-amber-300/80 flex items-center justify-between">
+            <span>Root Hash: sha256:d82e...7710</span>
+            <span class="text-emerald-400 font-bold">Verified</span>
+          </div>
+        </div>
+
+        <!-- Glyph 2: 三角洲发光树叶 (The Delta Leaf) -> 状态机与四级保证评级 -->
+        <div class="fringe-glyph-card rounded-3xl p-6 flex flex-col justify-between group">
+          <!-- 经典黄色密码点 -->
+          <div class="fringe-cipher-dot top-4 right-4"></div>
+
+          <!-- 背景金色发光叶脉脉络 -->
+          <svg class="absolute -right-6 -bottom-6 w-44 h-44 opacity-10 pointer-events-none group-hover:opacity-30 transition-opacity" viewBox="0 0 100 100" fill="none" stroke="#F5BE38">
+            <path d="M50,95 L50,15 M50,30 L75,55 L25,55 Z M50,55 L80,75 M50,55 L20,75" stroke-width="1.4" class="vein-glow-path"/>
+          </svg>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <!-- 树叶 Delta Glyph 徽标 -->
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-[0_0_15px_rgba(245,190,56,0.15)] group-hover:shadow-[0_0_20px_rgba(245,190,56,0.4)] transition-all">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <!-- 树叶外廓 -->
+                  <path d="M12 2C18 7 21 14 19 20c-2 4-5 4-7 4s-5 0-7-4c-2-6 1-13 7-18z"/>
+                  <!-- 主脉与中心 Delta 几何 -->
+                  <path d="M12 3v19"/>
+                  <path d="M12 8l5 6H7z" fill="rgba(245,190,56,0.3)"/>
+                </svg>
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70 border border-amber-500/20 px-2 py-0.5 rounded-full bg-amber-500/5">
+                GLYPH // DELTA LEAF
+              </span>
+            </div>
+
+            <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <span>四级可信可验证保证</span>
+              <span class="text-xs font-serif text-amber-400/80 font-normal">· 叶脉状态机</span>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              如自然分叉的 Delta 叶脉网络，从 Unavailable 到 Verified 构成不可逆的单向阶梯。生产者严禁自签名提升，必须由注册主体独立核验证明。
+            </p>
+          </div>
+          <div class="flex items-center justify-between text-[10px] font-mono bg-obsidian-950/80 p-2.5 rounded-xl border border-white/5">
+            <span class="text-slate-400">Assurance Ladder:</span>
+            <div class="flex items-center gap-1">
+              <span class="text-slate-500">L0</span>➔<span class="text-slate-400">L1</span>➔<span class="text-amber-300">L2 Replay</span>➔<span class="text-emerald-300 font-bold">L3 Verified</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Glyph 3: 背负 Φ 符文的青蛙 (The Phi Frog) -> 控制带确定性分诊与门禁 -->
+        <div class="fringe-glyph-card rounded-3xl p-6 flex flex-col justify-between group">
+          <!-- 经典黄色密码点 -->
+          <div class="fringe-cipher-dot top-4 right-4"></div>
+
+          <!-- 背景金色发光叶脉脉络 -->
+          <svg class="absolute -right-6 -bottom-6 w-44 h-44 opacity-10 pointer-events-none group-hover:opacity-30 transition-opacity" viewBox="0 0 100 100" fill="none" stroke="#F5BE38">
+            <path d="M10,90 Q40,60 85,15" stroke-width="1.8" class="vein-glow-path"/>
+            <path d="M30,70 Q55,65 75,75 M48,52 Q70,42 90,50" stroke-width="1.0" class="vein-glow-path"/>
+          </svg>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <!-- 青蛙 Phi Glyph 徽标 -->
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-[0_0_15px_rgba(245,190,56,0.15)] group-hover:shadow-[0_0_20px_rgba(245,190,56,0.4)] transition-all">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <!-- 青蛙轮廓 -->
+                  <ellipse cx="12" cy="13" rx="6" ry="7"/>
+                  <!-- 凸出双眼 -->
+                  <circle cx="8" cy="6" r="2"/>
+                  <circle cx="16" cy="6" r="2"/>
+                  <!-- 背部经典希腊字母 Phi Φ 符号 -->
+                  <circle cx="12" cy="13" r="2.8" fill="rgba(245,190,56,0.3)"/>
+                  <line x1="12" y1="8.5" x2="12" y2="17.5" stroke-width="1.8"/>
+                </svg>
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70 border border-amber-500/20 px-2 py-0.5 rounded-full bg-amber-500/5">
+                GLYPH // PHI FROG
+              </span>
+            </div>
+
+            <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <span>Control Band 确定性分诊</span>
+              <span class="text-xs font-serif text-amber-400/80 font-normal">· 琥珀封存</span>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              与首屏琥珀中静止凝固的青蛙相同，模型无关指标基线自动捕捉异常 Findings。仅当服务负责人行使单次人类特权时，方可解锁意图并生成受控修复。
+            </p>
+          </div>
+          <div class="bg-obsidian-950/80 p-2.5 rounded-xl border border-white/5 font-mono text-[10px] text-amber-300 flex items-center justify-between">
+            <span>Human Decision Slot:</span>
+            <span class="text-amber-400 font-bold">Fix | Schedule | Dismiss</span>
+          </div>
+        </div>
+
+        <!-- Glyph 4: 双生胚胎苹果 (The Embryo Apple) -> 保留策略与规范制品孵化 -->
+        <div class="fringe-glyph-card rounded-3xl p-6 flex flex-col justify-between group">
+          <!-- 经典黄色密码点 -->
+          <div class="fringe-cipher-dot top-4 right-4"></div>
+
+          <!-- 背景金色发光叶脉脉络 -->
+          <svg class="absolute -right-6 -bottom-6 w-44 h-44 opacity-10 pointer-events-none group-hover:opacity-30 transition-opacity" viewBox="0 0 100 100" fill="none" stroke="#F5BE38">
+            <path d="M10,90 Q40,60 85,15" stroke-width="1.8" class="vein-glow-path"/>
+            <path d="M48,52 Q70,42 90,50" stroke-width="1.0" class="vein-glow-path"/>
+          </svg>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <!-- 苹果 Embryo Glyph 徽标 -->
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-[0_0_15px_rgba(245,190,56,0.15)] group-hover:shadow-[0_0_20px_rgba(245,190,56,0.4)] transition-all">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <!-- 苹果外廓 -->
+                  <path d="M12 5c2-2 4-2 6 0 2 2 3 6 1 11-1.5 3.5-5 5-7 5s-5.5-1.5-7-5C3 11 4 7 6 5c2-2 4-2 6 0z"/>
+                  <path d="M12 5V2c1 0 2 .5 2 1.5"/>
+                  <!-- 剖开果核中的双生胚胎象征 -->
+                  <circle cx="10" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="14" cy="12" r="1.5" fill="currentColor"/>
+                </svg>
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70 border border-amber-500/20 px-2 py-0.5 rounded-full bg-amber-500/5">
+                GLYPH // EMBRYO APPLE
+              </span>
+            </div>
+
+            <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <span>保留策略与制品生命周期</span>
+              <span class="text-xs font-serif text-amber-400/80 font-normal">· 规范胚胎</span>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              从诞生到最终结算，覆盖 Ephemeral、Governance 到 Audit 全生命周期。法律保留（Legal Hold）超越过期 TTL，已删除制品留下不可伪造的合规墓碑。
+            </p>
+          </div>
+          <div class="bg-obsidian-950/80 p-2.5 rounded-xl border border-white/5 font-mono text-[10px] text-slate-300 flex items-center justify-between">
+            <span>Lifecycle: Ephemeral ➔ Audit</span>
+            <span class="text-cyan-400">Tombstones ON</span>
+          </div>
+        </div>
+
+        <!-- Glyph 5: 六指微光手掌 (The Six-Fingered Hand) -> 多智能体并发越权拦截 -->
+        <div class="fringe-glyph-card rounded-3xl p-6 flex flex-col justify-between group">
+          <!-- 经典黄色密码点 -->
+          <div class="fringe-cipher-dot top-4 right-4"></div>
+
+          <!-- 背景金色发光叶脉脉络 -->
+          <svg class="absolute -right-6 -bottom-6 w-44 h-44 opacity-10 pointer-events-none group-hover:opacity-30 transition-opacity" viewBox="0 0 100 100" fill="none" stroke="#F5BE38">
+            <path d="M10,90 Q40,60 85,15" stroke-width="1.8" class="vein-glow-path"/>
+            <path d="M30,70 Q55,65 75,75 M62,38 Q50,22 60,10" stroke-width="1.0" class="vein-glow-path"/>
+          </svg>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <!-- 六指手印 Glyph 徽标 -->
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-[0_0_15px_rgba(245,190,56,0.15)] group-hover:shadow-[0_0_20px_rgba(245,190,56,0.4)] transition-all">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <!-- 手掌骨架与 6 根手指 -->
+                  <path d="M18 11V7a1 1 0 0 0-2 0v4"/>
+                  <path d="M15 10V5a1 1 0 0 0-2 0v5"/>
+                  <path d="M12 9V4a1 1 0 0 0-2 0v5"/>
+                  <path d="M9 10V6a1 1 0 0 0-2 0v5"/>
+                  <path d="M6 11V8a1 1 0 0 0-2 0v5c0 4 2.5 7 6.5 7s6.5-3 6.5-7v-2a1 1 0 0 0-2 0"/>
+                  <!-- 掌心发光异常点 -->
+                  <circle cx="11" cy="15" r="1.2" fill="#F5BE38"/>
+                </svg>
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70 border border-amber-500/20 px-2 py-0.5 rounded-full bg-amber-500/5">
+                GLYPH // SIX-FINGERED
+              </span>
+            </div>
+
+            <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <span>外部调用效应封印</span>
+              <span class="text-xs font-serif text-amber-400/80 font-normal">· 六指手印</span>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              如捕捉跨越维度的六指异常，智能体向外部世界伸出的每一次执行均受阻断。唯一通道为预注册合约，强制绑定幂等键与逆向补偿效应。
+            </p>
+          </div>
+          <div class="bg-obsidian-950/80 p-2.5 rounded-xl border border-white/5 font-mono text-[10px] text-amber-300 flex items-center justify-between">
+            <span>MCP External Contract:</span>
+            <span class="text-emerald-400 font-bold">Non-Spawning</span>
+          </div>
+        </div>
+
+        <!-- Glyph 6: 分形几何蝴蝶 (The Fractal Butterfly) -> 混沌重放与应急破窗 -->
+        <div class="fringe-glyph-card rounded-3xl p-6 flex flex-col justify-between group">
+          <!-- 经典黄色密码点 -->
+          <div class="fringe-cipher-dot top-4 right-4"></div>
+
+          <!-- 背景金色发光叶脉脉络 -->
+          <svg class="absolute -right-6 -bottom-6 w-44 h-44 opacity-10 pointer-events-none group-hover:opacity-30 transition-opacity" viewBox="0 0 100 100" fill="none" stroke="#F5BE38">
+            <path d="M10,90 Q40,60 85,15" stroke-width="1.8" class="vein-glow-path"/>
+            <path d="M48,52 Q70,42 90,50 M62,38 Q50,22 60,10" stroke-width="1.0" class="vein-glow-path"/>
+          </svg>
+
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <!-- 蝴蝶 Fractal Glyph 徽标 -->
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-300 shadow-[0_0_15px_rgba(245,190,56,0.15)] group-hover:shadow-[0_0_20px_rgba(245,190,56,0.4)] transition-all">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <!-- 蝴蝶躯体与分形几何翅膀 -->
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <path d="M12 8c-3-4-8-4-9 0-1 4 4 7 9 10"/>
+                  <path d="M12 8c3-4 8-4 9 0 1 4-4 7-9 10"/>
+                  <!-- 翅膀内部几何骨骼线 -->
+                  <line x1="8" y1="6" x2="8" y2="14" stroke-dasharray="1 1"/>
+                  <line x1="16" y1="6" x2="16" y2="14" stroke-dasharray="1 1"/>
+                </svg>
+              </div>
+              <span class="text-[9px] font-mono text-amber-400/70 border border-amber-500/20 px-2 py-0.5 rounded-full bg-amber-500/5">
+                GLYPH // BUTTERFLY
+              </span>
+            </div>
+
+            <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
+              <span>确定性重放与破窗隔离</span>
+              <span class="text-xs font-serif text-amber-400/80 font-normal">· 分形重验</span>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              蝴蝶翅膀轻扇引发的风暴在 Amber 中必被完全驯服：F058 独立重放套件确保输出与模型版本无关。极限制权下的人类 Breakglass 具备不可延展的 24h 强审死线。
+            </p>
+          </div>
+          <div class="bg-obsidian-950/80 p-2.5 rounded-xl border border-white/5 font-mono text-[10px] text-cyan-300 flex items-center justify-between">
+            <span>Deterministic Evals:</span>
+            <span class="text-emerald-400 font-bold">14/14 Independent PASS</span>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ==================== CHAPTER 05: DEVELOPER CLI SHOWCASE ==================== -->
+    <section id="cli-section" class="chapter-section py-20 bg-obsidian-900/60 border-t border-white/5 lg:pl-16 transition-all duration-300" data-chapter="cli-section">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        
+        <div class="mb-2">
+          <span class="fringe-sub-glyph text-amber-400">// PROTOCOL REVELATION 05</span>
+        </div>
+
+        <h2 class="font-serif text-3xl font-bold text-white mb-4">
+          一个入口，掌控整个智能体治理宇宙
+        </h2>
+        <p class="text-slate-400 text-sm mb-8 max-w-2xl mx-auto">
+          无须复杂的云端配置。基于本地代码库的极简命令，即刻构建属于团队的确定性安全中枢。
+        </p>
+
+        <!-- 命令行交互视窗 -->
+        <div class="amber-glass rounded-2xl p-5 border border-amber-500/30 text-left font-mono text-xs text-slate-300 shadow-2xl relative overflow-hidden">
+          <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 text-[11px] text-slate-400">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span class="ml-2 text-slate-300">bash — amber-cli</span>
+            </div>
+            <button id="btn-copy-cli" class="hover:text-amber-300 flex items-center gap-1 transition-colors">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy</span>
+            </button>
+          </div>
+          <pre class="leading-relaxed text-amber-200/90 overflow-x-auto"><code><span class="text-slate-500"># 1. 快速检查本地代码库治理就绪状态</span>
+<span class="text-amber-400 font-bold">node scripts/amber.js audit --target .</span>
+
+<span class="text-slate-500"># 2. 评估确定性门禁合约（Fail-closed 判定）</span>
+<span class="text-amber-400 font-bold">node scripts/amber.js gate evaluate --target . --gate gate:pr-acceptance</span>
+
+<span class="text-slate-500"># 3. 独立 Principal 记录并核验四级保证证据收据</span>
+<span class="text-amber-400 font-bold">node scripts/amber.js evidence record --target . --assurance replayable</span>
+<span class="text-amber-400 font-bold">node scripts/amber.js evidence verify --target . --receipt evid_01HYZ --verifier human:auditor</span></code></pre>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ==================== FOOTER: 底部转化与结语 ==================== -->
+    <footer class="pt-20 pb-12 border-t border-amber-500/20 relative bg-obsidian-950 lg:pl-16">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- 底部转化 Call To Action -->
+        <div class="amber-glass rounded-3xl p-8 sm:p-12 border border-amber-500/30 text-center relative overflow-hidden mb-16 shadow-[0_0_80px_rgba(245,190,56,0.1)]">
+          <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+          
+          <h3 class="font-serif text-3xl sm:text-4xl font-bold text-white mb-4 relative z-10">
+            让智能体的每一次演进，皆成坚不可摧的琥珀。
+          </h3>
+          <p class="text-slate-300 text-sm max-w-2xl mx-auto mb-8 relative z-10">
+            无论是单兵作战还是多 Agent 蜂群协同，Amber Protocol 为您提供确定、静默且不可逆的信任基石。
+          </p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
+            <a href="#simulator" class="amber-glow-btn px-8 py-3.5 rounded-xl text-xs font-bold flex items-center gap-2">
+              <i data-lucide="terminal" class="w-4 h-4"></i>
+              <span>立即在本地初始化 Amber (npm init)</span>
+            </a>
+            <a href="https://github.com" target="_blank" class="px-6 py-3.5 rounded-xl text-xs font-semibold text-slate-300 bg-obsidian-900 border border-white/10 hover:border-amber-400/40 transition-all flex items-center gap-2">
+              <i data-lucide="github" class="w-4 h-4"></i>
+              <span>GitHub 源码与协议规范</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 版权与公约信息 -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 border-t border-white/5 text-xs text-slate-400 font-mono">
+          <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-amber-400"></div>
+            <span class="text-slate-300 font-semibold font-serif">AMBER PROTOCOL</span>
+            <span>— Repository-Local Governance Layer</span>
+          </div>
+          <div>
+            <span>Preserve truth like amber freezes time. Built for Agentic Engineering.</span>
+          </div>
+        </div>
+
+      </div>
+    </footer>
+
+  </main>
+
+
+  <!-- ==================== JAVASCRIPT: 极限流畅与 FRINGE 交互驱动 ==================== -->
+  <script>
+    // 初始化 Lucide 图标
+    lucide.createIcons();
+
+    // 1. 极致流畅 HERO 滚动视差（纯 transform + opacity，杜绝 filter: blur）
+    (function initOptimizedHeroScroll() {
+      const heroBoard = document.getElementById('hero-pinned-board');
+      const darkenMask = document.getElementById('hero-darken-mask');
+      if (!heroBoard || !darkenMask) return;
+
+      let ticking = false;
+
+      function updateHero() {
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const vh = window.innerHeight;
+
+        if (scrollY < vh * 1.4) {
+          const progress = Math.min(1, Math.max(0, scrollY / (vh * 0.85)));
+          
+          // 纯 GPU 硬件加速的缩放与微漂移，零重绘
+          const scale = 1 - progress * 0.06;
+          const translateY = scrollY * 0.1;
+          heroBoard.style.transform = `translate3d(0, ${translateY}px, 0) scale(${scale})`;
+          
+          // 纯 CSS opacity 变暗，极度流畅
+          darkenMask.style.opacity = `${progress * 0.82}`;
+        }
+        ticking = false;
+      }
+
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          window.requestAnimationFrame(updateHero);
+          ticking = true;
+        }
+      }, { passive: true });
+
+      updateHero();
+    })();
+
+
+    // 2. FRINGE 琥珀时空导航标尺联动（预缓存高度，彻底避免 Layout Thrashing）
+    (function initFringeHUD() {
+      const diamondNodes = document.querySelectorAll('.hud-diamond-node');
+      const chapterSections = document.querySelectorAll('.chapter-section');
+      if (diamondNodes.length === 0) return;
+
+      // 缓存章节顶部距离，滚动时不频繁 getBoundingClientRect
+      let sectionOffsets = [];
+
+      function cacheOffsets() {
+        sectionOffsets = [];
+        chapterSections.forEach(sec => {
+          sectionOffsets.push({
+            id: sec.id,
+            top: sec.offsetTop - window.innerHeight * 0.45,
+            bottom: sec.offsetTop + sec.offsetHeight - window.innerHeight * 0.45,
+            element: sec
+          });
+        });
+      }
+
+      cacheOffsets();
+      window.addEventListener('resize', cacheOffsets, { passive: true });
+
+      // 点击 HUD 菱形节点平滑滚动
+      diamondNodes.forEach(node => {
+        node.addEventListener('click', () => {
+          const targetId = node.getAttribute('data-nav');
+          const targetEl = document.getElementById(targetId);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+
+      let hudTicking = false;
+
+      function updateHUD() {
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+        let activeId = null;
+        for (let i = 0; i < sectionOffsets.length; i++) {
+          const s = sectionOffsets[i];
+          if (scrollY >= s.top && scrollY <= s.bottom) {
+            activeId = s.id;
+            break;
+          }
+        }
+
+        diamondNodes.forEach(node => {
+          const navId = node.getAttribute('data-nav');
+          if (navId === activeId) {
+            node.classList.add('active');
+          } else {
+            node.classList.remove('active');
+          }
+        });
+
+        // 对应章节卡片微光封锁效果
+        chapterSections.forEach(sec => {
+          if (sec.id === activeId) {
+            sec.classList.add('amber-quarantine-active');
+          } else {
+            sec.classList.remove('amber-quarantine-active');
+          }
+        });
+
+        hudTicking = false;
+      }
+
+      window.addEventListener('scroll', () => {
+        if (!hudTicking) {
+          window.requestAnimationFrame(updateHUD);
+          hudTicking = true;
+        }
+      }, { passive: true });
+
+      updateHUD();
+    })();
+
+
+    // 3. 超轻量高性能琥珀微粒 Canvas (优化至 25 个轻微粒，零开销)
+    (function initLightweightCanvas() {
+      const canvas = document.getElementById('amber-dust-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d', { alpha: true });
+      let width = (canvas.width = window.innerWidth);
+      let height = (canvas.height = window.innerHeight);
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      }, { passive: true });
+
+      const particles = [];
+      const count = 25;
+
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          size: Math.random() * 2 + 0.6,
+          speedY: Math.random() * 0.3 + 0.1,
+          speedX: (Math.random() - 0.5) * 0.2,
+          opacity: Math.random() * 0.5 + 0.2
+        });
+      }
+
+      function renderParticles() {
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#F5BE38';
+
+        for (let i = 0; i < count; i++) {
+          const p = particles[i];
+          p.y -= p.speedY;
+          p.x += p.speedX;
+
+          if (p.y < 0) {
+            p.y = height;
+            p.x = Math.random() * width;
+          }
+          if (p.x < 0) p.x = width;
+          if (p.x > width) p.x = 0;
+
+          ctx.globalAlpha = p.opacity;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        requestAnimationFrame(renderParticles);
+      }
+      renderParticles();
+    })();
+
+
+    // 4. 交互式 4 步骤管道切换逻辑 (Pipeline Steps)
+    (function initPipelineSteps() {
+      const stepCards = document.querySelectorAll('.step-card');
+      const stepIndicator = document.getElementById('step-indicator');
+      const btnPrev = document.getElementById('btn-prev-step');
+      const btnNext = document.getElementById('btn-next-step');
+      const paneContainer = document.getElementById('step-display-content');
+      let currentStep = 1;
+
+      const paneData = {
+        1: {
+          desc: "Step 1 of 4: Principal & Identity",
+          html: `
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+              <div class="flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
+                <span class="font-mono text-xs font-bold text-white">PRINCIPAL DIRECTORY & SOD MATRIX</span>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Enforced: Strict Separation</span>
+            </div>
+            <div class="space-y-3 font-mono text-xs mb-4">
+              <div class="bg-obsidian-950 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-300 font-bold">H</div>
+                  <div>
+                    <div class="text-white font-semibold">human:sarah@security.org</div>
+                    <div class="text-[10px] text-slate-400">Role: Security Auditor | Scope: [policies/*, breakglass/*]</div>
+                  </div>
+                </div>
+                <span class="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">Human Only Slot</span>
+              </div>
+              <div class="bg-obsidian-950 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold">A</div>
+                  <div>
+                    <div class="text-white font-semibold">agent:claude-code-runner-01</div>
+                    <div class="text-[10px] text-slate-400">Role: Code Producer | Scope: [src/*, tests/*]</div>
+                  </div>
+                </div>
+                <span class="px-2 py-0.5 text-[10px] bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30">Cannot Self-Approve</span>
+              </div>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-200">
+              <strong>Amber 权责公约：</strong> 任何由智能体提议的生产环境敏感操作，其 Approval 与 Verification 槽位绝对禁止注入智能体身份，杜绝智能体自编自导。
+            </div>
+          `
+        },
+        2: {
+          desc: "Step 2 of 4: Deny-Wins Policy",
+          html: `
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+              <div class="flex items-center gap-2">
+                <i data-lucide="shield-x" class="w-4 h-4 text-rose-400"></i>
+                <span class="font-mono text-xs font-bold text-white">DENY-WINS POLICY CEILING RADAR</span>
+              </div>
+              <span class="text-[10px] font-mono text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">Fail-Closed Active</span>
+            </div>
+            <div class="bg-obsidian-950 p-4 rounded-xl border border-white/5 font-mono text-xs text-slate-300 space-y-2 mb-4">
+              <div class="flex justify-between items-center text-[11px]">
+                <span class="text-slate-400">Org Ceiling: Strict git push prohibition</span>
+                <span class="text-rose-400 font-bold">DENY_ALWAYS</span>
+              </div>
+              <div class="flex justify-between items-center text-[11px]">
+                <span class="text-slate-400">Tenant Policy: Max batch modification 300 lines</span>
+                <span class="text-emerald-400">PASS (142 lines)</span>
+              </div>
+              <div class="flex justify-between items-center text-[11px]">
+                <span class="text-slate-400">Credential Leak Refusal Kernel</span>
+                <span class="text-emerald-400">PASS (0 secrets)</span>
+              </div>
+            </div>
+            <div class="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-200">
+              <strong>策略天花板：</strong> 组织与租户策略是绝对的最高法。即使智能体持有合法 Token，一旦触犯 Deny 规则即刻硬件级阻断。
+            </div>
+          `
+        },
+        3: {
+          desc: "Step 3 of 4: Hash-Chain Ledger",
+          html: `
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+              <div class="flex items-center gap-2">
+                <i data-lucide="link-2" class="w-4 h-4 text-amber-400"></i>
+                <span class="font-mono text-xs font-bold text-white">APPEND-ONLY SHA-256 HASH CHAIN</span>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Chain Healthy</span>
+            </div>
+            <div class="space-y-2 font-mono text-xs mb-4">
+              <div class="bg-obsidian-950 p-2.5 rounded-lg border border-amber-500/30 flex justify-between items-center">
+                <span>Block #1082: APPROVAL_CONSUMED (Single-use)</span>
+                <span class="text-amber-400 text-[10px]">Hash: 8b01a...71e</span>
+              </div>
+              <div class="bg-obsidian-950 p-2.5 rounded-lg border border-white/5 flex justify-between items-center">
+                <span>Block #1081: INTENT_ADMITTED (ADR-0023 Envelope)</span>
+                <span class="text-slate-400 text-[10px]">Hash: 44cf2...90a</span>
+              </div>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-200">
+              <strong>单次消费机制：</strong> 每一份 Human Approval 消费后即刻进入终态，严防重放攻击与影子执行。
+            </div>
+          `
+        },
+        4: {
+          desc: "Step 4 of 4: Assurance & Verification",
+          html: `
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-white/10">
+              <div class="flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-amber-400"></i>
+                <span class="font-mono text-xs font-bold text-white">ASSURANCE LEVEL VERIFICATION SEAL</span>
+              </div>
+              <span class="text-[10px] font-mono text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">Level 3: Verified</span>
+            </div>
+            <div class="bg-obsidian-950 p-4 rounded-xl border border-amber-400/40 seal-badge text-center space-y-2 mb-4">
+              <div class="inline-block p-2 rounded-full bg-amber-500/20 text-amber-300">
+                <i data-lucide="check-check" class="w-6 h-6"></i>
+              </div>
+              <div class="text-sm font-bold text-white font-serif">CRYPTO-SEALED EVIDENCE RECEIPT</div>
+              <div class="text-[10px] font-mono text-slate-300">Independent Verification by principal:human-auditor@amber.org</div>
+            </div>
+            <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-xs text-emerald-200">
+              <strong>终极可信：</strong> 只有通过独立第三方法定主体验证的证据，才能满足最高级别安全门禁放行条件。
+            </div>
+          `
+        }
+      };
+
+      function updateStep(step) {
+        currentStep = step;
+        stepCards.forEach(c => {
+          const s = parseInt(c.getAttribute('data-step'));
+          if (s === step) {
+            c.classList.add('active', 'border-l-amber-400', 'opacity-100');
+            c.classList.remove('border-l-slate-700', 'opacity-75');
+          } else {
+            c.classList.remove('active', 'border-l-amber-400', 'opacity-100');
+            c.classList.add('border-l-slate-700', 'opacity-75');
+          }
+        });
+
+        if (paneContainer && paneData[step]) {
+          paneContainer.innerHTML = paneData[step].html;
+          stepIndicator.innerText = paneData[step].desc;
+          lucide.createIcons();
+        }
+      }
+
+      stepCards.forEach(card => {
+        card.addEventListener('click', () => {
+          const step = parseInt(card.getAttribute('data-step'));
+          updateStep(step);
+        });
+      });
+
+      if (btnPrev) {
+        btnPrev.addEventListener('click', () => {
+          let prev = currentStep - 1;
+          if (prev < 1) prev = 4;
+          updateStep(prev);
+        });
+      }
+
+      if (btnNext) {
+        btnNext.addEventListener('click', () => {
+          let next = currentStep + 1;
+          if (next > 4) next = 1;
+          updateStep(next);
+        });
+      }
+    })();
+
+
+    // 5. 选项卡切换逻辑 (Tabbed Architecture)
+    (function initTabs() {
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabBtns.forEach(b => {
+            b.classList.remove('active', 'bg-amber-400', 'text-obsidian-950', 'font-semibold', 'shadow-md');
+            b.classList.add('text-slate-400', 'font-medium');
+          });
+
+          btn.classList.add('active', 'bg-amber-400', 'text-obsidian-950', 'font-semibold', 'shadow-md');
+          btn.classList.remove('text-slate-400', 'font-medium');
+
+          const target = btn.getAttribute('data-tab');
+          tabContents.forEach(content => {
+            if (content.id === target) {
+              content.classList.remove('hidden');
+            } else {
+              content.classList.add('hidden');
+            }
+          });
+        });
+      });
+    })();
+
+
+    // 6. 交互式沙盒模拟器逻辑 (Simulator)
+    (function initSimulator() {
+      const actionBtns = document.querySelectorAll('.sim-action-btn');
+      const runBtn = document.getElementById('btn-run-simulation');
+      const consoleOutput = document.getElementById('sim-console-output');
+      const statusBadge = document.getElementById('sim-status-badge');
+      let currentScenario = 'git-push';
+
+      actionBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          actionBtns.forEach(b => {
+            b.classList.remove('active', 'border-amber-500/40', 'bg-amber-500/10');
+            b.classList.add('border-white/5');
+          });
+          btn.classList.add('active', 'border-amber-500/40', 'bg-amber-500/10');
+          btn.classList.remove('border-white/5');
+          currentScenario = btn.getAttribute('data-scenario');
+        });
+      });
+
+      const simulationScenarios = {
+        'git-push': [
+          { text: "$ node scripts/amber.js sync session push --target .", color: "text-slate-200" },
+          { text: "▶ [EVALUATE] Inspecting Policy Ceiling: 'org-ceiling-no-live-git.json'", color: "text-amber-300" },
+          { text: "⚠ QUARANTINE TRIGGERED: Live 'git push' is strictly forbidden by Amber Governance Policy.", color: "text-rose-400 font-bold" },
+          { text: "▶ [STAGE A] Diverting to Governed Local Add & Commit under ADR-0020.", color: "text-amber-200" },
+          { text: "✔ Required Approval: Human Maintainer 'alice@amber.org' (Single-use consume token generated)", color: "text-emerald-400" },
+          { text: "✔ Evidence Receipt Recorded: #EVID-PUSH-0903 (Assurance: Replayable)", color: "text-cyan-300" },
+          { text: "✔ Hash-Chain Appended: sha256:77fa89...c19 (Tamper-evident crystallized)", color: "text-amber-400 font-bold" }
+        ],
+        'env-secret': [
+          { text: "$ node scripts/amber.js file modify --path .env.production", color: "text-slate-200" },
+          { text: "▶ [SCANNER] Activating Credential Leak & Secret Protection Kernel...", color: "text-amber-300" },
+          { text: "🚫 BLOCKED: Modification of production secrets without registered Break-Glass Grant is forbidden.", color: "text-rose-400 font-bold" },
+          { text: "▶ Status: FAIL-CLOSED (Exit 1). Zero bytes modified in repository.", color: "text-rose-300" },
+          { text: "✔ Incident receipt logged to .amber/audit/security-findings.jsonl", color: "text-slate-400" }
+        ],
+        'safe-refactor': [
+          { text: "$ node scripts/amber.js run-task --scope 'src/components/*.jsx'", color: "text-slate-200" },
+          { text: "▶ [PERMISSIONS] Agent 'claude-code' has verified capability: [CODE_EDIT_LOCAL]", color: "text-emerald-300" },
+          { text: "✔ Diff size: 48 lines modified (Within 300 line ceiling threshold)", color: "text-emerald-400" },
+          { text: "✔ Automated replay suite executed: 14/14 unit tests passed", color: "text-cyan-300" },
+          { text: "✔ Recorded Evidence: #EVID-REFACTOR-8812 (Assurance: Level 2 Replayable)", color: "text-amber-300 font-bold" }
+        ]
+      };
+
+      if (runBtn && consoleOutput) {
+        runBtn.addEventListener('click', () => {
+          consoleOutput.innerHTML = '';
+          statusBadge.innerText = 'EVALUATING...';
+          statusBadge.className = 'px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] animate-pulse font-bold';
+
+          const lines = simulationScenarios[currentScenario];
+          let delay = 0;
+
+          lines.forEach((line, index) => {
+            setTimeout(() => {
+              const div = document.createElement('div');
+              div.className = `${line.color} transition-all duration-300`;
+              div.innerText = line.text;
+              consoleOutput.appendChild(div);
+              consoleOutput.scrollTop = consoleOutput.scrollHeight;
+
+              if (index === lines.length - 1) {
+                statusBadge.innerText = 'CRYPTO-SEALED (OK)';
+                statusBadge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold';
+                if (typeof window.playCrystallizeSound === 'function') {
+                  window.playCrystallizeSound();
+                }
+                lucide.createIcons();
+              }
+            }, delay);
+            delay += 350;
+          });
+        });
+      }
+    })();
+
+
+    // 7. 动态天然 3D 琥珀化石渲染引擎 (Real Organic Amber Specimen with Inclusions)
+    (function initRealAmberSpecimen() {
+      const container = document.getElementById('amber-3d-gem-container');
+      if (!container) return;
+
+      if (typeof THREE === 'undefined') {
+        container.innerHTML = `
+          <div class="w-16 h-16 rounded-full amber-crystal-core shadow-[0_0_25px_#F5BE38]"></div>
+        `;
+        return;
+      }
+
+      const width = container.clientWidth || 120;
+      const height = container.clientHeight || 120;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+      camera.position.z = 4.6;
+
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      // 根组：用于琥珀整体旋转与交互
+      const amberGroup = new THREE.Group();
+      scene.add(amberGroup);
+
+      // 1. 天然有机琥珀外观 (水滴鹅卵石树脂，非切割宝石)
+      const amberGeo = new THREE.SphereGeometry(1.48, 48, 48);
+      const pos = amberGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        let x = pos.getX(i);
+        let y = pos.getY(i);
+        let z = pos.getZ(i);
+
+        // 自然水滴泪珠塑形：上窄下圆
+        if (y > 0) {
+          x *= 1.0 - (y / 1.48) * 0.22;
+          z *= 1.0 - (y / 1.48) * 0.22;
+          y *= 1.06;
+        } else {
+          x *= 1.0 + (-y / 1.48) * 0.12;
+          z *= 1.0 + (-y / 1.48) * 0.12;
+          y *= 0.96;
+        }
+
+        // 叠加极其平滑的自然有机树脂起伏
+        const ripple = Math.sin(x * 2.5) * Math.cos(y * 2.2) * Math.sin(z * 2.5) * 0.07;
+        pos.setXYZ(i, x + x * ripple, y + y * ripple, z + z * ripple);
+      }
+      amberGeo.computeVertexNormals();
+
+      // 天然温润透光金珀材质 (带次表面干邑红深层折射)
+      const amberMat = new THREE.MeshPhysicalMaterial({
+        color: 0xF59E0B,             // 纯正天然金珀
+        emissive: 0x92400E,          // 深金红内透光
+        emissiveIntensity: 0.32,
+        roughness: 0.04,             // 像天然抛光后的琥珀一样极温润、高光泽
+        metalness: 0.02,
+        transmission: 0.94,          // 极高透光度
+        ior: 1.54,                  // 琥珀天然折射率
+        thickness: 2.4,
+        attenuationColor: new THREE.Color(0x78350F), // 次表面深琥珀吸收
+        attenuationDistance: 1.2,
+        transparent: true,
+        opacity: 0.96,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05
+      });
+      const amberNugget = new THREE.Mesh(amberGeo, amberMat);
+      amberGroup.add(amberNugget);
+
+      // =========================================================================
+      // 2. 琥珀内封存的《Fringe》超逼真青蛙标本 (Hyper-Realistic Fringe Frog)
+      // =========================================================================
+
+      // A. 动态程序化生成超写实树蛙真皮贴图 (色彩/斑纹/背部Phi生物荧光/微观真皮疣粒凹凸)
+      function generateFrogTextures() {
+        // 1. 漫反射颜色贴图 (Diffuse Map)
+        const cCan = document.createElement('canvas');
+        cCan.width = 512;
+        cCan.height = 512;
+        const cCtx = cCan.getContext('2d');
+
+        // 背脊深苔藓墨绿 -> 侧腹翡翠绿 -> 下腹淡米黄
+        const grad = cCtx.createLinearGradient(0, 0, 0, 512);
+        grad.addColorStop(0.0, '#12260F');
+        grad.addColorStop(0.32, '#1E4218');
+        grad.addColorStop(0.68, '#416124');
+        grad.addColorStop(0.88, '#B8A876');
+        grad.addColorStop(1.0, '#D6CA9E');
+        cCtx.fillStyle = grad;
+        cCtx.fillRect(0, 0, 512, 512);
+
+        // 绘制自然深色树蛙不规则碎斑与真皮色素
+        for (let i = 0; i < 700; i++) {
+          const x = Math.random() * 512;
+          const y = Math.random() * 380;
+          const r = Math.random() * 3.5 + 1.2;
+          cCtx.fillStyle = Math.random() > 0.45 ? 'rgba(8, 16, 8, 0.45)' : 'rgba(50, 95, 30, 0.35)';
+          cCtx.beginPath();
+          cCtx.arc(x, y, r, 0, Math.PI * 2);
+          cCtx.fill();
+        }
+
+        // 背部两侧浅金色侧褶线 (Dorsolateral Folds)
+        cCtx.strokeStyle = 'rgba(217, 190, 100, 0.35)';
+        cCtx.lineWidth = 5;
+        cCtx.beginPath();
+        cCtx.moveTo(110, 80);
+        cCtx.bezierCurveTo(90, 200, 80, 320, 120, 430);
+        cCtx.stroke();
+
+        cCtx.beginPath();
+        cCtx.moveTo(402, 80);
+        cCtx.bezierCurveTo(422, 200, 432, 320, 392, 430);
+        cCtx.stroke();
+
+        // 核心：在真皮组织内自然透出的《Fringe》神秘希腊字母 Φ (Phi) 生物荧光印记
+        const phiX = 256, phiY = 190;
+        const phiGlow = cCtx.createRadialGradient(phiX, phiY, 8, phiX, phiY, 65);
+        phiGlow.addColorStop(0, 'rgba(186, 230, 253, 0.7)');
+        phiGlow.addColorStop(0.5, 'rgba(56, 189, 248, 0.25)');
+        phiGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        cCtx.fillStyle = phiGlow;
+        cCtx.beginPath();
+        cCtx.arc(phiX, phiY, 65, 0, Math.PI * 2);
+        cCtx.fill();
+
+        cCtx.strokeStyle = '#E0F2FE';
+        cCtx.lineWidth = 8;
+        cCtx.shadowColor = '#38BDF8';
+        cCtx.shadowBlur = 12;
+        cCtx.beginPath();
+        cCtx.arc(phiX, phiY, 28, 0, Math.PI * 2);
+        cCtx.stroke();
+
+        cCtx.beginPath();
+        cCtx.moveTo(phiX, phiY - 50);
+        cCtx.lineTo(phiX, phiY + 50);
+        cCtx.stroke();
+        cCtx.shadowBlur = 0;
+
+        // 2. 凹凸真皮角质贴图 (Bump Map) - 赋予微观疣粒与皮肤起伏
+        const bCan = document.createElement('canvas');
+        bCan.width = 512;
+        bCan.height = 512;
+        const bCtx = bCan.getContext('2d');
+        bCtx.fillStyle = '#808080';
+        bCtx.fillRect(0, 0, 512, 512);
+
+        // 2000+ 微细疣粒凹凸
+        for (let i = 0; i < 2200; i++) {
+          const x = Math.random() * 512;
+          const y = Math.random() * 512;
+          const r = Math.random() * 2.5 + 0.8;
+          const bGrad = bCtx.createRadialGradient(x, y, 0, x, y, r);
+          bGrad.addColorStop(0, '#FFFFFF');
+          bGrad.addColorStop(1, '#808080');
+          bCtx.fillStyle = bGrad;
+          bCtx.beginPath();
+          bCtx.arc(x, y, r, 0, Math.PI * 2);
+          bCtx.fill();
+        }
+
+        return {
+          diffuseMap: new THREE.CanvasTexture(cCan),
+          bumpMap: new THREE.CanvasTexture(bCan)
+        };
+      }
+
+      // B. 动态生成逼真树蛙虹膜横瞳贴图
+      function generateFrogEyeTexture() {
+        const eCan = document.createElement('canvas');
+        eCan.width = 256;
+        eCan.height = 256;
+        const eCtx = eCan.getContext('2d');
+
+        // 金铜色虹膜底色
+        const eGrad = eCtx.createRadialGradient(128, 128, 15, 128, 128, 128);
+        eGrad.addColorStop(0.0, '#FEF08A');
+        eGrad.addColorStop(0.35, '#F59E0B');
+        eGrad.addColorStop(0.8, '#92400E');
+        eGrad.addColorStop(1.0, '#451A03');
+        eCtx.fillStyle = eGrad;
+        eCtx.fillRect(0, 0, 256, 256);
+
+        // 虹膜放射状肌理线条
+        eCtx.strokeStyle = 'rgba(120, 53, 15, 0.45)';
+        eCtx.lineWidth = 1.6;
+        for (let i = 0; i < 72; i++) {
+          const angle = (i / 72) * Math.PI * 2;
+          eCtx.beginPath();
+          eCtx.moveTo(128 + Math.cos(angle) * 25, 128 + Math.sin(angle) * 25);
+          eCtx.lineTo(128 + Math.cos(angle) * 125, 128 + Math.sin(angle) * 125);
+          eCtx.stroke();
+        }
+
+        // 经典的深邃黑裂横向瞳孔 (Horizontal Cat-like Pupil)
+        eCtx.fillStyle = '#050505';
+        eCtx.beginPath();
+        eCtx.ellipse(128, 128, 62, 16, 0, 0, Math.PI * 2);
+        eCtx.fill();
+
+        return new THREE.CanvasTexture(eCan);
+      }
+
+      const frogTex = generateFrogTextures();
+      const frogEyeTex = generateFrogEyeTexture();
+
+      const frogGroup = new THREE.Group();
+      frogGroup.scale.set(0.9, 0.9, 0.9);
+      amberGroup.add(frogGroup);
+
+      // 超逼真树蛙物理材质：湿润、微细疣粒颗粒、背腹色差与微透光
+      const realisticFrogMat = new THREE.MeshPhysicalMaterial({
+        map: frogTex.diffuseMap,
+        bumpMap: frogTex.bumpMap,
+        bumpScale: 0.035,
+        roughness: 0.22,             // 湿润真皮反光
+        metalness: 0.05,
+        clearcoat: 0.7,              // 树脂浸润的高光油光感
+        clearcoatRoughness: 0.1,
+        emissive: 0x0D1F0B,
+        emissiveIntensity: 0.25
+      });
+
+      // 2.1 躯干与头部整体连续有机塑形 (带脊突、扁平吻部与饱满侧肋)
+      const bodyGeo = new THREE.SphereGeometry(0.55, 36, 36);
+      const bPos = bodyGeo.attributes.position;
+      for (let i = 0; i < bPos.count; i++) {
+        let x = bPos.getX(i);
+        let y = bPos.getY(i);
+        let z = bPos.getZ(i);
+
+        // 扁平流线形体比例
+        x *= 0.76;
+        y *= 0.44;
+        z *= 1.15;
+
+        // 前端口吻形成钝楔形，下颌收敛
+        if (z > 0.2) {
+          const t = (z - 0.2) / 0.45;
+          x *= 1.0 - t * 0.35;
+          y *= 1.0 - t * 0.4;
+          if (y < 0) y *= 0.8; // 下颌扁平
+        }
+
+        // 背脊中线隆起 (Dorsal Spine Ridge)
+        if (y > 0 && Math.abs(x) < 0.16) {
+          y += (0.16 - Math.abs(x)) * 0.22;
+        }
+
+        // 腹部微平收敛
+        if (y < 0) y *= 0.9;
+
+        bPos.setXYZ(i, x, y, z);
+      }
+      bodyGeo.computeVertexNormals();
+
+      const bodyMesh = new THREE.Mesh(bodyGeo, realisticFrogMat);
+      bodyMesh.rotation.x = -0.06;
+      frogGroup.add(bodyMesh);
+
+      // 2.2 逼真蛙眼结构 (内嵌眼球 + 虹膜横瞳 + 眼睑遮皱 + 透明湿润角膜)
+      const eyeLidMat = realisticFrogMat;
+      const eyeMat = new THREE.MeshStandardMaterial({
+        map: frogEyeTex,
+        roughness: 0.1,
+        metalness: 0.2
+      });
+      const corneaMat = new THREE.MeshPhysicalMaterial({
+        color: 0xFFFFFF,
+        transmission: 0.98,
+        roughness: 0.02,
+        ior: 1.34,
+        transparent: true,
+        opacity: 0.9
+      });
+
+      [-1, 1].forEach((side) => {
+        const eyeX = side * 0.22;
+        const eyeY = 0.16;
+        const eyeZ = 0.36;
+
+        // 眼窝与上眼睑褶皱
+        const lidGeo = new THREE.SphereGeometry(0.12, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.65);
+        const eyelid = new THREE.Mesh(lidGeo, eyeLidMat);
+        eyelid.position.set(eyeX, eyeY + 0.03, eyeZ);
+        eyelid.rotation.set(-0.25, side * 0.3, 0);
+        frogGroup.add(eyelid);
+
+        // 虹膜与横瞳眼球
+        const eyeball = new THREE.Mesh(new THREE.SphereGeometry(0.09, 18, 18), eyeMat);
+        eyeball.position.set(eyeX, eyeY, eyeZ + 0.02);
+        eyeball.rotation.set(0, side * 0.35, 0);
+        frogGroup.add(eyeball);
+
+        // 湿润透明角膜外罩
+        const cornea = new THREE.Mesh(new THREE.SphereGeometry(0.096, 16, 16), corneaMat);
+        cornea.position.set(eyeX, eyeY, eyeZ + 0.02);
+        frogGroup.add(cornea);
+      });
+
+      // 2.3 肌肉健硕的折叠后肢 (大腿肌群 + 折叠胫骨 + 带吸盘肉垫的蹼趾)
+      const thighGeo = new THREE.CylinderGeometry(0.16, 0.09, 0.52, 16);
+      thighGeo.scale(0.8, 1.0, 1.4);
+      const shinGeo = new THREE.CylinderGeometry(0.07, 0.045, 0.48, 12);
+      const toePadMat = new THREE.MeshStandardMaterial({ color: 0xFBBF24, roughness: 0.3 }); // 金黄吸盘
+
+      [-1, 1].forEach((side) => {
+        // 大腿
+        const thigh = new THREE.Mesh(thighGeo, realisticFrogMat);
+        thigh.position.set(side * 0.36, -0.02, -0.16);
+        thigh.rotation.set(0.3, side * 0.75, side * -0.35);
+        frogGroup.add(thigh);
+
+        // 小腿 (锐利折叠回缩)
+        const shin = new THREE.Mesh(shinGeo, realisticFrogMat);
+        shin.position.set(side * 0.44, -0.1, -0.32);
+        shin.rotation.set(1.4, side * -0.42, 0);
+        frogGroup.add(shin);
+
+        // 后足趾骨与真实的树蛙端部吸盘 (Adhesive Toe Pads)
+        for (let t = -1; t <= 1; t++) {
+          const toeGeo = new THREE.CylinderGeometry(0.018, 0.014, 0.22, 8);
+          const toe = new THREE.Mesh(toeGeo, realisticFrogMat);
+          toe.position.set(side * (0.34 + t * 0.04), -0.16, -0.08 + t * 0.04);
+          toe.rotation.set(1.5, side * (0.2 + t * 0.15), 0);
+          frogGroup.add(toe);
+
+          // 趾端球形吸盘
+          const pad = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 10), toePadMat);
+          pad.position.set(side * (0.34 + t * 0.04), -0.16, 0.03 + t * 0.04);
+          frogGroup.add(pad);
+        }
+      });
+
+      // 2.4 支撑前肢 (前臂与带吸盘肉垫的 4 趾)
+      const armGeo = new THREE.CylinderGeometry(0.05, 0.035, 0.34, 12);
+      [-1, 1].forEach((side) => {
+        const arm = new THREE.Mesh(armGeo, realisticFrogMat);
+        arm.position.set(side * 0.28, -0.06, 0.24);
+        arm.rotation.set(-0.55, side * 0.35, side * -0.45);
+        frogGroup.add(arm);
+
+        // 前爪吸盘指
+        for (let f = -1; f <= 1; f++) {
+          const fToe = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.01, 0.14, 6), realisticFrogMat);
+          fToe.position.set(side * (0.29 + f * 0.03), -0.18, 0.34 + f * 0.02);
+          fToe.rotation.set(0.1, side * (0.3 + f * 0.2), 0);
+          frogGroup.add(fToe);
+
+          const fPad = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), toePadMat);
+          fPad.position.set(side * (0.29 + f * 0.03), -0.18, 0.41 + f * 0.02);
+          frogGroup.add(fPad);
+        }
+      });
+
+      // 3. 封存在琥珀内的天然微气泡 (Trapped Bubbles)
+      const bubbleMat = new THREE.MeshPhysicalMaterial({
+        color: 0xFFFFFF,
+        transmission: 0.95,
+        ior: 1.1,
+        roughness: 0.05,
+        transparent: true,
+        opacity: 0.85
+      });
+
+      const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), bubbleMat);
+      b1.position.set(0.48, 0.42, 0.38);
+      amberGroup.add(b1);
+
+      const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), bubbleMat);
+      b2.position.set(-0.42, -0.42, -0.32);
+      amberGroup.add(b2);
+
+      const b3 = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), bubbleMat);
+      b3.position.set(-0.3, 0.52, -0.22);
+      amberGroup.add(b3);
+
+      // 4. 灯光系统 (温暖柔和的金色聚光)
+      const ambientLight = new THREE.AmbientLight(0xFFE4A0, 1.4);
+      scene.add(ambientLight);
+
+      const mainLight = new THREE.DirectionalLight(0xFFFFFF, 2.4);
+      mainLight.position.set(4, 5, 4);
+      scene.add(mainLight);
+
+      const backLight = new THREE.DirectionalLight(0xF59E0B, 1.8);
+      backLight.position.set(-3, -3, -3);
+      scene.add(backLight);
+
+      // 交互与缓慢有机自转
+      let mouseX = 0, mouseY = 0;
+      window.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 0.7;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 0.7;
+      }, { passive: true });
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // 优雅的自然翻转 (像悬浮在空间里的树脂化石)
+        amberGroup.rotation.y += 0.009;
+        amberGroup.rotation.x = Math.sin(Date.now() * 0.001) * 0.15;
+        amberGroup.rotation.z = Math.cos(Date.now() * 0.0012) * 0.08;
+
+        // 鼠标微量惯性追踪
+        amberGroup.position.x += (mouseX * 0.35 - amberGroup.position.x) * 0.06;
+        amberGroup.position.y += (-mouseY * 0.35 - amberGroup.position.y) * 0.06;
+
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // 注册全局时空宇宙线颜色动态映射 (Prime Gold ⇄ Over There Crimson)
+      window.updateAmberUniverse = function(isAlternate) {
+        if (isAlternate) {
+          amberMat.color.setHex(0xEF4444);
+          amberMat.attenuationColor.setHex(0x7F1D1D);
+          ambientLight.color.setHex(0xFFD1D1);
+          mainLight.color.setHex(0xFFE4E6);
+          backLight.color.setHex(0xDC2626);
+        } else {
+          amberMat.color.setHex(0xE5A015);
+          amberMat.attenuationColor.setHex(0x78350F);
+          ambientLight.color.setHex(0xFFE4A0);
+          mainLight.color.setHex(0xFFFFFF);
+          backLight.color.setHex(0xF59E0B);
+        }
+      };
+    })();
+
+    // 8. 复制 CLI 命令交互
+    (function initCopyCli() {
+      const copyBtn = document.getElementById('btn-copy-cli');
+      if (!copyBtn) return;
+      copyBtn.addEventListener('click', () => {
+        const text = `node scripts/amber.js audit --target .\nnode scripts/amber.js gate evaluate --target . --gate gate:pr-acceptance\nnode scripts/amber.js evidence record --target . --assurance replayable`;
+        navigator.clipboard.writeText(text).then(() => {
+          copyBtn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i><span class="text-emerald-400">Copied!</span>`;
+          lucide.createIcons();
+          setTimeout(() => {
+            copyBtn.innerHTML = `<i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy</span>`;
+            lucide.createIcons();
+          }, 2000);
+        });
+      });
+    })();
+
+    // 9. 离开视窗时的悬浮关键控件过渡切换引擎 (Floating Guardian Capsule & Viewport Transitions)
+    (function initViewportTransitions() {
+      const floatingWidget = document.getElementById('floating-amber-widget');
+      const heroBoard = document.getElementById('hero-pinned-board');
+      const navbar = document.querySelector('header nav');
+
+      if (!floatingWidget) return;
+
+      // 观测 Hero 区域离开视窗
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) {
+            // 首屏离开视窗：悬浮关键控件优雅滑入过渡呈现
+            floatingWidget.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+            floatingWidget.classList.add('translate-y-0', 'opacity-100', 'pointer-events-auto');
+
+            // 顶部导航栏过渡为紧凑沉浸态
+            if (navbar) {
+              navbar.classList.add('shadow-[0_10px_30px_rgba(0,0,0,0.8)]', 'border-amber-500/30', 'bg-obsidian-950/95');
+            }
+          } else {
+            // 首屏重回视窗：悬浮关键控件优雅平滑下潜隐藏
+            floatingWidget.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+            floatingWidget.classList.remove('translate-y-0', 'opacity-100', 'pointer-events-auto');
+
+            if (navbar) {
+              navbar.classList.remove('shadow-[0_10px_30px_rgba(0,0,0,0.8)]', 'border-amber-500/30', 'bg-obsidian-950/95');
+            }
+          }
+        });
+      }, {
+        root: null,
+        threshold: 0.15 // 当 Hero 剩余不足 15% 可见时即视为离开视窗
+      });
+
+      if (heroBoard) {
+        observer.observe(heroBoard);
+      }
+
+      // 各章节进出视窗的平滑过渡切换
+      const chapterSections = document.querySelectorAll('.chapter-section');
+      const chapterObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-viewport');
+          } else {
+            entry.target.classList.remove('in-viewport');
+          }
+        });
+      }, {
+        threshold: 0.2
+      });
+
+      chapterSections.forEach(sec => chapterObserver.observe(sec));
+      if (window.lucide) lucide.createIcons();
+    })();
+
+    // 10. 先锋科幻原生合成音效系统与 Fringe 平行宇宙线切换 (Web Audio & Universe Timeline Engine)
+    (function initUniverseAndAudio() {
+      let audioCtx = null;
+      let audioEnabled = true;
+
+      function getAudioContext() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        return audioCtx;
+      }
+
+      // 10.1 时空位移泛音微音效 (Phase Shift Synthesizer)
+      window.playPhaseShiftSound = function() {
+        if (!audioEnabled) return;
+        try {
+          const ctx = getAudioContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(280, now);
+          osc1.frequency.exponentialRampToValueAtTime(560, now + 0.35);
+
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(140, now);
+          osc2.frequency.exponentialRampToValueAtTime(280, now + 0.35);
+
+          gain.gain.setValueAtTime(0.01, now);
+          gain.gain.linearRampToValueAtTime(0.08, now + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 0.4);
+          osc2.stop(now + 0.4);
+        } catch (e) {}
+      };
+
+      // 10.2 树脂结晶封印微音效 (Resin Crystallization Hiss & Resonate)
+      window.playCrystallizeSound = function() {
+        if (!audioEnabled) return;
+        try {
+          const ctx = getAudioContext();
+          if (!ctx) return;
+          const now = ctx.currentTime;
+
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const filter = ctx.createBiquadFilter();
+
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(50, now + 0.55);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(500, now);
+          filter.frequency.exponentialRampToValueAtTime(100, now + 0.55);
+
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + 0.65);
+        } catch (e) {}
+      };
+
+      // 10.3 平行宇宙相位切换交互 (Timeline Phase Shift)
+      const universeBtn = document.getElementById('btn-universe-toggle');
+      const universeDot = document.getElementById('universe-dot');
+      const universeLabel = document.getElementById('universe-label');
+
+      if (universeBtn) {
+        universeBtn.addEventListener('click', () => {
+          const isAlternate = document.body.classList.toggle('universe-alternate');
+
+          if (isAlternate) {
+            // 切换为备择红宇宙 (Over There / Crimson Amber)
+            if (universeDot) {
+              universeDot.className = 'w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_10px_#F43F5E] group-hover:scale-125 transition-transform';
+            }
+            if (universeLabel) {
+              universeLabel.innerText = 'OVER THERE (RED)';
+              universeLabel.className = 'text-rose-300 group-hover:text-rose-200 hidden xl:inline font-bold';
+            }
+          } else {
+            // 恢复为主金宇宙 (Prime / Gold Amber)
+            if (universeDot) {
+              universeDot.className = 'w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#F5BE38] group-hover:scale-125 transition-transform';
+            }
+            if (universeLabel) {
+              universeLabel.innerText = 'PRIME TIMELINE';
+              universeLabel.className = 'text-slate-300 group-hover:text-amber-200 hidden xl:inline';
+            }
+          }
+
+          // 联动 3D 琥珀材质变色与光效
+          if (typeof window.updateAmberUniverse === 'function') {
+            window.updateAmberUniverse(isAlternate);
+          }
+
+          // 播放科幻时空位移泛音
+          window.playPhaseShiftSound();
+        });
+      }
+
+      // 10.4 音频静音/开启控制
+      const audioBtn = document.getElementById('btn-audio-toggle');
+      const audioIcon = document.getElementById('audio-icon');
+
+      if (audioBtn) {
+        audioBtn.addEventListener('click', () => {
+          audioEnabled = !audioEnabled;
+          if (audioEnabled) {
+            audioBtn.innerHTML = `<i data-lucide="volume-2" class="w-3.5 h-3.5 text-amber-300"></i>`;
+            window.playPhaseShiftSound();
+          } else {
+            audioBtn.innerHTML = `<i data-lucide="volume-x" class="w-3.5 h-3.5 text-slate-500"></i>`;
+          }
+          if (window.lucide) lucide.createIcons();
+        });
+      }
+    })();
+  </script>
+
+  <!-- ==================== 离开首屏视窗时平滑切入的悬浮关键控件 (FLOATING AMBER GUARDIAN CAPSULE) ==================== -->
+  <aside id="floating-amber-widget" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 transition-all duration-500 transform translate-y-24 opacity-0 pointer-events-none flex items-center gap-3 select-none">
+    <!-- 外层发光药丸胶囊 (自适应移动端轻量缩放与触控) -->
+    <div class="amber-glass rounded-full pl-2.5 pr-3 py-1.5 sm:pl-3 sm:pr-4 sm:py-2 border border-amber-500/40 shadow-[0_10px_35px_rgba(245,190,56,0.35)] backdrop-blur-2xl flex items-center gap-2.5 sm:gap-3.5 relative overflow-hidden group hover:border-amber-400 hover:shadow-[0_12px_45px_rgba(245,190,56,0.5)] transition-all">
+      
+      <!-- 胶囊内部微型发光琥珀晶石 (微缩 3D 琥珀青蛙核心) -->
+      <div class="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full amber-crystal-core flex items-center justify-center shrink-0 shadow-[0_0_12px_#F5BE38] animate-crystal-spin cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="返回顶部 3D 琥珀青蛙" aria-label="Back to Top Amber">
+        <div class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-white/95 shadow-[0_0_6px_#FFF]"></div>
+        <!-- 微型 Fringe 树叶脉络发光点 -->
+        <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-yellow-300 shadow-[0_0_6px_#FDE047] animate-ping"></span>
+      </div>
+
+      <!-- 实时关键状态 -->
+      <div class="flex flex-col text-left cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+        <div class="flex items-center gap-1.5">
+          <span class="font-serif text-xs font-bold text-white tracking-wide">AMBER 31422</span>
+          <span class="text-[8px] sm:text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">SEALED</span>
+        </div>
+        <span class="text-[9px] sm:text-[10px] font-mono text-emerald-400 flex items-center gap-1 hidden xs:flex">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          Fail-Closed Active
+        </span>
+      </div>
+
+      <div class="h-5 sm:h-6 w-px bg-white/10 mx-0.5"></div>
+
+      <!-- 快捷操作按钮：启动治理沙盒 -->
+      <a href="#simulator" class="amber-glow-btn px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold flex items-center gap-1.5 shadow-md">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-black"></i>
+        <span>治理沙盒</span>
+      </a>
+
+      <!-- 回到顶部快速按钮 -->
+      <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 hover:text-amber-300 flex items-center justify-center transition-colors cursor-pointer" title="回到顶部" aria-label="Scroll to top">
+        <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+      </button>
+
+    </div>
+  </aside>
+
+</body>
+</html>

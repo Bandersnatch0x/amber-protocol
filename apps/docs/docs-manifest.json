@@ -1,0 +1,643 @@
+{
+  "version": "1.6.0",
+  "totalDocuments": 78,
+  "documents": [
+    {
+      "id": "start-here/index",
+      "path": "start-here/index.md",
+      "group": "Start here",
+      "title": "Amber Protocol Overview & Boundaries",
+      "description": "What Amber Protocol is and is not: repository-local, governance-first, non-execution boundaries.",
+      "layer": "A"
+    },
+    {
+      "id": "start-here/installation",
+      "path": "start-here/installation.md",
+      "group": "Start here",
+      "title": "Installation & Environment Requirements",
+      "description": "Supported Node and npm expectations, global installation, and in-repo development setup.",
+      "layer": "A"
+    },
+    {
+      "id": "start-here/first-governed-workflow",
+      "path": "start-here/first-governed-workflow.md",
+      "group": "Start here",
+      "title": "First Governed Workflow",
+      "description": "Step-by-step walkthrough: audit, init, doctor, session start, and next with observable signals.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/index",
+      "path": "concepts/index.md",
+      "group": "Concepts",
+      "title": "Core Concepts Overview",
+      "description": "Foundational mental models of Amber Protocol's repository-local governance system.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/target-repository",
+      "path": "concepts/target-repository.md",
+      "group": "Concepts",
+      "title": "Target Repository & Isolation",
+      "description": "How Amber interacts with target codebases via --target without polluting user files.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/amber-setup",
+      "path": "concepts/amber-setup.md",
+      "group": "Concepts",
+      "title": "Amber Setup & Directory Structure",
+      "description": "The .amber/ directory, scaffolding idempotency, rules, and configuration.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/session",
+      "path": "concepts/session.md",
+      "group": "Concepts",
+      "title": "Session Lifecycle & State Machine",
+      "description": "Sessions as governed units of work, timeline tracking, and terminal states.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/route",
+      "path": "concepts/route.md",
+      "group": "Concepts",
+      "title": "Routes & Governance Pipelines",
+      "description": "Predefined and custom delivery routes, stage sequences, and gate points.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/wiki",
+      "path": "concepts/wiki.md",
+      "group": "Concepts",
+      "title": "Structured Wiki & Knowledge Base",
+      "description": "The OKF-compliant wiki model, knowledge plans, and document distillation.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/evidence",
+      "path": "concepts/evidence.md",
+      "group": "Concepts",
+      "title": "Evidence & Assurance Model",
+      "description": "Four assurance levels (unavailable, observed, replayable, verified) and tamper-evident receipts.",
+      "layer": "A"
+    },
+    {
+      "id": "concepts/glossary",
+      "path": "concepts/glossary.md",
+      "group": "Concepts",
+      "title": "Public Governance Glossary",
+      "description": "Authoritative definitions of Amber Protocol terms and concepts.",
+      "layer": "A"
+    },
+    {
+      "id": "guides/index",
+      "path": "guides/index.md",
+      "group": "Guides",
+      "title": "Guides & Task Walkthroughs",
+      "description": "Practical task-oriented guides for engineering teams using Amber Protocol.",
+      "layer": "A"
+    },
+    {
+      "id": "guides/adopting-existing-project",
+      "path": "guides/adopting-existing-project.md",
+      "group": "Guides",
+      "title": "Adopting an Existing Project",
+      "description": "Step-by-step adoption guide: running audit, generating init scaffold, and configuring doctor.",
+      "layer": "A"
+    },
+    {
+      "id": "guides/session-handoff-and-continuity",
+      "path": "guides/session-handoff-and-continuity.md",
+      "group": "Guides",
+      "title": "Session Handoff & Continuity",
+      "description": "Generating portable session handoff bundles and validating continuation state.",
+      "layer": "A"
+    },
+    {
+      "id": "guides/governance-gates-and-audit",
+      "path": "guides/governance-gates-and-audit.md",
+      "group": "Guides",
+      "title": "Governance Gates & Readiness Audit",
+      "description": "Evaluating phase gates, checking drift in CI, and conducting readiness audits.",
+      "layer": "A"
+    },
+    {
+      "id": "reference/index",
+      "path": "reference/index.md",
+      "group": "Reference",
+      "title": "Reference & Operator Index",
+      "description": "Comprehensive index of all Amber CLI commands, schemas, and action contracts.",
+      "layer": "A"
+    },
+    {
+      "id": "reference/cli/index",
+      "path": "reference/cli/index.md",
+      "group": "Reference",
+      "title": "CLI Command Reference Overview",
+      "description": "Global options, invocation patterns, and command categories.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/audit",
+      "path": "reference/cli/audit.md",
+      "group": "Reference",
+      "title": "amber audit",
+      "description": "Inspect an existing project without writing files. Supports --summary for bounded text output.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/init",
+      "path": "reference/cli/init.md",
+      "group": "Reference",
+      "title": "amber init",
+      "description": "Create missing Amber starter files without overwriting existing files. Supports --dry-run.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/doctor",
+      "path": "reference/cli/doctor.md",
+      "group": "Reference",
+      "title": "amber doctor",
+      "description": "Run Amber guardrail checks and target classification.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/next",
+      "path": "reference/cli/next.md",
+      "group": "Reference",
+      "title": "amber next",
+      "description": "Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).\n\nLifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept → learnings (when write-back triggers matched).\nSession evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).\nExisting projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.\n\nOptions:\n  --target <dir>     Path to the target repository.\n  --feature <id>     Focus a specific feature's lifecycle.\n  --session <id>     Focus a specific session's lifecycle.\n  --objective <text> Give an objective; next suggests a matching route and\n                     workflow pack from route manifest metadata (read-only advisor).\n  --json             Emit the machine-readable envelope.\n\nWith no --feature/--session, next auto-selects a focus and states which it chose.\nWithout --objective, next is the pure lifecycle inference (unchanged).\n\nExamples:\n  amber next --target .\n  amber next --target . --feature F001\n  amber next --target . --session <session-id> --json\n  amber next --target . --objective \"add payment integration\"\n  amber next --target . --objective \"fix login bug\" --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/plan",
+      "path": "reference/cli/plan.md",
+      "group": "Reference",
+      "title": "amber plan",
+      "description": "Create a feature-linked vertical-slice plan from a registered feature.\n\nRequired options:\n  --target <dir>       Path to the target repository.\n  --feature <id>       Feature id (e.g. F001) — must already exist in feature_list.json.\n  --title <text>       Short human-readable title for the plan.\n\nOptional:\n  --dry-run            Preview without writing files.\n\nExamples:\n  amber plan --target . --feature F001 --title \"Small slice\"\n  amber plan --target . --feature F002 --title \"AccountChargeDrawer dual-step\" --dry-run",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/handoff",
+      "path": "reference/cli/handoff.md",
+      "group": "Reference",
+      "title": "amber handoff",
+      "description": "Regenerate live handoff state or produce the portable handoff bundle.\n\nSubcommands:\n  (none)             Regenerate session-handoff.md from live state and validate it.\n  bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.\n  validate           Validate a handoff bundle directory.\n\nOptions:\n  --replay-scope <sessionId|runId>   Also write per-attempt replay slices (frozen admission values + replay decisions).\n\nExamples:\n  amber handoff --target path/to/repo\n  amber handoff bundle --target path/to/repo\n  amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest\n  amber handoff bundle --target path/to/repo --replay-scope run-<sessionId>-<attemptId>\n  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/session",
+      "path": "reference/cli/session.md",
+      "group": "Reference",
+      "title": "amber session",
+      "description": "Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.\n\nSubcommands:\n  start --goal \"...\" [--route <id>] [--budget <n>] [--worktree] [--mode interactive]\n      Create a new session, write manifest + timeline, optionally create worktree.\n  status [<id>]\n      Show status of current session or specified session by ID.\n  list\n      List all sessions in reverse chronological order.\n  abort <id>\n      Set session status to aborted, write abort event, cleanup worktree.\n  continue [<id>]\n      Continue a paused or incomplete session from its current stage.\n  complete-check --session <id> [--strict]\n      Report whether a session has enough evidence to be treated as complete.\n  complete --session <id> [--strict]\n      Mark a session completed (governance terminal state). Requires complete-check to pass.\n  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute] [--budget-minutes <n>]\n      Record verification evidence. Without --execute, records a self-reported claim.\n      With --execute, runs --command and records the real exit code (default 5-minute\n      budget; raise it for long suites, capped at 60).\n  approve --session <id> [--gate <gate-id>]\n      Record a gate_passed event so complete-check sees approval evidence.\n  lease --session <id> --owner-id <agent> --token-hash <hash>\n      Reacquire the session lease for the current owner: a fresh token and a\n      new fence (explicit, owner-bound; ADR-0029 §8.1).\n  run --session <id> [--dry-run|--execute]\n      Execute the current verb stage (F062). Dry-run resolves without executing.\n  settle --session <id> --request-id <id> --attempt-id <id> --request-hash <hash> --result <json>\n      Settle a pending host-agent request and advance the cursor on success.\n\nSession completion flow:\n  amber session start --goal \"...\"\n  amber session continue\n  amber session verify --session <id>\n  amber session approve --session <id> --gate <gate-id>\n  amber session complete-check --session <id>\n  amber session complete --session <id>\n\nRoute auto-matching:\n  Goals are matched against route trigger goalPattern regexes:\n    bugfix-quick     — ^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)\n    feature-standard — ^(add|implement|create|build)\\s+.*feature\n    refactor-safe    — ^(refactor|restructure|clean\\s*up|simplify|extract)\\b\n  Pass --route <id> to bypass auto-matching.\n\nTwo-layer approval gates:\n  Plan-level:  amber gate --confirm  → edits User Confirmation in the plan .md file.\n  Session-level: amber session approve → records gate_passed in the session timeline.\n  Both layers must be satisfied for complete-check --strict to pass.\n\nExamples:\n  amber session start --goal \"implement user auth\" --confirm\n  amber session start --goal \"fix login bug\" --route bugfix-quick --worktree --confirm\n  amber session start --goal \"add feature\" --mode interactive --confirm\n  amber session status\n  amber session list\n  amber session abort <session-id>\n  amber session continue\n  amber session complete-check --session <session-id>\n  amber session verify --session <session-id> --confirm\n  amber session approve --session <session-id>\n  amber session run --session <session-id> --dry-run\n  amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{\"status\":\"succeeded\"}'",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/wiki",
+      "path": "reference/cli/wiki.md",
+      "group": "Reference",
+      "title": "amber wiki",
+      "description": "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.\n\nSubcommands:\n  (none)             Scaffold the base wiki skeleton (idempotent).\n  knowledge          Knowledge Plan + Structured Knowledge Base (declarative plan format).\n    knowledge plan        Pre-flight inspection + propose or update the plan.\n    knowledge scaffold    Scaffold docs/wiki/knowledge-plan.json (or --yaml).\n    knowledge inspect     Dump the loaded plan.\n    knowledge report      Coverage report against declared documents + notes + cards.\n    knowledge validate    Schema validation of the plan.\n    knowledge build       Materialize structured knowledge pages under docs/wiki/knowledge/.\n\nExamples:\n  amber wiki knowledge plan --target .\n  amber wiki knowledge scaffold --target . --yaml\n  amber wiki knowledge build --target .\n  amber wiki knowledge report --target .",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/gate",
+      "path": "reference/cli/gate.md",
+      "group": "Reference",
+      "title": "amber gate",
+      "description": "Evaluate Gates and inspect their immutable outcomes (F050): the\nreviewable contracts admission is decided against — never hidden\nweights or model confidence.\n\nThe legacy plan gate is still here: `amber gate --plan <path>\n[--confirm]` validates that a plan is tied to feature state and has\nuser confirmation, or confirms it — a bare `amber gate` with no\nevaluate/show/list action routes there unchanged.\n\nA Gate Contract is a canonical artifact of the registered `gate` type,\nadmitted through the existing artifact surface: `amber artifact admit\n--type gate ... --extension gate.require='[...]'`. Its machine-actionable\ncontent rides the Envelope's extensions carrier under the `gate`\nnamespace: gate.require (required — a non-empty array of requirement\nobjects { evidenceType, subject?, assurance?, threshold?, maxAgeMs? }),\ngate.anyOf (bounded explicit alternatives: at most 8 sets of at most 8\nentries), gate.owners, gate.expires, gate.dependsOn,\ngate.maxEvidenceAgeMs, and gate.failBehavior (v1 is deny-only: \"deny\").\nThe gate lifecycle is draft -> active via --transition activate,\nactive -> retired via --transition retire. The evaluator is the\ncontract's first shape consumer: a malformed contract fails closed\nwith AMBER_E_GATE_CONTRACT_INVALID (or\nAMBER_E_GATE_UNSUPPORTED_COMPARATOR /\nAMBER_E_GATE_FAIL_BEHAVIOR_UNSUPPORTED for those specific verdicts).\n\nEvaluation is deterministic: allOf over gate.require plus bounded\nexplicit anyOf (>=1 alternative set fully satisfied when anyOf is\ndeclared). A requirement is satisfied only by an Evidence receipt\nthat joins on the receipt's subject (the requirement's evidenceType,\nscoped to the evaluation subject or the requirement's own subject\noverride), passed (status pass), at or above the required Assurance\nlevel (unavailable < observed < replayable < verified), fresh at the\nevaluation clock (age <= maxAgeMs — the requirement's maxAgeMs, else\nthe gate's maxEvidenceAgeMs; no bound means always fresh), and — when\na threshold is declared — whose LAST output parses and compares true\nunder the registered comparator (numeric: eq/ne/lt/le/gt/ge over a\nstrict base-10 decimal string; string: eq/ne/contains exact;\nversion ordering: lt/le/gt/ge dot-numeric, where \"1.2\" < \"1.10\";\neq/ne on string values are exact, so \"1.2\" != \"1.2.0\"). An\nexpired gate (gate.expires at or before the clock, no-tolerance)\nrefuses to run: AMBER_E_GATE_EXPIRED, no outcome appended.\n\nEvery completed evaluation appends one immutable `evaluated` event to\nthe hash-chained outcome ledger under .amber/gates/outcomes.jsonl —\na pass is never silently revised, and a fail is recorded (verdict\n\"fail\") rather than dropped: the record IS the audit trail. An\nin-place edit breaks the chain and fails every read closed as\nAMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT. The ledger is serialized by a\nshort-lived write lock (AMBER_E_GATE_OUTCOME_REGISTRY_LOCK; a lock\nolder than 30 s is reclaimed as stale) with a size ceiling\n(AMBER_GATE_MAX_OUTCOME_BYTES, default 1 MiB). Every outcome records\nits clock source (\"injected\" with --now, \"system\" otherwise) and\nthe fixed skew policy no-tolerance.\n\nSubcommands:\n  evaluate --gate <identity> --subject <subject>\n        Evaluate one gate against the recorded Evidence and append\n        the outcome. --revision <n> selects the committed gate\n        revision (default: the current committed head); --now <iso>\n        injects the evaluation clock. A FAIL verdict is a completed\n        evaluation, not a command error: the outcome is appended and\n        returned with exit code 0.\n  show --index <n> | --gate <identity> [--subject <subject>]\n        Show one outcome record: by 0-based ledger line (--index),\n        or the latest matching --gate (narrowed by --subject).\n  list [--gate <identity>] [--subject <subject>] [--verdict <pass|fail>]\n        List outcome records in append order, optionally filtered.\n\nExamples:\n  amber gate evaluate --target . --gate gate/login-gate --subject spec/login@2 --json\n  amber gate evaluate --target . --gate gate/login-gate --subject spec/login@2 --revision 2 --now 2027-01-31T09:00:00Z --json\n  amber gate show --target . --index 0 --json\n  amber gate list --target . --gate gate/login-gate --verdict fail --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/policy",
+      "path": "reference/cli/policy.md",
+      "group": "Reference",
+      "title": "amber policy",
+      "description": "Evaluate deny-wins Policy Contracts and inspect immutable Policy Outcomes (F050).\nPolicy Contracts are canonical artifacts of type `policy`; their machine-actionable\ncontent rides the Envelope extensions carrier under the `policy` namespace.\nStrict consumption requires org and tenant policies, with optional repo/play/gate\nlayers. Lower layers can only tighten the stack: deny rules accumulate,\nseparation of duties cannot be relaxed, unsupported allow/relax keys fail\nclosed, and delegations may only be declared by org/tenant policy within\nthe delegator Principal's own capability and scope.\n\nSubcommands:\n  evaluate --org-policy <id> --tenant-policy <id> --subject <subject>\n        --submitter <principal> --capability <capability> --approval <id>\n        --gate-outcome-index <n> [--repo-policy <id>] [--play-policy <id>]\n        [--gate-policy <id>] [--delegator <principal>] [--now <iso>]\n        Resolve the policy stack, consumed Approval, passing Gate Outcome,\n        Evidence actors, and optional direct delegation, then append a\n        pass/deny Policy Outcome.\n  show --index <n>\n        Show one Policy Outcome by its 0-based ledger line.\n  list [--subject <subject>] [--submitter <principal>]\n        [--capability <capability>] [--verdict <pass|deny>]\n        List Policy Outcomes in append order, optionally filtered.\n\nExamples:\n  amber policy evaluate --target . --org-policy policy/org --tenant-policy policy/tenant --repo-policy policy/repo --gate-policy policy/login --subject spec/login@2 --submitter dev@example.com --capability release --approval approval/login-42 --gate-outcome-index 0 --json\n  amber policy show --target . --index 0 --json\n  amber policy list --target . --verdict deny --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/adapter",
+      "path": "reference/cli/adapter.md",
+      "group": "Reference",
+      "title": "amber adapter",
+      "description": "Register read-only Adapters, record immutable read receipts, and prepare migration candidates (F051).\nAdapters declare source owner, supported record types/versions, exact scope,\nidentity mapping, freshness, and read-only permissions. Pre-Cutover reads\nnever mutate Canonical Artifacts; migration candidates become normal Artifact admission payloads\nand receipts record fresh/stale/unavailable/conflict/unmapped with exact source bytes/digest.\nShadow comparison writes bounded coverage receipts with source and target hashes.\nCutover is a separate human Decision scoped by artifact type, scope, and generation,\nbound to resolved comparison evidence, a registered human owner's independent\nconfirmation, and rollback evidence naming a recorded Evidence receipt;\npost-cutover source divergence appends a Finding and degrades reads and\nmigration candidates.\n\nSubcommands:\n  register --id <id> --adapter-owner <owner> --record-type <type>\n        --record-version <v> --scope <scope> --identity-map <strategy>\n        --freshness-ms <n> [--allow-path <prefix>] [--adapter-version <v>]\n  read --id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <v>] [--expected-source-hash <hash>] [--scope <scope>]\n  candidate --id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <v>] [--expected-source-hash <hash>] [--scope <scope>]\n  compare --id <id> --fixture <json> [--scope <scope>]\n  comparisons [--id <adapter-id>] [--scope <scope>]\n  cutover --id <id> --cutover-id <id> --artifact-type <type> --generation <gen>\n        --comparison-index <n> --decision-identity <identity> --revision <n>\n        --confirmed-by <owner> --rollback-evidence <ref> [--scope <scope>]\n  rollback --cutover-id <id> --decision-identity <identity> --revision <n>\n        --confirmed-by <owner> --evidence <ref>\n  cutovers [--id <adapter-id>] [--scope <scope>]\n  show --id <id>\n  list\n  receipts [--id <adapter-id>]\n\nExamples:\n  amber adapter register --target . --id adapter/legacy --adapter-owner legacy-team --record-type legacy-ticket --record-version v1 --scope F051 --identity-map path --freshness-ms 86400000 --allow-path legacy --json\n  amber adapter read --target . --id adapter/legacy --source legacy/item.json --record-id legacy-1 --record-version v1 --json\n  amber adapter candidate --target . --id adapter/legacy --source legacy/item.json --record-id legacy-1 --record-version v1 --json\n  amber adapter compare --target . --id adapter/legacy --fixture fixtures/adapter-shadow.json --json\n  amber adapter cutover --target . --id adapter/legacy --cutover-id cutover/legacy-gen-1 --artifact-type intent --generation gen-1 --comparison-index 0 --decision-identity decision/cutover-legacy --revision 1 --confirmed-by legacy-team --rollback-evidence evidence/rollback-plan --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/runner",
+      "path": "reference/cli/runner.md",
+      "group": "Reference",
+      "title": "amber runner",
+      "description": "Register controlled Runners, their closed operation capabilities, and governed\nexecution requests (F052). A Runner is an EXTERNAL executor identity: id, version,\nintegrity digest, owner, and closed capabilities (declared effects, path scope\nshape, timeout bound, credential requirement, rollback declaration) — never\ncommand text, and Amber never spawns anything (ADR-0022). Registration is a\nhuman-approved governance mutation binding a single-use committed human Decision;\nunknown runner, version drift, and integrity mismatch fail closed. A request is\nthe closed declaration of one intended execution: risk derives from capability\nfacts through a versioned pinned policy (callers carry no risk field), semantic\nrefusals are recorded as immutable denied events, and authorization consumes a\nsingle-use F050 Approval whose subject binds exactly one requestHash and\nenvironment (runner-request:<environment>:<requestHash>). Versioned environment\nprofiles gate admission: development requires an isolated scope, staging admits\nallowlisted deploy/rollback only with rollback rehearsal Evidence, production\ngrants preparation/diagnosis/runbook.* only; credentials are opaque short-lived\nhandles (never secret values), and the rehearsing party cannot approve its own\nrehearsal. Execution settles durably: prepare binds one registered executor to\none authorized request, the external Runner submits one result receipt, and\nAmber derives the outcome (attempted|timed-out|failed|committed|rolled-back) —\nnon-zero exit, signal, timeout, and scope escape fail explicitly, and sandbox\nassurance, credential assurance, and result integrity stay separate fields.\n\nSubcommands:\n  register --id <id> --runner-version <v> --integrity <sha256:...>\n        --runner-owner <owner> --decision-identity <identity> --revision <n>\n  capability --id <runner-id> --runner-version <v> --capability <name>\n        --capability-version <v>\n        --effect <effect> [--effect <effect> ...] [--path-prefix <prefix> ...]\n        --timeout-ms <n> --credential <none|scoped> --rollback <declaration>\n        --decision-identity <identity> --revision <n>\n  request --id <runner-id> --runner-version <v> --capability <name>\n        --capability-version <v> --repository <repo> --path <path> [--path <path> ...]\n        --environment <development|staging|production> [--scope <scope>]\n        [--input-hash <sha256:...> ...] --timeout-ms <n> --effect <effect> [...]\n        --credential <none|scoped> [--credential-handle <id> --credential-purpose <p>\n        --credential-scope <s> --credential-expires <iso>] [--rehearsal <evidence-id>]\n        --rollback <declaration>\n  authorize --request-hash <sha256:...> --approval <id>\n        --decision-identity <identity> --body <markdown> [--trace decides:<type>:<identity>]\n        [--scope <scope>]\n  requests [--environment <env>] [--status <requested|authorized|denied>]\n  prepare --request-hash <sha256:...> --id <runner-id> --runner-version <v>\n        --integrity <sha256:...>\n  settle --request-hash <sha256:...> --receipt <json-file>\n  abort --request-hash <sha256:...> --reason <text>\n  rolled-back --request-hash <sha256:...> --evidence <evidence-id> --reason <text>\n  executions [--status <attempted|timed-out|failed|committed|rolled-back>]\n  show --id <id>\n  list\n\nExamples:\n  amber runner register --target . --id runner/ci --runner-version 1.0.0 --integrity sha256:<64-hex> --runner-owner platform-team --decision-identity decision/runner-ci --revision 1 --json\n  amber runner capability --target . --id runner/ci --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 --effect deploy --path-prefix deploy/staging --timeout-ms 600000 --credential scoped --rollback runbook/staging-rollback --decision-identity decision/cap-deploy --revision 1 --json\n  amber runner request --target . --id runner/ci --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 --repository repo/main --path deploy/staging/web --environment staging --timeout-ms 300000 --effect deploy --credential scoped --rollback runbook/staging-rollback --json\n  amber runner authorize --target . --request-hash sha256:<64-hex> --approval approval/deploy-42 --decision-identity decision/deploy-42 --body \"# Authorize\" --trace decides:intent:intent/deploy --json\n  amber runner show --target . --id runner/ci --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/release",
+      "path": "reference/cli/release.md",
+      "group": "Reference",
+      "title": "amber release",
+      "description": "Prepare governed release candidates (F053 T1).\nA candidate immutably binds one exact Change (commit + committed Artifact\nrevisions), recorded Evidence, per-axis Review findings (logic, security,\nspec compliance — Evidence references, never approvals), the target\nenvironment, a versioned release Policy artifact, one registered F052\nRunner capability pin, the credentials class, and a rollback plan into a\ncanonical releaseHash. Preparation is a governance write: it never deploys\nand touches no git state; any drift invalidates downstream authorization.\n\nSubcommands:\n  prepare --id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev>\n        [--change-artifact ...] --evidence-item <evidence-id> [--evidence-item ...]\n        --review-logic <evidence-id> --review-security <evidence-id>\n        --review-spec <evidence-id> --environment <development|staging|production>\n        --release-policy <identity>@<rev> --runner <runner-id> --runner-version <v>\n        --capability <name> --capability-version <v> --credential <none|scoped>\n        --rollback <evidence-id>\n  authorize --id <release-id>\n        staging: --approval <id> --decision-identity <identity> --body <markdown>\n        [--trace decides:<type>:<identity>] [--scope <scope>] --rehearsal <evidence-id>\n        production: --branch-protection <evidence-id> --code-owner <identity>@<rev>\n        --release-manager <identity>@<rev> --release-gate-index <n>\n        --environment-gate-index <n>\n  deploy --id <release-id> --request-hash <sha256:...>\n  rollback --id <release-id> --request-hash <sha256:...>\n  transactions [--id <release-id>]\n  status --id <release-id>\n  receipts --id <release-id>\n  show --id <release-id>\n  list [--environment <env>]\n\nExamples:\n  amber release prepare --target . --id release/web-42 --commit <40-hex> --change-artifact spec:spec/login@2 --evidence-item evidence/test-run --review-logic evidence/review-logic --review-security evidence/review-security --review-spec evidence/review-spec --environment staging --release-policy policy/release@1 --runner runner/ci --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 --credential scoped --rollback evidence/rollback-plan --json\n  amber release show --target . --id release/web-42 --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/maintain",
+      "path": "reference/cli/maintain.md",
+      "group": "Reference",
+      "title": "amber maintain",
+      "description": "Register Control Band detectors, record deterministic Findings, derive\nand triage Trigger Proposals, complete fixes, and roll up (F054 T1-T4).\nA detector is a versioned, model-independent Control Band definition —\nmetric, source, numeric baseline, closed comparator rules (ge|gt|le|lt,\nlast matching rule wins), evaluation window, scope, cooldown, observation\nceiling, and the one permitted output type (finding) — registered as a\nhuman-approved governance mutation behind a single-use committed Decision.\n`detect` is target-read-only: it evaluates one declared observation\nfixture against the registered definition; an in-band verdict appends\nnothing, and an out-of-band verdict appends one immutable Finding\ncarrying the detector version, input and baseline hashes, the tier\nverdict, and a stable fingerprint (subject + rule version + scope +\nwindow). `propose` derives one immutable Trigger Proposal from one\nrecorded Finding — never from caller input, structurally never a\ncanonical artifact: repeats inside the detector's cooldown append the\nFinding onto the open proposal instead of duplicating it, and outside\ncooldown the open proposal must be triaged before a new one may open.\n`triage` binds one open proposal to one committed human Decision under\nthe closed vocabulary fix|schedule|dismiss: schedule and dismiss\npreserve their reasons and close the proposal reviewably, and only fix\nreturns a CANDIDATE Intent admission payload that must still pass the\nnormal canonical artifact surface — nothing is auto-admitted. Triage\nDecisions are single-use across the maintain ledgers. Staleness is\nderived at read time, never edited: findings and proposals read stale\nwhen a newer detector version registers or a later observation\nre-presents the fingerprint with different input. `complete` binds a\nfix-triaged proposal to committed intent + eval + eval-result pins\n(unresolved references refuse), so a shipped fix becomes a regression\nsignal. `rollup` aggregates counts by tier, status, and staleness\nwithin a declared --limit and marks truncation explicitly. All ledgers\nare hash-chained and fail every read closed.\n\nSubcommands:\n  register-detector --id <detector-id> --detector-version <v> --metric <name>\n        --source <origin> --baseline <number> --rule <tier>:<ge|gt|le|lt>:<threshold>\n        [--rule ...] --window-ms <n> --scope <scope> --cooldown-ms <n>\n        --max-observations <n> --decision-identity <identity> --revision <n>\n  detect --id <detector-id> --detector-version <v> --subject <subject>\n        --window-from <iso> --window-to <iso> --value <number>\n        --observation-hash <sha256:...>\n  propose --finding-index <n>\n  triage --fingerprint <sha256:...> --outcome <fix|schedule|dismiss>\n        [--reason <text>] --decision-identity <identity> --revision <n>\n  complete --fingerprint <sha256:...> --intent <identity>@<rev>\n        --eval <identity>@<rev> --eval-result <identity>@<rev>\n  rollup --limit <n>\n  detectors\n  findings [--id <detector-id>] [--fingerprint <sha256:...>]\n  proposals [--fingerprint <sha256:...>]\n\nExamples:\n  amber maintain register-detector --target . --id detector/error-rate --detector-version 1 --metric http-5xx-rate --source observability/api --baseline 10 --rule warn:ge:100 --rule page:ge:500 --window-ms 3600000 --scope service/api --cooldown-ms 3600000 --max-observations 100 --owner alice@example.com --policy policy/error-budget@1 --decision-identity decision/detector-error-rate --revision 1 --json\n  amber maintain detect --target . --id detector/error-rate --detector-version 1 --subject service/api --window-from 2026-08-29T00:00:00.000Z --window-to 2026-08-29T01:00:00.000Z --value 120 --observation-hash sha256:<64-hex> --json\n  amber maintain propose --target . --finding-index 0 --json\n  amber maintain triage --target . --fingerprint sha256:<64-hex> --outcome schedule --reason \"next sprint\" --decision-identity decision/triage-1 --revision 1 --json\n  amber maintain complete --target . --fingerprint sha256:<64-hex> --intent intent/maintain-x@1 --eval eval/maintain-check@1 --eval-result eval-result/maintain-check-run@1 --json\n  amber maintain rollup --target . --limit 100 --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/retention",
+      "path": "reference/cli/retention.md",
+      "group": "Reference",
+      "title": "amber retention",
+      "description": "Classify records into governed retention classes, evaluate expiry\ndeterministically, govern Legal Holds, register Holders, review\ndeletion candidates with bounded authorization, and settle\ncoordinated deletion with a minimal Proof (F055 T1-T4).\nA classification binds one committed record to a protocol retention\nclass (ephemeral|operational|governance|audit) whose TTL and legal\nbasis resolve at classification time from a committed, versioned\ntenant retention Policy artifact (its extensions carrier declares\n{ retention: { classes: { <class>: { ttlMs, legalBasis } } } }).\nClassifications are immutable hash-chained ledger events under\n.amber/retention/ — re-classification appends, never edits — and\ndeclared secret or personal content refuses classification unless an\nexplicit minimization marker rides the event: unsafe raw content\nnever enters a ledger. `evaluate` is deterministic and read-only:\neach record's expired-eligible|retained verdict derives from its\nlatest classification and an injected clock — report-only, nothing\nis deleted. A Legal Hold (`hold`) binds scope (one exact record pin\nor one subject identity), a preserved reason, and the issuer — the\nverified principal of a single-use committed human Decision — and\noverrides TTL: evaluation reports a held record as retained-by-hold\nnaming the hold. `release` is a second single-use human Decision;\na released hold stays listable forever — no silent bypass, no\ninvisible permanent exception. A Holder (`holder`) declares one\ncopy-holding surface (canonical-body|raw-output|cache|index|export|\nsubscription|external) with its registered Adapter pin behind a\nsingle-use human Decision; immutable per version. `candidate` is a\ngovernance-write that enumerates the exact expired-eligible records,\ntheir retention basis, Legal Hold exclusions, every registered\nHolder, and the proposed per-Holder effects — content is never\ntouched — and binds them into a canonical candidateHash. `authorize`\nconsumes one scoped Approval whose subject is\nretention-deletion:<candidateHash> after re-deriving the reviewed\ncontent; any drift refuses. `execute` opens one transaction per\nauthorized candidate (duplicate execution refuses); every covered\nHolder settles independently (`settle`, statuses\nsettled|refused|failed|unavailable with adapter provenance and a\nreceipt hash) — the transaction reads deletion-pending while ANY\nHolder is unsettled, a settled Holder can never re-settle, and a\nretry targets only unsettled Holders. `proof` derives the minimal\nDeletion Proof from full coverage only: identity, declared coverage,\nreceipts, policy/legal pins, settlement time, and a controlled\nsalted fingerprint — never a public content hash, never deleted\ncontent. Deleted records project as tombstones, and a tombstoned\nsubject refuses Gate evaluation: historical existence is not\ncurrent proof.\n\nSubcommands:\n  classify --record <type>:<identity>@<rev> --retention-class <class>\n        --policy <identity>@<rev> [--sensitivity <none|secret|personal>]\n        [--minimized]\n  evaluate [--now <iso>]\n  classifications [--type <type>] [--id <identity>]\n  hold --id <hold-id> (--record <type>:<identity>@<rev> | --subject <identity>)\n        --reason <text> --decision-identity <identity> --revision <n>\n  release --id <hold-id> --decision-identity <identity> --revision <n>\n  holds [--status <active|released>]\n  holder --id <holder-id> --holder-version <v> --surface <surface>\n        --adapter <adapter-id> --adapter-version <v>\n        --decision-identity <identity> --revision <n>\n  holders\n  candidate --id <candidate-id> [--now <iso>]\n  authorize --id <candidate-id> --approval <id> --decision-identity <identity>\n        --body <markdown> [--trace decides:<type>:<identity>] [--scope <scope>]\n  candidates [--status <prepared|authorized>]\n  execute --id <transaction-id> --candidate <candidate-id>\n  settle --id <transaction-id> --holder <holder-id> --holder-version <v>\n        --status <settled|refused|failed|unavailable> --receipt-hash <sha256:...>\n  status --id <transaction-id>\n  proof --id <transaction-id>\n\nExamples:\n  amber retention classify --target . --record spec:spec/login@2 --retention-class operational --policy policy/tenant-retention@1 --json\n  amber retention evaluate --target . --now 2026-08-29T00:00:00.000Z --json\n  amber retention classifications --target . --type spec --json\n  amber retention hold --target . --id hold/litigation-42 --subject spec/login --reason \"litigation hold\" --decision-identity decision/hold-42 --revision 1 --json\n  amber retention release --target . --id hold/litigation-42 --decision-identity decision/release-42 --revision 1 --json\n  amber retention holds --target . --status active --json\n  amber retention holder --target . --id holder/canonical-body --holder-version 1 --surface canonical-body --adapter adapter/store --adapter-version 1 --decision-identity decision/holder-1 --revision 1 --json\n  amber retention candidate --target . --id deletion/2026-08 --now 2026-08-29T00:00:00.000Z --json\n  amber retention authorize --target . --id deletion/2026-08 --approval approval/deletion-42 --decision-identity decision/deletion-42 --body \"# Authorize deletion\" --json\n  amber retention candidates --target . --status prepared --json\n  amber retention execute --target . --id deletion-tx/2026-08 --candidate deletion/2026-08 --json\n  amber retention settle --target . --id deletion-tx/2026-08 --holder holder/canonical-body --holder-version 1 --status settled --receipt-hash sha256:<64-hex> --json\n  amber retention status --target . --id deletion-tx/2026-08 --json\n  amber retention proof --target . --id deletion-tx/2026-08 --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/external",
+      "path": "reference/cli/external.md",
+      "group": "Reference",
+      "title": "amber external",
+      "description": "Register External Effect contracts, propose exact requests,\nauthorize them drift-bound, settle governed executions, and\ncompensate committed effects (F056 T1-T4).\nAmber forbids arbitrary account-bearing external operations: the\nonly thing that can ever execute externally is a registered effect\ncontract. Each contract declares the external owner, one system\ntype (ticketing|code-review|notification|deployment|storage), one\nregistered operation name, the exact external target and scope,\nidempotency behavior (idempotent|at-most-once), a credentials class\n(none|scoped), the receipt fields the external system must return,\na compensation declaration — a named compensating effect or an\nexplicit irreversibility marker — a bounded timeout (at most 24h),\nand the one registered F051 Adapter pin (id + version, verified at\nregistration) that owns the API. Registration settles behind a\nsingle-use committed human Decision (acceptance|approval with a\nverified principal snapshot) into a hash-chained append-only ledger\nunder .amber/external/ and is immutable per effect id@version —\nchanged external semantics register a new version, and stale pins\nrefuse downstream. No contract field can carry a command,\nexecutable, or remote URL: every external-facing name is a closed\nslug (no whitespace, no URL scheme, no shell metacharacters, no \"..\"\ntraversal segments), so free-form execution vectors refuse by\nconstruction. `effects` is a read-only projection of the registry\nand fails closed on a corrupt ledger.\n`propose` is a governance-write that binds one registered effect\nversion (its current head), the contract's exact target and scope,\nthe canonical payload hash, the credentials class, and the declared\ncompensation into a canonical requestHash — review binds exactly\nwhat will happen. Idempotency binds owner + effect + target +\nscope + payloadHash: an identical request refuses naming the\nexisting proposal, so a retry can never create a duplicate external\nrecord. `authorize` consumes one single-use Approval whose subject\nbinds external-effect:<requestHash> and settles the human Decision\natomically with the consumption; effect-version or Adapter-version\ndrift since the proposal refuses — a stale authorization can never\nride changed external semantics. `proposals` lists the requests\nread-only.\n`execute` prepares one execution for an AUTHORIZED request: the\noperation, target, scope, and Adapter pin come only from the\nreviewed contract snapshot (caller input can never supply a\ncommand, executable, or URL; the request re-derives one last time\nso post-authorization drift refuses), and a scoped-credentials\ncontract binds a short-lived purpose/scope/expiry credential\nboundary whose expiry is bounded by the contract timeout — no\nhandle or value field exists in any stored shape, and\ncredential-looking material refuses with\nAMBER_E_EXTERNAL_CREDENTIAL_LEAK. One execution is open per\nrequest; a committed request never re-executes, and an unconfirmed\n(attempted|unknown) outcome retries only under a contract declared\nidempotent. `settle` records the Adapter's declared result receipt\n(real external record id, request/response digests, declared\nstatus) and Amber — never the adapter — derives the terminal\noutcome (denied|attempted|committed|failed|unknown): committed\nrequires the record id AND response digest (missing output reads\nas its refusal, never success), a claimed failure without the\nresponse digest downgrades to attempted, and settled outcomes\nnever re-settle. `reconcile` is the only path from unknown to\ncommitted: it requires recorded reconciliation Evidence from a\nproducer independent of the authorizing approver. `status` reads\none execution with its settlement and reconciliation.\n`compensate` opens a NEW governed proposal for one committed (or\nfailed-partial) execution: it rides exactly the compensation the\nORIGINAL contract declared (an irreversible contract refuses), it\nrecords the original execution id as its compensates linkage, one\ncompensation lineage exists per original, and it then goes through\nits own authorization, execution, and receipt — the original\noutcome is never rewritten. `transactions` is the read-time\nprojection joining every execution with its compensation lineage;\n`compensated` flips only when a compensating execution actually\ncommitted. Nothing under this command executes an external\noperation, MCP surfaces only the approval-required proposal\ncontract and never spawns it, and the ADR-0020 sync\ntransport exception stays untouched.\n\nSubcommands:\n  register --id <effect-id> --effect-version <v> --owner <owner>\n        --system <system> --operation <operation>\n        --external-target <target> --scope <scope>\n        --input-schema <json-schema>\n        --idempotency <idempotent|at-most-once>\n        --credential <none|scoped>\n        --receipt-field <name> [--receipt-field <name> ...]\n        (--compensation-effect <effect-id> | --irreversible)\n        --timeout-ms <n> --adapter <adapter-id> --adapter-version <v>\n        --decision-identity <identity> --revision <n>\n  effects [--system <system>]\n  propose --id <proposal-id> --effect <effect-id>@<version>\n        --payload-hash <sha256:...>\n  authorize --id <proposal-id> --approval <id>\n        --decision-identity <identity> --body <markdown>\n        [--trace decides:<type>:<identity>] [--scope <scope>]\n  proposals [--status <proposed|authorized>]\n  execute --id <execution-id> --request <proposal-id>\n        [--credential-purpose <p> --credential-scope <s>\n        --credential-expires <iso>] [--now <iso>]\n  settle --id <execution-id> --request-digest <sha256:...>\n        --status <committed|failed|denied|unknown>\n        [--external-record <id>] [--response-digest <sha256:...>]\n        [--now <iso>]\n  reconcile --id <execution-id> --evidence <evidence-id>\n        --external-record <id> [--now <iso>]\n  status --id <execution-id>\n  compensate --id <proposal-id> --execution <execution-id>\n        --payload-hash <sha256:...> [--now <iso>]\n  transactions [--request <proposal-id>]\n\nExamples:\n  amber external register --target . --id effect/ticket-comment --effect-version 1 --owner platform-team --system ticketing --operation comment.create --external-target tracker/amber-protocol --scope issues --input-schema '{\"type\":\"object\"}' --idempotency idempotent --credential scoped --receipt-field commentId --compensation-effect effect/ticket-comment-delete --timeout-ms 30000 --adapter adapter/tracker --adapter-version 1 --decision-identity decision/effect-1 --revision 1 --json\n  amber external effects --target . --system ticketing --json\n  amber external propose --target . --id request/ticket-comment-288 --effect effect/ticket-comment@1 --payload-hash sha256:<64-hex> --yes --json\n  amber external authorize --target . --id request/ticket-comment-288 --approval approval/external-42 --decision-identity decision/external-42 --body \"# Authorize external effect\" --json\n  amber external proposals --target . --status proposed --json\n  amber external execute --target . --id execution/ticket-comment-1 --request request/ticket-comment-288 --credential-purpose comment.create --credential-scope tracker/amber-protocol --credential-expires 2026-08-29T00:00:30.000Z --json\n  amber external settle --target . --id execution/ticket-comment-1 --external-record TRACK-1234 --request-digest sha256:<64-hex> --response-digest sha256:<64-hex> --status committed --json\n  amber external reconcile --target . --id execution/ticket-comment-1 --evidence evidence/reconcile-1 --external-record TRACK-1234 --json\n  amber external status --target . --id execution/ticket-comment-1 --json\n  amber external compensate --target . --id request/undo-ticket-comment-1 --execution execution/ticket-comment-1 --payload-hash sha256:<64-hex> --json\n  amber external transactions --target . --request request/ticket-comment-288 --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/breakglass",
+      "path": "reference/cli/breakglass.md",
+      "group": "Reference",
+      "title": "amber breakglass",
+      "description": "Grant, use, settle, review, and list break-glass authorizations\n(F057 T1-T4).\nBreak-glass is a distinct, one-use HUMAN authorization for a\nproduction emergency — never a flag, a reusable token, or an\nAgent-granted exception, and neither --yes nor --force ever routes\nhere. A grant is limited by one registered capability (an F052\nrunner capability pin runner:<runnerId>@<v>/<name>@<v> or an F056\nexternal effect pin external:<effect-id>@<version>, verified\nagainst its registry — break-glass reaches only what is already\ngoverned, never arbitrary shell or HTTP), the exact target and\nscope, environment, purpose, risk (low|medium|high|critical), a\ncredential class (none|scoped), a short half-open validity window\n[validFrom, validUntil) of at most 24h at the injected governance\nclock, an incident reference, and a mandatory post-review deadline\nwithin 30 days of the window closing. Granting settles behind a\nsingle-use committed human Decision (acceptance|approval with a\nverified principal snapshot; Agents and service identities refuse\nthe slot — no self-grant) into the hash-chained append-only ledger\nunder .amber/breakglass/. `revoke` is a second single-use human\nDecision that immediately blocks future use with a preserved\nreason. Status derives read-time (granted|used|revoked|expired;\na terminal use wins, then revocation) and history is never\nrewritten: revoked\nand expired grants stay listable forever with their original\ncontent intact. `use` spends the one-use authorization atomically\nwith the underlying admission under the ledger lock: the reference\nmust be the ALREADY-AUTHORIZED underlying request (an F056 proposal\nid or an F052 runner requestHash) riding exactly the granted\ncapability at the granted target and scope (and environment for\nrunner requests) — a grant can never widen itself, a failed\nadmission never consumes, concurrent callers cannot double-spend,\nrevoked/not-yet-valid/expired grants refuse at the injected clock,\nand the use event records the exact admitted request hash (a\nre-chained use outside the window fails every read closed). A used\ngrant is terminal: it cannot be revoked or re-used, and status\nused wins the read-time derivation. Every grant-facing name is a\nclosed slug and credential-looking material refuses: the audit\ntrail carries no secret. Nothing under this command executes\nanything — the underlying capability still runs only through its\nown governed F052/F056 surface.\nAn emergency attempt cannot disappear: `settle` binds the used\ngrant to the REAL underlying receipt (an F056 execution id or the\nF052 runner request hash) and derives the outcome — including\nfailures and partial outcomes — and the declared rollback or\ncompensation linkage from the underlying registry, never from the\ncaller; a claim without a resolvable reference refuses, and one\nsettlement per grant records immutably. `review` is the mandatory\nhuman post-review: outcome, necessity, impact, and follow-up\n(non-empty, preserved) behind a single-use committed human\nDecision, valid only after the grant ENDED (use, revocation, or\nexpiry) — one review per grant, and a late review is still\nrecordable but reads flagged. `status` projects the full lifecycle\nat the injected clock: the grant with its use, settlement, and\nreview, plus read-time reviewOverdue (ended + past the declared\ndeadline + unreviewed) and reviewLate flags — Policy consumers can\nfail closed on an overdue review, and review can never be silently\nskipped. MCP surfaces only the approval-required grant contract and\nnever executes it, the ADR-0020 transport exception stays isolated,\nand break-glass waives nothing.\n\nSubcommands:\n  grant --id <grant-id> --incident <incident> --purpose <purpose>\n        --capability <runner:...|external:...> --exact-target <target>\n        --scope <scope> --environment <env>\n        --risk <low|medium|high|critical> --credential <none|scoped>\n        --valid-from <iso> --valid-until <iso> --review-by <iso>\n        --decision-identity <identity> --revision <n> [--now <iso>]\n  revoke --id <grant-id> --reason <text>\n        --decision-identity <identity> --revision <n> [--now <iso>]\n  grants [--status <granted|used|revoked|expired>] [--now <iso>]\n  use --id <grant-id> --request <underlying-reference> [--now <iso>]\n  show --id <grant-id> [--now <iso>]\n  settle --id <grant-id> --receipt <underlying-receipt> [--now <iso>]\n  review --id <grant-id> --outcome <text> --necessity <text>\n        --impact <text> --follow-up <text>\n        --decision-identity <identity> --revision <n> [--now <iso>]\n  status --id <grant-id> [--now <iso>]\n\nExamples:\n  amber breakglass grant --target . --id breakglass/incident-42-restore --incident incident/42 --purpose restore-login-service --capability external:effect/ticket-comment@1 --exact-target tracker/amber-protocol --scope issues --environment production --risk high --credential scoped --valid-from 2026-08-29T00:00:00.000Z --valid-until 2026-08-29T01:00:00.000Z --review-by 2026-09-01T00:00:00.000Z --decision-identity decision/breakglass-42 --revision 1 --yes --json\n  amber breakglass revoke --target . --id breakglass/incident-42-restore --reason \"credential compromise suspected\" --decision-identity decision/breakglass-revoke-42 --revision 1 --json\n  amber breakglass grants --target . --status granted --now 2026-08-29T00:30:00.000Z --json\n  amber breakglass use --target . --id breakglass/incident-42-restore --request request/ticket-comment-288 --now 2026-08-29T00:30:00.000Z --json\n  amber breakglass show --target . --id breakglass/incident-42-restore --now 2026-08-29T00:30:00.000Z --json\n  amber breakglass settle --target . --id breakglass/incident-42-restore --receipt execution/ticket-comment-1 --json\n  amber breakglass review --target . --id breakglass/incident-42-restore --outcome \"service restored\" --necessity \"release path was 40 minutes out\" --impact \"one ticket comment created\" --follow-up \"add a standing runbook\" --decision-identity decision/breakglass-review-42 --revision 1 --json\n  amber breakglass status --target . --id breakglass/incident-42-restore --now 2026-09-01T00:00:00.000Z --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/review",
+      "path": "reference/cli/review.md",
+      "group": "Reference",
+      "title": "amber review",
+      "description": "Review a plan against static Amber standards and release-readiness checks.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/accept",
+      "path": "reference/cli/accept.md",
+      "group": "Reference",
+      "title": "amber accept",
+      "description": "Accept a reviewed plan and append an Amber evolution record.\n\nOptions:\n  --plan <path>       Relative path to the plan to accept.\n  --session <id>      Optional session id; prints completion-check status as a warning.\n  --strict             When used with --session, turn missing completion-check evidence into errors.\n\nExample:\n  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md\n  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md --session <session-id>",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/learnings",
+      "path": "reference/cli/learnings.md",
+      "group": "Reference",
+      "title": "amber learnings",
+      "description": "Inspect post-accept learning write-back triggers for a feature, or book the review.\nRead-only inspection by default; --reviewed books the review on the feature entry.\n\nOptions:\n  --feature <id>     Feature to inspect (defaults to the current lifecycle focus).\n  --reviewed         Book the learning review (requires --feature; overwrites any prior booking).\n  --owner <id>       Durable Amber surface that owns the learned behavior; exactly one is required when booking.\n                     Canonical owner routes:\n                       - skill: Will the durable behavior primarily teach an agent how to perform a specific task? Owns instruction documents that guide an agent through a specific task; it does not execute the task.\n                       - hook: Must this behavior be checked at a lifecycle boundary every time that boundary is reached? Owns deterministic lifecycle reminders, blockers, records, or policy checks at a host boundary.\n                       - command: Is the durable behavior best exposed as a short, fixed operator entry point? Owns a concise, explicit CLI or manual entry point that invokes a stable operation.\n                       - standard: Is the behavior a reusable set of review checks applied across changes? Owns reusable review criteria and check collections; it does not itself run a scheduler.\n                       - script: Is the behavior a deterministic extraction, validation, transformation, or formatting helper? Owns deterministic support logic for extracting, validating, transforming, or formatting data.\n                       - workflow-pack: Should the behavior be carried as a declarative bundle of reusable governance pieces? Owns declarative bundles that compose skills, standards, scripts, and approval gates without autonomous execution.\n                       - loop-contract: Does the behavior define recurring-work trigger, cadence, state, stop, and review semantics? Owns declarative repeated-work contracts for trigger, cadence, state spine, hard stops, and review gates; it is not a scheduler.\n                       - ci: Must the check run on a protected repository event or pull-request gate? Owns continuous checks that actually run on protected repository or PR events; it does not imply general target-project execution.\n  --surface <path>   Knowledge surface the review was written to. Repeatable;\n                     a single flag also accepts a comma-separated list.\n  --json             Emit the machine-readable envelope.\n\nBoundary: Amber detects and reminds; it never writes knowledge docs itself.\n\nExamples:\n  amber learnings --target .\n  amber learnings --target . --feature F001\n  amber learnings --target . --feature F001 --reviewed --owner command --surface docs/specs/f001.md",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/break-loop",
+      "path": "reference/cli/break-loop.md",
+      "group": "Reference",
+      "title": "amber break-loop",
+      "description": "Scaffold and validate a post-mortem for a defect class that recurred after a fix (recurrence >= 2).\nThe default action scaffolds; `validate` refuses placeholder content.\n\nActions:\n  (none)             Scaffold docs/quality/break-loops/<date>-<slug>.md; never overwrites an existing file.\n  validate           Check every section is filled: ids chosen, write-back surface + test\n                     anchor + runnable verification command present.\n\nOptions:\n  --issue <n>        Reference number of the recurring issue, required to scaffold (recorded only, no tracker access).\n  --title \"<t>\"      Post-mortem title, required to scaffold; needs at least one ASCII letter or digit (becomes the filename slug).\n  --recurrence <n>   How many times the class has come back, required to scaffold; must be >= 2.\n  --file <path>      Post-mortem file to validate (validate action).\n  --json             Emit the machine-readable envelope.\n\nRoot-cause taxonomy (pick one primary by id):\n  - missing-contract — The rule existed nowhere in writing, so nothing could enforce or re-teach it.\n  - cross-layer-drift — Two layers disagreed because nothing kept their shared contract in step.\n  - change-propagation-failure — A change landed in one place and never reached every place that depends on it.\n  - verification-gap — No test anchored the behavior, so the break reached mainline without failing anything.\n  - implicit-assumption — An unstated assumption held quietly until conditions changed and it stopped holding.\n\nPrevention-mechanism menu (pick one by id):\n  - contract-and-anchor — Write the contract doc section plus a mandatory test anchor that fails whenever the rule is violated. (write-back surface: docs/specs/ + tests/)\n  - parity-guard — Extend an existing coverage or parity walk so the drift itself fails CI. (write-back surface: the relevant parity test)\n  - centralized-helper — Replace scattered copies with one shared helper so the class cannot re-scatter. (write-back surface: the helper module + its unit test)\n  - checklist-item — Add the consideration to the ritual or wiki checklist where it will be re-read. (write-back surface: docs/wiki or the ritual doc)\n\nBoundary: Amber scaffolds and validates — the analysis is the operator's.\nNo issue-tracker access, no recurrence auto-detection, no execution.\n\nExamples:\n  amber break-loop --target . --issue 122 --title \"Evidence dates drift\" --recurrence 2\n  amber break-loop validate --target . --file docs/quality/break-loops/2026-08-15-Evidence-dates-drift.md",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/pack",
+      "path": "reference/cli/pack.md",
+      "group": "Reference",
+      "title": "amber pack",
+      "description": "Inspect or validate declarative workflow packs without executing them.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/profile",
+      "path": "reference/cli/profile.md",
+      "group": "Reference",
+      "title": "amber profile",
+      "description": "⚠️  DEPRECATED (legacy `inspect` action only): Inspect declarative project profiles. Will be removed in v2 — use 'amber governance' instead.\n\nNOT deprecated: `profile deployment <show|set|validate|resolve>` declares and reads the\ndeployment profile (`.amber/profile.json`) and remains the only supported surface for it;\n'amber governance' cannot set a deployment profile. Contract: docs/specs/deployment-profiles.md.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/task",
+      "path": "reference/cli/task.md",
+      "group": "Reference",
+      "title": "amber task",
+      "description": "⚠️  DEPRECATED: Prepare isolated task ledger, evidence, replay, and worktree artifacts. Will be removed in v2.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/result",
+      "path": "reference/cli/result.md",
+      "group": "Reference",
+      "title": "amber result",
+      "description": "⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/agent",
+      "path": "reference/cli/agent.md",
+      "group": "Reference",
+      "title": "amber agent",
+      "description": "⚠️  DEPRECATED: Create and control auditable worker/reviewer dispatch records without executing agent work. Will be removed in v2.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/team",
+      "path": "reference/cli/team.md",
+      "group": "Reference",
+      "title": "amber team",
+      "description": "⚠️  DEPRECATED: Inspect, install, pin, update, and roll back local team distribution metadata. Will be removed in v2.\n\nUse install --dry-run to preview .amber/team metadata writes before creating local state.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/maintenance",
+      "path": "reference/cli/maintenance.md",
+      "group": "Reference",
+      "title": "amber maintenance",
+      "description": "Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/adoption",
+      "path": "reference/cli/adoption.md",
+      "group": "Reference",
+      "title": "amber adoption",
+      "description": "⚠️  DEPRECATED: Generate, list, or index safe adoption report artifacts without modifying target repositories. Will be removed in v2 — use 'amber governance audit' instead.\n\nExamples:\n  amber adoption report --target path/to/repo --output docs/examples/project-adoption-report.md\n  amber adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle\n  amber adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md\n  amber adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md\n  amber adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run\n  amber adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/loop",
+      "path": "reference/cli/loop.md",
+      "group": "Reference",
+      "title": "amber loop",
+      "description": "Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.\nLoop status accepts one ledger JSON file or a directory and reports bounded no-progress signals without executing anything.\n\nExamples:\n  amber loop inspect --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --json\n  amber loop recommend --target . --goal \"continuous improvement\" --json\n  amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json\n  amber loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json\n  amber loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json\n  amber loop status --ledger .amber/loops/daily-amber-triage/history --json\n  amber loop validate-loop --contract path/to/contract.json --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/ledger",
+      "path": "reference/cli/ledger.md",
+      "group": "Reference",
+      "title": "amber ledger",
+      "description": "Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/route",
+      "path": "reference/cli/route.md",
+      "group": "Reference",
+      "title": "amber route",
+      "description": "Inspect, validate, and dry-run delivery routes from routes/*.route.json.\n\nSubcommands:\n  list                 List all routes (id, version, stage count).\n  inspect <id>         Print a route's stage tree and full JSON.\n  validate <file>      Validate a route file; non-zero exit on invalid.\n  test <id> --dry-run  Print the ordered stage sequence and gate points.\n\nExamples:\n  amber route list\n  amber route inspect feature-standard\n  amber route validate routes/feature-standard.route.json\n  amber route test bugfix-quick --dry-run",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/status",
+      "path": "reference/cli/status.md",
+      "group": "Reference",
+      "title": "amber status",
+      "description": "Show a curated one-line overview of repo state: git branch, Amber init status,\ninstall freshness, and scaffold/artifact/wiki drift counts. Read-only, thin\nfront-door — does NOT duplicate doctor or maintenance inspect.\n\nOptions:\n  --target <dir>     Path to the target repository.\n  --json             Emit machine-readable JSON.\n\nExamples:\n  amber status --target .\n  amber status --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/drift",
+      "path": "reference/cli/drift.md",
+      "group": "Reference",
+      "title": "amber drift",
+      "description": "CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail.",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/sync",
+      "path": "reference/cli/sync.md",
+      "group": "Reference",
+      "title": "amber sync",
+      "description": "Detect scaffold and artifact drift between installed files and shipped\ntemplates, and prepare distributed sync transport.\n\namber sync (no subcommand): drift report between installed files and\nshipped templates. Dry-run by default (no changes made). With --execute,\nrefreshes stale Amber-owned scaffold files and caches customized/\nambiguous proposals.\n\nSubcommands:\n  envelope <pack|unpack|compat|validate>\n        Pack a governed artifact into a sync envelope under\n        .amber/sync/envelopes/, or validate/unpack/compat-check one.\n  session <run|push|pull|list|replay|conflicts|approve|ledger>\n        run: pull (admit + apply) then prepare transport. push: prepare\n        transport (report-only by default; the report lists envelopes,\n        affected paths, and proposed git operations as structured,\n        schema-governed ops — schemas/sync-transport-report.schema.json).\n        push --execute --yes: ADR-0020 Stage A (F041) governed local\n        commit — git add .amber/sync/envelopes + transport decision\n        records, then git commit, behind identity, policy, single-use\n        approval, and path-and-state confinement gates; every attempt\n        is recorded in the hash-chained transport ledger\n        (.amber/sync/transport/ledger.jsonl). git push is NEVER\n        executed. approve --reviewer <name>: record the single-use\n        transport approval. ledger: verify the transport ledger chain.\n        pull/replay: apply envelopes through the admission pipeline;\n        version/identity/generation/concurrent-edit refusals are\n        recorded in .amber/sync/conflicts.jsonl. list: show envelopes.\n        conflicts: show the conflict ledger.\n\nOptions:\n  --target <dir>     Path to the target repository.\n  --execute          (drift refresh / sync session push) Refresh stale\n                     Amber-owned files, or run the governed transport\n                     commit (requires --yes + a prior approval).\n  --yes              Explicit confirmation for governed mutations\n                     (non-interactive invocations fail closed without it).\n  --json             Emit machine-readable JSON.\n\nExamples:\n  amber sync --target .\n  amber sync --target . --execute\n  amber sync session run --target .\n  amber sync session push --target .\n  amber sync session approve --reviewer <name> --target .\n  amber sync session push --execute --yes --target .\n  amber sync session ledger --target .\n  amber sync session conflicts --target .",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/migrate",
+      "path": "reference/cli/migrate.md",
+      "group": "Reference",
+      "title": "amber migrate",
+      "description": "Backfill version metadata in recognized Amber JSON artifacts, or migrate\nlegacy state and wiki naming to the Amber Protocol layout.\n\nSubcommands:\n  state        Merge legacy .harness state into .amber without overwriting.\n  wiki         Rename docs/wiki/agent/harness.md to amber.md and fix links.\n  (none)       Backfill recognized artifacts in .amber, routes, and workflow-packs.\n\nOptions:\n  --archive-legacy  Rename .harness to a timestamped backup after clean state migration.\n  --dry-run         Preview changes without writing files (artifact mode).\n\nExamples:\n  amber migrate --target <path>\n  amber migrate state --target <path>\n  amber migrate wiki --target <path>",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/governance",
+      "path": "reference/cli/governance.md",
+      "group": "Reference",
+      "title": "amber governance",
+      "description": "Create, inspect, and report governance controls for a target repository.\n\nSubcommands:\n  docs         Generate governance documents (CODE_OF_CONDUCT.md, CONTRIBUTING.md, GOVERNANCE.md).\n  evidence     Export governance evidence from sessions or tasks.\n  policy       Show governance policy (defaults and overrides).\n  audit        Generate comprehensive audit report with policy, sessions, and executions.\n  readiness    Report local governance readiness for higher-autonomy agent work.\n  report       Score the delivery loop and emit structured next actions.\n\nExamples:\n  amber governance docs --target path/to/repo\n  amber governance docs --target path/to/repo --json\n  amber governance evidence --session <id> --output evidence.md\n  amber governance evidence --task <id> --output evidence.md --json\n  amber governance policy --target path/to/repo\n  amber governance policy --target path/to/repo --json\n  amber governance audit --target path/to/repo --output audit.md\n  amber governance audit --target path/to/repo --output audit.md --since 2025-01-01\n  amber governance audit --target path/to/repo --output audit.md --json\n  amber governance readiness --target path/to/repo --json\n  amber governance readiness --target path/to/repo --output docs/governance-readiness.md\n  amber governance report --target path/to/repo\n  amber governance report --target path/to/repo --output docs/governance-report.md --confirm",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/execution",
+      "path": "reference/cli/execution.md",
+      "group": "Reference",
+      "title": "amber execution",
+      "description": "Validate execution boundaries and integration contracts.\n\nSubcommands:\n  validate-integration  Validate integration contract structure and hardstops.\n  readiness             Review plan for execution boundary violations.\n\nExamples:\n  amber execution validate-integration --contract path/to/contract.json --json\n  amber execution readiness --plan path/to/plan.md --target path/to/repo --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/security",
+      "path": "reference/cli/security.md",
+      "group": "Reference",
+      "title": "amber security",
+      "description": "Run security governance checks in report-only mode.\n\nSubcommands:\n  audit [--target <dir>] [--output <file>]  Generate a security audit report without mutating target code.\n\nExamples:\n  amber security audit --target path/to/repo\n  amber security audit --target path/to/repo --output docs/security-audit.md",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/feature",
+      "path": "reference/cli/feature.md",
+      "group": "Reference",
+      "title": "amber feature",
+      "description": "Add, list, remove features in feature_list.json, record verification evidence, and book feature paths.\n\nSubcommands:\n  add    --id <id> --title <text> [--priority <n>] [--area <area>] [--behavior <text>] [--verify <step>...] [--paths <p,p> | --path <p>]...\n         Register a new feature in feature_list.json. To be doctor-valid, pass --area, --behavior, and at least one --verify.\n  list\n         List all registered features with status.\n  remove --id <id>\n         Remove a feature from feature_list.json.\n  verify --feature <id> [--command <cmd>] [--result <text>] [--notes <text>]\n         Record verification evidence for a feature.\n  evidence --feature <id>\n         List all recorded evidence for a feature.\n  paths  --feature <id> [--path <p>]...\n         Book paths onto a feature (append-only, comma-splits each value, skips duplicates).\n         Without --path it inspects the feature's current paths read-only.\n\nExamples:\n  amber feature add --id F001 --title \"User login\" --priority 1 --area auth --behavior \"User logs in with email\" --verify \"npm test\" --paths src/auth\n  amber feature list\n  amber feature remove --id F001\n  amber feature verify --feature F001 --command \"npm test\" --result \"42 passed\"\n  amber feature evidence --feature F001\n  amber feature paths --target . --feature F001 --path src/new.js",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/clean",
+      "path": "reference/cli/clean.md",
+      "group": "Reference",
+      "title": "amber clean",
+      "description": "Remove amber-generated files from the target repository (reverse of init).\n\nOptions:\n  --dry-run    Preview which files would be removed without deleting them.\n\nExamples:\n  amber clean --target path/to/repo\n  amber clean --target path/to/repo --dry-run",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/explain",
+      "path": "reference/cli/explain.md",
+      "group": "Reference",
+      "title": "amber explain",
+      "description": "Look up Amber error codes, or regenerate the troubleshooting reference.\n\nUsage:\n  amber explain                 List every error code with its layer.\n  amber explain <code>          Show cause + fix for one code (bare suffix ok).\n  amber explain --markdown <p>  Write the error-code table to a standalone reference file.\n\nExamples:\n  amber explain\n  amber explain AMBER_E_FEATURE_NO_EVIDENCE\n  amber explain feature_no_evidence\n  amber explain --markdown docs/ERROR_CODES.md",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/hooks",
+      "path": "reference/cli/hooks.md",
+      "group": "Reference",
+      "title": "amber hooks",
+      "description": "Manage the opt-in git pre-commit governance guard.\n\nSubcommands:\n  install [--warn-only] [--force]\n        Install a .git/hooks/pre-commit guard. --warn-only never blocks; --force overwrites a foreign hook.\n  uninstall   Remove the Amber guard (restores any backed-up hook).\n  status      Report whether the guard is installed and its mode.\n  check [--warn-only]\n        Run the governance checks now (this is what the hook invokes).\n\n  breadcrumb print [--format json|text]\n        Render the per-turn <amber-workflow-state> block (read-only; default json envelope).\n  breadcrumb install [--platform claude]\n        Opt-in merge of the breadcrumb command into .claude/settings.json hooks.UserPromptSubmit.\n  breadcrumb uninstall\n        Remove the Amber-managed breadcrumb entry; foreign entries are preserved.\n  breadcrumb status\n        Report whether the breadcrumb hook is installed (and echo its command).\n\nThe breadcrumb is opt-in and never auto-installed (amber init does not add it).\nThe hook only reads governance metadata; it never runs project build/test commands.\nBypass once with: AMBER_SKIP_HOOKS=1 git commit ... (breadcrumb print is silent too).\n\nExamples:\n  amber hooks install --target .\n  amber hooks status --target .\n  amber hooks check --target .\n  amber hooks uninstall --target .\n  amber hooks breadcrumb print --target . --format text\n  amber hooks breadcrumb install --target . --platform claude\n  amber hooks breadcrumb status --target .",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/workflow",
+      "path": "reference/cli/workflow.md",
+      "group": "Reference",
+      "title": "amber workflow",
+      "description": "Assess agent-workflow effectiveness across five dimensions, separate from\ngovernance readiness. Read-only by default. See ADR-0008.\n\nSubcommands:\n  assess [--format json|markdown] [--output-dir <path>] [--no-sessions]\n        Produce a workflow-effectiveness report. Sessions (amber-native)\n        are included by default; --no-sessions emits a repository-only\n        baseline. --format json is the default output. --output-dir writes\n        the report to a file instead of stdout (assess only).\n  findings   (P2) List findings from a prior report.\n  plan --report <path> --finding <id> [--dry-run]\n        Bridge a finding to a dry-run amber plan draft (review before applying).\n  compare    (P3) Compare two reports across schema versions.\n\nNotes:\n  --json has no effect on workflow output; use --format to pick json/markdown.\n\nExamples:\n  amber workflow assess --target . --format json\n  amber workflow assess --target . --format markdown --output-dir docs/quality/\n  amber workflow assess --target . --no-sessions",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/context",
+      "path": "reference/cli/context.md",
+      "group": "Reference",
+      "title": "amber context",
+      "description": "Govern the context write and load paths (ADR-0009/0010/0015): emit distillation\ncontracts, judge agent output, verify page health, assemble task-scoped Loadouts,\nand report metrics. Amber never calls a model — an agent executes the contract.\n\nSubcommands:\n  request --page <id> [--title <t>] [--source <ref>] [--knowledge-kind <kind>] [--supersedes <id>] [--reason <r>] [--max-words <n>] [--force]\n        Scan evidence, bundle hash-bearing sources, write a distillation contract\n        to .amber/context/requests/. Sources are mutable by default; refs under\n        .amber/ and docs/adr/ are immutable (excerpt-snapshotted).\n        --source and --supersedes may repeat. --force supersedes an open request.\n  ingest --request <id> --payload <file.json>\n        Judge the agent's output: schema, citation completeness, payload-to-request\n        binding, request-owned scope, and source freshness. The matching request\n        is required for every accepted or no-change outcome.\n        A payload of {\"outcome\":\"no-change\"} rebases hashes without touching content.\n  verify [--json]\n        Health-check every page: stale / tampered / missing / obsolete / orphaned,\n        with AMBER_E_CONTEXT_* codes plus separately derived lifecycle and assurance.\n  list / show --page <id> / delete --page <id>\n        Inspect or manage accepted pages. list accepts --knowledge-kind <kind>.\n  refresh\n        Scan pages for source changes: cosmetic changes absorbed silently\n        (raw-only), real changes generate refresh requests.\n  stats [--window <n>] [--knowledge-kind <kind>]\n        Report over .amber/context/events.jsonl: filter rate, pass rate,\n        no-change rate, unknown-block share, assurance, and source density.\n        --window considers only the last <n> events (trend regression).\n  load --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]\n        Assemble a task-scoped Loadout: three target-local Required Artifacts plus\n        a freshness-gated, budgeted selection of Context Pages, written to\n        .amber/context/loadouts/<route>[-<feature>].json.\n  preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]\n        Assemble and print the same Loadout without writing files or events.\n  verify --loadout <file>\n        Re-check Required Artifacts and required-tier Pages (path and hash) right\n        before the agent loads them; missing, escaped, or changed inputs fail closed.\n  projection <status|rebuild>\n        Check or rebuild the disposable, hash-bound Context index projection.\n  benchmark --fixture <file> [--mode <smoke|full>]\n        Run deterministic Loadout quality metrics against a target-local fixture.\n  source-adapter --fixture <file> [--enable] [--allow-transcript]\n        Produce unaccepted Source Bundle candidates from the local fixture adapter.\n        Disabled by default; transcript sources require explicit opt-in and redaction.\n  retention [--older-than-days <n>]\n        Report age, reachability, lineage protection, and eligibility. Never deletes.\n\nExamples:\n  amber context request --target . --page governed-execution\n  amber context ingest --target . --request kd-2026-08-07-a3f1 --payload page.json --confirm\n  amber context verify --target . --json\n  amber context refresh --target .\n  amber context load --target . --route feature-standard --feature F015\n  amber context verify --target . --loadout .amber/context/loadouts/feature-standard-F015.json\n  amber context projection status --target .\n  amber context benchmark --target . --fixture fixtures/context-benchmark.json\n  amber context source-adapter --target . --fixture fixtures/context-source.json --enable\n  amber context retention --target . --older-than-days 90\n  amber context stats --target .",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/memory",
+      "path": "reference/cli/memory.md",
+      "group": "Reference",
+      "title": "amber memory",
+      "description": "Govern the memory write-back pipeline (Governed Memory Layer): request, ingest,\napprove, book, and abandon memory entries, plus a read-only status projection.\nAmber never writes knowledge docs itself — humans curate MEMORY.md; Amber registers.\n\nSubcommands:\n  request    Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination).\n  ingest     Mechanically admit request entries into the registry as proposals (all-or-nothing).\n  approve    Human, entry-level approval gate (--entry-id, --decision approve|reject, --reason).\n  book       Register a MEMORY.md surface hash and promote booked entries to active.\n             --ratify --claim <text> ratifies a human direct edit directly (γ-free).\n  abandon    Explicit human abandon of a request or entry (terminal ledger marker).\n  status     Read-only three-section projection (entries / gamma / alpha).\n\nBoundary: Amber detects, admits, and registers; humans curate MEMORY.md and approve.\n\nExamples:\n  amber memory status --target . --json\n  amber memory approve --target . --entry-id <id> --decision approve\n  amber memory abandon --target . --entry <id>",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/projection",
+      "path": "reference/cli/projection.md",
+      "group": "Reference",
+      "title": "amber projection",
+      "description": "Manage rebuildable read-only projections (ADR-0019 D5; ADR-0012 amendment):\nGovernance Graph, Governed Knowledge Base, and Visualization Workbench.\nProjections are derived from canonical Amber artifacts and are never canonical\nauthority — rebuild() regenerates from canonical state at any time.\n\nSubcommands:\n  rebuild --type <governance-graph|knowledge-base|visualization-workbench>\n        Rebuild from canonical artifacts: context pages (.amber/context/pages/),\n        plus committed Canonical Artifact revisions for the Governance Graph.\n  status --type <type>  Report projection state: missing, current, or drifted.\n  strict-query --scope <node> --checkpoint <sha256> --projection-version 1\n        --limit <n> --sort id --depth <0|1> [--cursor <cursor>]\n        Strict Governance Graph read: exact scope/checkpoint/version,\n        expiring cursor, and stale dependency refusal.\n  invalidate --subject <scope> --dependency <type:identity[@revision]> --reason <text>\n        Append a scoped staleness receipt; history is never rewritten.\n  list                  List all projections and their status.\n\nExamples:\n  amber projection rebuild --type governance-graph --target . --json\n  amber projection status --type knowledge-base --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/knowledge",
+      "path": "reference/cli/knowledge.md",
+      "group": "Reference",
+      "title": "amber knowledge",
+      "description": "Govern the Knowledge Base lifecycle (ADR-0009 amendment; baseline\nGoverned Knowledge Base bounded context): admission with provenance\nand explicit authorization, immutable reviewable records, freshness,\nrefresh, retirement, and reuse lineage. Queries are exact-scope and\nfail closed.\n\nSubcommands:\n  admit --page <id> --auth <authorization>\n        Admit a Knowledge Record from a canonical Context Page.\n  list                  List all Knowledge Records.\n  status --id <record-id>  Report record freshness (fresh/stale).\n  retire --id <record-id> --reason <text>\n        Retire a record explicitly.\n  query --scope <page-id>  Exact-scope query; unknown scope denied.\n  graph                 Emit the deterministic knowledge graph (F059;\n        F060 code layer): three layers (decision: adr/artifact;\n        knowledge: wiki/memory/architecture; implementation: feature/\n        code), six verbs (supersedes, builds-on, references, describes,\n        imports, anchors), dead-anchor drift findings.\n        Read-only, schema-validated (knowledge-graph.schema.json),\n        byte-identical on recompute over an unchanged tree.\n  search --query <text> [--limit <n>] [--json]\n        Read-time document index (0009): three planes — content\n        (substring over the full search surface, binaries skipped by\n        NUL-byte detection), path (every file path/name is a key,\n        curing file-name-invisibility R07/R08), and lexicon (CONTEXT.md\n        terms mechanically derived; _Avoid_ tokens findable but never\n        suggestion outputs). Boolean-hit + deterministic byte order;\n        zero weights, zero model confidence; fail-closed on empty query.\n  context-manifest      Render the context-page manifest and validate it against the committed census.\n  context-sync [--refresh]\n        Idempotently drive context request/ingest/verify for the manifest and rebuild\n        the knowledge-base projection. Existing unmanaged pages are never overwritten.\n  context-review-sample [--limit <n>] [--output <file>]\n        Emit a bounded ADR/wiki/architecture sample with source hashes, page ids,\n        verification verdicts, and excerpts for the mandatory HITL checkpoint.\n\nExamples:\n  amber knowledge admit --page p1 --auth human-approve --target . --json\n  amber knowledge status --id <record-id> --target . --json\n  amber knowledge graph --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/phase",
+      "path": "reference/cli/phase.md",
+      "group": "Reference",
+      "title": "amber phase",
+      "description": "Manage Phase 0-4 gate evidence, promotion, and rollback (#168).\nEach phase gate requires complete deterministic evidence; promotion\nrequires explicit authorization; rollback requires a checkpoint\n(destructive rollback is impossible) and records append-only lineage.\n\nSubcommands:\n  evidence --phase <phase-0..phase-4>  Show the gate evidence.\n  validate --phase <phase>  Check evidence completeness.\n  promote --phase <phase> --auth <authorization>\n        Promote with complete evidence + explicit authorization.\n  rollback --phase <phase> --checkpoint <id> [--reason <text>]\n        Roll back to a checkpoint (never destructive).\n  transitions              List append-only lineage.\n  invariants               Check invariant non-regression.\n\nExamples:\n  amber phase validate --phase phase-0 --target . --json\n  amber phase promote --phase phase-0 --auth human-approve --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/artifact",
+      "path": "reference/cli/artifact.md",
+      "group": "Reference",
+      "title": "amber artifact",
+      "description": "Admit and read Canonical Planning Artifacts (F049; ADR-0023).\nEach revision binds a human-readable Artifact Body to a\nmachine-actionable Envelope in one atomic admission, settled through\ndurable prepared/committed/aborted journal records. Only committed\nrevisions are visible; history is append-only and immutable — there\nis no in-place mutation path for a committed revision.\n\nRegistered Artifact Types (closed registry): intent, spec, plan,\ndecision, gate, policy, eval, eval-result. intent, spec, and plan\neach have a closed lifecycle of\nnamed transitions — intent: draft -> accepted via --transition\naccept; spec/plan: draft -> approved via --transition approve. A\ntransition is admitted as a new revision (superseding the head); it\nnever mutates a committed revision. A decision records an\nauthority act by a Principal (F050): its lifecycle is a single\nrecorded state (no transitions — an amended Decision is a new\nrevision of the same identity, admitted fresh), and every Decision\nrevision binds the acting Principal, verified against the\nPrincipal registry at admission time (amber principal). A gate is a\nGate Contract (F050 #228): draft -> active via --transition\nactivate, active -> retired via --transition retire; its\nmachine-actionable content rides the extensions carrier under the\ngate namespace (--extension gate.require=...), and `amber gate\nevaluate` is that content's deterministic consumer. A policy is a\nPolicy Contract (F050 #230): draft -> active via --transition\nactivate, active -> retired via --transition retire; its\ndeny-wins content rides under extensions.policy and `amber policy\nevaluate` is that content's strict-consumption consumer. Eval\ndefinitions use the same draft -> active -> retired lifecycle under\nthe eval type; eval-result artifacts are recorded immutable suite\noutcomes produced by `amber eval admit` and then referenced by normal\nreplayable Evidence receipts.\n\nTyped Trace lineage (versioned registry: refines, realizes,\nsupersedes, decides): a Spec must refine exactly one accepted Intent\nrevision and a Plan must realize exactly one approved Spec revision\n(required planning lineage; a Plan cannot realize an Intent\ndirectly — the omitted-Spec policy). A generic or unregistered\nrelation cannot satisfy required lineage, and Traces crossing\nscope boundaries are rejected. A Decision must decide exactly one\ncommitted revision of a registered type: the decides Trace\nqualifies for any registered target type, so it DECLARES the type\nitself — --trace decides:<targetType>:<identity>[@<revision>].\n\nEvery read is a verification read: show and list replay the settlement\njournal, sweep both halves of every committed pair, cross-check the\ncommitted record's content hash, and walk the trace graph for cycles.\nTampered state fails closed with stable corruption codes instead of\nbeing served; one corrupt artifact fails the whole listing. A crashed\nadmission (dangling prepared record) is settled deterministically as\naborted — journal-only recovery that never rewrites a Body or Envelope\nand stays invisible to reads.\n\nSubcommands:\n  admit --id <identity> --body <markdown>\n        Admit a new revision; returns the admission receipt.\n        --type <intent|spec|plan|decision|gate> selects the Artifact Type\n        (default intent). --expected-head <n> (or --supersedes-revision <n>)\n        declares the compare-and-swap precondition: admission fails\n        closed as a conflict when the head moved, so concurrent\n        editors cannot overwrite or duplicate a committed revision.\n        An exact duplicate retry (same Body, provenance, and expected\n        head) returns the original receipt with no new revision; the\n        same Body with different envelope content fails closed as an\n        idempotency conflict. --idempotency-key <key> is optional\n        retry metadata — reusing a key with different content fails\n        closed; keys never determine artifact identity.\n        --transition <name> applies a registered lifecycle transition\n        (the new revision carries the target state).\n        --trace <type>:<identity>[@<revision>] declares a typed Trace\n        (repeatable); the target type is derived from the registered\n        Trace contract, and the revision defaults to the target's\n        current committed head. A Trace whose contract cannot derive\n        the target type (decides) declares it instead:\n        --trace decides:<targetType>:<identity>[@<revision>].\n        --scope <tag> is an optional confinement tag — Traces are\n        confined to one scope.\n        --extension <ns>.<key>=<value> carries opaque extension data\n        in the Envelope's reserved extensions carrier (repeatable);\n        the value is JSON when it parses and a verbatim string\n        otherwise, the namespace/key split is on the first dot, and\n        a namespace or key shadowing a core Envelope field fails\n        closed as an extension collision.\n        --decision-kind <acceptance|approval|review> and --principal\n        <id> bind a Decision admission (required for --type decision,\n        rejected for every other type): the Principal is verified\n        against the registry — registered, unrevoked, inside its\n        validity window — and snapshotted into the Envelope. An\n        acceptance or approval Decision is a human-only authority\n        slot: binding a service Principal fails closed, and only a\n        review Decision may be carried by a service identity.\n  show --id <identity> [--type <type>] [--revision <n>]\n        Show a committed revision (verification read: fails closed on\n        corrupt settlement, an orphaned pair half, or a cyclic trace).\n  list                  List committed artifacts (current revision\n        each; a verification read of the whole store — one corrupt\n        artifact fails the listing).\n\nExamples:\n  amber artifact admit --id intent/login-bug --body \"# Intent: login bug\" --target . --json\n  amber artifact admit --id intent/login-bug --body \"...\" --expected-head 1 --transition accept --target .\n  amber artifact admit --type spec --id spec/login-spec --body \"...\" --trace refines:intent/login-bug --target . --json\n  amber artifact admit --type plan --id plan/login-plan --body \"...\" --trace realizes:spec/login-spec --target . --json\n  amber artifact admit --id intent/login-bug --body \"...\" --extension acme.ticket=INT-42 --target . --json\n  amber artifact admit --type decision --id decision/login-accepted --body \"...\" --decision-kind acceptance --principal alice@example.com --trace decides:spec:spec/login-spec --target . --json\n  amber artifact admit --type gate --id gate/login-gate --body \"# Gate: login readiness\" --extension gate.require='[{\"evidenceType\":\"spec/login@2\",\"assurance\":\"observed\",\"threshold\":{\"value\":80,\"comparator\":\"ge\"}}]' --extension gate.owners='[\"alice@example.com\"]' --target . --json\n  amber artifact show --id intent/login-bug --revision 1 --target . --json\n  amber artifact list --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/principal",
+      "path": "reference/cli/principal.md",
+      "group": "Reference",
+      "title": "amber principal",
+      "description": "Register, inspect, and revoke Principals — the humans and service\nidentities that can act with authority in this repository (F050).\nEvery Decision artifact (amber artifact admit --type decision) binds\nits acting Principal, verified against this registry at admission\ntime: registered, unrevoked, and inside its validity window.\n\nThe registry is governed state, not incidental metadata: an\nappend-only event ledger under .amber/principals/ (registered and\nrevoked events; no in-place mutation path) protected by a\ntamper-evident hash chain (each event binds the previous event's\nhash; a fold over an edited ledger fails closed as corruption),\nserialized by a short-lived registry write lock (a second writer\nin flight fails closed as AMBER_E_PRINCIPAL_REGISTRY_LOCK; a\nlock older than 30 s is reclaimed as stale), fail-closed on\ncorruption and on schema versions this reader does not support,\nwith a size ceiling (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES; default\n1 MiB; an append that would exceed it is refused before any\ndurable state is touched). A principal id is registered at most\nonce and revocation is terminal — a revoked id cannot be\nre-registered (revocation would otherwise be laundersable).\n\nSubcommands:\n  register --id <id> --kind <human|service>\n        Register a Principal. --role, --membership, --capability,\n        --scope, --issuer, and the validity window\n        --valid-from/--valid-to (ISO-8601 with an explicit zone;\n        half-open [from, to)) are optional qualifications; the\n        window is evaluated against the admission-time clock when\n        a Decision binds the Principal.\n  show --id <id>        Show one Principal's record and current\n        status: active | revoked | expired | not-yet-valid.\n  list                  List every registered Principal with its\n        status, in first-registration order.\n  revoke --id <id> [--reason <text>]\n        Revoke a Principal terminally. A revoked Principal can no\n        longer bind new Decisions; already-committed Decisions\n        keep their recorded Principal snapshots.\n\nExamples:\n  amber principal register --target . --id alice@example.com --kind human --role tech-lead --scope team-a --json\n  amber principal register --target . --id ci-bot --kind service --capability deploy --valid-to 2027-01-01T00:00:00Z --json\n  amber principal show --target . --id alice@example.com --json\n  amber principal list --target . --json\n  amber principal revoke --target . --id ci-bot --reason \"rotated credentials\" --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/eval",
+      "path": "reference/cli/eval.md",
+      "group": "Reference",
+      "title": "amber eval",
+      "description": "Run deterministic instruction-surface Evals (F050 Evidence; F058).\nVersion 2 contains four Evals: MCP tool descriptions, QA contract-surface\nmodel independence, the Context quote boundary, and breadcrumb authenticity.\n`eval run` is report-only; `eval admit` is the explicit F050 admission path\nthat writes canonical Eval definition/result artifacts and a replayable\nEvidence receipt. Eval is not Approval and cannot widen execution authority.\n\nSubcommands:\n  run [--suite instruction-surface]  Replay the suite against --target.\n        Exit 0 when every Eval passes; exit 1 when any Eval has findings.\n  admit --producer <principal>  Admit the suite definition/result artifacts\n        and record replayable Evidence through the normal receipt ledger.\n        Optional: --definition-id, --outcome-id, --evidence-id, --subject.\n  list                  List registered Eval identities in the suite.\n  show --id <evalId>    Show one Eval definition.\n\nExamples:\n  amber eval run --target . --json\n  amber eval admit --target . --producer ci-runner --evidence-id evidence/eval-run --yes --json\n  amber eval list --target .\n  amber eval show --id eval.instruction-surface.mcp-tool-description --target .",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/evidence",
+      "path": "reference/cli/evidence.md",
+      "group": "Reference",
+      "title": "amber evidence",
+      "description": "Record and independently verify Evidence receipts, each binding the\nfour-level Assurance contract (F050): unavailable | observed |\nreplayable | verified. A receipt records what actually ran — identity,\nproducer (a registry-verified Principal snapshot), scope, subject,\ninputs, tools, environment, time, status, and outputs — so a reviewer\ncan assess the claim, not just consume it.\n\nThe ledger is governed state, not incidental output: an append-only\nevent ledger under .amber/evidence/ (recorded and verified events; no\nin-place mutation path) protected by a tamper-evident hash chain (a\nfold over an edited ledger fails closed as corruption), serialized by\na short-lived write lock (a second writer in flight fails closed as\nAMBER_E_EVIDENCE_REGISTRY_LOCK; a lock older than 30 s is reclaimed\nas stale), with a size ceiling (AMBER_EVIDENCE_MAX_REGISTRY_BYTES;\ndefault 1 MiB; an append that would exceed it is refused before any\ndurable state is touched).\n\nA claim can never impersonate verification: \"verified\" is not\nrecordable (AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN), only an\nindependent registered Principal — one whose id differs from the\nproducer's — can append a verification event, and a producer naming\nitself as verifier fails closed (AMBER_E_EVIDENCE_SELF_VERIFICATION).\nA replayable receipt must name what it replayed via --replay-of\n(deterministic replay provenance; AMBER_E_EVIDENCE_REPLAY_OF_CONFLICT\notherwise). Effective assurance and the verifier list are derived at\nread time — a later verification changes what a read returns without\nrewriting any event. An evidence id is recorded exactly once; a re-run\nis a new receipt.\n\nSubcommands:\n  record --id <id> --producer <principal> --assurance <level> --subject <what>\n        Record one receipt. --scope, --input, --tool, --env <key=value>,\n        --outputs, --status <pass|fail> (required — the receipt states\n        its run outcome explicitly), and --replay-of (required for\n        replayable, forbidden otherwise) qualify it.\n  verify --id <id> --verifier <principal>\n        Append one independent verification event; promotes the\n        effective assurance to verified. A verification is recorded\n        exactly once per verifier (AMBER_E_EVIDENCE_ALREADY_VERIFIED).\n  show --id <id>        Show one derived record (effective assurance,\n        verifiers).\n  list                  List every derived record in first-recorded\n        order.\n\nExamples:\n  amber evidence record --target . --id evidence/run-42 --producer ci-runner --assurance replayable --replay-of eval.instruction-surface --subject eval.instruction-surface --status pass --tool node --env os=linux --outputs 'all evals pass' --json\n  amber evidence verify --target . --id evidence/run-42 --verifier reviewer-alice --json\n  amber evidence show --target . --id evidence/run-42 --json\n  amber evidence list --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/approval",
+      "path": "reference/cli/approval.md",
+      "group": "Reference",
+      "title": "amber approval",
+      "description": "Grant, revoke, consume, and inspect Approvals — the human\nauthorizations a Decision settles under (F050): scoped, expiring,\nrevocable, and single-use. One authorization can never be replayed.\n\nThe registry is governed state, not incidental metadata: an\nappend-only event ledger under .amber/approvals/ (granted, revoked,\nand consumed events; no in-place mutation path) protected by a\ntamper-evident hash chain (a fold over an edited ledger fails closed\nas corruption), serialized by a short-lived write lock (a second\nwriter in flight fails closed as AMBER_E_APPROVAL_REGISTRY_LOCK; a\nlock older than 30 s is reclaimed as stale), fail-closed on\ncorruption and on schema versions this reader does not support, with\na size ceiling (AMBER_APPROVAL_MAX_REGISTRY_BYTES; default 1 MiB; an\nappend that would exceed it is refused before any durable state is\ntouched).\n\nAn Approval is a human-only authorization slot: the approver (and the\nrevoker) are verified against the Principal registry — registered,\nunrevoked, inside their validity window — and must be human; the\nverified snapshot is frozen into the event. The validity window is\nhalf-open [validAt, validUntil) under a recorded clock source and the\nno-tolerance skew policy: at exactly validUntil the authorization is\nalready expired. validAt (when the window opens) and recordedAt (when\nthe record was written) are stored as distinct fields.\n\nConsumption is atomic with the authorized Decision's settlement: the\nconsume writer admits one Decision artifact (decisionKind approval,\nprincipal = the approval's frozen approver) and appends the consumed\nevent binding that Decision's identity and revision — if the\nadmission fails, no consumed event is written and the authorization\nstays unconsumed. A second consumer (racing or serial) fails closed\nas AMBER_E_APPROVAL_ALREADY_CONSUMED; consumption is terminal, so a\nconsumed approval can no longer be revoked. When the approval carries\na scope, the Decision is admitted with that same scope. Derived status\n(granted | revoked | consumed | expired) is computed at read time,\nnever stored.\n\nSubcommands:\n  grant --id <id> --approver <human-principal> --subject <what>\n        Grant one authorization. --valid-until <iso> is the required\n        expiry instant (ISO-8601; a date-time must carry an explicit\n        zone); --scope <tag> is an optional confinement tag.\n  revoke --id <id> --revoker <human-principal>\n        Revoke terminally (revocation is a human act; history is\n        never rewritten).\n  consume --id <id> --decision-identity <identity> --body <markdown>\n        Settle the authorization as one approval Decision.\n        --trace decides:<type>:<identity> names the artifact revision\n        the Decision decides (the Decision admission's required\n        lineage); --scope must match the approval's scope when it\n        carries one.\n  show --id <id>        Show one derived record (status, decision\n        binding when consumed).\n  list                  List every derived record in grant order.\n\nExamples:\n  amber approval grant --target . --id approval/login-42 --approver alice@example.com --subject spec/login@2 --valid-until 2027-01-31 --scope team-a --json\n  amber approval consume --target . --id approval/login-42 --decision-identity decision/login-approved --body 'Approved after review.' --trace decides:spec:spec/login --json\n  amber approval revoke --target . --id approval/login-42 --revoker alice@example.com --json\n  amber approval show --target . --id approval/login-42 --json\n  amber approval list --target . --json",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/schemas",
+      "path": "reference/schemas.md",
+      "group": "Reference",
+      "title": "Declarative JSON Schemas",
+      "description": "Overview of core JSON schemas: session, timeline, route, manifest, handoff, and action types.",
+      "layer": "A"
+    },
+    {
+      "id": "reference/action-types",
+      "path": "reference/action-types.md",
+      "group": "Reference",
+      "title": "Action Types & MCP Integration",
+      "description": "Operational ontology action types, function bindings, and safe read-only boundaries.",
+      "layer": "A"
+    },
+    {
+      "id": "troubleshooting/index",
+      "path": "troubleshooting/index.md",
+      "group": "Troubleshooting",
+      "title": "Troubleshooting Hub: Error → Fix",
+      "description": "Single authoritative resolution matrix for common Amber Protocol setup and session errors.",
+      "layer": "A"
+    },
+    {
+      "id": "about/index",
+      "path": "about/index.md",
+      "group": "About",
+      "title": "About Amber Protocol",
+      "description": "Mission, design principles, and repository-local governance architecture.",
+      "layer": "A"
+    },
+    {
+      "id": "about/version-history",
+      "path": "about/version-history.md",
+      "group": "About",
+      "title": "Version History & Migration Notes",
+      "description": "Curated version history, breaking changes, support matrix, and notes on retired legacy commands.",
+      "layer": "A"
+    },
+    {
+      "id": "about/boundaries",
+      "path": "about/boundaries.md",
+      "group": "About",
+      "title": "Safety Boundaries & Privacy Posture",
+      "description": "Formal statement of safety constraints: zero telemetry, no autonomous execution, no remote agent dispatch.",
+      "layer": "A"
+    },
+    {
+      "id": "about/contributing",
+      "path": "about/contributing.md",
+      "group": "About",
+      "title": "Documentation Ownership & Contribution",
+      "description": "How to contribute to public documentation, CODEOWNERS, and A/B/C corpus layering rules.",
+      "layer": "A"
+    }
+  ],
+  "denyPatterns": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "MEMORY.md",
+    "LOOP.md",
+    ".amber/**",
+    "docs/agents/**",
+    "docs/reference/week-c6-settings-draft/**",
+    "docs/plans/**",
+    "docs/reviews/**",
+    "docs/quality/**",
+    "docs/research/**"
+  ]
+}

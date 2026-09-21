@@ -34,7 +34,13 @@ function setGitAdapterForThisModule(adapter) {
 
 // Personal, per-developer Amber state that should not be committed to a shared
 // repository. The advisor flags any of these not already covered by .gitignore.
-const PERSONAL_PATTERNS = [".amber/sessions/", "PROGRESS.md", "session-handoff.md", "notes.md"];
+//
+// The patterns are root-anchored on purpose. An unanchored basename rule also
+// matches a same-named file anywhere in the tree, so `MEMORY.md` quietly
+// swallowed the docs site's generated `reference/cli/memory.md` on
+// case-insensitive filesystems — a committed artifact that no longer appeared
+// in `git status` at all.
+const PERSONAL_PATTERNS = ["/.amber/sessions/", "/PROGRESS.md", "/session-handoff.md", "/notes.md"];
 
 const REQUIRED_DOCS = ["docs/wiki/product/overview.md", "docs/wiki/engineering/verification.md"];
 
@@ -113,11 +119,18 @@ function generateCodeReviewAdvice(teamMetrics, _workflowDetection) {
 
 // A gitignore line covers a pattern when it matches exactly, or when it is a
 // parent directory rule — `.amber/` (or `.amber`) covers `.amber/sessions/`.
+// Root anchoring is ignored while comparing: an unanchored `notes.md` also
+// ignores the root file, so it already gives the protection the anchored advice
+// asks for, and reporting it as missing would be a false positive on every
+// repository that adopted the pre-anchoring advice.
 function isCovered(pattern, rules) {
+	const bare = (rule) => rule.replace(/^\//, "");
+	const target = bare(pattern);
 	return rules.some((rule) => {
-		if (rule === pattern) return true;
-		const dir = rule.endsWith("/") ? rule : `${rule}/`;
-		return pattern.startsWith(dir);
+		const normalized = bare(rule);
+		if (normalized === target) return true;
+		const dir = normalized.endsWith("/") ? normalized : `${normalized}/`;
+		return target.startsWith(dir);
 	});
 }
 

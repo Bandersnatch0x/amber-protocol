@@ -243,6 +243,16 @@ These surfaces are the protocol's reference implementation: governed verb stages
 | DeepSeek Harness (`dsh`) overlay    | [dsh/README.md](./dsh/README.md)                                                                                                                                                           |
 | Contributing                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                                       |
 
+The public documentation site (`apps/docs`) provides reader-focused guides, concepts, and authoritative single-source CLI references with 100% offline local search:
+
+```bash
+npm run docs:build      # Build the static documentation site
+npm run docs:verify     # Run the mechanical verification seam
+npm run docs:gen        # Generate CLI reference pages from command registry
+npm run docs:gen:check  # Verify zero drift between code and CLI reference docs
+npm run docs:test       # Run public documentation test suite
+```
+
 The optional Web Viewer (`apps/web`) is a journey-aware inspector. It shows the current J0–J5 stage, the next governed action, active sessions, pending gates, and repository-local evidence. It reflects Amber state; it does not create a second workflow or replace the Agent/CLI authority surface.
 
 ```bash

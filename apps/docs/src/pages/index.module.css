@@ -1,0 +1,497 @@
+/* Amber Protocol Landing Page Styles - Unified High-Craft Governance Aesthetic */
+
+.mainContainer {
+  position: relative;
+  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.05) 0%, transparent 60%),
+              linear-gradient(180deg, rgba(5, 7, 13, 0.98) 0%, rgba(9, 13, 22, 1) 100%);
+  min-height: 100vh;
+  color: #f8fafc;
+  overflow: hidden;
+}
+
+[data-theme='light'] .mainContainer {
+  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.08) 0%, transparent 60%),
+              linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #0f172a;
+}
+
+/* 2. Diagram Section */
+.diagramSection {
+  padding: 3rem 1.5rem 2rem;
+  max-width: 1240px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+/* 3. Section Common Header */
+.section {
+  padding: 5rem 1.5rem;
+  max-width: 1240px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 3.5rem;
+}
+
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.85rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 9999px;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-size: 2.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+[data-theme='light'] .sectionTitle {
+  color: #0f172a;
+}
+
+.sectionSubtitle {
+  font-size: 1.05rem;
+  color: #94a3b8;
+  max-width: 680px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+[data-theme='light'] .sectionSubtitle {
+  color: #475569;
+}
+
+/* 4. Core Architecture Pillars Grid */
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.75rem;
+}
+
+@media (max-width: 1024px) {
+  .grid3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pillarCard {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 12px;
+  padding: 2rem 1.75rem;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+
+.pillarCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.8) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.pillarCard:hover::before {
+  opacity: 1;
+}
+
+[data-theme='light'] .pillarCard {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.pillarCard:hover {
+  border-color: rgba(245, 158, 11, 0.6);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 158, 11, 0.1);
+}
+
+[data-theme='light'] .pillarCard:hover {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08), 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+.pillarCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.pillarIconBox {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pillarIcon {
+  width: 22px;
+  height: 22px;
+  color: #f59e0b;
+}
+
+.pillarTag {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.675rem;
+  font-weight: 700;
+  color: rgba(245, 158, 11, 0.85);
+  letter-spacing: 0.05em;
+}
+
+.pillarTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.75rem;
+  color: #ffffff;
+}
+
+[data-theme='light'] .pillarTitle {
+  color: #0f172a;
+}
+
+.pillarBody {
+  font-size: 0.925rem;
+  line-height: 1.6;
+  color: #94a3b8;
+  flex-grow: 1;
+  margin-bottom: 1.5rem;
+}
+
+[data-theme='light'] .pillarBody {
+  color: #475569;
+}
+
+.pillarLink {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f59e0b;
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.pillarLink:hover {
+  color: #fbbf24;
+  transform: translateX(2px);
+}
+
+/* 5. Governed Workflow Pipeline */
+.workflowSection {
+  background: rgba(9, 13, 22, 0.6);
+  border-top: 1px solid rgba(245, 158, 11, 0.15);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  padding: 5.5rem 1.5rem;
+  position: relative;
+}
+
+[data-theme='light'] .workflowSection {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.workflowContainer {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.pipelineGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.25rem;
+  position: relative;
+}
+
+@media (max-width: 1024px) {
+  .pipelineGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .pipelineGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pipelineItem {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 12px;
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+[data-theme='light'] .pipelineItem {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.pipelineItem:hover {
+  border-color: #f59e0b;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 15px rgba(245, 158, 11, 0.1);
+}
+
+.pipelineItemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.pipelineStepNum {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #f59e0b;
+}
+
+.pipelinePhaseTag {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.pipelineTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.75rem;
+  color: #ffffff;
+}
+
+[data-theme='light'] .pipelineTitle {
+  color: #0f172a;
+}
+
+.pipelineCodeBox {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  margin-bottom: 0.85rem;
+  overflow-x: auto;
+}
+
+[data-theme='light'] .pipelineCodeBox {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.pipelineCodeBox code {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.725rem;
+  color: #fbbf24;
+  white-space: nowrap;
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+
+[data-theme='light'] .pipelineCodeBox code {
+  color: #b45309;
+}
+
+.pipelineDesc {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+[data-theme='light'] .pipelineDesc {
+  color: #475569;
+}
+
+/* 6. Bottom Adoption CTA */
+.ctaBanner {
+  background: radial-gradient(circle at 50% 30%, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.95) 75%),
+              rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 20px;
+  padding: 4.5rem 2rem;
+  text-align: center;
+  margin: 2rem auto 3rem;
+  max-width: 1080px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 158, 11, 0.08);
+}
+
+[data-theme='light'] .ctaBanner {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), 0 0 20px rgba(245, 158, 11, 0.1);
+}
+
+.ctaHeader {
+  max-width: 680px;
+  margin: 0 auto 2rem;
+}
+
+.ctaTitle {
+  font-size: 2.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+[data-theme='light'] .ctaTitle {
+  color: #0f172a;
+}
+
+.ctaDesc {
+  font-size: 1.1rem;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+[data-theme='light'] .ctaDesc {
+  color: #475569;
+}
+
+.ctaQuickBox {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2.25rem;
+}
+
+.quickstartSnippet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #05070d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 0.8rem 1.6rem;
+  border-radius: 10px;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.95rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='light'] .quickstartSnippet {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.quickPrompt {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+.quickCommand {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.ctaActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  background: #f59e0b;
+  color: #000000 !important;
+  font-weight: 800;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.8rem;
+  border-radius: 8px;
+  text-decoration: none !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+  cursor: pointer;
+}
+
+.primaryBtn:hover {
+  background: #fbbf24;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(245, 158, 11, 0.55);
+}
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  background: rgba(30, 41, 59, 0.8);
+  color: #f8fafc !important;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+[data-theme='light'] .secondaryBtn {
+  background: #f1f5f9;
+  color: #0f172a !important;
+  border-color: #cbd5e1;
+}
+
+.secondaryBtn:hover {
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+  background: rgba(245, 158, 11, 0.12);
+  transform: translateY(-2px);
+}
+
