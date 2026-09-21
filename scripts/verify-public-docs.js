@@ -80,7 +80,9 @@ function verifyBuildAndPageCount(manifest) {
 		if (!allowlistPaths.has(rel) && !rel.startsWith("assets/")) {
 			// Check if it's a valid subsection index
 			const isAllowedSub = Array.from(allowlistPaths).some(
-				(allowed) => allowed === rel || allowed.replace(/\/index\.html$/, "") === rel.replace(/\/index\.html$/, ""),
+				(allowed) =>
+					allowed === rel ||
+					allowed.replace(/\/index\.html$/, "") === rel.replace(/\/index\.html$/, ""),
 			);
 			if (!isAllowedSub) {
 				errors.push(
@@ -510,12 +512,7 @@ function verifyReaderScenarios() {
 	const errors = [];
 
 	// Scenario 1: First-Time Reader Journey
-	const firstWorkflowPath = path.join(
-		DOCS_DIR,
-		"docs",
-		"start-here",
-		"first-governed-workflow.md",
-	);
+	const firstWorkflowPath = path.join(DOCS_DIR, "docs", "start-here", "first-governed-workflow.md");
 	const boundariesPath = path.join(DOCS_DIR, "docs", "about", "boundaries.md");
 
 	if (!fs.existsSync(firstWorkflowPath)) {
@@ -539,12 +536,27 @@ function verifyReaderScenarios() {
 		errors.push("Scenario 1 failed: about/boundaries.md does not exist.");
 	} else {
 		const boundContent = fs.readFileSync(boundariesPath, "utf8");
-		if (
-			!boundContent.includes("No dynamic workflow execution") &&
-			!boundContent.includes("Zero Dynamic Execution")
-		) {
+		// What matters is the claim, not the sentence. The new-reader trial asks a
+		// reader to say back what Amber does NOT do, so the gate asserts those
+		// claims are on the page; matching is case- and whitespace-insensitive so
+		// an editorial rewrite of a still-true statement cannot fail the build.
+		// The patterns stay literal (no wildcards) — a loose pattern would pass
+		// vacuously and stop being evidence of anything.
+		const normalizedContent = boundContent.toLowerCase().replace(/\s+/g, " ");
+		const nonExecutionClaims = [
+			["dynamic workflow execution", /no dynamic workflow execution|zero dynamic execution/],
+			["automatic build or test execution", /does not automatically run tests/],
+			["live agent dispatch", /no live agent is ever started/],
+			["scheduled loop runs", /schedules a loop run/],
+			["rewriting existing project documents", /skip existing user-authored files/],
+		];
+		const missingClaims = nonExecutionClaims
+			.filter(([, pattern]) => !pattern.test(normalizedContent))
+			.map(([claim]) => claim);
+
+		if (missingClaims.length > 0) {
 			errors.push(
-				"Scenario 1 failed: Safety and non-execution boundary is not clearly stated in boundaries.md.",
+				`Scenario 1 failed: boundaries.md does not state the non-execution boundary for: ${missingClaims.join(", ")}.`,
 			);
 		}
 	}
@@ -557,15 +569,11 @@ function verifyReaderScenarios() {
 			const testCommands = ["audit", "gate", "handoff"];
 			for (const cmd of testCommands) {
 				if (!indexContent.includes(cmd)) {
-					errors.push(`Scenario 2 failed: Command "${cmd}" not discoverable in local search index.`);
+					errors.push(
+						`Scenario 2 failed: Command "${cmd}" not discoverable in local search index.`,
+					);
 				}
-				const cmdDocPath = path.join(
-					BUILD_DIR,
-					"reference",
-					"cli",
-					cmd,
-					"index.html",
-				);
+				const cmdDocPath = path.join(BUILD_DIR, "reference", "cli", cmd, "index.html");
 				if (!fs.existsSync(cmdDocPath)) {
 					errors.push(
 						`Scenario 2 failed: Exact reference landing page for "${cmd}" missing at ${cmdDocPath}.`,
