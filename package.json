@@ -39,6 +39,7 @@
 		"check": "node scripts/run-tests.js",
 		"doctor": "node scripts/amber.js doctor --target .",
 		"handoff": "node scripts/amber.js handoff --target .",
+		"contracts:validate": "node scripts/amber.js contracts validate --target .",
 		"encoding": "node scripts/validate-encoding.js",
 		"manifests": "node scripts/validate-manifests.js --target .",
 		"version:sync": "node scripts/sync-version.js",

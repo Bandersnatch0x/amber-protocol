@@ -28,6 +28,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"init",
 	"audit",
 	"wiki",
+	"contracts",
 	"doctor",
 	"handoff",
 	"plan",

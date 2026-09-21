@@ -1,0 +1,28 @@
+{
+	"actionTypeId": "amber.contracts.validate",
+	"version": 1,
+	"title": "Contract registry validation",
+	"goal": "Validate the repository-local distributed-governance contract registry without mutating anything.",
+	"mode": "dry-run",
+	"parameters": {},
+	"submissionCriteria": [],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#contract-registry",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "contracts",
+		"subcommand": "validate",
+		"args": []
+	}
+}

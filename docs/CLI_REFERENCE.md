@@ -473,6 +473,16 @@ node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/la
 
 ## Utility Commands
 
+### contracts validate
+
+Validate the distributed-governance contract registry:
+
+```bash
+node scripts/amber.js contracts validate --target . [--json]
+```
+
+Read-only, offline, and repository-local. It validates schema, inventory, compatibility matrix, and evidence identifiers.
+
 ### init
 
 Initialize Amber structure:

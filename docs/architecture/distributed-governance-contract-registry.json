@@ -1,0 +1,1004 @@
+{
+	"registryId": "amber.distributed-governance.contract-registry",
+	"registryVersion": "1.1.0",
+	"sourceBaseline": "docs/architecture/distributed-governance-baseline.md",
+	"authorityBoundaries": {
+		"repositoryLocalAuthority": true,
+		"offlineCapability": true,
+		"executesAnything": false
+	},
+	"versionDomains": [
+		{
+			"id": "runtime-protocol",
+			"title": "Runtime Protocol",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": [
+				"0.9.0"
+			],
+			"refusedVersions": [
+				"0.8.0"
+			]
+		},
+		{
+			"id": "contract-schema",
+			"title": "Contract and Schema",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": [
+				"0.9.0"
+			],
+			"refusedVersions": [
+				"0.8.0"
+			]
+		},
+		{
+			"id": "capability",
+			"title": "Capability",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": [
+				"0.9.0"
+			],
+			"refusedVersions": [
+				"0.8.0"
+			]
+		},
+		{
+			"id": "projection-rule",
+			"title": "Projection Rule",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": [
+				"0.9.0"
+			],
+			"refusedVersions": [
+				"0.8.0"
+			]
+		},
+		{
+			"id": "component-generation",
+			"title": "Component Generation",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": [
+				"0.9.0"
+			],
+			"refusedVersions": [
+				"0.8.0"
+			]
+		},
+		{
+			"id": "source-generation",
+			"title": "Source Generation",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": [
+				"0.9.0"
+			],
+			"refusedVersions": [
+				"0.8.0"
+			]
+		}
+	],
+	"boundedContexts": [
+		{
+			"id": "amber-core",
+			"title": "Amber Core"
+		},
+		{
+			"id": "sync-runtime",
+			"title": "Sync Runtime"
+		},
+		{
+			"id": "governance-graph",
+			"title": "Governance Graph"
+		},
+		{
+			"id": "governed-knowledge-base",
+			"title": "Governed Knowledge Base"
+		},
+		{
+			"id": "visualization-workbench",
+			"title": "Visualization Workbench"
+		},
+		{
+			"id": "organization-control-plane",
+			"title": "Organization Control Plane"
+		}
+	],
+	"entries": [
+		{
+			"id": "amber.distributed-governance.contract.sync-envelope",
+			"kind": "contract",
+			"title": "Sync Envelope",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.domain-fact",
+			"kind": "contract",
+			"title": "Domain Fact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.domain-event",
+			"kind": "contract",
+			"title": "Domain Event",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.sync-control-record",
+			"kind": "contract",
+			"title": "Sync Control Record",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.sync-session",
+			"kind": "contract",
+			"title": "Sync Session",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.sync-operation",
+			"kind": "contract",
+			"title": "Sync Operation",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.checkpoint",
+			"kind": "contract",
+			"title": "Checkpoint",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.ownership-handoff",
+			"kind": "contract",
+			"title": "Ownership Handoff",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.conflict",
+			"kind": "contract",
+			"title": "Conflict",
+			"versionDomain": "contract-schema",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.resolution",
+			"kind": "contract",
+			"title": "Resolution",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.rejection",
+			"kind": "contract",
+			"title": "Rejection",
+			"versionDomain": "contract-schema",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.corruption",
+			"kind": "contract",
+			"title": "Corruption",
+			"versionDomain": "contract-schema",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.read-snapshot",
+			"kind": "contract",
+			"title": "Read Snapshot",
+			"versionDomain": "contract-schema",
+			"owningContext": "visualization-workbench",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.query-contract",
+			"kind": "contract",
+			"title": "Query Contract",
+			"versionDomain": "contract-schema",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.projection-query-envelope",
+			"kind": "contract",
+			"title": "Projection Query Envelope",
+			"versionDomain": "projection-rule",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.projection-read-receipt",
+			"kind": "contract",
+			"title": "Projection Read Receipt",
+			"versionDomain": "projection-rule",
+			"owningContext": "visualization-workbench",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.knowledge-candidate",
+			"kind": "contract",
+			"title": "Knowledge Candidate",
+			"versionDomain": "contract-schema",
+			"owningContext": "governed-knowledge-base",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.knowledge-record",
+			"kind": "contract",
+			"title": "Knowledge Record",
+			"versionDomain": "contract-schema",
+			"owningContext": "governed-knowledge-base",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.context-page",
+			"kind": "contract",
+			"title": "Context Page",
+			"versionDomain": "source-generation",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.projection-generation",
+			"kind": "contract",
+			"title": "Projection Generation",
+			"versionDomain": "component-generation",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.person-identity",
+			"kind": "contract",
+			"title": "Person Identity",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.agent-identity",
+			"kind": "contract",
+			"title": "Agent Identity",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.tenant-and-organization-structure",
+			"kind": "contract",
+			"title": "Tenant and Organization Structure",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.team",
+			"kind": "contract",
+			"title": "Team",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.membership",
+			"kind": "contract",
+			"title": "Membership",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.repository-registration",
+			"kind": "contract",
+			"title": "Repository Registration",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.role-assignment",
+			"kind": "contract",
+			"title": "Role Assignment",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.policy-assignment",
+			"kind": "contract",
+			"title": "Policy Assignment",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.contract.administrative-fencing",
+			"kind": "contract",
+			"title": "Administrative Fencing",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"bindings": {
+				"schema": "contract-schema:1.0.0",
+				"type": "runtime-protocol:1.0.0",
+				"capability": "capability:1.0.0",
+				"projectionRule": "projection-rule:1.0.0",
+				"componentGeneration": "component-generation:1.0.0",
+				"sourceGeneration": "source-generation:1.0.0"
+			}
+		},
+		{
+			"id": "amber.distributed-governance.artifact.work",
+			"kind": "artifact",
+			"title": "Work Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "work"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.decision",
+			"kind": "artifact",
+			"title": "Decision Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "decision"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.evidence",
+			"kind": "artifact",
+			"title": "Evidence Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "evidence"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.approval",
+			"kind": "artifact",
+			"title": "Approval Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "approval"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.context",
+			"kind": "artifact",
+			"title": "Context Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "context"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.learning",
+			"kind": "artifact",
+			"title": "Learning Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "learning"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.ledger",
+			"kind": "artifact",
+			"title": "Ledger Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "ledger"
+		},
+		{
+			"id": "amber.distributed-governance.artifact.acceptance",
+			"kind": "artifact",
+			"title": "Acceptance Artifact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				154
+			],
+			"artifactType": "acceptance"
+		},
+		{
+			"id": "amber.distributed-governance.invariant.repository-local-authority",
+			"kind": "invariant",
+			"title": "Repository-local authority",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				153,
+				157
+			],
+			"adrs": [
+				"ADR-0001"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.offline-operation",
+			"kind": "invariant",
+			"title": "Offline operation",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				150,
+				153
+			],
+			"adrs": [
+				"ADR-0001",
+				"ADR-0011"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.optional-non-executing-sync-runtime",
+			"kind": "invariant",
+			"title": "Optional non-executing Sync Runtime",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				149,
+				157
+			],
+			"adrs": [
+				"ADR-0001",
+				"ADR-0005"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"kind": "invariant",
+			"title": "One versioned protocol and artifact model",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				149,
+				152
+			],
+			"adrs": [
+				"ADR-0012"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"kind": "invariant",
+			"title": "Rebuildable read-only projections",
+			"versionDomain": "projection-rule",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				148,
+				150,
+				156,
+				157
+			],
+			"adrs": [
+				"ADR-0007",
+				"ADR-0012"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"kind": "invariant",
+			"title": "Exact-scope deny-wins authorization and privacy minimization",
+			"versionDomain": "capability",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				151,
+				156
+			],
+			"adrs": [
+				"ADR-0011"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.fail-closed-degraded-read-only",
+			"kind": "invariant",
+			"title": "Fail-closed degraded read-only",
+			"versionDomain": "projection-rule",
+			"owningContext": "visualization-workbench",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				150,
+				151,
+				156
+			],
+			"adrs": [
+				"ADR-0011"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"kind": "invariant",
+			"title": "Append-only lineage and immutable records",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				148,
+				151,
+				155
+			],
+			"adrs": [
+				"ADR-0004"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"kind": "invariant",
+			"title": "Source and Resolution ownership",
+			"versionDomain": "source-generation",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				148,
+				149,
+				155
+			],
+			"adrs": [
+				"ADR-0009",
+				"ADR-0012"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.conflict-preservation-and-governed-resolution",
+			"kind": "invariant",
+			"title": "Conflict preservation and governed resolution",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				148,
+				155
+			],
+			"adrs": [
+				"ADR-0004",
+				"ADR-0015"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"kind": "invariant",
+			"title": "Tenant and Repository isolation",
+			"versionDomain": "capability",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				146,
+				151,
+				152
+			],
+			"adrs": [
+				"ADR-0012"
+			]
+		},
+		{
+			"id": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"kind": "invariant",
+			"title": "No hidden authority or execution",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"disposition": "supported",
+			"sourceResolutions": [
+				145,
+				147,
+				149,
+				153,
+				154,
+				157
+			],
+			"adrs": [
+				"ADR-0001",
+				"ADR-0003",
+				"ADR-0005"
+			]
+		}
+	],
+	"compatibility": {
+		"outcomePrecedence": [
+			"unknown",
+			"refused",
+			"deprecated",
+			"supported"
+		],
+		"cases": [
+			{
+				"caseId": "DG-COMPAT-SUPPORTED-001",
+				"description": "All six version domains are at their current supported versions.",
+				"combination": {
+					"runtimeProtocol": "1.0.0",
+					"contractSchema": "1.0.0",
+					"capability": "1.0.0",
+					"projectionRule": "1.0.0",
+					"componentGeneration": "1.0.0",
+					"sourceGeneration": "1.0.0"
+				},
+				"expectedOutcome": "supported",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.supported.v1"
+			},
+			{
+				"caseId": "DG-COMPAT-DEPRECATED-001",
+				"description": "All six version domains are in their declared deprecated ranges.",
+				"combination": {
+					"runtimeProtocol": "0.9.0",
+					"contractSchema": "0.9.0",
+					"capability": "0.9.0",
+					"projectionRule": "0.9.0",
+					"componentGeneration": "0.9.0",
+					"sourceGeneration": "0.9.0"
+				},
+				"expectedOutcome": "deprecated",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.deprecated.v1"
+			},
+			{
+				"caseId": "DG-COMPAT-REFUSED-001",
+				"description": "All six version domains are in their declared refused ranges.",
+				"combination": {
+					"runtimeProtocol": "0.8.0",
+					"contractSchema": "0.8.0",
+					"capability": "0.8.0",
+					"projectionRule": "0.8.0",
+					"componentGeneration": "0.8.0",
+					"sourceGeneration": "0.8.0"
+				},
+				"expectedOutcome": "refused",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.refused.v1"
+			},
+			{
+				"caseId": "DG-COMPAT-UNKNOWN-001",
+				"description": "The Runtime Protocol version is not registered, so the combination fails closed as unknown.",
+				"combination": {
+					"runtimeProtocol": "2.0.0",
+					"contractSchema": "1.0.0",
+					"capability": "1.0.0",
+					"projectionRule": "1.0.0",
+					"componentGeneration": "1.0.0",
+					"sourceGeneration": "1.0.0"
+				},
+				"expectedOutcome": "unknown",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.unknown.v1"
+			}
+		]
+	}
+}

@@ -120,6 +120,14 @@ const COMMAND_CAPABILITIES = {
 		edits: [],
 		sideEffects: [],
 	},
+	"contracts/validate": {
+		effect: "read",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
+	},
 	"governance/report": {
 		effect: "read",
 		approver: "system",

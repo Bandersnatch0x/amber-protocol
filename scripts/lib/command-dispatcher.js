@@ -79,6 +79,7 @@ const { inferNext } = require("./next-command");
 const { backfillVersioning, migrateManifests } = require("./migrate-command");
 const { migrateState, migrateWiki } = require("./state-migration");
 const { validateWorkflowPack, validateLoopContract } = require("./core/execution-validator");
+const { loadRegistry, validateRegistry } = require("./distributed-governance-contract-registry");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -311,6 +312,40 @@ async function handleSession(args) {
 		...(sessionResult.sessionId ? { sessionId: sessionResult.sessionId } : {}),
 	};
 	return { result, exitCode: sessionResult.exitCode, bypassPrint: !args.json };
+}
+
+function handleContracts(args) {
+	const action = args._?.[0];
+	if (action !== "validate") {
+		return {
+			result: {
+				target: resolveTarget(args),
+				readOnly: true,
+				errors: ["contracts requires validate."],
+				warnings: [],
+			},
+			exitCode: 1,
+		};
+	}
+
+	const target = resolveTarget(args);
+	const registryPath = path.join(
+		target,
+		"docs",
+		"architecture",
+		"distributed-governance-contract-registry.json",
+	);
+	const validation = validateRegistry(loadRegistry(registryPath));
+	return {
+		result: {
+			target,
+			registryPath,
+			readOnly: true,
+			...validation,
+			warnings: [],
+		},
+		exitCode: validation.valid ? 0 : 1,
+	};
 }
 
 function handleGovernance(args) {
@@ -1189,6 +1224,7 @@ const COMMAND_HANDLERS = {
 	route: handleRoute,
 	session: handleSession,
 	migrate: handleMigrate,
+	contracts: handleContracts,
 	governance: handleGovernance,
 	execution: handleExecution,
 	security: handleSecurity,

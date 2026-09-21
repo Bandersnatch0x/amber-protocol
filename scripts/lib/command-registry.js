@@ -13,6 +13,7 @@ const TYPED_COMMAND_NAMES = new Set([
 	"session",
 	"route",
 	"context",
+	"contracts",
 	"governance",
 	"ledger",
 	"loop",
@@ -23,6 +24,20 @@ const TYPED_COMMAND_NAMES = new Set([
 // joined with newlines. Command order is an external CLI contract, while help,
 // output policy, and handler binding remain owned by this registration module.
 const COMMAND_HELP = {
+	contracts: [
+		"Validate the repository-local distributed-governance contract registry.",
+		"",
+		"Subcommands:",
+		"  validate             Validate the registry schema, inventory, compatibility matrix, and evidence identifiers.",
+		"",
+		"Options:",
+		"  --target <repo>       Path to the target repository.",
+		"  --json                Emit the validation result as JSON.",
+		"",
+		"Examples:",
+		"  amber contracts validate --target .",
+		"  amber contracts validate --target . --json",
+	],
 	init: "Create missing Amber starter files without overwriting existing files. Supports --dry-run.",
 	audit:
 		"Inspect an existing project without writing files. Supports --summary for bounded text output.",
@@ -762,6 +777,7 @@ const COMMAND_OUTPUT = {
 		usage:
 			"Usage: amber init --target <repo> [--with-wiki] [--skip-detection] [--json] [--dry-run]",
 	},
+	contracts: { usage: "Usage: amber contracts validate --target <repo> [--json]" },
 	audit: { summary: true },
 	wiki: { dryRun: true },
 	plan: {
@@ -852,6 +868,7 @@ const COMMANDS = Object.freeze([
 	"init",
 	"audit",
 	"wiki",
+	"contracts",
 	"doctor",
 	"handoff",
 	"plan",
@@ -891,6 +908,7 @@ const TIER_BY_COMMAND = {
 	init: "core",
 	audit: "core",
 	wiki: "core",
+	contracts: "core",
 	doctor: "core",
 	handoff: "core",
 	plan: "core",

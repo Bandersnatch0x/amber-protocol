@@ -1544,7 +1544,7 @@ test("unknown command returns a clear error", () => {
 
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /Unknown command: work/);
-	assert.match(result.stderr, /init, audit, wiki, doctor, handoff, plan, gate/);
+	assert.match(result.stderr, /init, audit, wiki, contracts, doctor, handoff, plan, gate/);
 });
 
 test("help scopes dry-run to commands that support it", () => {

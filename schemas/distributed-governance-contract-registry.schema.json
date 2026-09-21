@@ -1,0 +1,231 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/distributed-governance-contract-registry.schema.json",
+	"title": "Amber Distributed Governance Contract Registry",
+	"description": "Versioned inventory of distributed-governance public contracts, artifacts, and invariants, together with the deterministic compatibility matrix.",
+	"type": "object",
+	"required": [
+		"registryId",
+		"registryVersion",
+		"sourceBaseline",
+		"authorityBoundaries",
+		"versionDomains",
+		"boundedContexts",
+		"entries",
+		"compatibility"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"registryId": { "const": "amber.distributed-governance.contract-registry" },
+		"registryVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+		"sourceBaseline": { "const": "docs/architecture/distributed-governance-baseline.md" },
+		"authorityBoundaries": {
+			"type": "object",
+			"required": ["repositoryLocalAuthority", "offlineCapability", "executesAnything"],
+			"additionalProperties": false,
+			"properties": {
+				"repositoryLocalAuthority": { "const": true },
+				"offlineCapability": { "const": true },
+				"executesAnything": { "const": false }
+			}
+		},
+		"versionDomains": {
+			"type": "array",
+			"minItems": 6,
+			"items": {
+				"type": "object",
+				"required": ["id", "title", "currentVersion", "deprecatedVersions", "refusedVersions"],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"enum": [
+							"runtime-protocol",
+							"contract-schema",
+							"capability",
+							"projection-rule",
+							"component-generation",
+							"source-generation"
+						]
+					},
+					"title": { "type": "string", "minLength": 1 },
+					"currentVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+					"deprecatedVersions": {
+						"type": "array",
+						"items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+					},
+					"refusedVersions": {
+						"type": "array",
+						"items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+					}
+				}
+			}
+		},
+		"boundedContexts": {
+			"type": "array",
+			"minItems": 6,
+			"items": {
+				"type": "object",
+				"required": ["id", "title"],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"enum": [
+							"amber-core",
+							"sync-runtime",
+							"governance-graph",
+							"governed-knowledge-base",
+							"visualization-workbench",
+							"organization-control-plane"
+						]
+					},
+					"title": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"entries": {
+			"type": "array",
+			"minItems": 49,
+			"items": {
+				"type": "object",
+				"required": [
+					"id",
+					"kind",
+					"title",
+					"versionDomain",
+					"owningContext",
+					"version",
+					"disposition"
+				],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^amber\\.distributed-governance\\.(contract|invariant|artifact)\\.[a-z0-9-]+$"
+					},
+					"kind": { "enum": ["contract", "invariant", "artifact"] },
+					"title": { "type": "string", "minLength": 1 },
+					"versionDomain": {
+						"enum": [
+							"runtime-protocol",
+							"contract-schema",
+							"capability",
+							"projection-rule",
+							"component-generation",
+							"source-generation"
+						]
+					},
+					"owningContext": {
+						"enum": [
+							"amber-core",
+							"sync-runtime",
+							"governance-graph",
+							"governed-knowledge-base",
+							"visualization-workbench",
+							"organization-control-plane"
+						]
+					},
+					"version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+					"disposition": { "enum": ["supported", "deprecated", "refused"] },
+					"bindings": {
+						"type": "object",
+						"required": [
+							"schema",
+							"type",
+							"capability",
+							"projectionRule",
+							"componentGeneration",
+							"sourceGeneration"
+						],
+						"additionalProperties": false,
+						"properties": {
+							"schema": { "type": "string", "minLength": 1 },
+							"type": { "type": "string", "minLength": 1 },
+							"capability": { "type": "string", "minLength": 1 },
+							"projectionRule": { "type": "string", "minLength": 1 },
+							"componentGeneration": { "type": "string", "minLength": 1 },
+							"sourceGeneration": { "type": "string", "minLength": 1 }
+						}
+					},
+					"sourceResolutions": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "type": "integer", "minimum": 1 }
+					},
+					"adrs": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "type": "string", "pattern": "^ADR-[0-9]{4}$" }
+					},
+					"artifactType": {
+						"enum": [
+							"work",
+							"decision",
+							"evidence",
+							"approval",
+							"context",
+							"learning",
+							"ledger",
+							"acceptance"
+						]
+					}
+				},
+				"oneOf": [
+					{ "properties": { "kind": { "const": "contract" } }, "required": ["bindings"] },
+					{
+						"properties": { "kind": { "const": "invariant" } },
+						"required": ["sourceResolutions", "adrs"]
+					},
+					{
+						"properties": { "kind": { "const": "artifact" } },
+						"required": ["artifactType", "sourceResolutions"]
+					}
+				]
+			}
+		},
+		"compatibility": {
+			"type": "object",
+			"required": ["outcomePrecedence", "cases"],
+			"additionalProperties": false,
+			"properties": {
+				"outcomePrecedence": {
+					"const": ["unknown", "refused", "deprecated", "supported"]
+				},
+				"cases": {
+					"type": "array",
+					"minItems": 4,
+					"items": {
+						"type": "object",
+						"required": ["caseId", "description", "combination", "expectedOutcome", "evidenceId"],
+						"additionalProperties": false,
+						"properties": {
+							"caseId": { "type": "string", "pattern": "^DG-COMPAT-[A-Z0-9-]+$" },
+							"description": { "type": "string", "minLength": 1 },
+							"combination": {
+								"type": "object",
+								"propertyNames": {
+									"enum": [
+										"runtimeProtocol",
+										"contractSchema",
+										"capability",
+										"projectionRule",
+										"componentGeneration",
+										"sourceGeneration"
+									]
+								},
+								"additionalProperties": {
+									"type": "string",
+									"pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+								}
+							},
+							"expectedOutcome": { "enum": ["supported", "deprecated", "refused", "unknown"] },
+							"evidenceId": {
+								"type": "string",
+								"pattern": "^amber\\.distributed-governance\\.evidence\\.compatibility\\.[a-z0-9.-]+$"
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
