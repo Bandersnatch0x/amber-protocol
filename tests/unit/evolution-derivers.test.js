@@ -16,7 +16,6 @@ const path = require("node:path");
 const {
 	DERIVER_DESTINATIONS,
 	DRAFT_KINDS,
-	RULES_DERIVER_BLOCK,
 	REJECTION_RECORD_FIELDS,
 	REJECTION_RECORD_DEPENDENCIES,
 	attributionFingerprintOf,
