@@ -526,6 +526,33 @@ test("retry after fixing the evidence passes and sees the prior rejection histor
 	}
 });
 
+test("two Propose runs in the same millisecond keep both proposal records", (t) => {
+	// The proposal filename is a millisecond-resolution stamp. Two runs landing
+	// in the same millisecond used to render the same path, so the second write
+	// silently overwrote the first — destroying exactly the rejection history
+	// scanPriorRejections reads back. Pin the clock so the collision is
+	// deterministic rather than a race a fast machine has to win.
+	const target = tmpTarget("proposal-collision");
+	t.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-01-01T00:00:00.000Z") });
+	try {
+		seedSignificantStructured(target);
+		const first = runMaintenanceAction("propose", target, {});
+		assert.deepEqual(first.errors, []);
+		const firstBytes = readProposal(target, first.proposalPath);
+
+		seedSignificantStructured(target);
+		const second = runMaintenanceAction("propose", target, {});
+		assert.deepEqual(second.errors, []);
+
+		assert.notEqual(second.proposalPath, first.proposalPath);
+		assert.equal(listProposalFiles(target).length, 2);
+		assert.equal(readProposal(target, first.proposalPath), firstBytes);
+	} finally {
+		t.mock.timers.reset();
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
 test("a still-failing retry records the prior rejection count in its own record", () => {
 	const target = tmpTarget("retry-fail");
 	try {
