@@ -17,8 +17,7 @@ function getLanguage(className: string | undefined): string | undefined {
 }
 
 type MessageSegment =
-  | { type: 'text'; value: string }
-  | { type: 'code'; value: string; language?: string };
+  { type: 'text'; value: string } | { type: 'code'; value: string; language?: string };
 
 function stripLeadingLineNumber(line: string): string {
   return line.replace(/^\s*\d+(?:\s+|[|:]\s*)/, '');

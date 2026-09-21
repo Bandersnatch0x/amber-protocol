@@ -39,12 +39,7 @@ interface RunVerificationInput {
 // ---------------------------------------------------------------------------
 
 export type VerificationJobStatus =
-  | 'pending'
-  | 'running'
-  | 'denied'
-  | 'completed'
-  | 'failed'
-  | 'timeout';
+  'pending' | 'running' | 'denied' | 'completed' | 'failed' | 'timeout';
 export type VerificationPhase = 'idle' | 'submitting' | 'running' | 'settled';
 
 export const TERMINAL_VERIFICATION_JOB_STATUSES: readonly VerificationJobStatus[] = [
@@ -75,8 +70,7 @@ export function isKnownVerificationJobStatus(value: unknown): value is Verificat
 }
 
 export type VerificationSubmission =
-  | { kind: 'denied'; result: UnknownRecord }
-  | { kind: 'job'; jobId: string };
+  { kind: 'denied'; result: UnknownRecord } | { kind: 'job'; jobId: string };
 
 /** Parse the runVerification mutation result into the two contract shapes. */
 export function resolveVerificationSubmission(submission: unknown): VerificationSubmission | null {

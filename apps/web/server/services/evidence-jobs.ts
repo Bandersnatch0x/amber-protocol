@@ -60,12 +60,7 @@ export const MAX_CONCURRENT_EVIDENCE_JOBS = 4;
 const STALE_TERMINAL_JOB_MS = 24 * 60 * 60 * 1000;
 
 export type EvidenceJobStatus =
-  | 'pending'
-  | 'running'
-  | 'denied'
-  | 'completed'
-  | 'failed'
-  | 'timeout';
+  'pending' | 'running' | 'denied' | 'completed' | 'failed' | 'timeout';
 
 export const EVIDENCE_JOB_TERMINAL_STATUSES: readonly EvidenceJobStatus[] = [
   'denied',
