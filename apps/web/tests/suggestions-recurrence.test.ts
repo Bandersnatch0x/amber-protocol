@@ -33,7 +33,12 @@ function claudeFailureJsonl(tool: string, error: string, cwd: string): string {
   ].join('\n');
 }
 
-function codexFailureJsonl(repoRoot: string, sessionId: string, tool: string, error: string): string {
+function codexFailureJsonl(
+  repoRoot: string,
+  sessionId: string,
+  tool: string,
+  error: string,
+): string {
   return [
     JSON.stringify({
       type: 'session_meta',
@@ -86,7 +91,10 @@ describe('Improvement Suggestions recurrence reporting (evolution contract §9, 
 
   function seedCodex(sessionId: string, error: string, tool = 'Bash'): void {
     const name = `rollout-2026-06-17T10-00-00-${sessionId}.jsonl`;
-    writeFile(path.join(codexHome, 'sessions', name), codexFailureJsonl(root, sessionId, tool, error));
+    writeFile(
+      path.join(codexHome, 'sessions', name),
+      codexFailureJsonl(root, sessionId, tool, error),
+    );
   }
 
   function list() {

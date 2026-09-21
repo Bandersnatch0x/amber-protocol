@@ -61,7 +61,12 @@ function claudeFailureJsonl(tool: string, error: string, cwd: string): string {
   ].join('\n');
 }
 
-function codexFailureJsonl(repoRoot: string, sessionId: string, tool: string, error: string): string {
+function codexFailureJsonl(
+  repoRoot: string,
+  sessionId: string,
+  tool: string,
+  error: string,
+): string {
   return [
     JSON.stringify({
       type: 'session_meta',
@@ -114,7 +119,10 @@ describe('Improvement Suggestions structured attribution (evolution contract §3
 
   function seedCodex(sessionId: string, error: string, tool = 'Bash'): void {
     const name = `rollout-2026-06-17T10-00-00-${sessionId}.jsonl`;
-    writeFile(path.join(codexHome, 'sessions', name), codexFailureJsonl(root, sessionId, tool, error));
+    writeFile(
+      path.join(codexHome, 'sessions', name),
+      codexFailureJsonl(root, sessionId, tool, error),
+    );
   }
 
   function list() {
@@ -146,7 +154,7 @@ describe('Improvement Suggestions structured attribution (evolution contract §3
     expect(attributionProblem(attribution)).toBeNull();
   });
 
-	it('redacts secret material from the derived failureMode before it is persisted (B1R SP-B1-01)', () => {
+  it('redacts secret material from the derived failureMode before it is persisted (B1R SP-B1-01)', () => {
     const token = 'SyntheticSecretGhIjKlMnOpQrStUvWx';
     const group: FrictionSignal[] = [
       {
@@ -198,9 +206,7 @@ describe('Improvement Suggestions structured attribution (evolution contract §3
     // Changing an attribution claim can never add a destination or verb: the
     // attribution vocabulary contains no path, verb, or allowlist influence.
     const attribution = card.findingAttribution!;
-    expect(Object.keys(attribution).sort()).toEqual(
-      [...FINDING_ATTRIBUTION.FIELDS].slice().sort(),
-    );
+    expect(Object.keys(attribution).sort()).toEqual([...FINDING_ATTRIBUTION.FIELDS].slice().sort());
     expect(JSON.stringify(attribution)).not.toMatch(/MEMORY\.md|AGENTS\.md|apply|allowlist/);
   });
 

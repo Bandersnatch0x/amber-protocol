@@ -296,10 +296,7 @@ function SessionDetailPage() {
               link. Data comes from the read-side projection; no interactive
               replay control exists on this surface by contract. */}
           {session.driftState ? (
-            <DriftBadge
-              state={session.driftState}
-              reportHref={session.driftReportHref ?? null}
-            />
+            <DriftBadge state={session.driftState} reportHref={session.driftReportHref ?? null} />
           ) : null}
           <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{session.id}</span>
           {effectiveStatus === 'completed' && (

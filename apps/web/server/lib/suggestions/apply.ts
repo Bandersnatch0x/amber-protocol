@@ -156,7 +156,10 @@ export interface CompensationResult {
  * rollback whose write fails silently (or leaves different bytes) is a
  * degraded state, not a compensation.
  */
-export function compensateApply(repoRoot: string, applied: AppliedFileRecord[]): CompensationResult {
+export function compensateApply(
+  repoRoot: string,
+  applied: AppliedFileRecord[],
+): CompensationResult {
   try {
     rollback(repoRoot, applied);
   } catch (err) {
@@ -217,7 +220,11 @@ function describeError(err: unknown): string {
 // A failed audit append after the target mutation is NEVER success: the
 // compensated variant names the rollback, the degraded variant names the
 // degraded state and the operator reconciliation step (§8.6 step 3).
-function auditWriteFailed(action: string, compensation: CompensationResult, errors: string[]): {
+function auditWriteFailed(
+  action: string,
+  compensation: CompensationResult,
+  errors: string[],
+): {
   ok: false;
   code: string;
   message: string;
@@ -276,7 +283,10 @@ function commitIoFailed(
 
 // The §8.6 precheck refusal: nothing is mutated and the underlying stable
 // code rides the result verbatim.
-function precheckRefusal(action: string, result: { code: string; errors: string[] }): {
+function precheckRefusal(
+  action: string,
+  result: { code: string; errors: string[] },
+): {
   ok: false;
   code: string;
   message: string;
@@ -396,8 +406,7 @@ export function undoSuggestion(
   const preUndo: PreUndoCapture[] = [];
   const restoredProjection = record.applied.map((file) => ({
     path: file.path,
-    hash:
-      file.previousContents === null ? null : sha256Utf8(file.previousContents),
+    hash: file.previousContents === null ? null : sha256Utf8(file.previousContents),
   }));
   for (const file of record.applied) {
     const abs = resolveRepoFile(repoRoot, file.path);

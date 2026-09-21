@@ -1,7 +1,11 @@
 import { createRequire } from 'module';
 import { HOST_FILE_CEILING, PROMOTION_TRANSCRIPT_THRESHOLD } from './paths';
 import type { FrictionSignal, HostId, ImprovementSuggestion, SuggestionOperation } from './types';
-import { deriveExpectedEffect, deriveFindingAttribution, planFrictionCardOperations } from './planner';
+import {
+  deriveExpectedEffect,
+  deriveFindingAttribution,
+  planFrictionCardOperations,
+} from './planner';
 import type { WebAdapter } from '../../../../../scripts/lib/web-adapter';
 
 // Trusted-control evolution contract §3: the closed-set validation authority is

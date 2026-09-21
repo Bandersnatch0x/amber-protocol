@@ -16,7 +16,8 @@ export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
 // seam — these unions are a typing mirror, parity-checked against the runtime
 // vocabulary by test (both directions, compiler-enforced), never an
 // independent enum authority. Attribution is a claim, never a permission.
-export type EntrySurface = 'instruction-surface' | 'tool-output' | 'policy-rule' | 'capability-request';
+export type EntrySurface =
+  'instruction-surface' | 'tool-output' | 'policy-rule' | 'capability-request';
 export type ImpactSurface = 'target-repo' | 'context' | 'external' | 'governance-state';
 export type ResponsibleArtifact =
   | 'instruction-surface'

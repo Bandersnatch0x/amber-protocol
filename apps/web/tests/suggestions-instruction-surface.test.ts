@@ -76,7 +76,14 @@ describe('Instruction-surface planner extension (Slice 6)', () => {
   }
 
   const group: FrictionSignal[] = [
-    { host: 'claude', transcriptId: 't1', tool: 'Bash', error: 'boom', excerpt: 'boom', fingerprint: 'abc123def456' },
+    {
+      host: 'claude',
+      transcriptId: 't1',
+      tool: 'Bash',
+      error: 'boom',
+      excerpt: 'boom',
+      fingerprint: 'abc123def456',
+    },
   ];
 
   it('wiki stays the first operation and the default suggestion surface', () => {
@@ -139,15 +146,48 @@ describe('Instruction-surface planner extension (Slice 6)', () => {
   });
 
   it('derivation is deterministic: same inputs → identical operations', () => {
-    const a = planAgentsMdOperation({ repoRoot: root, fingerprint: 'abc123def456', tool: 'Bash', wikiRelPath: 'w.md' });
-    const b = planAgentsMdOperation({ repoRoot: root, fingerprint: 'abc123def456', tool: 'Bash', wikiRelPath: 'w.md' });
+    const a = planAgentsMdOperation({
+      repoRoot: root,
+      fingerprint: 'abc123def456',
+      tool: 'Bash',
+      wikiRelPath: 'w.md',
+    });
+    const b = planAgentsMdOperation({
+      repoRoot: root,
+      fingerprint: 'abc123def456',
+      tool: 'Bash',
+      wikiRelPath: 'w.md',
+    });
     expect(a).toEqual(b);
-    const s1 = planSkillOperation({ fingerprint: 'abc123def456', tool: 'Bash', wikiRelPath: 'w.md' });
-    const s2 = planSkillOperation({ fingerprint: 'abc123def456', tool: 'Bash', wikiRelPath: 'w.md' });
+    const s1 = planSkillOperation({
+      fingerprint: 'abc123def456',
+      tool: 'Bash',
+      wikiRelPath: 'w.md',
+    });
+    const s2 = planSkillOperation({
+      fingerprint: 'abc123def456',
+      tool: 'Bash',
+      wikiRelPath: 'w.md',
+    });
     expect(s1).toEqual(s2);
     // The composed plan keeps the wiki note identical to the standalone planner.
-    const wiki = planFrictionNote({ fingerprint: 'abc123def456', tool: 'Bash', group, transcriptCount: 2, hosts: ['claude'], now: new Date('2026-09-18') });
-    const card = planFrictionCardOperations({ repoRoot: root, fingerprint: 'abc123def456', tool: 'Bash', group, transcriptCount: 2, hosts: ['claude'], now: new Date('2026-09-18') });
+    const wiki = planFrictionNote({
+      fingerprint: 'abc123def456',
+      tool: 'Bash',
+      group,
+      transcriptCount: 2,
+      hosts: ['claude'],
+      now: new Date('2026-09-18'),
+    });
+    const card = planFrictionCardOperations({
+      repoRoot: root,
+      fingerprint: 'abc123def456',
+      tool: 'Bash',
+      group,
+      transcriptCount: 2,
+      hosts: ['claude'],
+      now: new Date('2026-09-18'),
+    });
     expect(card[0]).toEqual(wiki[0]);
     expect(card).toHaveLength(3);
   });
@@ -155,42 +195,50 @@ describe('Instruction-surface planner extension (Slice 6)', () => {
   // End-to-end Apply/Undo are I/O-bound and sit near the 5s default timeout
   // under full-suite parallel load (1.8s isolated); the explicit budget keeps
   // the assertions intact without weakening them.
-  it('Apply accepts the instruction-surface operations under the allowlist; Undo restores them', { timeout: 20000 }, () => {
-    seedClaudePair();
-    const card = list()[0];
-    // The real card carries the instruction-surface operations through the
-    // same admission path (V1–V3 ran during list(); it was exposed).
-    expect(card.operations).toHaveLength(3);
-    expect(fs.existsSync(path.join(root, 'AGENTS.md'))).toBe(false);
+  it(
+    'Apply accepts the instruction-surface operations under the allowlist; Undo restores them',
+    { timeout: 20000 },
+    () => {
+      seedClaudePair();
+      const card = list()[0];
+      // The real card carries the instruction-surface operations through the
+      // same admission path (V1–V3 ran during list(); it was exposed).
+      expect(card.operations).toHaveLength(3);
+      expect(fs.existsSync(path.join(root, 'AGENTS.md'))).toBe(false);
 
-    const applied = applySuggestionById(card.id, { repoRoot: root, homes: { claudeHome } });
-    expect(applied.ok).toBe(true);
+      const applied = applySuggestionById(card.id, { repoRoot: root, homes: { claudeHome } });
+      expect(applied.ok).toBe(true);
 
-    // All three artifacts landed; the instruction file carries the bullet.
-    expect(fs.existsSync(path.join(root, card.operations[0].path))).toBe(true);
-    const agents = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
-    expect(agents).toContain('docs/wiki/agent/friction/');
-    expect(fs.existsSync(path.join(root, card.operations[2].path))).toBe(true);
+      // All three artifacts landed; the instruction file carries the bullet.
+      expect(fs.existsSync(path.join(root, card.operations[0].path))).toBe(true);
+      const agents = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
+      expect(agents).toContain('docs/wiki/agent/friction/');
+      expect(fs.existsSync(path.join(root, card.operations[2].path))).toBe(true);
 
-    // Undo restores everything: created files removed, AGENTS.md back to absent.
-    const undone = undoSuggestionById(card.id, { repoRoot: root, homes: { claudeHome } });
-    expect(undone.ok).toBe(true);
-    expect(fs.existsSync(path.join(root, card.operations[0].path))).toBe(false);
-    expect(fs.existsSync(path.join(root, card.operations[2].path))).toBe(false);
-    expect(fs.existsSync(path.join(root, 'AGENTS.md'))).toBe(false);
-  });
+      // Undo restores everything: created files removed, AGENTS.md back to absent.
+      const undone = undoSuggestionById(card.id, { repoRoot: root, homes: { claudeHome } });
+      expect(undone.ok).toBe(true);
+      expect(fs.existsSync(path.join(root, card.operations[0].path))).toBe(false);
+      expect(fs.existsSync(path.join(root, card.operations[2].path))).toBe(false);
+      expect(fs.existsSync(path.join(root, 'AGENTS.md'))).toBe(false);
+    },
+  );
 
-  it('Undo restores the pre-Apply AGENTS.md bytes when the file existed', { timeout: 20000 }, () => {
-    fs.writeFileSync(path.join(root, 'AGENTS.md'), 'existing rules\n');
-    seedClaudePair();
-    const card = list()[0];
-    expect(applySuggestionById(card.id, { repoRoot: root, homes: { claudeHome } }).ok).toBe(true);
-    const agents = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
-    expect(agents.startsWith('existing rules\n')).toBe(true);
-    expect(agents).toContain('docs/wiki/agent/friction/');
-    expect(undoSuggestionById(card.id, { repoRoot: root, homes: { claudeHome } }).ok).toBe(true);
-    expect(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8')).toBe('existing rules\n');
-  });
+  it(
+    'Undo restores the pre-Apply AGENTS.md bytes when the file existed',
+    { timeout: 20000 },
+    () => {
+      fs.writeFileSync(path.join(root, 'AGENTS.md'), 'existing rules\n');
+      seedClaudePair();
+      const card = list()[0];
+      expect(applySuggestionById(card.id, { repoRoot: root, homes: { claudeHome } }).ok).toBe(true);
+      const agents = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
+      expect(agents.startsWith('existing rules\n')).toBe(true);
+      expect(agents).toContain('docs/wiki/agent/friction/');
+      expect(undoSuggestionById(card.id, { repoRoot: root, homes: { claudeHome } }).ok).toBe(true);
+      expect(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8')).toBe('existing rules\n');
+    },
+  );
 
   it('the planner never plans MEMORY.md and every planned path is allowlisted', () => {
     seedClaudePair();

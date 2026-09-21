@@ -264,7 +264,10 @@ describe('Improvement Suggestions apply overlay', () => {
     // compensation cannot restore, so the result must name the affected
     // paths and the reconciliation step instead of reporting success.
     const realWrite = fs.writeFileSync.bind(fs);
-    vi.spyOn(fs, 'writeFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, data: unknown) => {
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((
+      p: fs.PathOrFileDescriptor,
+      data: unknown,
+    ) => {
       if (String(p).endsWith('-second.md')) throw new Error('simulated mid-commit EIO');
       return realWrite(p, data as string | Uint8Array);
     }) as typeof fs.writeFileSync);
@@ -331,7 +334,10 @@ describe('Improvement Suggestions apply overlay', () => {
     // must return the explicit commit-io-failed result — never a throw.
     const realWrite = fs.writeFileSync.bind(fs);
     let writes = 0;
-    vi.spyOn(fs, 'writeFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, data: unknown) => {
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((
+      p: fs.PathOrFileDescriptor,
+      data: unknown,
+    ) => {
       if (String(p) === abs) {
         writes += 1;
         if (writes === 2) throw new Error('simulated stale-branch rollback failure');
@@ -362,7 +368,10 @@ describe('Improvement Suggestions apply overlay', () => {
     // degraded result must name the affected path and the reconciliation step.
     const realWrite = fs.writeFileSync.bind(fs);
     let writes = 0;
-    vi.spyOn(fs, 'writeFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, data: unknown) => {
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((
+      p: fs.PathOrFileDescriptor,
+      data: unknown,
+    ) => {
       if (String(p) === abs) {
         writes += 1;
         if (writes >= 2) throw new Error('simulated stale-branch rollback failure');

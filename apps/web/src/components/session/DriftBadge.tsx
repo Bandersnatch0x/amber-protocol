@@ -17,7 +17,10 @@ interface DriftBadgeProps {
   reportHref?: string | null;
 }
 
-const driftConfig: Record<DriftState, { className: string; labelKey: Parameters<ReturnType<typeof useI18n>['t']>[0] }> = {
+const driftConfig: Record<
+  DriftState,
+  { className: string; labelKey: Parameters<ReturnType<typeof useI18n>['t']>[0] }
+> = {
   EXACT: {
     className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
     labelKey: 'sessions.drift.exact',

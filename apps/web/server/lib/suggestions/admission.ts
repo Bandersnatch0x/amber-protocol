@@ -11,8 +11,7 @@ const requireCli = createRequire(import.meta.url);
 const adapter = requireCli('../../../../../scripts/lib/web-adapter.js') as WebAdapter;
 
 export type AdmissionOutcome =
-  | { exposed: true; card: ImprovementSuggestion }
-  | { exposed: false; reason: string };
+  { exposed: true; card: ImprovementSuggestion } | { exposed: false; reason: string };
 
 function homeFor(host: HostId, homes: SuggestionHomes): string | undefined {
   if (host === 'claude') return homes.claudeHome;

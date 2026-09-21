@@ -100,7 +100,10 @@ function mutate(
 
 // The §8.6 refusal for a ledger that cannot carry the audit event: nothing is
 // mutated and the underlying stable code rides the result verbatim.
-function ledgerRefusal(action: string, result: { code: string; errors: string[] }): {
+function ledgerRefusal(
+  action: string,
+  result: { code: string; errors: string[] },
+): {
   ok: false;
   code: string;
   message: string;

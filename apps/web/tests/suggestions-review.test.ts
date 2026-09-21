@@ -14,7 +14,11 @@ import {
   snoozeSuggestion,
   undoSuggestionById,
 } from '../server/lib/suggestions/service';
-import type { FrictionSignal, ImprovementSuggestion, SuggestionHomes } from '../server/lib/suggestions/types';
+import type {
+  FrictionSignal,
+  ImprovementSuggestion,
+  SuggestionHomes,
+} from '../server/lib/suggestions/types';
 import type { WebAdapter } from '../../../scripts/lib/web-adapter';
 
 // F064 Slice 3 (trusted-control evolution contract §5–§8): the card admission
@@ -200,9 +204,16 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
 
   it('an unchanged re-surface rides the existing round; a changed-evidence retry opens a new one (§8.2)', () => {
     const fingerprint = `fp-rounds-${(seamCounter += 1)}`;
-    const input = proposalInput(fingerprint, [{ host: 'claude', transcriptId: 't1', excerpt: 'e' }], ['claude']);
+    const input = proposalInput(
+      fingerprint,
+      [{ host: 'claude', transcriptId: 't1', excerpt: 'e' }],
+      ['claude'],
+    );
 
-    expect(adapter.ensureSuggestionProposed(root, input)).toMatchObject({ ok: true, appended: true });
+    expect(adapter.ensureSuggestionProposed(root, input)).toMatchObject({
+      ok: true,
+      appended: true,
+    });
     expect(
       adapter.recordSuggestionValidityRejection(root, {
         fingerprint,
@@ -277,7 +288,11 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
       adapter.recordSuggestionApplied(root, {
         fingerprint,
         applied: [
-          { path: 'docs/wiki/agent/friction/rounds.md', beforeHash: null, afterHash: 'a'.repeat(64) },
+          {
+            path: 'docs/wiki/agent/friction/rounds.md',
+            beforeHash: null,
+            afterHash: 'a'.repeat(64),
+          },
         ],
       }).ok,
     ).toBe(true);
@@ -315,7 +330,11 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
       adapter.recordSuggestionApplied(root, {
         fingerprint,
         applied: [
-          { path: 'docs/wiki/agent/friction/rounds.md', beforeHash: null, afterHash: 'b'.repeat(64) },
+          {
+            path: 'docs/wiki/agent/friction/rounds.md',
+            beforeHash: null,
+            afterHash: 'b'.repeat(64),
+          },
         ],
       }).ok,
     ).toBe(true);
@@ -334,9 +353,16 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
 
   it('a host-set change also opens a new proposal round (§8.2)', () => {
     const fingerprint = `fp-rounds-hosts-${(seamCounter += 1)}`;
-    const input = proposalInput(fingerprint, [{ host: 'claude', transcriptId: 't1', excerpt: 'e' }], ['claude']);
+    const input = proposalInput(
+      fingerprint,
+      [{ host: 'claude', transcriptId: 't1', excerpt: 'e' }],
+      ['claude'],
+    );
 
-    expect(adapter.ensureSuggestionProposed(root, input)).toMatchObject({ ok: true, appended: true });
+    expect(adapter.ensureSuggestionProposed(root, input)).toMatchObject({
+      ok: true,
+      appended: true,
+    });
     expect(
       adapter.recordSuggestionValidityRejection(root, {
         fingerprint,
@@ -400,7 +426,9 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
     expect(outcome.exposed).toBe(false);
     if (!outcome.exposed) expect(outcome.reason).toBe('validity:no-evidence');
 
-    const [record] = adapter.foldSuggestionReview(root).filter((entry) => entry.fingerprint === fingerprint);
+    const [record] = adapter
+      .foldSuggestionReview(root)
+      .filter((entry) => entry.fingerprint === fingerprint);
     expect(record.validatedAt).toBeNull();
     expect(record.rejections[0].reason).toBe('validity:no-evidence');
   });
@@ -430,7 +458,9 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
     expect(outcome.exposed).toBe(false);
     if (!outcome.exposed) expect(outcome.reason).toBe('validity:capability-reduction');
 
-    const [record] = adapter.foldSuggestionReview(root).filter((entry) => entry.fingerprint === fingerprint);
+    const [record] = adapter
+      .foldSuggestionReview(root)
+      .filter((entry) => entry.fingerprint === fingerprint);
     expect(record.rejections[0].reason).toBe('validity:capability-reduction');
   });
 
@@ -468,7 +498,9 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
 
     const outcome = admitAtSeam({ ...base, fingerprint }, seamSignals(fingerprint, sourceFile));
     expect(outcome.exposed).toBe(true);
-    const [record] = adapter.foldSuggestionReview(root).filter((entry) => entry.fingerprint === fingerprint);
+    const [record] = adapter
+      .foldSuggestionReview(root)
+      .filter((entry) => entry.fingerprint === fingerprint);
     expect(record.validatedAt).toBeTruthy();
   });
 
@@ -509,7 +541,9 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
     expect(record.lastAppliedDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
     // The applied bytes never ride the ledger — digest only (§8.4).
     expect(fs.readFileSync(ledgerPath(), 'utf8')).not.toContain('Improvement Suggestion');
-    const overlay = JSON.parse(fs.readFileSync(path.join(root, '.amber', 'suggestions', 'state.json'), 'utf8'));
+    const overlay = JSON.parse(
+      fs.readFileSync(path.join(root, '.amber', 'suggestions', 'state.json'), 'utf8'),
+    );
     expect(overlay.records[card.fingerprint].status).toBe('applied');
   });
 
@@ -625,9 +659,7 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
     // The ledger is byte-identical to what promotion left plus the corruption:
     // the refused Apply appended nothing.
     expect(fs.readFileSync(ledgerPath(), 'utf8').trimEnd().endsWith('garbage')).toBe(true);
-    expect(
-      fs.readFileSync(ledgerPath(), 'utf8').split(/\r?\n/).filter(Boolean).length,
-    ).toBe(3);
+    expect(fs.readFileSync(ledgerPath(), 'utf8').split(/\r?\n/).filter(Boolean).length).toBe(3);
   });
 
   it('an exhausted ceiling refuses Apply before any mutation', () => {

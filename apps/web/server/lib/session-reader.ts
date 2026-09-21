@@ -12,7 +12,10 @@ const adapter = requireCli('../../../../scripts/lib/web-adapter.js') as {
   sessionDriftFold: (
     targetRoot: string,
     sessionId: string,
-  ) => { state: 'EXACT' | 'COMPATIBLE' | 'DRIFTED' | 'NON_REPLAYABLE'; report: Record<string, number> } | null;
+  ) => {
+    state: 'EXACT' | 'COMPATIBLE' | 'DRIFTED' | 'NON_REPLAYABLE';
+    report: Record<string, number>;
+  } | null;
 };
 
 export interface Session {

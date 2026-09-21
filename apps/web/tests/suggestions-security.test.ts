@@ -18,11 +18,7 @@ import type { WebAdapter } from '../../../scripts/lib/web-adapter';
 const requireCli = createRequire(import.meta.url);
 const adapter = requireCli('../../../scripts/lib/web-adapter.js') as WebAdapter;
 
-function seedReviewChain(
-  repoRoot: string,
-  fingerprint: string,
-  operations: object[] = [],
-): void {
+function seedReviewChain(repoRoot: string, fingerprint: string, operations: object[] = []): void {
   const attribution = {
     entrySurface: 'tool-output',
     impactSurface: 'context',
@@ -36,7 +32,8 @@ function seedReviewChain(
     // The §8.2 `proposed` payload digests the card's planned operations, so a
     // card driven into Apply must declare at least one — an empty array is a
     // writer-shape refusal, not a valid proposal.
-    operations: operations.length > 0 ? operations : [{ verb: 'create', path: 'docs/wiki/seed.md' }],
+    operations:
+      operations.length > 0 ? operations : [{ verb: 'create', path: 'docs/wiki/seed.md' }],
     attribution,
   });
   if (!proposed.ok) throw new Error(`proposed setup failed: ${proposed.errors.join('; ')}`);

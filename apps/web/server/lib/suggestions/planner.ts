@@ -107,7 +107,9 @@ export function planAgentsMdOperation(input: {
 }): SuggestionOperation {
   const abs = resolveRepoFile(input.repoRoot, 'AGENTS.md');
   if (!abs) {
-    throw new Error('AGENTS.md is allowlisted but did not resolve inside the repo; refusing to plan an instruction edit against an unresolved path');
+    throw new Error(
+      'AGENTS.md is allowlisted but did not resolve inside the repo; refusing to plan an instruction edit against an unresolved path',
+    );
   }
   const tool = safeToolName(input.tool);
   const summary =

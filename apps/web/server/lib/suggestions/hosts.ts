@@ -310,7 +310,14 @@ function collectCursorSignals(
         const call = id ? pending.get(id) : undefined;
         const error = typeof record.content === 'string' ? record.content : 'tool error';
         signals.push(
-          signalFromFailure('cursor', transcriptId, call?.tool ?? 'unknown', error, timestamp, filePath),
+          signalFromFailure(
+            'cursor',
+            transcriptId,
+            call?.tool ?? 'unknown',
+            error,
+            timestamp,
+            filePath,
+          ),
         );
       }
     }
