@@ -206,6 +206,17 @@ const COMMAND_CAPABILITIES = {
 		edits: [],
 		sideEffects: [],
 	},
+	// The contract registry validator reads the registry, its schema and the
+	// pointers the registry claims. It has no write flag and no evidence side
+	// effect, so it is a direct read-only execution.
+	"contracts/validate": {
+		effect: "read",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
+	},
 	"eval/admit": {
 		effect: "write",
 		approver: "human",

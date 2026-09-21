@@ -226,7 +226,8 @@
 									"eval",
 									"external",
 									"breakglass",
-									"runner"
+									"runner",
+									"contracts"
 								]
 							},
 							"subcommand": { "type": "string" },
@@ -248,7 +249,8 @@
 						"eval",
 						"external",
 						"breakglass",
-						"runner"
+						"runner",
+						"contracts"
 					],
 					"description": "Amber CLI command family this action maps to."
 				},
