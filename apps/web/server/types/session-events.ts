@@ -13,6 +13,7 @@ export const SessionStatusSchema = z.enum([
   'routed',
   'executing',
   'paused',
+  'blocked',
   'completed',
   'failed',
   'aborted',
@@ -23,6 +24,16 @@ const SessionEventBaseSchema = z.object({
   timestamp: z.union([z.number(), z.string()]),
   data: z.record(z.string(), z.unknown()).optional(),
 });
+
+// Governed-run events (governance contract §10): run lifecycle, policy
+// refusals, the approval handshake, block/unblock, and context grants. The web
+// consumes none of their payloads yet — `data` carries the detail and the base
+// schema deliberately leaves it unconstrained — but the schema MUST accept
+// them, or a session that took a governed path fails to read back. Kept as one
+// shape-by-type factory rather than eleven identical literals; the generic
+// preserves the literal so the union still discriminates.
+const governedRunEvent = <T extends string>(type: T) =>
+  SessionEventBaseSchema.extend({ type: z.literal(type), sessionId: z.string().optional() });
 
 // sessionId is optional on every variant: events read back from timeline.jsonl
 // (via normalizeEvent, which flattens `data` onto the top level) do not always
@@ -112,6 +123,17 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     type: z.literal('verification_failed'),
     sessionId: z.string().optional(),
   }),
+  governedRunEvent('run_started'),
+  governedRunEvent('run_completed'),
+  governedRunEvent('run_failed'),
+  governedRunEvent('policy_denied'),
+  governedRunEvent('approval_requested'),
+  governedRunEvent('approval_granted'),
+  governedRunEvent('approval_consumed'),
+  governedRunEvent('session_blocked'),
+  governedRunEvent('session_unblocked'),
+  governedRunEvent('context_granted'),
+  governedRunEvent('context_denied'),
   // Web control-plane lifecycle for durable runner handshakes. These are a web
   // superset over the CLI timeline schema so the UI can show where a control
   // request stopped: requested, acknowledged, rejected, or timed out.
