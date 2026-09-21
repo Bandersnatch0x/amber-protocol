@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
 import styles from './DataFlowDiagram.module.css';
 
 export const DataFlowDiagram: React.FC = () => {
@@ -9,152 +8,118 @@ export const DataFlowDiagram: React.FC = () => {
     if (!canvasRef.current || typeof window === 'undefined') return;
 
     const canvas = canvasRef.current;
-    const width = canvas.parentElement?.clientWidth || 900;
-    const height = canvas.parentElement?.clientHeight || 350;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // Scene & Camera
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
-    camera.position.z = 180;
+    let width = (canvas.width = canvas.parentElement?.clientWidth || 900);
+    let height = (canvas.height = canvas.parentElement?.clientHeight || 350);
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // Particle Constellation Geometry
-    const particleCount = 120;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
-    const amberColor = new THREE.Color('#f59e0b');
-    const blueColor = new THREE.Color('#3b82f6');
-
-    for (let i = 0; i < particleCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 400;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
-
-      const isAmber = Math.random() > 0.4;
-      const c = isAmber ? amberColor : blueColor;
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
+    const particleCount = 65;
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+      alpha: number;
     }
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const particles: Particle[] = [];
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: (Math.random() - 0.5) * 0.3,
+        size: Math.random() * 2 + 1,
+        alpha: Math.random() * 0.6 + 0.2,
+      });
+    }
 
-    const material = new THREE.PointsMaterial({
-      size: 3.5,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.65,
-    });
+    let animId: number;
 
-    const particles = new THREE.Points(geometry, material);
-    scene.add(particles);
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
 
-    // Connecting dynamic lines
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x3b82f6,
-      transparent: true,
-      opacity: 0.12,
-    });
-    const lineGeometry = new THREE.BufferGeometry();
-    const lineMesh = new THREE.LineSegments(lineGeometry, lineMaterial);
-    scene.add(lineMesh);
+      // Move and draw particles
+      particles.forEach((p, idx) => {
+        p.x += p.vx;
+        p.y += p.vy;
 
-    let animationFrameId: number;
-    let clock = new THREE.Clock();
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
 
-    const animate = () => {
-      const time = clock.getElapsedTime();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b';
+        ctx.globalAlpha = p.alpha;
+        ctx.fill();
 
-      // Rotate particle cloud gently
-      particles.rotation.y = time * 0.05;
-      particles.rotation.x = Math.sin(time * 0.03) * 0.05;
+        // Connect nearby particles
+        for (let j = idx + 1; j < particleCount; j++) {
+          const p2 = particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
 
-      const pos = geometry.attributes.position.array as Float32Array;
-      const linePositions: number[] = [];
-
-      for (let i = 0; i < particleCount; i++) {
-        // Floating wave movement
-        pos[i * 3 + 1] += Math.sin(time + pos[i * 3] * 0.01) * 0.12;
-
-        // Form connections between nearby particles
-        for (let j = i + 1; j < particleCount; j++) {
-          const dx = pos[i * 3] - pos[j * 3];
-          const dy = pos[i * 3 + 1] - pos[j * 3 + 1];
-          const dz = pos[i * 3 + 2] - pos[j * 3 + 2];
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 45) {
-            linePositions.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-            linePositions.push(pos[j * 3], pos[j * 3 + 1], pos[j * 3 + 2]);
+          if (dist < 80) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.globalAlpha = (1 - dist / 80) * 0.15;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
           }
         }
-      }
+      });
 
-      geometry.attributes.position.needsUpdate = true;
-      lineGeometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(linePositions, 3)
-      );
-
-      renderer.render(scene, camera);
-      animationFrameId = requestAnimationFrame(animate);
+      ctx.globalAlpha = 1;
+      animId = requestAnimationFrame(render);
     };
 
-    animate();
+    render();
 
     const handleResize = () => {
       if (!canvas.parentElement) return;
-      const newWidth = canvas.parentElement.clientWidth;
-      const newHeight = canvas.parentElement.clientHeight;
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight);
+      width = canvas.width = canvas.parentElement.clientWidth;
+      height = canvas.height = canvas.parentElement.clientHeight;
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
-      renderer.dispose();
-      geometry.dispose();
-      material.dispose();
-      lineGeometry.dispose();
-      lineMaterial.dispose();
     };
   }, []);
 
   return (
     <div className={styles.diagramWrapper}>
-      {/* 3D WebGL Canvas Layer */}
+      {/* 2D Ambient Particle Canvas */}
       <canvas ref={canvasRef} className={styles.canvasBackground} />
 
       {/* Foreground Content */}
       <div className={styles.diagramContent}>
         <div className={styles.diagramHeader}>
-          <h2 className={styles.diagramTitle}>Governance Engineering for Amber Protocol</h2>
+          <div className={styles.diagramBadge}>[ OPERATIONAL_ONTOLOGY ]</div>
+          <h2 className={styles.diagramTitle}>Governance Engineering Architecture</h2>
           <div className={styles.diagramSubtitle}>
-            THE SYSTEM BEHIND AGENT-ASSISTED GOVERNANCE
+            THE DETERMINISTIC DATA FLOW BEHIND AGENT-ASSISTED GOVERNANCE
           </div>
         </div>
 
         <div className={styles.flowContainer}>
           {/* 1. User Request Node */}
           <div className={styles.nodeCard}>
+            <div className={styles.nodeTag}>INPUT</div>
             <div className={styles.nodeTitle}>USER REQUEST</div>
             <div className={styles.nodeSubtitle}>goal · inputs · constraints</div>
           </div>
 
-          {/* SVG Connector 1: Straight Arrow */}
+          {/* SVG Connector 1 */}
           <svg
             className={styles.connectorSvg}
             viewBox="0 0 50 160"
@@ -164,50 +129,53 @@ export const DataFlowDiagram: React.FC = () => {
             <path
               d="M 5 80 L 45 80"
               className={styles.solidArrow}
-              stroke="#3b82f6"
+              stroke="#f59e0b"
               strokeWidth="2"
             />
-            <polygon points="45,76 50,80 45,84" fill="#3b82f6" />
+            <polygon points="45,76 50,80 45,84" fill="#f59e0b" />
           </svg>
 
-          {/* 2. Branch Stack: RESEARCH, BUILD, VERIFY */}
+          {/* 2. Branch Stack */}
           <div className={styles.branchStack}>
-            <div className={styles.branchNode}>RESEARCH</div>
-            <div className={styles.branchNode}>BUILD</div>
-            <div className={styles.branchNode}>VERIFY</div>
+            <div className={styles.branchNode}>
+              <span className={styles.branchDot} /> RESEARCH
+            </div>
+            <div className={styles.branchNode}>
+              <span className={styles.branchDot} /> BUILD
+            </div>
+            <div className={styles.branchNode}>
+              <span className={styles.branchDot} /> VERIFY
+            </div>
           </div>
 
-          {/* SVG Connector 2: Curved Merging Dashed Stream */}
+          {/* SVG Connector 2 */}
           <svg
             className={styles.connectorSvg}
             viewBox="0 0 60 160"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Top branch curve */}
             <path
               d="M 5 28 C 30 28, 40 75, 55 78"
               className={styles.flowLine}
-              stroke="#3b82f6"
+              stroke="#f59e0b"
               strokeWidth="2"
             />
-            {/* Middle branch straight */}
             <path
               d="M 5 80 L 55 80"
               className={styles.flowLine}
-              stroke="#3b82f6"
+              stroke="#f59e0b"
               strokeWidth="2"
             />
-            {/* Bottom branch curve */}
             <path
               d="M 5 132 C 30 132, 40 85, 55 82"
               className={styles.flowLine}
-              stroke="#3b82f6"
+              stroke="#f59e0b"
               strokeWidth="2"
             />
           </svg>
 
-          {/* 3. Center Kernel: Amber Protocol */}
+          {/* 3. Center Kernel */}
           <div className={styles.engineBoundary}>
             <div className={styles.engineCard}>
               <div className={styles.engineBeacon} />
@@ -215,10 +183,11 @@ export const DataFlowDiagram: React.FC = () => {
                 A<span>.</span>
               </div>
               <div className={styles.engineLabel}>AMBER PROTOCOL</div>
+              <div className={styles.engineSub}>Deterministic Kernel</div>
             </div>
           </div>
 
-          {/* SVG Connector 3: Flow Arrow to Synthesize */}
+          {/* SVG Connector 3 */}
           <svg
             className={styles.connectorSvg}
             viewBox="0 0 50 160"
@@ -228,19 +197,20 @@ export const DataFlowDiagram: React.FC = () => {
             <path
               d="M 5 80 L 45 80"
               className={styles.solidArrow}
-              stroke="#3b82f6"
+              stroke="#f59e0b"
               strokeWidth="2"
             />
-            <polygon points="45,76 50,80 45,84" fill="#3b82f6" />
+            <polygon points="45,76 50,80 45,84" fill="#f59e0b" />
           </svg>
 
-          {/* 4. Synthesize Node (Oval Pill) */}
+          {/* 4. Synthesize Node */}
           <div className={`${styles.nodeCard} ${styles.pillNode}`}>
+            <div className={styles.nodeTag}>INTEGRATE</div>
             <div className={styles.nodeTitle}>SYNTHESIZE</div>
             <div className={styles.nodeSubtitle}>state + evidence</div>
           </div>
 
-          {/* SVG Connector 4: Flow Arrow to Ship */}
+          {/* SVG Connector 4 */}
           <svg
             className={styles.connectorSvg}
             viewBox="0 0 50 160"
@@ -250,14 +220,15 @@ export const DataFlowDiagram: React.FC = () => {
             <path
               d="M 5 80 L 45 80"
               className={styles.solidArrow}
-              stroke="#3b82f6"
+              stroke="#f59e0b"
               strokeWidth="2"
             />
-            <polygon points="45,76 50,80 45,84" fill="#3b82f6" />
+            <polygon points="45,76 50,80 45,84" fill="#f59e0b" />
           </svg>
 
           {/* 5. Pass -> Ship Node */}
           <div className={styles.nodeCard}>
+            <div className={styles.nodeTag}>DELIVER</div>
             <div className={styles.nodeTitle}>PASS → SHIP</div>
             <div className={styles.nodeSubtitle}>bounded output</div>
           </div>
@@ -266,7 +237,7 @@ export const DataFlowDiagram: React.FC = () => {
         {/* Footer Tagline */}
         <div className={styles.diagramFooter}>
           <div className={styles.tagline}>
-            STATE · ROUTING · VERIFICATION · RECOVERY
+            <span>STATE</span> · <span>ROUTING</span> · <span>VERIFICATION</span> · <span>RECOVERY</span>
           </div>
         </div>
       </div>

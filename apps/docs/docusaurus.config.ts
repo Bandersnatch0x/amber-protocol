@@ -1,6 +1,15 @@
+import fs from 'fs';
+import path from 'path';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import { themes as prismThemes } from 'prism-react-renderer';
+
+// Load version & environment assumptions directly from repository release metadata
+const rootPkgPath = path.resolve(__dirname, '../../package.json');
+const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
+
+const amberVersion = rootPkg.version || '1.6.0';
+const nodeEngines = rootPkg.engines?.node || '^20.19.0 || ^22.12.0 || >=23';
 
 const config: Config = {
   title: 'Amber Protocol',
@@ -25,6 +34,11 @@ const config: Config = {
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
+  },
+
+  customFields: {
+    amberVersion,
+    nodeEngines,
   },
 
   presets: [
@@ -60,22 +74,23 @@ const config: Config = {
 
   themeConfig: {
     colorMode: {
-      defaultMode: 'light',
+      defaultMode: 'dark',
       disableSwitch: false,
       respectPrefersColorScheme: true,
     },
     navbar: {
       title: 'Amber Protocol',
       logo: {
-        alt: 'Amber Protocol Logo',
+        alt: 'Amber Logo',
         src: 'img/amber-logo.svg',
+        srcDark: 'img/amber-logo.svg',
         width: 32,
         height: 32,
       },
       items: [
         {
           to: '/start-here',
-          label: 'Start here',
+          label: 'Start Here',
           position: 'left',
         },
         {
@@ -114,10 +129,10 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Adoption',
+          title: 'Reader Journey',
           items: [
             {
-              label: 'Start here',
+              label: 'Start Here',
               to: '/start-here',
             },
             {
@@ -131,10 +146,27 @@ const config: Config = {
           ],
         },
         {
+          title: 'Architecture & Guides',
+          items: [
+            {
+              label: 'Core Concepts',
+              to: '/concepts',
+            },
+            {
+              label: 'Adopting Existing Projects',
+              to: '/guides/adopting-existing-project',
+            },
+            {
+              label: 'Session Handoffs',
+              to: '/guides/session-handoff',
+            },
+          ],
+        },
+        {
           title: 'Reference',
           items: [
             {
-              label: 'CLI Reference',
+              label: 'CLI Commands (54)',
               to: '/reference/cli',
             },
             {
@@ -172,7 +204,7 @@ const config: Config = {
               href: 'https://github.com/Bandersnatch0x/amber-protocol',
             },
             {
-              label: 'Version v1.6.0',
+              label: `Version v${amberVersion}`,
               to: '/about/version-history',
             },
           ],

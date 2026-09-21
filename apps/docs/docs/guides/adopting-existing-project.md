@@ -5,7 +5,7 @@ sidebar_label: "Adopting an Existing Project"
 description: "Step-by-step adoption guide: running audit, generating init scaffold, and configuring doctor."
 ---
 
-import CommandBlock from '@site/src/components/CommandBlock';
+import CommandBlock from '@site/src/components/command-block';
 
 # Adopting an Existing Project
 

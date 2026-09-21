@@ -472,6 +472,16 @@ For the full boundary notes, see [SPEC.md](./SPEC.md).
 | DeepSeek Harness (`dsh`) overlay    | [dsh/README.md](./dsh/README.md)                                                                                                                                      |
 | Contributing                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
 
+The public documentation site (`apps/docs`) provides reader-focused guides, concepts, and authoritative single-source CLI references with 100% offline local search:
+
+```bash
+npm run docs:build      # Build the static documentation site
+npm run docs:verify     # Run the 11-gate mechanical verification seam
+npm run docs:gen        # Generate CLI reference pages from command registry
+npm run docs:gen:check  # Verify zero drift between code and CLI reference docs
+npm run docs:test       # Run public documentation test suite
+```
+
 The web viewer (`apps/web`) provides a dashboard for sessions and timelines:
 
 ```bash

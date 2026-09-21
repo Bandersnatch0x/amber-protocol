@@ -5,7 +5,7 @@ sidebar_label: "Installation"
 description: "Supported Node and npm expectations, global installation, and in-repo development setup."
 ---
 
-import CommandBlock from '@site/src/components/CommandBlock';
+import CommandBlock from '@site/src/components/command-block';
 
 # Installation & Environment Requirements
 

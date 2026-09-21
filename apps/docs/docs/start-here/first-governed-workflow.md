@@ -5,7 +5,7 @@ sidebar_label: "First Governed Workflow"
 description: "Step-by-step walkthrough: audit, init, doctor, session start, and next with observable signals."
 ---
 
-import CommandBlock from '@site/src/components/CommandBlock';
+import CommandBlock from '@site/src/components/command-block';
 
 # First Governed Workflow
 

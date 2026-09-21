@@ -5,7 +5,7 @@ sidebar_label: "Gates & Readiness Audit"
 description: "Evaluating phase gates, checking drift in CI, and conducting readiness audits."
 ---
 
-import CommandBlock from '@site/src/components/CommandBlock';
+import CommandBlock from '@site/src/components/command-block';
 
 # Governance Gates & Readiness Audit
 

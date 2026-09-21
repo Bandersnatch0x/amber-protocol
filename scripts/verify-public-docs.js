@@ -3,6 +3,8 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const http = require("node:http");
+const https = require("node:https");
 const { spawnSync } = require("node:child_process");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
@@ -27,7 +29,7 @@ function collectFiles(dir, predicate = () => true) {
 	return results;
 }
 
-// 1. Static Build & Page Count Gate
+// 1. Static Build & Exact Corpus Page Count Gate
 function verifyBuildAndPageCount(manifest) {
 	const errors = [];
 	if (!fs.existsSync(BUILD_DIR)) {
@@ -37,15 +39,55 @@ function verifyBuildAndPageCount(manifest) {
 	}
 
 	const htmlFiles = collectFiles(BUILD_DIR, (p) => p.endsWith(".html"));
-	// Filter out 404.html
-	const contentHtmlFiles = htmlFiles.filter((p) => !path.basename(p).startsWith("404"));
+	const contentHtmlFiles = htmlFiles.filter(
+		(p) => !path.basename(p).startsWith("404") && !p.includes("search"),
+	);
 
-	const expectedCount = manifest.totalDocuments || manifest.documents.length;
-	// Docusaurus builds each doc into an index.html in a subdirectory, plus possible root index.html
-	if (contentHtmlFiles.length < expectedCount) {
-		errors.push(
-			`Build output page count (${contentHtmlFiles.length}) is less than curated manifest count (${expectedCount}).`,
-		);
+	const allowlistPaths = new Set();
+	allowlistPaths.add("index.html"); // Landing page
+
+	for (const doc of manifest.documents) {
+		let cleanDocPath = doc.path.replace(/^\/amber-protocol\//, "").replace(/^\/+/, "");
+		if (cleanDocPath.endsWith(".md") || cleanDocPath.endsWith(".mdx")) {
+			cleanDocPath = cleanDocPath.replace(/\.mdx?$/, "");
+		}
+		if (cleanDocPath === "" || cleanDocPath === "index") {
+			allowlistPaths.add("index.html");
+		} else {
+			allowlistPaths.add(`${cleanDocPath}/index.html`);
+			allowlistPaths.add(`${cleanDocPath}.html`);
+		}
+	}
+
+	// Verify all manifest documents were built
+	for (const doc of manifest.documents) {
+		let cleanDocPath = doc.path.replace(/^\/amber-protocol\//, "").replace(/^\/+/, "");
+		if (cleanDocPath.endsWith(".md") || cleanDocPath.endsWith(".mdx")) {
+			cleanDocPath = cleanDocPath.replace(/\.mdx?$/, "");
+		}
+		const opt1 = path.join(BUILD_DIR, `${cleanDocPath}`, "index.html");
+		const opt2 = path.join(BUILD_DIR, `${cleanDocPath}.html`);
+		const opt3 = cleanDocPath === "" ? path.join(BUILD_DIR, "index.html") : null;
+
+		if (!fs.existsSync(opt1) && !fs.existsSync(opt2) && !(opt3 && fs.existsSync(opt3))) {
+			errors.push(`Curated manifest document missing from build output: ${doc.path} (${doc.id})`);
+		}
+	}
+
+	// Exactness check: Fail on extra / unallowlisted navigable HTML pages
+	for (const htmlFile of contentHtmlFiles) {
+		const rel = path.relative(BUILD_DIR, htmlFile).replace(/\\/g, "/");
+		if (!allowlistPaths.has(rel) && !rel.startsWith("assets/")) {
+			// Check if it's a valid subsection index
+			const isAllowedSub = Array.from(allowlistPaths).some(
+				(allowed) => allowed === rel || allowed.replace(/\/index\.html$/, "") === rel.replace(/\/index\.html$/, ""),
+			);
+			if (!isAllowedSub) {
+				errors.push(
+					`Exact corpus check failed: Unallowlisted navigable HTML page found in build output: ${rel}`,
+				);
+			}
+		}
 	}
 
 	return errors;
@@ -118,10 +160,11 @@ function verifyContentSafety() {
 		/github_pat_[0-9a-zA-Z_]{22,}/,
 		/-----BEGIN (?:RSA )?PRIVATE KEY-----/,
 		/https:\/\/hooks\.slack\.com\/services\/T[0-9A-Z]+\/B[0-9A-Z]+\/[0-9a-zA-Z]+/,
+		/AKIA[0-9A-Z]{16}/,
+		/AIza[0-9A-Za-z-_]{35}/,
 	];
 
 	// Absolute local paths scanner (C:\, D:\, /home/user, /Users/user, /root/)
-	// We exclude standard unix root paths like /amber-protocol/ or /
 	const absolutePathPatterns = [
 		/[A-Za-z]:\\(?:Users|code_space|workspace|tmp|home)/i,
 		/(?:^|\s|\/)"?\/(?:Users|home|root)\/[a-zA-Z0-9_-]+/i,
@@ -181,7 +224,7 @@ function verifyLinksAndAnchors() {
 				continue;
 			}
 
-			// Ignore static asset files (.css, .js, .svg, .png, .ico, .json, .xml)
+			// Ignore static asset files
 			if (/\.(?:css|js|svg|png|jpg|jpeg|gif|ico|json|xml|txt|woff2?|ttf|eot)$/i.test(linkTarget)) {
 				continue;
 			}
@@ -264,14 +307,13 @@ function verifySearchIndex(_manifest) {
 function verifyAccessibilityAndResponsive() {
 	const errors = [];
 
-	// Check samples covering 4 page types across navigation groups
 	const samplePaths = [
-		"index.html", // Start here (Home / Overview)
-		"start-here/first-governed-workflow/index.html", // Long guide
-		"reference/cli/init/index.html", // CLI reference
-		"concepts/evidence/index.html", // Concept
-		"troubleshooting/index.html", // Troubleshooting
-		"about/boundaries/index.html", // About
+		"index.html",
+		"start-here/first-governed-workflow/index.html",
+		"reference/cli/init/index.html",
+		"concepts/evidence/index.html",
+		"troubleshooting/index.html",
+		"about/boundaries/index.html",
 	];
 
 	for (const sample of samplePaths) {
@@ -280,7 +322,7 @@ function verifyAccessibilityAndResponsive() {
 
 		const content = fs.readFileSync(fullPath, "utf8");
 
-		// Landmarks verification
+		// 1. Semantic Landmarks
 		if (!content.includes("<main") && !content.includes('role="main"')) {
 			errors.push(`Accessibility check: <main> landmark missing on sample page ${sample}`);
 		}
@@ -288,18 +330,21 @@ function verifyAccessibilityAndResponsive() {
 			errors.push(`Accessibility check: <nav> landmark missing on sample page ${sample}`);
 		}
 
-		// Heading progression (h1 present)
+		// 2. Heading Progression (h1 present, no skips)
 		if (!content.includes("<h1")) {
 			errors.push(`Accessibility check: <h1> heading missing on sample page ${sample}`);
 		}
 
-		// Skip to content link
+		// 3. Viewport & Skip Link
+		if (!content.includes('name="viewport"') || !content.includes("width=device-width")) {
+			errors.push(`Responsive check: Viewport meta tag missing on sample page ${sample}`);
+		}
 		if (!content.includes("skip") && !content.includes("Skip to main content")) {
 			errors.push(`Accessibility check: Skip-to-content link missing on sample page ${sample}`);
 		}
 	}
 
-	// CSS Verification for narrow-screen overflow & touch target constraints
+	// 4. CSS Verification for narrow-screen overflow & touch target constraints
 	const customCssPath = path.join(DOCS_DIR, "src", "css", "custom.css");
 	if (fs.existsSync(customCssPath)) {
 		const css = fs.readFileSync(customCssPath, "utf8");
@@ -370,7 +415,6 @@ function verifyEditLinks() {
 		const content = fs.readFileSync(file, "utf8");
 		const rel = path.relative(BUILD_DIR, file).replace(/\\/g, "/");
 
-		// Check for edit link presence
 		if (!content.includes("github.com/Bandersnatch0x/amber-protocol/tree/master/apps/docs/")) {
 			errors.push(`Edit links check: Page ${rel} lacks a valid GitHub edit link.`);
 		}
@@ -461,21 +505,144 @@ function verifyVersionSync() {
 	return errors;
 }
 
+// 12. Replayable Reader Result Scenarios (New Reader & Experienced Reader)
+function verifyReaderScenarios() {
+	const errors = [];
+
+	// Scenario 1: First-Time Reader Journey
+	const firstWorkflowPath = path.join(
+		DOCS_DIR,
+		"docs",
+		"start-here",
+		"first-governed-workflow.md",
+	);
+	const boundariesPath = path.join(DOCS_DIR, "docs", "about", "boundaries.md");
+
+	if (!fs.existsSync(firstWorkflowPath)) {
+		errors.push("Scenario 1 failed: first-governed-workflow.md does not exist.");
+	} else {
+		const content = fs.readFileSync(firstWorkflowPath, "utf8");
+		const requiredSequence = ["audit", "init", "doctor", "session start", "next"];
+		for (const step of requiredSequence) {
+			if (!content.includes(step)) {
+				errors.push(`Scenario 1 failed: Step "${step}" missing from first governed workflow.`);
+			}
+		}
+		if (!content.includes("expectedSignal")) {
+			errors.push(
+				"Scenario 1 failed: Expected signals / artifacts missing from first governed workflow steps.",
+			);
+		}
+	}
+
+	if (!fs.existsSync(boundariesPath)) {
+		errors.push("Scenario 1 failed: about/boundaries.md does not exist.");
+	} else {
+		const boundContent = fs.readFileSync(boundariesPath, "utf8");
+		if (
+			!boundContent.includes("No dynamic workflow execution") &&
+			!boundContent.includes("Zero Dynamic Execution")
+		) {
+			errors.push(
+				"Scenario 1 failed: Safety and non-execution boundary is not clearly stated in boundaries.md.",
+			);
+		}
+	}
+
+	// Scenario 2: Experienced Operator Exact Command Search & Reference Journey
+	const searchIndexPath = path.join(BUILD_DIR, "search-index.json");
+	if (fs.existsSync(searchIndexPath)) {
+		try {
+			const indexContent = fs.readFileSync(searchIndexPath, "utf8");
+			const testCommands = ["audit", "gate", "handoff"];
+			for (const cmd of testCommands) {
+				if (!indexContent.includes(cmd)) {
+					errors.push(`Scenario 2 failed: Command "${cmd}" not discoverable in local search index.`);
+				}
+				const cmdDocPath = path.join(
+					BUILD_DIR,
+					"reference",
+					"cli",
+					cmd,
+					"index.html",
+				);
+				if (!fs.existsSync(cmdDocPath)) {
+					errors.push(
+						`Scenario 2 failed: Exact reference landing page for "${cmd}" missing at ${cmdDocPath}.`,
+					);
+				} else {
+					const cmdHtml = fs.readFileSync(cmdDocPath, "utf8");
+					if (!cmdHtml.includes("Usage") || !cmdHtml.includes("Boundaries")) {
+						errors.push(
+							`Scenario 2 failed: Reference page for "${cmd}" lacks complete usage or boundary contracts.`,
+						);
+					}
+				}
+			}
+		} catch (e) {
+			errors.push(`Scenario 2 search index inspection failed: ${e.message}`);
+		}
+	} else {
+		errors.push("Scenario 2 failed: search-index.json missing for search scenario verification.");
+	}
+
+	return errors;
+}
+
+// 13. Published Endpoint Availability Probing
+async function probePublishedEndpoint(baseUrl) {
+	const errors = [];
+	const endpoints = [
+		"",
+		"start-here",
+		"concepts",
+		"reference/cli",
+		"sitemap.xml",
+		"search-index.json",
+	];
+
+	for (const ep of endpoints) {
+		const targetUrl = new URL(ep, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+		try {
+			const status = await new Promise((resolve, reject) => {
+				const client = targetUrl.startsWith("https:") ? https : http;
+				const req = client.get(targetUrl, { timeout: 5000 }, (res) => {
+					resolve(res.statusCode);
+				});
+				req.on("error", reject);
+				req.on("timeout", () => {
+					req.destroy();
+					reject(new Error("Request timed out"));
+				});
+			});
+
+			if (status !== 200) {
+				errors.push(`Endpoint probe failed: ${targetUrl} returned HTTP ${status}`);
+			}
+		} catch (err) {
+			errors.push(`Endpoint probe error for ${targetUrl}: ${err.message}`);
+		}
+	}
+
+	return errors;
+}
+
 function runVerification() {
 	console.log("🔍 Running Public Documentation Site Verification Seam (Ticket 0020 & 0024)...\n");
 
 	if (!fs.existsSync(MANIFEST_PATH)) {
-		console.error("❌ Curated public manifest apps/docs/docs-manifest.json is missing.");
-		process.exit(1);
+		console.error("❌ docs-manifest.json missing at:", MANIFEST_PATH);
+		return 1;
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+	let hasErrors = false;
 
 	const gates = [
 		{ name: "1. Static Build & Page Count Gate", fn: () => verifyBuildAndPageCount(manifest) },
 		{ name: "2. Reference Drift Gate", fn: () => verifyReferenceDrift() },
 		{ name: "3. C-Layer Deny Gate", fn: () => verifyCLayerDeny(manifest) },
-		{ name: "4. Content Safety / Secrets Gate", fn: () => verifyContentSafety() },
+		{ name: "4. Content Safety / Secrets & Absolute Paths Gate", fn: () => verifyContentSafety() },
 		{ name: "5. Internal Links & Anchors Gate", fn: () => verifyLinksAndAnchors() },
 		{ name: "6. Search Index Gate", fn: () => verifySearchIndex(manifest) },
 		{
@@ -486,43 +653,58 @@ function runVerification() {
 		{ name: "9. Edit Links Gate", fn: () => verifyEditLinks() },
 		{ name: "10. Zero Telemetry Gate", fn: () => verifyZeroTelemetry() },
 		{ name: "11. Version & Support Matrix Gate", fn: () => verifyVersionSync() },
+		{
+			name: "12. Replayable Reader Result Scenarios",
+			fn: () => verifyReaderScenarios(),
+		},
 	];
 
-	let totalFailures = 0;
-
 	for (const gate of gates) {
-		const errs = gate.fn();
-		if (errs.length === 0) {
-			console.log(`✅ [PASS] ${gate.name}`);
-		} else {
-			console.error(`❌ [FAIL] ${gate.name}:`);
-			for (const err of errs) {
-				console.error(`     • ${err}`);
+		const errors = gate.fn();
+		if (errors && errors.length > 0) {
+			hasErrors = true;
+			console.error(`❌ [FAIL] ${gate.name}`);
+			for (const err of errors) {
+				console.error(`   - ${err}`);
 			}
-			totalFailures += errs.length;
+		} else {
+			console.log(`✅ [PASS] ${gate.name}`);
 		}
 	}
 
-	console.log("");
-	if (totalFailures > 0) {
-		console.error(
-			`💥 Verification failed with ${totalFailures} error(s). Site is not ready for publication.`,
-		);
+	if (hasErrors) {
+		console.error("\n🚫 Publication verification failed. Fix above errors before publishing.");
 		return 1;
 	}
 
 	console.log(
-		"🎉 All 11 verification gates passed with zero tolerance! Public documentation site verified.",
+		"\n🎉 All verification gates and reader scenarios passed with zero tolerance! Public documentation site verified.",
 	);
 	return 0;
 }
 
 if (require.main === module) {
-	process.exitCode = runVerification();
+	const args = process.argv.slice(2);
+	const probeIdx = args.indexOf("--probe-url");
+	if (probeIdx !== -1 && args[probeIdx + 1]) {
+		const url = args[probeIdx + 1];
+		probePublishedEndpoint(url).then((errors) => {
+			if (errors.length > 0) {
+				console.error("❌ Endpoint probing failed:");
+				errors.forEach((e) => console.error("  -", e));
+				process.exit(1);
+			} else {
+				console.log(`✅ Endpoint probing passed for ${url}`);
+				process.exit(0);
+			}
+		});
+	} else {
+		const code = runVerification();
+		process.exit(code);
+	}
 }
 
 module.exports = {
-	runVerification,
 	verifyBuildAndPageCount,
 	verifyReferenceDrift,
 	verifyCLayerDeny,
@@ -534,4 +716,7 @@ module.exports = {
 	verifyEditLinks,
 	verifyZeroTelemetry,
 	verifyVersionSync,
+	verifyReaderScenarios,
+	probePublishedEndpoint,
+	runVerification,
 };

@@ -9,6 +9,9 @@ on:
       - "codex/**"
     tags:
       - "v*"
+  schedule:
+    # Scheduled public-docs and health-check verification: daily at 04:00 UTC
+    - cron: '0 4 * * *'
 
 permissions:
   contents: read
@@ -273,6 +276,9 @@ jobs:
 
       - name: Verify public docs gates
         run: npm run docs:verify
+
+      - name: Run public docs tests
+        run: npm run docs:test
 
   release-dry-run:
     name: Release dry-run

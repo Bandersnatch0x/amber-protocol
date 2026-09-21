@@ -17,6 +17,7 @@ const {
 	verifyEditLinks,
 	verifyZeroTelemetry,
 	verifyVersionSync,
+	verifyReaderScenarios,
 	runVerification,
 } = require("../scripts/verify-public-docs");
 
@@ -106,6 +107,11 @@ test("public docs verification seam: 10. Zero Telemetry Gate", () => {
 test("public docs verification seam: 11. Version & Support Matrix Gate", () => {
 	const errors = verifyVersionSync();
 	assert.deepEqual(errors, [], `Version sync check failed: ${errors.join("; ")}`);
+});
+
+test("public docs verification seam: 12. Replayable Reader Result Scenarios", () => {
+	const errors = verifyReaderScenarios();
+	assert.deepEqual(errors, [], `Reader scenarios check failed: ${errors.join("; ")}`);
 });
 
 test("public docs verification seam runs end-to-end and returns exit code 0", () => {

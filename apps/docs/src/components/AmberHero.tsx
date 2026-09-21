@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from '@docusaurus/Link';
-import { Shield, Menu, X } from 'lucide-react';
-import * as THREE from 'three';
 import styles from './AmberHero.module.css';
 
 /**
- * 3D Amber Crystal & Golden Particle Background
- * Replaces generic video with an interactive, locally-rendered Amber Gem & Resin Particle Nebula.
+ * High-Craft 3D Amber Crystal & Resin Particle Nebula Background
+ * Rendered with high-performance 2D Canvas 3D isometric projection.
+ * Zero external dependencies.
  */
 const AmberCrystalBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -15,187 +14,175 @@ const AmberCrystalBackground: React.FC = () => {
     if (!canvasRef.current || typeof window === 'undefined') return;
 
     const canvas = canvasRef.current;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // Scene & Camera
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 1000);
-    camera.position.z = 190;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
 
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      alpha: true,
-      antialias: true,
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // Ambient & Point Lights
-    const ambientLight = new THREE.AmbientLight(0x1a1205, 1.5);
-    scene.add(ambientLight);
-
-    const amberLight = new THREE.PointLight(0xf59e0b, 2.5, 400);
-    amberLight.position.set(0, 0, 50);
-    scene.add(amberLight);
-
-    // 1. Central Amber Crystal (Faceted Icosahedron)
-    const crystalGroup = new THREE.Group();
-    crystalGroup.position.set(window.innerWidth > 996 ? 90 : 0, 0, 0);
-    scene.add(crystalGroup);
-
-    // Outer wireframe shell
-    const outerGeo = new THREE.IcosahedronGeometry(48, 0);
-    const outerMat = new THREE.MeshBasicMaterial({
-      color: 0xf59e0b,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.25,
-    });
-    const outerCrystal = new THREE.Mesh(outerGeo, outerMat);
-    crystalGroup.add(outerCrystal);
-
-    // Inner translucent faceted crystal
-    const innerGeo = new THREE.IcosahedronGeometry(42, 0);
-    const innerMat = new THREE.MeshStandardMaterial({
-      color: 0xd97706,
-      emissive: 0x78350f,
-      roughness: 0.15,
-      metalness: 0.85,
-      transparent: true,
-      opacity: 0.55,
-      flatShading: true,
-    });
-    const innerCrystal = new THREE.Mesh(innerGeo, innerMat);
-    crystalGroup.add(innerCrystal);
-
-    // Core Glowing Polyhedron
-    const coreGeo = new THREE.OctahedronGeometry(22, 0);
-    const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xfbbf24,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.7,
-    });
-    const coreCrystal = new THREE.Mesh(coreGeo, coreMat);
-    crystalGroup.add(coreCrystal);
-
-    // 2. Orbital Governance Rings (围绕琥珀内核的治理规则环)
-    const ringGeo1 = new THREE.TorusGeometry(68, 0.6, 16, 100);
-    const ringMat1 = new THREE.MeshBasicMaterial({
-      color: 0xf59e0b,
-      transparent: true,
-      opacity: 0.2,
-    });
-    const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
-    ring1.rotation.x = Math.PI / 3;
-    crystalGroup.add(ring1);
-
-    const ringGeo2 = new THREE.TorusGeometry(78, 0.4, 16, 100);
-    const ringMat2 = new THREE.MeshBasicMaterial({
-      color: 0xfbbf24,
-      transparent: true,
-      opacity: 0.15,
-    });
-    const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
-    ring2.rotation.y = Math.PI / 4;
-    ring2.rotation.x = Math.PI / 6;
-    crystalGroup.add(ring2);
-
-    // 3. Floating Amber Resin Particles & Embers (悬浮琥珀微粒与流光)
-    const particleCount = 200;
-    const particleGeo = new THREE.BufferGeometry();
-    const particlePos = new Float32Array(particleCount * 3);
-    const particleColors = new Float32Array(particleCount * 3);
-
-    const c1 = new THREE.Color(0xf59e0b); // Amber Gold
-    const c2 = new THREE.Color(0xfbbf24); // Amber Light
-    const c3 = new THREE.Color(0xd97706); // Deep Amber
-
-    for (let i = 0; i < particleCount; i++) {
-      particlePos[i * 3] = (Math.random() - 0.5) * 500;
-      particlePos[i * 3 + 1] = (Math.random() - 0.5) * 300;
-      particlePos[i * 3 + 2] = (Math.random() - 0.5) * 200;
-
-      const rand = Math.random();
-      const c = rand > 0.6 ? c1 : rand > 0.3 ? c2 : c3;
-      particleColors[i * 3] = c.r;
-      particleColors[i * 3 + 1] = c.g;
-      particleColors[i * 3 + 2] = c.b;
+    // 3D Particles
+    const particleCount = 140;
+    interface Particle {
+      x: number;
+      y: number;
+      z: number;
+      size: number;
+      alpha: number;
+      color: string;
+      vy: number;
     }
 
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
-    particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+    const colors = ['#f59e0b', '#fbbf24', '#d97706', '#fde68a'];
+    const particles: Particle[] = [];
 
-    const particleMat = new THREE.PointsMaterial({
-      size: 3,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending,
-    });
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        x: (Math.random() - 0.5) * 800,
+        y: (Math.random() - 0.5) * 600,
+        z: Math.random() * 400 + 50,
+        size: Math.random() * 2.5 + 1,
+        alpha: Math.random() * 0.7 + 0.3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vy: (Math.random() - 0.5) * 0.4,
+      });
+    }
 
-    const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
+    // 3D Polyhedron Vertices for Central Amber Crystal
+    const vertices: [number, number, number][] = [
+      [0, 1.6, 0],
+      [1.2, 0.5, 0.9],
+      [-1.2, 0.5, 0.9],
+      [0, 0.5, -1.4],
+      [1.2, -0.7, 0.9],
+      [-1.2, -0.7, 0.9],
+      [0, -0.7, -1.4],
+      [0, -1.7, 0],
+    ];
 
-    // Animation Loop
+    const edges = [
+      [0, 1], [0, 2], [0, 3],
+      [1, 2], [2, 3], [3, 1],
+      [1, 4], [2, 5], [3, 6],
+      [4, 5], [5, 6], [6, 4],
+      [7, 4], [7, 5], [7, 6],
+    ];
+
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    let angleX = 0;
+    let angleY = 0;
     let mouseX = 0;
     let mouseY = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
-      mouseX = (e.clientX / window.innerWidth - 0.5) * 0.3;
-      mouseY = (e.clientY / window.innerHeight - 0.5) * 0.3;
+      mouseX = (e.clientX / width - 0.5) * 0.4;
+      mouseY = (e.clientY / height - 0.5) * 0.4;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
 
-    const animate = () => {
-      const time = clock.getElapsedTime();
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
 
-      // Rotate Amber Crystal with organic breathing motion
-      outerCrystal.rotation.y = time * 0.15;
-      outerCrystal.rotation.x = time * 0.08;
+      // Background Radial Amber Glow
+      const centerX = width > 996 ? width * 0.65 : width * 0.5;
+      const centerY = height * 0.48;
 
-      innerCrystal.rotation.y = -time * 0.2;
-      innerCrystal.rotation.z = time * 0.1;
+      const radial = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, width * 0.45);
+      radial.addColorStop(0, 'rgba(245, 158, 11, 0.12)');
+      radial.addColorStop(0.5, 'rgba(217, 119, 6, 0.04)');
+      radial.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = radial;
+      ctx.fillRect(0, 0, width, height);
 
-      coreCrystal.rotation.x = time * 0.3;
-      coreCrystal.rotation.y = time * 0.25;
+      angleY += 0.008 + (mouseX - angleY * 0.1) * 0.05;
+      angleX += 0.004 + (mouseY - angleX * 0.1) * 0.05;
 
-      ring1.rotation.z = time * 0.08;
-      ring2.rotation.z = -time * 0.06;
+      // Draw Particles
+      particles.forEach((p) => {
+        p.y += p.vy;
+        if (p.y > 300) p.y = -300;
+        if (p.y < -300) p.y = 300;
 
-      // Parallax with mouse
-      crystalGroup.rotation.y += (mouseX - crystalGroup.rotation.y) * 0.05;
-      crystalGroup.rotation.x += (mouseY - crystalGroup.rotation.x) * 0.05;
+        const fov = 350;
+        const scale = fov / (fov + p.z);
+        const px = centerX + p.x * scale;
+        const py = centerY + p.y * scale;
 
-      // Floating resin particles movement
-      const pos = particleGeo.attributes.position.array as Float32Array;
-      for (let i = 0; i < particleCount; i++) {
-        pos[i * 3 + 1] += Math.sin(time * 0.5 + pos[i * 3] * 0.01) * 0.08;
-        pos[i * 3] += Math.cos(time * 0.3 + pos[i * 3 + 1] * 0.01) * 0.04;
-      }
-      particleGeo.attributes.position.needsUpdate = true;
+        ctx.beginPath();
+        ctx.arc(px, py, p.size * scale, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.alpha * scale;
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 6 * scale;
+        ctx.fill();
+      });
 
-      // Pulsing amber core glow
-      const scale = 1 + Math.sin(time * 2) * 0.04;
-      coreCrystal.scale.set(scale, scale, scale);
+      // 3D Projection Matrix
+      const radX = angleX;
+      const radY = angleY;
+      const crystalScale = width > 768 ? 95 : 65;
 
-      renderer.render(scene, camera);
-      animationFrameId = requestAnimationFrame(animate);
+      const projected = vertices.map(([x, y, z]) => {
+        // Rotate Y
+        let x1 = x * Math.cos(radY) + z * Math.sin(radY);
+        let z1 = -x * Math.sin(radY) + z * Math.cos(radY);
+        // Rotate X
+        let y2 = y * Math.cos(radX) - z1 * Math.sin(radX);
+        let z2 = y * Math.sin(radX) + z1 * Math.cos(radX);
+
+        const fov = 300;
+        const scale = fov / (fov + z2 * 35);
+        return {
+          x: centerX + x1 * crystalScale * scale,
+          y: centerY + y2 * crystalScale * scale,
+          scale,
+        };
+      });
+
+      // Draw Crystal Edges
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#f59e0b';
+
+      edges.forEach(([i, j]) => {
+        const p1 = projected[i];
+        const p2 = projected[j];
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+        ctx.lineWidth = 1.4 * p1.scale;
+        ctx.globalAlpha = 0.8;
+        ctx.stroke();
+      });
+
+      // Draw Crystal Vertices
+      projected.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3 * p.scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#fbbf24';
+        ctx.globalAlpha = 0.9;
+        ctx.fill();
+      });
+
+      // Draw Outer Orbital Halo
+      ctx.beginPath();
+      ctx.ellipse(centerX, centerY, crystalScale * 1.5, crystalScale * 0.45, angleY * 0.5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+
+      animationFrameId = requestAnimationFrame(render);
     };
 
-    animate();
+    render();
 
     const handleResize = () => {
-      const newW = window.innerWidth;
-      const newH = window.innerHeight;
-      camera.aspect = newW / newH;
-      camera.updateProjectionMatrix();
-      renderer.setSize(newW, newH);
-      crystalGroup.position.set(newW > 996 ? 90 : 0, 0, 0);
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
     };
 
     window.addEventListener('resize', handleResize);
@@ -204,19 +191,6 @@ const AmberCrystalBackground: React.FC = () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
-      renderer.dispose();
-      outerGeo.dispose();
-      outerMat.dispose();
-      innerGeo.dispose();
-      innerMat.dispose();
-      coreGeo.dispose();
-      coreMat.dispose();
-      ringGeo1.dispose();
-      ringMat1.dispose();
-      ringGeo2.dispose();
-      ringMat2.dispose();
-      particleGeo.dispose();
-      particleMat.dispose();
     };
   }, []);
 
@@ -247,7 +221,6 @@ const GridLines: React.FC = () => {
 
   return (
     <div className={styles.gridLinesContainer}>
-      {/* 4 Vertical Lines */}
       {verticalPositions.map((left, i) => (
         <div
           key={`v-${i}`}
@@ -256,7 +229,6 @@ const GridLines: React.FC = () => {
         />
       ))}
 
-      {/* 2 Horizontal Lines */}
       {horizontalPositions.map((top, i) => (
         <div
           key={`h-${i}`}
@@ -265,7 +237,6 @@ const GridLines: React.FC = () => {
         />
       ))}
 
-      {/* 8 Plus Marks at Intersections */}
       {horizontalPositions.map((top, hi) =>
         verticalPositions.map((left, vi) => (
           <div
@@ -314,20 +285,16 @@ const ConnectorLine: React.FC<ConnectorLineProps> = ({ x1, y1, x2, y2, delay }) 
 const CentralNodes: React.FC = () => {
   return (
     <div className={styles.centralNodes}>
-      {/* Connector Lines in Elbow Pairs */}
-      {/* Node 1: CORE_ENGINE */}
       <ConnectorLine x1="38%" y1="14%" x2="52%" y2="14%" delay={1200} />
       <ConnectorLine x1="52%" y1="14%" x2="60%" y2="27%" delay={1400} />
 
-      {/* Node 2: VERIFIABLE_EVIDENCE */}
       <ConnectorLine x1="32%" y1="58%" x2="20%" y2="74%" delay={1500} />
       <ConnectorLine x1="20%" y1="74%" x2="6%" y2="74%" delay={1700} />
 
-      {/* Node 3: CONTINUITY_HANDOFF */}
       <ConnectorLine x1="78%" y1="53%" x2="63%" y2="53%" delay={1800} />
       <ConnectorLine x1="63%" y1="53%" x2="50%" y2="63%" delay={2000} />
 
-      {/* Node 1 Square & Label */}
+      {/* Node 1 */}
       <div
         className={`${styles.nodeSquare} anim-scale-in`}
         style={{ top: '27%', left: '60%', animationDelay: '1500ms' }}
@@ -342,7 +309,7 @@ const CentralNodes: React.FC = () => {
         </div>
       </div>
 
-      {/* Node 2 Square & Label */}
+      {/* Node 2 */}
       <div
         className={`${styles.nodeSquare} anim-scale-in`}
         style={{ top: '58%', left: '32%', animationDelay: '1800ms' }}
@@ -357,7 +324,7 @@ const CentralNodes: React.FC = () => {
         </div>
       </div>
 
-      {/* Node 3 Square & Label */}
+      {/* Node 3 */}
       <div
         className={`${styles.nodeSquare} anim-scale-in`}
         style={{ top: '63%', left: '50%', animationDelay: '2100ms' }}
@@ -387,11 +354,11 @@ export const AmberHero: React.FC = () => {
 
   return (
     <section className={styles.heroSection}>
-      {/* 3D Amber Crystal & Resin Particle Nebula Background */}
+      {/* 3D Amber Crystal & Particle Background */}
       <AmberCrystalBackground />
 
       <div className={styles.contentLayer}>
-        {/* 7. Top Navigation */}
+        {/* Top Navigation */}
         <nav className={styles.nav}>
           <div className={styles.navLeftGroup}>
             <Link to="/" className={`${styles.wordmark} anim-fade-up`} style={{ animationDelay: '200ms' }}>
@@ -408,38 +375,46 @@ export const AmberHero: React.FC = () => {
             className={`${styles.navRightGroup} anim-slide-right`}
             style={{ animationDelay: '600ms' }}
           >
-            <Shield className="w-[15px] h-[15px] text-[#F59E0B]" strokeWidth={1.5} />
+            <svg
+              className="w-[15px] h-[15px] text-[#F59E0B]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#F59E0B"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
             <span className={styles.agentText}>agent::v1.6.0</span>
             <span className={styles.governedBadge}>[ GOVERNED ]</span>
             <span className={styles.statusLabel}>STATUS:</span>
             <span className={styles.chip}>ASSURANCE_L4</span>
           </div>
 
-          {/* Hamburger Button for Mobile */}
+          {/* Hamburger Button */}
           <button
             className={`${styles.hamburgerBtn} anim-fade-in`}
             style={{ animationDelay: '400ms' }}
             aria-label="Toggle menu"
             onClick={() => setMenuOpen(!menuOpen)}
           >
-            <span
-              className={`absolute transition-all duration-300 ${
-                menuOpen ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
-              }`}
-            >
-              <Menu className="w-[22px] h-[22px] text-white" strokeWidth={1.5} />
-            </span>
-            <span
-              className={`absolute transition-all duration-300 ${
-                menuOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
-              }`}
-            >
-              <X className="w-[22px] h-[22px] text-white" strokeWidth={1.5} />
-            </span>
+            {menuOpen ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
           </button>
         </nav>
 
-        {/* 8. Mobile Menu Overlay */}
+        {/* Mobile Menu */}
         <div className={`${styles.mobileMenu} ${menuOpen ? styles.menuVisible : styles.menuHidden}`}>
           <div className={styles.menuBackdrop} onClick={() => setMenuOpen(false)} />
           <div className={styles.menuPanel}>
@@ -448,7 +423,10 @@ export const AmberHero: React.FC = () => {
               aria-label="Close menu"
               onClick={() => setMenuOpen(false)}
             >
-              <X className="w-[22px] h-[22px] text-white" strokeWidth={1.5} />
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
 
             <div className={styles.mobileNavList}>
@@ -467,37 +445,24 @@ export const AmberHero: React.FC = () => {
                 </Link>
               ))}
             </div>
-
-            <div className={styles.mobileStatusBlock}>
-              <div className={styles.mobileStatusRow1}>
-                <Shield className="w-[15px] h-[15px] text-[#F59E0B]" strokeWidth={1.5} />
-                <span className={styles.agentText}>agent::v1.6.0</span>
-                <span className={styles.governedBadge}>[ GOVERNED ]</span>
-              </div>
-              <div className={styles.mobileStatusRow2}>
-                <span className={styles.agentText}>STATUS:</span>
-                <span className={styles.chip}>ASSURANCE_L4</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* 9. Main Heading */}
+        {/* Main Heading */}
         <h1 className={`${styles.heading} anim-fade-up`} style={{ animationDelay: '400ms' }}>
           Governed Agents.
           <br />
           Verifiable Output.
         </h1>
 
-        {/* 10. Grid Lines & Plus Marks */}
+        {/* Grid Lines */}
         <GridLines />
 
-        {/* 11. Central Nodes (Desktop) */}
+        {/* Central Nodes */}
         <CentralNodes />
 
-        {/* 12. Bottom Row */}
+        {/* Bottom Row */}
         <div className={styles.bottomRow}>
-          {/* Left CTA Button */}
           <Link
             to="/start-here/first-governed-workflow"
             className={`${styles.ctaBtn} anim-fade-up`}
@@ -507,7 +472,6 @@ export const AmberHero: React.FC = () => {
             <span className={styles.ctaText}>Start Governed Workflow</span>
           </Link>
 
-          {/* Right Info Card */}
           <div
             className={`${styles.infoCardWrapper} anim-slide-right`}
             style={{ animationDelay: '1100ms' }}
@@ -541,3 +505,4 @@ export const AmberHero: React.FC = () => {
     </section>
   );
 };
+

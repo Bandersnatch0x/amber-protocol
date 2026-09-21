@@ -1,0 +1,129 @@
+.container {
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--amber-border);
+  background: var(--amber-bg-surface);
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: var(--amber-bg-secondary);
+  border-bottom: 1px solid var(--amber-border);
+  font-size: 0.85rem;
+}
+
+.context {
+  font-weight: 600;
+  color: var(--amber-text-secondary);
+}
+
+.natureBadge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badgeReadOnly {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badgeGoverned {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--amber-500);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badgeGated {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badgeScaffold {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.commandRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background: #090d16;
+  gap: 1rem;
+}
+
+[data-theme='light'] .commandRow {
+  background: #f8fafc;
+}
+
+.commandText {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.9rem;
+  color: var(--amber-400);
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  word-break: break-all;
+}
+
+[data-theme='light'] .commandText {
+  color: #b45309;
+}
+
+.copyBtn {
+  background: var(--amber-bg-surface);
+  border: 1px solid var(--amber-border);
+  color: var(--amber-text-primary);
+  border-radius: 4px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copyBtn:hover {
+  border-color: var(--amber-500);
+  color: var(--amber-500);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.footer {
+  padding: 0.6rem 1rem;
+  background: var(--amber-bg-secondary);
+  border-top: 1px solid var(--amber-border);
+  font-size: 0.825rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+
+.signalLabel {
+  color: var(--amber-text-muted);
+  font-weight: 500;
+}
+
+.signalValue {
+  color: var(--amber-text-secondary);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8rem;
+}
