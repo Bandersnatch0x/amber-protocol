@@ -37,7 +37,6 @@ issues/
 .playwright-cli/
 .tanstack/
 apps/web/screenshots/
-apps/web/output/
 .claude/settings.local.json
 .claude/worktrees/
 .claude/plans/
