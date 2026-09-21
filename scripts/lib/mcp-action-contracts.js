@@ -226,6 +226,25 @@ const COMMAND_CAPABILITIES = {
 		edits: [".amber/external/proposals.jsonl"],
 		sideEffects: ["ledger-append"],
 	},
+	// Context/runtime contract §5.4: the Runtime loop is projected as thin,
+	// approval-required stage Actions (submit and settle) — never compressed
+	// verbs, never executed by the MCP surface. authorize/prepare stay CLI.
+	"runner/request": {
+		effect: "write",
+		approver: "human",
+		evidence: "runner-request",
+		directReadOnlyExec: false,
+		edits: [".amber/runner/requests.jsonl"],
+		sideEffects: ["ledger-append"],
+	},
+	"runner/settle": {
+		effect: "write",
+		approver: "human",
+		evidence: "runner-settlement",
+		directReadOnlyExec: false,
+		edits: [".amber/runner/executions.jsonl"],
+		sideEffects: ["ledger-append"],
+	},
 	"breakglass/grant": {
 		effect: "write",
 		approver: "human",

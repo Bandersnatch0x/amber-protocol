@@ -54,7 +54,9 @@ const GOLDEN = Object.freeze({
 const GOLDEN_SHA256 = Object.freeze({
 	candidates: "c64810466c23b81d8a63496d28f6edfdc1d695701de9ba5671cc46d132d09bb2",
 	authorizations: "880618fa15577e3ebc809d75b4290d5e38a4208e3ccd75f002fb1da4fb9e2d9c",
-	transactions: "65f02a560a202c6084701265aad73a27aee4d148d0c3b8a0e7f65a2e75210be4",
+	// Re-recorded after the §7.2 risk-policy bump (v2) changed the F052
+	// requestHash the transactions bind.
+	transactions: "e1cd025ac8ee1028ea2701a8ca76c98554e4398ee4d5528b7966b887b4135ca0",
 });
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
@@ -328,6 +330,14 @@ test("the factory-assembled release ledgers match the pre-migration recording", 
 		["deploy", "rollback"],
 	);
 	for (const name of Object.keys(GOLDEN)) {
+		// Recording mode (documented ritual): AMBER_RECORD_RELEASE_GOLDEN=1
+		// re-records the golden fixtures from the CURRENT writer — run twice,
+		// verify byte-identical, update GOLDEN_SHA256. The §7.2 risk-policy
+		// bump changed every F052 requestHash the transactions bind.
+		if (process.env.AMBER_RECORD_RELEASE_GOLDEN === "1") {
+			fs.copyFileSync(ledgers[name], GOLDEN[name]);
+			continue;
+		}
 		const actual = fs.readFileSync(ledgers[name]);
 		const golden = fs.readFileSync(GOLDEN[name]);
 		assert.equal(
@@ -338,7 +348,30 @@ test("the factory-assembled release ledgers match the pre-migration recording", 
 		assert.equal(
 			actual.equals(golden),
 			true,
-			`the migrated ${name} ledger ritual wrote different bytes than the pre-migration recording in tests/fixtures/release/${path.basename(GOLDEN[name])}`,
+			`the migrated ${name} ledger ritual wrote different bytes than the pre-migration recording in tests/fixtures/release/${path.basename(GOLDEN[name])}` +
+				(() => {
+					const a = actual.toString("utf8").split("\n");
+					const b = golden.toString("utf8").split("\n");
+					const diffs = [];
+					for (let i = 0; i < Math.max(a.length, b.length); i++) {
+						if (a[i] !== b[i]) {
+							try {
+								const ra = a[i] ? JSON.parse(a[i]) : null;
+								const rb = b[i] ? JSON.parse(b[i]) : null;
+								const keys = [
+									...new Set([...(ra ? Object.keys(ra) : []), ...(rb ? Object.keys(rb) : [])]),
+								];
+								const changed = keys.filter(
+									(k) => JSON.stringify(ra?.[k]) !== JSON.stringify(rb?.[k]),
+								);
+								diffs.push(`line ${i}: differs in [${changed.join(", ")}]`);
+							} catch {
+								diffs.push(`line ${i}: unparseable`);
+							}
+						}
+					}
+					return `\n${diffs.join("\n")}`;
+				})(),
 		);
 	}
 });

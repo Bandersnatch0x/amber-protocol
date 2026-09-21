@@ -15,6 +15,7 @@
 		"pages",
 		"references",
 		"excluded",
+		"redactions",
 		"deltaSince"
 	],
 	"properties": {
@@ -22,6 +23,19 @@
 		"route": {
 			"type": "string",
 			"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+		},
+		"redactions": {
+			"description": "ContextSnapshot redaction ledger (context/runtime contract §3.2): records THAT a field was omitted inside admitted pages and why — never values, counts, or ordering. Empty when the build omitted nothing.",
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["field", "reason"],
+				"properties": {
+					"field": { "type": "string", "minLength": 1 },
+					"reason": { "enum": ["classification-ceiling", "purpose-mismatch"] }
+				}
+			}
 		},
 		"feature": {
 			"anyOf": [
@@ -58,7 +72,7 @@
 					"items": {
 						"type": "object",
 						"additionalProperties": false,
-						"required": ["kind", "path", "rawHash", "words"],
+						"required": ["kind", "path", "rawHash", "words", "classification"],
 						"properties": {
 							"kind": {
 								"enum": ["operating-manual", "route-manifest", "loadout-definition"]
@@ -68,7 +82,11 @@
 								"type": "string",
 								"pattern": "^sha256:[0-9a-f]{64}$"
 							},
-							"words": { "type": "integer", "minimum": 0 }
+							"words": { "type": "integer", "minimum": 0 },
+							"classification": {
+								"description": "Required Artifacts carry the fixed internal classification; not caller-settable (context/runtime contract §3.1).",
+								"const": "internal"
+							}
 						}
 					}
 				}
@@ -105,6 +123,20 @@
 						"type": "array",
 						"uniqueItems": true,
 						"items": { "type": "string" }
+					},
+					"classification": {
+						"description": "The effective classification projection (stored value wins; governed pages without a stored label project internal).",
+						"enum": ["public", "internal", "confidential", "restricted", "secret", "unknown"]
+					},
+					"classificationSource": {
+						"enum": ["stored", "effective-default", "unlabeled"]
+					},
+					"purpose": {
+						"anyOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+					},
+					"expiresAt": {
+						"description": "Effective hard expiry derived from the page ttl and its ingest/refresh instant; null when the page carries no ttl.",
+						"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
 					}
 				}
 			}
@@ -136,7 +168,16 @@
 				"properties": {
 					"pageId": { "type": "string" },
 					"reason": {
-						"enum": ["over-budget", "tampered", "obsolete", "stale", "superseded", "knowledge-kind"]
+						"enum": [
+							"over-budget",
+							"tampered",
+							"obsolete",
+							"stale",
+							"superseded",
+							"knowledge-kind",
+							"classification",
+							"expired"
+						]
 					},
 					"detail": { "type": "string", "minLength": 1 }
 				}

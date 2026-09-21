@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
+import { createRequire } from 'module';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -8,6 +9,37 @@ import { resolveRepoFile, isRepoScoped } from '../server/lib/suggestions/paths';
 import { planFrictionNote } from '../server/lib/suggestions/planner';
 import { safeToolName } from '../server/lib/suggestions/fingerprint';
 import type { ImprovementSuggestion, FrictionSignal } from '../server/lib/suggestions/types';
+import type { WebAdapter } from '../../../scripts/lib/web-adapter';
+
+// The §8.2 correlation chain (proposed → validated → applied) is enforced by
+// the suggestion-review ledger guard: a forged card driven straight into
+// Apply must first stand up its promotion + admission events through the
+// adapter seam, exactly like the real service path does.
+const requireCli = createRequire(import.meta.url);
+const adapter = requireCli('../../../scripts/lib/web-adapter.js') as WebAdapter;
+
+function seedReviewChain(repoRoot: string, fingerprint: string, operations: object[] = []): void {
+  const attribution = {
+    entrySurface: 'tool-output',
+    impactSurface: 'context',
+    failureMode: 'boom',
+    responsibleArtifact: 'wiki',
+  };
+  const proposed = adapter.ensureSuggestionProposed(repoRoot, {
+    fingerprint,
+    evidence: [{ host: 'claude', transcriptId: 't1', excerpt: 'boom' }],
+    hosts: ['claude'],
+    // The §8.2 `proposed` payload digests the card's planned operations, so a
+    // card driven into Apply must declare at least one — an empty array is a
+    // writer-shape refusal, not a valid proposal.
+    operations:
+      operations.length > 0 ? operations : [{ verb: 'create', path: 'docs/wiki/seed.md' }],
+    attribution,
+  });
+  if (!proposed.ok) throw new Error(`proposed setup failed: ${proposed.errors.join('; ')}`);
+  const validated = adapter.recordSuggestionValidated(repoRoot, { fingerprint });
+  if (!validated.ok) throw new Error(`validated setup failed: ${validated.errors.join('; ')}`);
+}
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'amber-suggest-sec-'));
@@ -105,6 +137,8 @@ describe('Improvement Suggestions security boundaries', () => {
   });
 
   it('can undo a remove operation', () => {
+    seedReviewChain(root, 'fp-remove');
+
     const target = path.join(root, 'docs', 'wiki', 'gone.md');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, 'original bytes\n');

@@ -2282,12 +2282,61 @@
 			"area": "observability",
 			"title": "Improvement Suggestions (web, multi-host)",
 			"user_visible_behavior": "The web viewer lists Improvement Suggestion cards clustered from Claude, Codex, and Cursor transcripts for the current repository. A card shows an evidence count, host badges, a preview of an allowlisted wiki operation, and Apply / Dismiss / Snooze / Undo. Apply never writes product code, tests, or MEMORY.md.",
-			"status": "in_progress",
+			"status": "accepted",
 			"verification": [
-				"apps/web vitest: suggestions cluster, apply, hosts, router",
+				"apps/web vitest: suggestions heuristic, cluster, router, apply, attribution, instruction-surface, recurrence, review, security",
 				"apps/web playwright: tests/e2e/suggestions.spec.ts"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npx vitest run tests/suggestions-*.test.ts tests/server/suggestions-router.test.ts",
+					"result": "pass: 9 files, 74 tests passed",
+					"date": "2026-09-21",
+					"notes": "apps/web; suites: heuristic, cluster, router, apply, attribution, instruction-surface, recurrence, review, security"
+				},
+				{
+					"command": "npx playwright test tests/e2e/suggestions.spec.ts",
+					"result": "pass: 2 passed (18.0s)",
+					"date": "2026-09-21",
+					"notes": "apps/web; desktop nav opens suggestions page with clustered card; preview and apply write an allowlisted wiki note"
+				},
+				{
+					"command": "node scripts/amber.js --help --all | grep -ci suggestion",
+					"result": "pass: 0 (amber exit 0; no new default CLI verb shipped)",
+					"date": "2026-09-21",
+					"notes": "phase boundary: suggestions stays a web mount over tRPC"
+				},
+				{
+					"command": "npm test",
+					"result": "pass: 3761 tests, 222 suites, 0 fail (619s)",
+					"date": "2026-09-21",
+					"notes": "existing Amber guardrails still pass"
+				},
+				{
+					"command": "npx vitest run tests/suggestions-apply.test.ts -t non-allowlisted",
+					"result": "pass: 1 passed | 11 skipped",
+					"date": "2026-09-21",
+					"notes": "Apply refuses a non-allowlisted operation; allowlist is AGENTS.md, CLAUDE.md, docs/wiki/**/*.md, skills/*/SKILL.md"
+				},
+				{
+					"command": "npm run manifests",
+					"result": "pass: Errors 0",
+					"date": "2026-09-21",
+					"notes": "acceptance guardrail"
+				},
+				{
+					"command": "npm run doctor",
+					"result": "pass: feature_list.json errors=0 warnings=0; all checks Errors 0",
+					"date": "2026-09-21",
+					"notes": "acceptance guardrail"
+				},
+				{
+					"command": "npm run gen:agents:check",
+					"result": "pass: agent command files up to date (15 files)",
+					"date": "2026-09-21",
+					"notes": "acceptance guardrail"
+				}
+			],
 			"notes": [
 				"Web-only; no new default CLI verb.",
 				"Apply allowlist: AGENTS.md, CLAUDE.md, docs/wiki/**/*.md, skills/*/SKILL.md."
@@ -2298,7 +2347,8 @@
 				"apps/web/src/routes/suggestions/",
 				"docs/specs/F064-improvement-suggestions.md",
 				"docs/plans/F064-Improvement-suggestions.md"
-			]
+			],
+			"updated": "2026-09-21"
 		}
 	]
 }

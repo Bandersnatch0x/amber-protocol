@@ -9,6 +9,30 @@
 		"pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
 		"title": { "type": "string", "minLength": 1 },
 		"scope": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+		"classification": {
+			"description": "Page-level classification metadata owned by the page (context/runtime contract §3.1); absent means the read-side effective projection applies — never a stored write-back.",
+			"enum": ["public", "internal", "confidential", "restricted", "secret"]
+		},
+		"purpose": {
+			"description": "Non-empty string referencing the Loadout scope (route or feature id).",
+			"type": "string",
+			"minLength": 1
+		},
+		"ttl": {
+			"description": "ISO-8601 duration; the load-build derives the effective hard expiry from the page's ingest/refresh instant.",
+			"type": "string",
+			"pattern": "^P(?=(\\d|T\\d))(?:(\\d+)Y)?(?:(\\d+)M)?(?:(\\d+)D)?(T(?=(\\d))(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+(?:\\.\\d+)?)S)?)?$"
+		},
+		"relabelDecision": {
+			"description": "Reference to the committed human Decision authorizing a classification downgrade of a restricted/secret source (ingest refuses a downgrade that cannot show one).",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["identity", "revision"],
+			"properties": {
+				"identity": { "type": "string", "minLength": 1 },
+				"revision": { "type": "integer", "minimum": 1 }
+			}
+		},
 		"knowledgeKind": {
 			"enum": [
 				"invariant",

@@ -22,7 +22,32 @@ const { validateWiki } = require("./validators");
 
 const { statePathForCreate } = require("../state-dir-resolver");
 
-const { detectGitWorkflow } = require("./git-workflow-detector");
+// §5.5 split (governance contract G-9): the LOGIC is Core; the git EXECUTION
+// source is Adapter-injected (lazily defaulting to the Coding-domain seam).
+// Core never imports git-exec/git-workflow-detector at module load (G1/G8).
+let gitAdapterForscaffold = null;
+function defaultGitAdapterForThisModule() {
+	if (gitAdapterForscaffold === null) {
+		let detector;
+		try {
+			detector = require("./git-workflow-detector");
+		} catch {
+			detector = {};
+		}
+		gitAdapterForscaffold = {
+			detectGitWorkflow: detector.detectGitWorkflow,
+		};
+	}
+	return gitAdapterForscaffold;
+}
+
+/**
+ * Test/adapter seam: inject the git runner. Pass null to restore the default.
+ */
+function setGitAdapterForThisModule(adapter) {
+	gitAdapterForscaffold = adapter;
+}
+
 const { generateGovernanceAdvice } = require("./team-governance-advisor");
 
 function listTemplateFiles(templateRoot = TEMPLATE_ROOT) {
@@ -162,7 +187,7 @@ function gatherInitInsights(targetRoot, options) {
 
 	let detection = null;
 	if (!options.skipDetection) {
-		const workflow = detectGitWorkflow(targetRoot);
+		const workflow = defaultGitAdapterForThisModule().detectGitWorkflow(targetRoot);
 		const governance = workflow ? generateGovernanceAdvice(targetRoot, workflow) : null;
 		if (workflow || governance) {
 			detection = { workflow, governance };
@@ -356,6 +381,7 @@ function scaffoldWiki(target, options = {}) {
 }
 
 module.exports = {
+	setGitAdapterForThisModule,
 	listTemplateFiles,
 	copyTemplateFiles,
 	scaffoldHarness,

@@ -144,6 +144,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_KB_CORRUPT"],
 	},
+	AMBER_E_RUN_EVENTS_CORRUPT: {
+		title: "Session timeline chain is broken",
+		cause:
+			"a chained run-event's prevHash or body hash no longer verifies — the timeline was edited in place after chaining began. Legacy plaintext lines (pre-chain) are a tolerated prefix and never verified.",
+		remedy:
+			"Restore timeline.jsonl from version control or a backup; chained events are append-only and must not be edited in place.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED"],
+	},
 	// --- Fail-closed ledger reads (F035-S5 decision D4: absence is empty, not corruption) ---
 	AMBER_E_KB_CORRUPT: {
 		title: "Knowledge ledger is corrupt or unreadable",
@@ -288,6 +297,50 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_INVALID_ARG", "AMBER_E_STALENESS_REGISTRY_CORRUPT"],
 	},
+	AMBER_E_SUGGESTION_REVIEW_CORRUPT: {
+		title: "Suggestion review ledger is corrupt or unreadable",
+		cause:
+			"A suggestion-review ledger read hit a corrupt line, a broken hash chain, an unknown kind or field, or an event sequence the review writers could never produce (an unproposed fingerprint, a second proposal, an unvalidated apply, an unbalanced undo). An absent ledger reads as empty; this code only fires on real corruption — and on the write path it refuses the mutation rather than letting an audit event go missing.",
+		remedy:
+			"Restore .amber/suggestions/review.jsonl from a backup or version control if tracked; never edit the ledger in place — it is append-only governed state and every change is a proposed/validated/rejected/applied/undone event. If it is untracked and unrecoverable, reconcile the overlay (.amber/suggestions/state.json) by hand: it remains the current-state owner.",
+		layer: "Observability",
+		related: [
+			"AMBER_E_SUGGESTION_REVIEW_LOCK",
+			"AMBER_E_SUGGESTION_REVIEW_SIZE_CEILING",
+			"AMBER_E_EVIDENCE_REGISTRY_CORRUPT",
+		],
+	},
+	AMBER_E_SUGGESTION_REVIEW_LOCK: {
+		title: "Another suggestion review ledger write is in flight",
+		cause:
+			"A concurrent review writer holds .amber/suggestions/review.lock (fresh within the stale window), so the conflicting append or its §8.6 precheck is refused instead of racing the in-flight one.",
+		remedy:
+			"Retry once the in-flight write completes; a lock older than the stale window (30 s) is a crashed holder and is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_SUGGESTION_REVIEW_CORRUPT", "AMBER_E_EVIDENCE_REGISTRY_LOCK"],
+	},
+	AMBER_E_SUGGESTION_REVIEW_SIZE_CEILING: {
+		title: "Suggestion review ledger exceeds its size ceiling",
+		cause:
+			"Appending the next review event would grow .amber/suggestions/review.jsonl beyond the size ceiling (default 1 MiB, env AMBER_SUGGESTION_REVIEW_MAX_BYTES), so the write — and any target mutation gated on its §8.6 precheck — is refused before durable state is touched.",
+		remedy:
+			"Keep rejection summaries bounded, or raise the ceiling deliberately via AMBER_SUGGESTION_REVIEW_MAX_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: [
+			"AMBER_E_SUGGESTION_REVIEW_CORRUPT",
+			"AMBER_E_EVIDENCE_SIZE_CEILING",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
+	AMBER_E_SUGGESTION_REVIEW_STATE: {
+		title: "Suggestion review ledger state refuses this event",
+		cause:
+			"The per-kind writer guard refused the append against a fresh fold: a fingerprint is proposed exactly once, validated exactly once per proposal, Apply requires a validated proposal that is not already applied, and Undo requires a currently-applied proposal. The fold treats the same sequences as corruption when read back.",
+		remedy:
+			"Do not append review events by hand; drive the surface through the suggestion service (promotion at scan, Apply/Undo/Dismiss through the review actions), which only produces legal sequences.",
+		layer: "Governance",
+		related: ["AMBER_E_SUGGESTION_REVIEW_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",
 		cause: "ingest received a payload that does not satisfy schemas/context-page.schema.json.",
@@ -312,6 +365,67 @@ const CATALOG = {
 			"Return output for the exact request without changing its target, scope, sources, excerpts, or hashes.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_REQUEST_MISSING"],
+	},
+	AMBER_E_CONTEXT_DOWNGRADE_REFUSED: {
+		title: "Classification downgrade without a recorded Decision",
+		cause:
+			"the payload relabels a restricted/secret page to a lower classification and carries no relabelDecision that resolves to a committed human Decision (context/runtime contract §3.1: downgrade is a governance change).",
+		remedy:
+			"Record a human Decision authorizing the relabel and ingest again with relabelDecision: {identity, revision}; upgrades and first labels need no Decision.",
+		layer: "Context",
+		related: ["AMBER_E_CONTEXT_REQUEST_MISMATCH"],
+	},
+	AMBER_E_RESEARCH_CITATIONS_CORRUPT: {
+		title: "Research citation store failed its integrity walk",
+		cause:
+			"the citation ledger failed its chain walk or an entry violates the closed citation shape — the store is edited in place or written by something other than the ledger-family append.",
+		remedy:
+			"Restore .amber/research/citations.jsonl from version control or a backup; the store is append-only and must not be edited in place.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_LOCK"],
+	},
+	AMBER_E_RESEARCH_CITATIONS_LOCK: {
+		title: "Research citation store is locked by another writer",
+		cause:
+			"another process holds the citations lock; concurrent citation appends serialize through it.",
+		remedy: "Retry the citation append once the writer finishes; never delete the lock file.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
+	},
+	AMBER_E_RESEARCH_CITATIONS_CEILING: {
+		title: "Research citation store would exceed its size ceiling",
+		cause:
+			"appending this citation would grow the store beyond its size ceiling (AMBER_RESEARCH_CITATIONS_MAX_BYTES); the write is refused before any durable state changes.",
+		remedy:
+			"Raise the ceiling explicitly via the env variable after reviewing the store, or archive old citations through a governed retention decision.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
+	},
+	AMBER_E_RESEARCH_CITATION_INVALID: {
+		title: "Research citation input is invalid",
+		cause:
+			"the citation carries a closed-set violation (missing fields, non-digest rawHash, unparseable retrievedAt) or the citationId is already recorded — a citation is recorded once.",
+		remedy: "Correct the citation fields; a changed claim is a new citation id, never a rewrite.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
+	},
+	AMBER_E_RESEARCH_VERIFIER_INVALID: {
+		title: "Research claim verification is invalid",
+		cause:
+			"claim_supported was invoked without an independent verifier principal (verifier = producer) or with missing claim fields (§6.3: the producer never verifies its own claim).",
+		remedy:
+			"Have a principal other than the producer record the verdict; human review is sufficient, a service Principal is allowed, self-verification is not.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATION_INVALID"],
+	},
+	AMBER_E_RESEARCH_QUERY_REFUSED: {
+		title: "Research query declaration refused",
+		cause:
+			"the search request's querySources[] fails R-EG-2: an unresolvable reference, a source above the capability's maxQueryClassification, or missing provenance where the capability requires it.",
+		remedy:
+			"Declare only sources that resolve in the current snapshot and fit the ceiling; a legitimately needed higher ceiling is a new capability version (human-approved), never a per-call override.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATION_INVALID"],
 	},
 	AMBER_E_CONTEXT_CLAIM_UNCITED: {
 		title: "Context page block cites an undeclared source",

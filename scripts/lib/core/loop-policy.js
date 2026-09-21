@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { computeConfidenceClasses } = require("./governance-readiness");
+const { admittedUnderCeiling } = require("./classification");
 
 const MAX_PATTERN_LEN = 200;
 
@@ -63,15 +64,61 @@ function matches(rule, command) {
 	return false;
 }
 
-// Pure function: deny wins, then allow, then defaultAction.
-function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
+// The closed five-value decision enumeration (governance contract §6.1,
+// extend-only): `deny` and `allow` are the v1 faces; `require_approval` and
+// `allow_with_limits` are v2 rule decisions; `unknown` replaces the implicit
+// default-deny when `defaultAction:"unknown"` is configured — it fails closed
+// like deny but additionally names the cause (`no-rule-matched`). `defer` is
+// deliberately NOT introduced: async PDP semantics contradict ADR-0001's
+// synchronous artifact-first boundary (require_approval is the human-delay
+// path).
+const POLICY_DECISIONS = Object.freeze([
+	"deny",
+	"allow",
+	"require_approval",
+	"allow_with_limits",
+	"unknown",
+]);
+
+// Pure function: deny wins, then allow, then defaultAction — extended with
+// the v2 decision faces (§6.2). v1 command-text rules (`action`/`match`/
+// `pattern`) and v2 capability rules (`decision` + `match{capability,target,
+// effect,constraints}`) share one deny-wins precision order; the caller
+// resolves `require_approval` into the capture→grant→execute path and
+// `allow_with_limits` into RunScope-constrained execution.
+function evaluateCommandPolicy(command, rules = DEFAULT_RULES, subject = null) {
 	const list = Array.isArray(rules?.rules) ? rules.rules : [];
+	// v1 deny (deny-wins first pass, all rules).
 	for (const rule of list) {
 		if (rule.action === "deny" && matches(rule, command)) {
 			return {
 				allowed: false,
 				matchedRule: rule.id,
 				reason: `denied by rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
+	// v2 explicit deny decisions ride the same first pass (a v2 rule with
+	// decision:"deny" is a deny, wherever it appears).
+	for (const rule of list) {
+		if (rule.decision === "deny" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: false,
+				matchedRule: rule.id,
+				reason: `denied by v2 rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
+	// require_approval beats allow in the precision order (§6.2).
+	for (const rule of list) {
+		if (rule.decision === "require_approval" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: false,
+				matchedRule: rule.id,
+				decision: "require_approval",
+				reason: `require_approval by rule ${rule.id}; enter the capture→grant→execute path (governance contract §6.1)`,
 				...confidenceSpread(rules, rule.id),
 			};
 		}
@@ -86,7 +133,40 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 			};
 		}
 	}
+	for (const rule of list) {
+		if (rule.decision === "allow" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: true,
+				matchedRule: rule.id,
+				reason: `allowed by v2 rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
+	for (const rule of list) {
+		if (rule.decision === "allow_with_limits" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: true,
+				matchedRule: rule.id,
+				decision: "allow_with_limits",
+				limits: rule.match?.constraints ?? null,
+				reason: `allowed with limits by rule ${rule.id}; the limits snapshot rides RunScope constraints`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
 	const allowByDefault = rules?.defaultAction === "allow";
+	if (!allowByDefault && rules?.defaultAction === "unknown") {
+		// unknown ⊃ deny: fails closed identically, additionally names the
+		// cause (§6.1).
+		return {
+			allowed: false,
+			matchedRule: null,
+			decision: "unknown",
+			reason: "no-rule-matched; defaultAction=unknown — refused like deny, with the cause named",
+			...confidenceSpread(rules, null),
+		};
+	}
 	return {
 		allowed: allowByDefault,
 		matchedRule: null,
@@ -95,6 +175,63 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 			: "no allow rule matched; defaultAction=deny",
 		...confidenceSpread(rules, null),
 	};
+}
+
+// The v2 capability face: a rule matches when every DECLARED dimension of
+// its `match` object agrees with the subject ({capability, target, effect,
+// constraints, contextClassification}). A rule without a `match` object is a
+// v1-shaped record and never matches on the v2 face.
+//
+// §6.2 / C0 §3.3 — the classification ceiling constraint: a rule declaring
+// `constraints.maxClassification` only matches a subject whose context
+// classification is at or under that ceiling. A subject with no declared
+// context classification (or `unknown`) NEVER satisfies any ceiling — the
+// rule simply doesn't match and the request falls to lower precision and the
+// fail-closed default (C0 §3.1: unknown is refused, never silently passed).
+function v2RuleMatches(rule, subject) {
+	if (!rule || typeof rule !== "object" || !rule.match || typeof rule.match !== "object") {
+		return false;
+	}
+	if (!subject || typeof subject !== "object") return false;
+	const match = rule.match;
+	if (match.capability !== undefined && match.capability !== subject.capability) return false;
+	if (match.effect !== undefined && match.effect !== subject.effect) return false;
+	if (match.target && typeof match.target === "object") {
+		if (match.target.pathPrefix !== undefined) {
+			const subjectPaths = Array.isArray(subject.target?.paths) ? subject.target.paths : [];
+			const prefix = String(match.target.pathPrefix);
+			const inside = subjectPaths.some((candidate) => {
+				const p = String(candidate);
+				return prefix.endsWith("/")
+					? p.startsWith(prefix)
+					: p === prefix || p.startsWith(`${prefix}/`);
+			});
+			if (!inside) return false;
+		}
+	}
+	if (
+		match.constraints &&
+		typeof match.constraints === "object" &&
+		match.constraints.maxClassification !== undefined &&
+		match.constraints.maxClassification !== null
+	) {
+		// §6.2/C0 §3.3 classification-ceiling constraint, direction per decision:
+		//   deny — GUARD semantics: fires when the subject exceeds the ceiling
+		//   (or is unknown/undeclared — fail-closed, C0 §3.1);
+		//   allow/require_approval/allow_with_limits — ADMISSION semantics: the
+		//   rule matches only when the subject is within the ceiling; unknown
+		//   never satisfies it and the request falls to the fail-closed default.
+		const violated = !admittedUnderCeiling(
+			subject.contextClassification ?? "unknown",
+			match.constraints.maxClassification,
+		).ok;
+		if (rule.decision === "deny") {
+			if (!violated) return false;
+		} else if (violated) {
+			return false;
+		}
+	}
+	return true;
 }
 
 // Optional confidence_gating block (T1, ADR-0011). When present AND enabled, the
@@ -197,8 +334,11 @@ function applyBuiltinDenies(command) {
 // are intentional semantic aliases over this single implementation — named
 // surfaces for evidence-runner vs governed-runner (loops + route command-stages),
 // not divergent logic. They were previously two byte-identical bodies that could
-// drift apart; one baseline cannot drift from itself.
-function evaluateWithBaseline(command, rules = DEFAULT_RULES) {
+// drift apart; one baseline cannot drift from itself. The optional `subject`
+// ({capability, target, effect, constraints, contextClassification}) feeds the
+// v2 capability face; null/absent (loops, verify) means no v2 match dimensions —
+// ceiling-carrying v2 rules never match (fail-closed).
+function evaluateWithBaseline(command, rules = DEFAULT_RULES, subject = null) {
 	const builtin = applyBuiltinDenies(command);
 	if (builtin) {
 		// Built-in un-removable denies are the most deterministic control on the
@@ -208,7 +348,7 @@ function evaluateWithBaseline(command, rules = DEFAULT_RULES) {
 		if (gating && gating.enabled !== false) return { ...builtin, confidence: "high" };
 		return builtin;
 	}
-	return evaluateCommandPolicy(command, rules);
+	return evaluateCommandPolicy(command, rules, subject);
 }
 const evaluateVerifyPolicy = evaluateWithBaseline;
 const evaluateGovernedPolicy = evaluateWithBaseline;
@@ -268,4 +408,6 @@ module.exports = {
 	loadVerifyPolicyRules,
 	DEFAULT_RULES,
 	matches,
+	v2RuleMatches,
+	POLICY_DECISIONS,
 };

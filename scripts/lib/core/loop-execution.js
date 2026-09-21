@@ -31,12 +31,35 @@ function loadContract(file, contractId) {
 
 function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 	const targetRoot = resolveTarget(target);
+	let data;
 	try {
-		loadContract(file, contractId);
+		({ data } = loadContract(file, contractId));
 	} catch (e) {
 		return { target: targetRoot, errors: [e.message], warnings: [] };
 	}
 	const approvalKey = crypto.randomUUID();
+	// §6.4 loop-surface identity binding: the approved record gains the same
+	// three-hash tuple as the run contract's grants (scopeHash over the
+	// loop's authority projection, policyVersion over the CURRENT rules,
+	// capabilityHash over the loop's governed-command projection). No
+	// separate loopRunId exists — contractId + the consumed approvalKey
+	// remain the loop execution identity (loop runs are single-execution
+	// contracts; R-AU-3/R-AU-4 hold via the tuple binding).
+	const { loadPolicyRules } = require("./loop-policy");
+	const { policyHashOf, scopeHashOf } = require("./run-freeze");
+	const rules = loadPolicyRules(targetRoot);
+	const governed = data?.contracts?.find?.((entry) => entry.id === contractId) ?? null;
+	const loopScopeInputs = {
+		capabilities: [`loop:${contractId}`],
+		targets: [governed?.governed?.command ?? contractId],
+		constraints: null,
+		context_scope: null,
+		side_effect_policy: {
+			defaultAction: rules?.defaultAction ?? "deny",
+			capabilityEffects: ["execute"],
+		},
+		expiration: null,
+	};
 	const record = appendLedgerRecord(ledgerPath(targetRoot, contractId), {
 		schemaVersion: 2,
 		kind: "approved",
@@ -44,6 +67,12 @@ function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 		contractId,
 		approvalKey,
 		reviewer: reviewer || "unknown",
+		scopeHash: scopeHashOf(loopScopeInputs),
+		policyVersion: policyHashOf(rules),
+		capabilityHash: policyHashOf({
+			command: governed?.governed?.command ?? null,
+			rules: governed?.governed?.rules ?? null,
+		}),
 		recordedAt: new Date().toISOString(),
 		executesAnything: false,
 	});

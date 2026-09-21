@@ -501,8 +501,8 @@ test("request constants pin the environments and the risk policy", () => {
 			runbookNamespace: "runbook.",
 		},
 	});
-	assert.deepEqual(RISK_LEVELS, ["low", "medium", "high"]);
-	assert.equal(RISK_POLICY_VERSION, 1);
+	assert.deepEqual(RISK_LEVELS, ["low", "medium", "high", "critical"]);
+	assert.equal(RISK_POLICY_VERSION, 2);
 	assert.deepEqual(EFFECT_RISK, {
 		read: "low",
 		prepare: "low",
@@ -525,7 +525,8 @@ test("a request derives its risk from capability facts, never from the caller", 
 	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
 	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
 	assert.equal(submitted.record.status, "requested");
-	assert.equal(submitted.record.risk, "high");
+	// §7.2 escalation: scoped credential on a deploy effect ⇒ critical.
+	assert.equal(submitted.record.risk, "critical");
 	assert.equal(submitted.record.riskPolicyVersion, RISK_POLICY_VERSION);
 	assert.match(submitted.record.requestHash, /^sha256:[0-9a-f]{64}$/);
 	assert.equal(
@@ -581,7 +582,10 @@ test("a request derives its risk from capability facts, never from the caller", 
 		{ now: NOW },
 	);
 	assert.equal(subset.ok, true, (subset.errors || []).join("; "));
-	assert.equal(subset.record.risk, "high");
+	// The REGISTERED capability's effect set classifies (deploy-class), not
+	// the caller's read subset — and with the §7.2 escalation the registry
+	// capability (scoped credential on deploy) derives critical.
+	assert.equal(subset.record.risk, "critical");
 
 	assert.equal(showRunnerRequest(dir, submitted.record.requestHash).status, "requested");
 	assert.equal(showRunnerRequest(dir, `sha256:${"f".repeat(64)}`), null);
@@ -1226,14 +1230,22 @@ test("tampered execution journal fails every read closed", () => {
 	);
 });
 
-test("the MCP seam exposes no runner execution surface", () => {
+test("the MCP seam exposes runner stages only as approval-required Actions", () => {
 	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
-	// Target-write execution is returned approval-required and never
-	// spawned (ADR-0022/F018): the MCP capability registry carries no
-	// runner verb at all, so no registry-proven read-only variant can ever
-	// auto-execute one.
-	const runnerCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
+	// Context/runtime contract §5.4: the Runtime loop is projected as thin,
+	// approval-required stage Actions (amber.runner.request / amber.runner.settle)
+	// — never compressed verbs, never spawned. No runner capability may carry a
+	// read-only direct-exec variant, so the MCP surface can never auto-execute
+	// a runner stage.
+	const runnerCapabilities = Object.entries(COMMAND_CAPABILITIES).filter(([key]) =>
 		key.split(/[\s.:/-]/).includes("runner"),
 	);
-	assert.deepEqual(runnerCapabilities, []);
+	assert.deepEqual(
+		runnerCapabilities.map(([key]) => key),
+		["runner/request", "runner/settle"],
+	);
+	for (const [, capability] of runnerCapabilities) {
+		assert.equal(capability.effect, "write");
+		assert.equal(capability.directReadOnlyExec, false);
+	}
 });

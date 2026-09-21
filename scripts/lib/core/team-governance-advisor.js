@@ -11,7 +11,26 @@
 const path = require("node:path");
 
 const { pathExists, readText, resolveTarget } = require("./fs-utils");
-const { gitOutput } = require("./git-exec");
+// §5.5 split (governance contract G-9): the LOGIC is Core; the git EXECUTION
+// source is Adapter-injected (lazily defaulting to the Coding-domain seam).
+// Core never imports git-exec/git-workflow-detector at module load (G1/G8).
+let gitAdapterForteamGovernanceAdvisor = null;
+function defaultGitAdapterForThisModule() {
+	if (gitAdapterForteamGovernanceAdvisor === null) {
+		const gitExec = require("./git-exec");
+		gitAdapterForteamGovernanceAdvisor = {
+			gitOutput: gitExec.gitOutput,
+		};
+	}
+	return gitAdapterForteamGovernanceAdvisor;
+}
+
+/**
+ * Test/adapter seam: inject the git runner. Pass null to restore the default.
+ */
+function setGitAdapterForThisModule(adapter) {
+	gitAdapterForteamGovernanceAdvisor = adapter;
+}
 
 // Personal, per-developer Amber state that should not be committed to a shared
 // repository. The advisor flags any of these not already covered by .gitignore.
@@ -56,7 +75,12 @@ function categorize(count) {
 // `git shortlog`, which reads from stdin when not attached to a TTY and would
 // hang under a non-interactive child process. Absent git / zero commits -> 0.
 function analyzeTeamSize(targetRoot) {
-	const out = gitOutput(resolveTarget(targetRoot), ["log", "--all", "--no-merges", "--format=%ae"]);
+	const out = defaultGitAdapterForThisModule().gitOutput(resolveTarget(targetRoot), [
+		"log",
+		"--all",
+		"--no-merges",
+		"--format=%ae",
+	]);
 	const count = out
 		? new Set(
 				out
@@ -172,6 +196,7 @@ function generateGovernanceAdvice(targetRoot, workflowDetection) {
 }
 
 module.exports = {
+	setGitAdapterForThisModule,
 	generateGovernanceAdvice,
 	analyzeTeamSize,
 	readGitignore,

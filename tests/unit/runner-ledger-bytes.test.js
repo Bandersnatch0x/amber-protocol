@@ -65,11 +65,11 @@ const GOLDEN = Object.freeze({
 	executions: path.join(FIXTURES_DIR, "executions-lifecycle.golden.jsonl"),
 });
 const GOLDEN_SHA256 = Object.freeze({
-	registry: "a2493061687c1b8aa20897723eaf75bc10a47ed0cdce9aeaf0928ac68e6f545b",
-	requests: "ef667b68808a2104235947203c9c2b4a33915d979469130c54ddab6307a9caf1",
-	executions: "c597bf21bab2e30afcd6a1758c9406f41e052939ac660f61e58b785cf20e6cfb",
+	registry: "805237f7826cca1bbe0eb91c21debcbeba81dddc6940d5782103837c2f5c536d",
+	requests: "a9bf8f1ed98f8f7e2373ef3c95eb38dbf1cd254bdb05278f0e6047e6e2f0e916",
+	executions: "a4f96119113975059096171416944ada12c52c0727419823f42653f36ac996d9",
 });
-const GOLDEN_BYTES = Object.freeze({ registry: 1069, requests: 1469, executions: 1427 });
+const GOLDEN_BYTES = Object.freeze({ registry: 1156, requests: 1783, executions: 1427 });
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const NOW = new Date("2026-08-28T00:00:00.000Z");
@@ -272,6 +272,16 @@ function runLifecycle(dir) {
 
 test("the factory-assembled runner ledgers are byte-identical to the pre-migration recording", () => {
 	const ledgers = runLifecycle(mkTarget("lifecycle"));
+	// The documented recording ritual (header comment): the env flag
+	// re-records the golden fixtures from the CURRENT writer — run it twice,
+	// verify both recordings byte-identical, then update the pinned
+	// GOLDEN_SHA256 / GOLDEN_BYTES constants.
+	if (process.env.AMBER_RECORD_RUNNER_GOLDEN === "1") {
+		for (const [name, golden] of Object.entries(GOLDEN)) {
+			fs.copyFileSync(ledgers[name], golden);
+		}
+		return;
+	}
 	assert.deepEqual(
 		readEvents(ledgers.registry).map((event) => event.kind),
 		["runner", "capability"],

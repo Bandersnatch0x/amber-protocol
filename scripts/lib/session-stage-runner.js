@@ -29,10 +29,26 @@ const {
 	readLedger,
 	verifyLedgerChain,
 	latestUnconsumedApproval,
+	latestUnconsumedApprovalFor,
 } = require("./core/loop-ledger");
 const { showEvidence } = require("./core/evidence-receipts");
-const { runGovernedCommand } = require("./core/governed-runner");
+const {
+	runGovernedCommand,
+	resolveCommandId,
+	eligibilityProblem,
+} = require("./core/governed-runner");
 const { codedError } = require("./core/error-catalog");
+const { loadPolicyRules } = require("./core/loop-policy");
+const {
+	capabilityHashOf,
+	contractHashOf,
+	executionProfileHashOf,
+	inputDigestOf,
+	policyHashOf,
+	projectCapabilityRecord,
+	runIdOf,
+	scopeHashOf,
+} = require("./core/run-freeze");
 
 // Closed settlement vocabulary (spec §"`settle` result and pending lifecycle").
 const SETTLEMENT_STATUSES = Object.freeze([
@@ -249,6 +265,181 @@ function idempotencyKeyOf({
 		.digest("hex");
 }
 
+// ── trusted-control run contract: frozen admission (spec §3–§4) ─────────────
+// Freeze = values + hashes. The values are the replay inputs; the hashes are
+// integrity checks and join keys, never replay inputs. All derivations live in
+// core/run-freeze.js and are shared with the governed-runner gate path.
+
+/**
+ * Freeze one attempt's admission inputs at capture time (spec §3): the
+ * six-field closed scopeInputs set, the evaluated request, the complete parsed
+ * rules object, the full registered capability record, the Loadout hash, and
+ * the execution profile — plus the five base hashes, the Layer-1 contractHash,
+ * and the R-FR-0 inputDigest.
+ *
+ * Recorded absences (never default-filled, R-FR-4/R-AU-1 discipline):
+ * `constraints` and `context_scope` are `null` until their owning contracts
+ * derive them on this surface; `contextHash` is `null` until a Loadout is
+ * wired to sessions; policy is `null` when rules.json is absent (the gate
+ * refuses later — capture records reality).
+ *
+ * @returns {{frozen: object, inputDigest: string}}
+ */
+function freezeAttemptInputs(projectRoot, resolved, manifest, route, attemptNumber, fence) {
+	const routeHash = routeHashOf(route);
+	const stage = resolved.stage;
+	const capabilityRecord = resolved.resolution?.capability ?? null;
+	const rules = loadPolicyRules(projectRoot);
+
+	// The evaluated request (R-FR-0): the exact resolved command/argv the gates
+	// will evaluate, captured verbatim — never a live caller value at replay
+	// time. bounded-command stages resolve the named command from the CURRENT
+	// rules (null when rules are absent or the name does not resolve — the
+	// gate refuses); host-agent attempts have no governed call, so the
+	// resolved command is null. argv is [] for a shell-string command: no
+	// argument vector exists (review-recorded implementation choice).
+	let resolvedCommand = null;
+	if (resolved.requiresApproval && rules && capabilityRecord) {
+		const resolution = resolveCommandId(capabilityRecord.name, rules);
+		resolvedCommand = resolution.ok ? resolution.command : null;
+	}
+	const evaluatedRequest = { resolvedCommand, argv: resolvedCommand === null ? null : [] };
+
+	const scopeInputs = {
+		capabilities: [resolved.capabilityPin],
+		targets: [stage.target],
+		constraints: null,
+		// §4 (context/runtime contract): the authorization-relevant constraints
+		// ride context_scope when the session manifest declares them — the
+		// closed four-field §4 shape. Absent remains the honest null (R-CA-4):
+		// no context-constraint check existed, never a defaulted value.
+		context_scope: manifest.context_scope ?? null,
+		side_effect_policy: {
+			defaultAction: rules?.defaultAction ?? "deny",
+			capabilityEffects: [...(capabilityRecord?.effects ?? [])].sort(),
+		},
+		expiration: manifest.lease?.expiresAt ?? null,
+	};
+	const contextHash = null;
+	const executionContext = manifest.execution_context ?? null;
+	const hashes = {
+		scopeHash: scopeHashOf(scopeInputs),
+		policyHash: policyHashOf(rules),
+		capabilityHash: capabilityHashOf(capabilityRecord ? [capabilityRecord] : []),
+		contextHash,
+		executionProfileHash: executionProfileHashOf(executionContext),
+	};
+	const inputDigest = inputDigestOf({
+		resolvedCommand,
+		argv: evaluatedRequest.argv,
+		capabilityPin: resolved.capabilityPin,
+		routeHash,
+		stageName: stage.name,
+		attemptNumber,
+		fence,
+	});
+	return {
+		frozen: {
+			scopeInputs,
+			evaluatedRequest,
+			// The complete parsed rules object: the replay input for R-RP-2.
+			policy: rules ?? null,
+			// Registered semantics (the pinned field set), not a digest label.
+			capabilityRecords: capabilityRecord ? [projectCapabilityRecord(capabilityRecord)] : [],
+			contextHash,
+			executionContext,
+			hashes: {
+				...hashes,
+				contractHash: contractHashOf({
+					routeId: route.routeId,
+					routeVersion: route.version || manifest.route.version,
+					hashes,
+				}),
+			},
+		},
+		inputDigest,
+	};
+}
+
+/**
+ * R-AD-2: attempt status is fold-derived from the appended events, never
+ * stored: `requested` → `denied` | `admitted` → `settled` (or `expired`).
+ */
+function attemptStatusOf(records, request) {
+	const requestId = request.requestId;
+	if (
+		records.some(
+			(record) => record.kind === "stage_attempt_expired" && record.requestId === requestId,
+		)
+	) {
+		return "expired";
+	}
+	if (
+		records.some(
+			(record) => record.kind === "stage_attempt_settled" && record.requestId === requestId,
+		)
+	) {
+		return "settled";
+	}
+	if (
+		records.some((record) => record.kind === "attempt_denied" && record.requestId === requestId)
+	) {
+		return "denied";
+	}
+	if (
+		records.some((record) => record.kind === "attempt_admitted" && record.requestId === requestId)
+	) {
+		return "admitted";
+	}
+	return "requested";
+}
+
+/**
+ * The still-open capture for a stage (R-AD-6 step 3 / R-ID-6): a `requested`
+ * attempt under the CURRENT lease fence whose deadline has not passed.
+ * Resuming it re-fires the gates for the SAME attempt instead of forking a
+ * new one; a terminal or stale-fence attempt never resumes.
+ */
+function findOpenAttempt(records, stageName, fence, now = new Date()) {
+	const open = records
+		.filter((record) => record.kind === "stage_attempt_requested" && record.stageName === stageName)
+		.filter((record) => attemptStatusOf(records, record) === "requested")
+		.filter((record) => record.leaseFence === undefined || record.leaseFence === fence)
+		.filter((record) => Date.parse(record.deadlineAt) > now.getTime());
+	return open.length > 0 ? open[open.length - 1] : null;
+}
+
+/**
+ * The gate binding (spec §5 R-AD-3 / §6): the frozen hashes and attempt
+ * identity the governed-runner verifies BEFORE any effect. A legacy request
+ * without frozen inputs carries no binding (R-FR-4 — never inferred).
+ */
+function gateBindingOf(request) {
+	const frozen = request.frozen;
+	if (!frozen) return undefined;
+	return {
+		inputDigest: request.inputDigest,
+		policyHash: frozen.hashes.policyHash,
+		capabilityHash: frozen.hashes.capabilityHash,
+		scopeHash: frozen.hashes.scopeHash,
+		// R-CA-3: the hard context expiry rides the binding so consumption
+		// refuses `context-expired` before any effect.
+		contextExpiresAt: frozen.scopeInputs?.context_scope?.constraints?.expiresAt ?? null,
+		// §6.2/C0 §3.3: the PDP v2 classification face evaluates against the
+		// attempt's own declared context ceiling (R-AU-1) — null is the honest
+		// absence (R-CA-4) and never satisfies a ceiling rule.
+		contextClassification:
+			frozen.scopeInputs?.context_scope?.constraints?.maxClassification ?? null,
+		attemptIdentity: {
+			capabilityPin: request.capabilityPin,
+			routeHash: request.routeHash,
+			stageName: request.stageName,
+			attemptNumber: request.attemptNumber,
+			fence: request.leaseFence,
+		},
+	};
+}
+
 /**
  * Resolve the current stage from the ledger cursor. Returns null when every
  * stage is complete. `gateAfter` on the last completed stage blocks the next
@@ -406,7 +597,20 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 		resolved.ownerId = session.manifest.lease?.ownerId ?? null;
 		resolved.execute = false;
 		resolved.requiresApproval = resolved.adapter.providerClass === "bounded-command";
-		// Dry-run creates no attempt and never advances the cursor.
+		// Dry-run creates no attempt and never advances the cursor. An open
+		// capture would resume in place (R-AD-6 step 3), so the projection
+		// shows that request instead of a would-be fork.
+		const openAttempt = findOpenAttempt(cursorRead.records, resolved.stage.name, resolved.fence);
+		if (openAttempt) {
+			return {
+				success: true,
+				dryRun: true,
+				request: openAttempt,
+				resume: true,
+				providerClass: resolved.adapter.providerClass,
+			};
+		}
+		const attemptNumber = attemptsForStage(cursorRead.records, resolved.stage.name).length + 1;
 		return {
 			success: true,
 			dryRun: true,
@@ -415,8 +619,16 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 				session.manifest,
 				route,
 				resolved,
-				attemptsForStage(cursorRead.records, resolved.stage.name).length + 1,
+				attemptNumber,
 				latestUnconsumedApproval(cursorRead.records)?.approvalKey ?? null,
+				freezeAttemptInputs(
+					projectRoot,
+					resolved,
+					session.manifest,
+					route,
+					attemptNumber,
+					resolved.fence,
+				),
 			),
 			providerClass: resolved.adapter.providerClass,
 		};
@@ -448,9 +660,19 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
  * Materialize the closed request identity (spec §"run request and attempt
  * identity"). attemptNumber and the idempotency key derive from the ledger
  * state; approvalRef binds the approval this attempt will consume when the
- * adapter requires one (bounded-command).
+ * adapter requires one (bounded-command). The frozen admission record (run
+ * contract §3) rides the request and fills the native `inputDigest` field
+ * (R-FR-0 — declared before this contract, never consumed until now).
  */
-function buildRequest(sessionId, manifest, route, resolved, attemptNumber, approvalRef) {
+function buildRequest(
+	sessionId,
+	manifest,
+	route,
+	resolved,
+	attemptNumber,
+	approvalRef,
+	frozenBundle,
+) {
 	const routeHash = routeHashOf(route);
 	const idempotencyKey = idempotencyKeyOf({
 		sessionId,
@@ -478,9 +700,10 @@ function buildRequest(sessionId, manifest, route, resolved, attemptNumber, appro
 		idempotencyKey,
 		leaseOwnerId: resolved.ownerId,
 		leaseFence: resolved.fence,
-		inputDigest: null,
+		inputDigest: frozenBundle ? frozenBundle.inputDigest : null,
 		executionMode: resolved.execute ? "execute" : "dry-run",
 		...(resolved.requiresApproval ? { approvalRef } : {}),
+		...(frozenBundle ? { frozen: frozenBundle.frozen } : {}),
 		requestedAt: new Date().toISOString(),
 		deadlineAt: new Date(Date.now() + 300_000).toISOString(),
 	};
@@ -508,11 +731,54 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 		? (latestUnconsumedApproval(records)?.approvalKey ?? null)
 		: null;
 
+	// R-AD-6 step 3 / R-ID-6: a still-open capture under the current fence
+	// resumes in place — the gates re-fire for the SAME attempt (no fork, no
+	// new attemptId). A host-agent capture stays pending (Amber never starts
+	// the Agent); re-running is an idempotent projection of the same request.
+	const openAttempt = findOpenAttempt(records, stage.name, options.leaseFence);
+	if (openAttempt) {
+		if (adapter.providerClass === "host-agent") {
+			return {
+				success: true,
+				pending: true,
+				request: openAttempt,
+				providerClass: adapter.providerClass,
+			};
+		}
+		return runCapturedAttempt(
+			projectRoot,
+			sessionId,
+			sessionDir,
+			route,
+			stage,
+			adapter,
+			resolution,
+			openAttempt,
+			records,
+		);
+	}
+
 	const attemptNumber = attemptsForStage(records, stage.name).length + 1;
-	const request = buildRequest(sessionId, manifest, route, resolved, attemptNumber, approvalRef);
+	const frozenBundle = freezeAttemptInputs(
+		projectRoot,
+		resolved,
+		manifest,
+		route,
+		attemptNumber,
+		options.leaseFence,
+	);
+	const request = buildRequest(
+		sessionId,
+		manifest,
+		route,
+		resolved,
+		attemptNumber,
+		approvalRef,
+		frozenBundle,
+	);
 
 	// An identical request hash returns the existing record instead of forking
-	// a second attempt with the same identity.
+	// a second attempt with the same identity (R-ID-5).
 	const duplicate = findByIdempotencyKey(records, request.idempotencyKey);
 	if (duplicate) {
 		return {
@@ -544,6 +810,18 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 			providerClass: adapter.providerClass,
 		},
 	});
+	// Timeline run events (plan Slice 6): every attempt opens its run window at
+	// capture; the events carry the lossless derived runId (R-ID-1), and a
+	// stored variant that differs from the derivation fails the fold.
+	appendSessionEvent(sessionDir, {
+		type: "run_started",
+		data: {
+			runId: runIdOf(sessionId, request.attemptId),
+			attemptId: request.attemptId,
+			requestId: request.requestId,
+			stage: stage.name,
+		},
+	});
 
 	// host-agent: Amber records the request and stops. It never starts an Agent.
 	if (adapter.providerClass === "host-agent") {
@@ -555,94 +833,18 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 		};
 	}
 
-	// bounded-command: read-only/verification only. The worktree is removed in
-	// governed-runner's finally block, so file output cannot survive
-	// (decision 6). The capability NAME is the policy rule id — decision 1's
-	// named command and decision 2's capability pin meet here.
 	if (adapter.providerClass === "bounded-command") {
-		const outcome = runGovernedCommand({
-			target: projectRoot,
-			commandId: resolution.capability.name,
-			producer: request.leaseOwnerId,
-			evidenceId: `evidence/${sessionId}/${request.attemptId}`,
-			capabilityPin,
-			requestId: request.requestId,
-			attemptId: request.attemptId,
-			ledgerPath,
-			budgetMinutes: 5,
-			subject: { sessionId, stage: stage.name },
-			label: `${sessionId}:${stage.name}`,
-		});
-		if (outcome.executed) {
-			// A real execution settles in the same call, success or failure — the
-			// request never stays pending after the command ran. A succeeded
-			// settlement requires Evidence (closed contract), so an execution
-			// whose receipt could not be recorded settles as failed, never as
-			// succeeded-without-Evidence.
-			const evidenceId = outcome.evidence?.id ?? null;
-			const commandExitedZero = outcome.exitCode === 0;
-			const internalSettlement = commandExitedZero
-				? evidenceId
-					? {
-							status: "succeeded",
-							exitCode: outcome.exitCode,
-							outputDigest: outcome.outputDigest ?? null,
-							evidenceId,
-							stdoutPreview: outcome.stdoutTail ?? "",
-							stderrPreview: outcome.stderrTail ?? "",
-						}
-					: {
-							status: "failed",
-							exitCode: outcome.exitCode,
-							outputDigest: outcome.outputDigest ?? null,
-							errorCode: "AMBER_E_EVIDENCE_MISSING",
-							reason:
-								"execution exited 0 but no Evidence receipt was recorded; a succeeded settlement requires a valid Evidence binding",
-							stdoutPreview: outcome.stdoutTail ?? "",
-							stderrPreview: outcome.stderrTail ?? "",
-						}
-				: {
-						status: "failed",
-						exitCode: outcome.exitCode,
-						outputDigest: outcome.outputDigest ?? null,
-						stdoutPreview: outcome.stdoutTail ?? "",
-						stderrPreview: outcome.stderrTail ?? "",
-					};
-			// The internal path runs the same closed-contract validation the
-			// CLI settle seam runs, so a durable record can never hold a shape
-			// the seam would have refused.
-			const shapeProblem = settlementProblem(internalSettlement, stage);
-			if (shapeProblem) return fail("AMBER_E_INVALID_ARG", shapeProblem);
-			const settled = settleInternal(
-				projectRoot,
-				sessionId,
-				sessionDir,
-				route,
-				request,
-				internalSettlement,
-			);
-			return commandExitedZero && evidenceId
-				? settled
-				: {
-						...settled,
-						success: false,
-						message: commandExitedZero
-							? "execution exited 0 but no Evidence receipt was recorded; the attempt settles as failed"
-							: `Command exited ${outcome.exitCode}`,
-						exitCode: 1,
-					};
-		}
-		// Refusal (policy, approval, isolation, ledger): the attempt never ran.
-		// Record the terminal rejected event so the request is not left pending,
-		// then surface the refusal (spec: a refused submission is rejected and
-		// does not advance the cursor).
-		const reason = outcome.errors.join("; ");
-		const settled = settleInternal(projectRoot, sessionId, sessionDir, route, request, {
-			status: "rejected",
-			reason,
-			errorCode: "AMBER_E_POLICY_DENY",
-		});
-		return { ...settled, success: false, message: reason, exitCode: 1 };
+		return runCapturedAttempt(
+			projectRoot,
+			sessionId,
+			sessionDir,
+			route,
+			stage,
+			adapter,
+			resolution,
+			request,
+			records,
+		);
 	}
 
 	// native: deterministic Amber code. No capability is registered as native
@@ -651,6 +853,181 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 		"AMBER_E_STAGE_ADAPTER_UNAVAILABLE",
 		`adapter ${adapter.adapterId} declares provider class native, but no native handler is bound to ${capabilityPin}`,
 	);
+}
+
+/**
+ * Drive one durably captured attempt through the gates (R-AD-6 step 3). The
+ * gate path inside governed-runner verifies the frozen binding BEFORE any
+ * effect (slice 3); the admission outcome is its own appended event
+ * (R-AD-1/R-AD-2); a real execution settles in the same call.
+ *
+ * `request` may be the fresh capture or the resumed open capture — the gates
+ * and records bind the attempt identity the request already carries.
+ */
+function runCapturedAttempt(
+	projectRoot,
+	sessionId,
+	sessionDir,
+	route,
+	stage,
+	adapter,
+	resolution,
+	request,
+	records,
+) {
+	const ledgerPath = ledgerPathOf(sessionDir);
+
+	// R-AD-6 step 1: an approval-requiring attempt with no ELIGIBLE grant stays
+	// durably captured — awaiting-authorization. Nothing executes, nothing is
+	// consumed, and no admission event exists; the attempt expires through the
+	// existing deadline path if its grant never arrives. Eligible means the
+	// mutual binding holds: an unconsumed grant bound to THIS attempt (or an
+	// explicitly unbound legacy grant) whose binding fields match the frozen
+	// tuple — the same selection the governed-runner gate applies (R-AU-3).
+	if ("approvalRef" in request) {
+		const binding = gateBindingOf(request);
+		const eligible = binding
+			? latestUnconsumedApprovalFor(
+					records,
+					(grant) => !eligibilityProblem(grant, binding, request.attemptId),
+				)
+			: latestUnconsumedApproval(records);
+		if (!eligible) {
+			return {
+				success: true,
+				awaitingAuthorization: true,
+				request,
+				providerClass: adapter.providerClass,
+			};
+		}
+	}
+
+	const outcome = runGovernedCommand({
+		target: projectRoot,
+		commandId: resolution.capability.name,
+		producer: request.leaseOwnerId,
+		evidenceId: `evidence/${sessionId}/${request.attemptId}`,
+		capabilityPin: request.capabilityPin,
+		requestId: request.requestId,
+		attemptId: request.attemptId,
+		ledgerPath,
+		budgetMinutes: 5,
+		subject: {
+			sessionId,
+			stage: stage.name,
+			runId: runIdOf(sessionId, request.attemptId),
+			scopeHash: request.frozen?.hashes?.scopeHash ?? null,
+		},
+		label: `${sessionId}:${stage.name}`,
+		frozen: gateBindingOf(request),
+	});
+
+	// R-AD-1: capture is not admission. The outcome is a separate appended
+	// event — `attempt_admitted` with the recorded policy verdict, or
+	// `attempt_denied` with the explicit refusal reason — and the attempt
+	// status is fold-derived from them (R-AD-2), never stored.
+	if (outcome.executed) {
+		appendLedgerRecord(ledgerPath, {
+			schemaVersion: 2,
+			kind: "attempt_admitted",
+			requestId: request.requestId,
+			attemptId: request.attemptId,
+			stageName: request.stageName,
+			policyVerdict: {
+				commandId: outcome.commandId ?? null,
+				matchedRule: outcome.matchedRule ?? null,
+			},
+			admittedAt: new Date().toISOString(),
+		});
+	} else {
+		appendLedgerRecord(ledgerPath, {
+			schemaVersion: 2,
+			kind: "attempt_denied",
+			requestId: request.requestId,
+			attemptId: request.attemptId,
+			stageName: request.stageName,
+			reason: outcome.errors.join("; "),
+			...(outcome.refusal ? { refusal: outcome.refusal } : {}),
+			deniedAt: new Date().toISOString(),
+		});
+	}
+
+	// bounded-command: read-only/verification only. The worktree is removed in
+	// governed-runner's finally block, so file output cannot survive
+	// (decision 6). The capability NAME is the policy rule id — decision 1's
+	// named command and decision 2's capability pin meet here.
+	if (outcome.executed) {
+		// A real execution settles in the same call, success or failure — the
+		// request never stays pending after the command ran. A succeeded
+		// settlement requires Evidence (closed contract), so an execution
+		// whose receipt could not be recorded settles as failed, never as
+		// succeeded-without-Evidence.
+		const evidenceId = outcome.evidence?.id ?? null;
+		const commandExitedZero = outcome.exitCode === 0;
+		const internalSettlement = commandExitedZero
+			? evidenceId
+				? {
+						status: "succeeded",
+						exitCode: outcome.exitCode,
+						outputDigest: outcome.outputDigest ?? null,
+						evidenceId,
+						stdoutPreview: outcome.stdoutTail ?? "",
+						stderrPreview: outcome.stderrTail ?? "",
+					}
+				: {
+						status: "failed",
+						exitCode: outcome.exitCode,
+						outputDigest: outcome.outputDigest ?? null,
+						errorCode: "AMBER_E_EVIDENCE_MISSING",
+						reason:
+							"execution exited 0 but no Evidence receipt was recorded; a succeeded settlement requires a valid Evidence binding",
+						stdoutPreview: outcome.stdoutTail ?? "",
+						stderrPreview: outcome.stderrTail ?? "",
+					}
+			: {
+					status: "failed",
+					exitCode: outcome.exitCode,
+					outputDigest: outcome.outputDigest ?? null,
+					stdoutPreview: outcome.stdoutTail ?? "",
+					stderrPreview: outcome.stderrTail ?? "",
+				};
+		// The internal path runs the same closed-contract validation the
+		// CLI settle seam runs, so a durable record can never hold a shape
+		// the seam would have refused.
+		const shapeProblem = settlementProblem(internalSettlement, stage);
+		if (shapeProblem) return fail("AMBER_E_INVALID_ARG", shapeProblem);
+		const settled = settleInternal(
+			projectRoot,
+			sessionId,
+			sessionDir,
+			route,
+			request,
+			internalSettlement,
+		);
+		return commandExitedZero && evidenceId
+			? settled
+			: {
+					...settled,
+					success: false,
+					message: commandExitedZero
+						? "execution exited 0 but no Evidence receipt was recorded; the attempt settles as failed"
+						: `Command exited ${outcome.exitCode}`,
+					exitCode: 1,
+				};
+	}
+
+	// Refusal (policy, approval, isolation, ledger, frozen-admission gate): the
+	// attempt never ran. The terminal rejected event keeps the request from
+	// staying pending, then the refusal surfaces (spec: a refused submission is
+	// rejected and does not advance the cursor). The approval was not consumed
+	// (R-AD-3: drift is refused before consumption).
+	const reason = outcome.errors.join("; ");
+	const settled = settleInternal(projectRoot, sessionId, sessionDir, route, request, {
+		status: "rejected",
+		reason,
+		errorCode: "AMBER_E_POLICY_DENY",
+	});
+	return { ...settled, success: false, message: reason, exitCode: 1 };
 }
 
 // ── settle ──────────────────────────────────────────────────────────────────
@@ -772,6 +1149,17 @@ function settleInternal(projectRoot, sessionId, sessionDir, route, request, sett
 				status: settlement.status,
 			},
 		});
+		// The run window closed without success (plan Slice 6).
+		appendSessionEvent(sessionDir, {
+			type: "run_failed",
+			data: {
+				runId: runIdOf(sessionId, request.attemptId),
+				attemptId: request.attemptId,
+				requestId: request.requestId,
+				stage: request.stageName,
+				status: settlement.status,
+			},
+		});
 		return {
 			success: true,
 			settled: true,
@@ -804,6 +1192,16 @@ function settleInternal(projectRoot, sessionId, sessionDir, route, request, sett
 			requestId: request.requestId,
 			requestHash: request.idempotencyKey,
 			attemptId: request.attemptId,
+			status: settlement.status,
+		},
+	});
+	appendSessionEvent(sessionDir, {
+		type: "run_completed",
+		data: {
+			runId: runIdOf(sessionId, request.attemptId),
+			attemptId: request.attemptId,
+			requestId: request.requestId,
+			stage: request.stageName,
 			status: settlement.status,
 		},
 	});
@@ -1024,13 +1422,83 @@ function evidenceReceiptExists(projectRoot, evidenceId) {
 	}
 }
 
+// ── trusted-control run contract: authorization grant writer (Slice 2) ──────
+
+/**
+ * R-AD-6 step 2 (spec §5) — the session surface's authorization grant writer.
+ * The human authorization step records a grant BOUND to a captured attempt and
+ * its frozen three-hash tuple: the tuple is copied from the attempt's own
+ * frozen admission record (never caller-supplied, so a grant can never bind a
+ * tuple the attempt did not freeze), and `boundAttemptId` is set — grants are
+ * attempt-bound by default (spec §7 R3).
+ *
+ * A grant naming an attemptId that does not exist in the ledger is refused
+ * (spec §10 test 10), as is a grant for an attempt that is no longer in its
+ * captured `requested` window (R-ID-6: admission outcomes are terminal; a
+ * retry is a new capture with a new grant).
+ *
+ * @param {string} projectRoot
+ * @param {string} sessionId
+ * @param {{attemptId: string, grantedBy?: string}} grant
+ */
+function grantSessionExecution(projectRoot, sessionId, grant = {}) {
+	if (!grant || typeof grant.attemptId !== "string" || grant.attemptId.length === 0) {
+		return fail("AMBER_E_INVALID_ARG", "grant requires the captured attemptId to bind");
+	}
+	const sessionDir = sessionDirOf(projectRoot, sessionId);
+	const cursorRead = readCursorLedger(sessionDir);
+	if (!cursorRead.ok) return fail("AMBER_E_LEDGER_TAMPERED", cursorRead.reason);
+	const records = cursorRead.records;
+
+	const request = records.find(
+		(record) => record.kind === "stage_attempt_requested" && record.attemptId === grant.attemptId,
+	);
+	if (!request) {
+		return fail(
+			"AMBER_E_INVALID_ARG",
+			`no captured attempt ${grant.attemptId} exists in session ${sessionId}; a grant binds an attempt the ledger already captured (R-AD-6)`,
+		);
+	}
+	if (attemptStatusOf(records, request) !== "requested") {
+		return fail(
+			"AMBER_E_INVALID_ARG",
+			`attempt ${grant.attemptId} is ${attemptStatusOf(records, request)}; a grant binds an attempt still in its captured requested window (R-ID-6)`,
+		);
+	}
+	if (!request.frozen) {
+		return fail(
+			"AMBER_E_INVALID_ARG",
+			`attempt ${grant.attemptId} carries no frozen admission record; a legacy attempt cannot be granted (R-FR-4)`,
+		);
+	}
+
+	return {
+		success: true,
+		grant: appendLedgerRecord(ledgerPathOf(sessionDir), {
+			schemaVersion: 2,
+			kind: "approved",
+			approvalKey: `approval-${request.attemptId}`,
+			approvalState: "approved",
+			// The binding tuple is the attempt's own frozen values (R-AU-1/-2).
+			scopeHash: request.frozen.hashes.scopeHash,
+			policyVersion: request.frozen.hashes.policyHash,
+			capabilityHash: request.frozen.hashes.capabilityHash,
+			boundAttemptId: request.attemptId,
+			...(grant.grantedBy ? { grantedBy: grant.grantedBy } : {}),
+			recordedAt: new Date().toISOString(),
+		}),
+	};
+}
+
 module.exports = {
 	runSessionStage,
 	settleSessionRequest,
+	grantSessionExecution,
 	lookupAdapter,
 	verifyLease,
 	cursorFromLedger,
 	idempotencyKeyOf,
+	attemptStatusOf,
 	SETTLEMENT_STATUSES,
 	// Test-only seams (see _setAdapterTableForTest).
 	_setAdapterTableForTest,

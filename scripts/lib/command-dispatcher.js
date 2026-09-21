@@ -446,6 +446,7 @@ function handleHandoff(args) {
 			result: writeHandoffBundle(resolveTarget(args), {
 				outputDir: args.outputDir || args.bundleDir,
 				targetDisplay: args.target || ".",
+				replayScope: args.replayScope,
 			}),
 		};
 	}

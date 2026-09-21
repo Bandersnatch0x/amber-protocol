@@ -39,6 +39,12 @@ const { sha256, canonicalJson } = require("./context-hash");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { relativeSlash, resolvePathWithin } = require("./fs-utils");
 const {
+	CLASSIFICATIONS,
+	effectiveClassificationOf,
+	admittedUnderCeiling,
+	expiresAtFromTtl,
+} = require("./classification");
+const {
 	KNOWLEDGE_KINDS,
 	normalizeKnowledgeKind,
 	readKnowledgeGraph,
@@ -126,6 +132,9 @@ function collectRequiredArtifacts(targetRoot, route) {
 			path: relativeSlash(targetRoot, filePath),
 			rawHash: sha256(content),
 			words: estimateWords(content),
+			// §3.1: Required Artifacts carry the fixed internal classification;
+			// not caller-settable.
+			classification: "internal",
 		});
 	}
 	return { artifacts, errors };
@@ -173,6 +182,10 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 				rawHash: e.rawHash,
 				status: "ok",
 				scope: e.scope || [],
+				classification: e.classification,
+				classificationSource: e.classificationSource,
+				purpose: e.purpose,
+				expiresAt: e.expiresAt,
 			};
 			remaining -= e.words;
 		} else {
@@ -246,6 +259,23 @@ function loadBuildConfig(targetRoot, opts) {
 			],
 		};
 	}
+	// §3.3: the classification ceiling is a build option (the PDP context face
+	// or caller constraint supplies it); absent means no classification
+	// constraint exists — nothing is classification-denied.
+	const maxClassification =
+		opts.maxClassification === undefined || opts.maxClassification === null
+			? null
+			: opts.maxClassification;
+	if (maxClassification !== null && CLASSIFICATIONS.includes(maxClassification) === false) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_SCHEMA_INVALID",
+					detail: `invalid maxClassification: ${JSON.stringify(maxClassification)}`,
+				},
+			],
+		};
+	}
 	return {
 		errors: [],
 		route,
@@ -255,6 +285,7 @@ function loadBuildConfig(targetRoot, opts) {
 		requiredPins: Array.isArray(opts.required) ? opts.required.slice() : [],
 		knowledgeKinds: [...new Set(knowledgeKinds)].sort(),
 		requiredArtifacts,
+		maxClassification,
 	};
 }
 
@@ -296,6 +327,12 @@ function collectPageEntries(targetRoot, route, feature) {
 		if (!page) continue;
 		const scope = Array.isArray(page.scope) ? page.scope.slice() : null;
 		if (scope && scope.length > 0) anyScope = true;
+		// §3.1 metadata projection: the stored label wins; governed-ingest pages
+		// without a stored label project effective `internal` (recorded via
+		// classificationSource, never written back onto the page); the hard
+		// expiry derives from the page ttl at its ingest/refresh instant.
+		const effective = effectiveClassificationOf({ stored: page.classification, governed: true });
+		const baseInstant = page.created_at || activity.latestAtByPage[pageId] || null;
 		pageEntries.push({
 			pageId,
 			page,
@@ -306,6 +343,10 @@ function collectPageEntries(targetRoot, route, feature) {
 			scope,
 			knowledgeKind: normalizeKnowledgeKind(page.knowledgeKind),
 			supersededBy: knowledgeGraph.successorsByPage.get(pageId) || [],
+			classification: effective.classification,
+			classificationSource: effective.classificationSource,
+			purpose: typeof page.purpose === "string" ? page.purpose : null,
+			expiresAt: expiresAtFromTtl(page, baseInstant),
 		});
 	}
 	for (const entry of pageEntries) {
@@ -320,8 +361,39 @@ function collectPageEntries(targetRoot, route, feature) {
 	return { ...activity, pageEntries };
 }
 
-function selectRequiredPages(pageEntries, requiredPins) {
-	const state = { excluded: [], pagesMap: {}, seen: new Set(), requiredPageIds: [] };
+// §3.3 ingress exclusions: classification-ceiling denials and hard expiry are
+// authority facts that apply to EVERY tier (a required pin cannot pull a page
+// past its ceiling or past its expiry). Runs before tier selection; marks the
+// page seen so no tier adds it. The record states the fact and the reason —
+// never more (spec §8 case 2/3 load-build half).
+function applyAuthorityExclusions(pageEntries, state, config, now = new Date()) {
+	for (const entry of pageEntries) {
+		if (state.seen.has(entry.pageId)) continue;
+		if (entry.expiresAt !== null && Date.parse(entry.expiresAt) <= now.getTime()) {
+			state.seen.add(entry.pageId);
+			state.excluded.push({
+				pageId: entry.pageId,
+				reason: "expired",
+				detail: `hard expiry ${entry.expiresAt} has passed (ttl)`,
+			});
+			continue;
+		}
+		const verdict = admittedUnderCeiling(entry.classification, config.maxClassification);
+		if (!verdict.ok) {
+			state.seen.add(entry.pageId);
+			state.excluded.push({
+				pageId: entry.pageId,
+				reason: "classification",
+				detail:
+					verdict.refusal === "classification-unknown"
+						? "classification-unknown never satisfies any ceiling (§3.1)"
+						: `classification ${entry.classification} exceeds the load ceiling ${config.maxClassification}`,
+			});
+		}
+	}
+}
+
+function selectRequiredPages(pageEntries, requiredPins, state) {
 	for (const pin of requiredPins) {
 		if (state.seen.has(pin)) continue;
 		state.seen.add(pin);
@@ -358,6 +430,10 @@ function selectRequiredPages(pageEntries, requiredPins) {
 			rawHash: entry.rawHash,
 			status: entry.status === "stale" ? "stale" : "ok",
 			scope: entry.scope || [],
+			classification: entry.classification,
+			classificationSource: entry.classificationSource,
+			purpose: entry.purpose,
+			expiresAt: entry.expiresAt,
 		};
 	}
 	return state;
@@ -429,7 +505,12 @@ function appendStatusExclusions(pageEntries, state) {
 }
 
 function selectPageTiers(pageEntries, config) {
-	const state = selectRequiredPages(pageEntries, config.requiredPins);
+	const state = { excluded: [], pagesMap: {}, seen: new Set(), requiredPageIds: [] };
+	// §3.3 authority exclusions run FIRST: classification-denied and expired
+	// pages never enter any tier, required pins included.
+	applyAuthorityExclusions(pageEntries, state, config);
+	const required = selectRequiredPages(pageEntries, config.requiredPins, state);
+	state.requiredPageIds = required.requiredPageIds;
 	const supersededPin = state.excluded.find((entry) => entry.reason === "superseded");
 	if (supersededPin) {
 		return {
@@ -509,6 +590,10 @@ function assembleLoadout(config, pageState, selection, delta) {
 		pages: delta.pages,
 		references: delta.references,
 		excluded: selection.excluded.slice().sort(comparePageIdAsc),
+		// §3.2 redaction ledger: records THAT a field was omitted inside
+		// admitted pages and why. The build omits nothing today — the bounded,
+		// deterministic empty ledger keeps the snapshot shape closed.
+		redactions: [],
 		deltaSince: delta.deltaSince,
 	};
 }

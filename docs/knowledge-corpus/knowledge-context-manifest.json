@@ -16,8 +16,8 @@
       "sourcePath": "docs/adr/0001-governance-first-artifact-first.md",
       "title": "Governance-first, artifact-first protocol",
       "source": {
-        "rawHash": "sha256:f6342068f7475367a7bcdfec6e3b6c8ee8a22e33e4d1a7b3bd6fc926017028ab",
-        "normHash": "sha256:29c57b7ec48d84a11eee8aa783062e8532579cd96a8c63cb96796d8ba40804f2"
+        "rawHash": "sha256:03228123f5cfb9ddd455fc3c2d3a44885a95abc39cbf685c07e0056b55392f22",
+        "normHash": "sha256:5f292aac5e661b29e2a950131798a7c0dc0a04eff7b06fd5950b65fcd0dcb597"
       }
     },
     {
@@ -364,8 +364,8 @@
       "sourcePath": "docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
       "title": "Coding-Agent-Enabled Repositories and Trusted Continuation",
       "source": {
-        "rawHash": "sha256:5ac22b6432856df9e810b11e40cb9de4bdac7f3b6e3eca1ff74bb475a9a2eac1",
-        "normHash": "sha256:7b3279cfad6292b76f3e2fd9f1b73c013fe9c9305d3719c0272cbd367fb9f560"
+        "rawHash": "sha256:fac8eeb9f42f619223613e0daae76425775452e58a364ad6e90bbaa4dd04a980",
+        "normHash": "sha256:a94a808cd62ea6e8be67ea1c4706a2435ed5c191d6135ffa6a60a12e0ba7dc10"
       }
     },
     {
@@ -597,5 +597,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:3949c47673b1139da21376e4039d54269497a9b144938fe169844241c232a517"
+  "manifestHash": "sha256:0690655e9115df4eb20f52a7e6b986450e092d7969600bc7797a0d2ea2466e7a"
 }

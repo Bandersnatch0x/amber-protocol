@@ -1,0 +1,43 @@
+{
+	"actionTypeId": "amber.runner.settle",
+	"version": 1,
+	"title": "Settle a prepared runner execution",
+	"goal": "Record the Runtime's declared receipt for one prepared execution: Amber derives the terminal outcome (timeout → signal → exit → scope claim check) and records both — settlement is immutable and receipt content stays an executor claim (E2). Stage 6 of the real five-stage Runtime lifecycle (context/runtime contract §5).",
+	"mode": "interactive",
+	"parameters": {
+		"requestHash": {
+			"type": "string",
+			"required": true,
+			"description": "The prepared request's sha256 request hash."
+		},
+		"executionId": {
+			"type": "string",
+			"required": true,
+			"description": "Execution id (e.g. execution/1)."
+		}
+	},
+	"submissionCriteria": ["approval-required"],
+	"effects": {
+		"edits": [".amber/runner/executions.jsonl"],
+		"sideEffects": ["ledger-append"],
+		"rollback": false
+	},
+	"evidenceRequired": ["runner-settlement"],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#runner-registry",
+		"approver": ["human"],
+		"evidence": ["runner-settlement"],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "runner",
+		"subcommand": "settle",
+		"args": [
+			{ "flag": "--request-hash", "source": "parameters.requestHash" },
+			{ "flag": "--execution", "source": "parameters.executionId" },
+			{ "flag": "--json", "flagOnly": true }
+		]
+	}
+}
