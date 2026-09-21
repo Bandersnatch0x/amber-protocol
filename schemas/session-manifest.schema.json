@@ -70,6 +70,33 @@
 				"pinned_at": { "type": "string", "format": "date-time" },
 				"pinned_by": { "type": "string" }
 			}
+		},
+		"context_scope": {
+			"description": "Trusted-control context/runtime contract §4: the authorization-relevant context constraints frozen into scopeInputs.context_scope. Absent means no context-constraint check existed (R-CA-4) — never defaulted.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["constraints"],
+			"properties": {
+				"constraints": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["maxClassification", "purpose", "expiresAt", "accessBoundaries"],
+					"properties": {
+						"maxClassification": {
+							"enum": ["public", "internal", "confidential", "restricted", "secret", null]
+						},
+						"purpose": { "anyOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }] },
+						"expiresAt": {
+							"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+						},
+						"accessBoundaries": {
+							"type": "array",
+							"uniqueItems": true,
+							"items": { "type": "string", "minLength": 1 }
+						}
+					}
+				}
+			}
 		}
 	}
 }

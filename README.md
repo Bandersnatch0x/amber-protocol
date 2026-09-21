@@ -166,15 +166,15 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 
 Amber organizes governance into seven control layers, weighted toward safety — the higher the priority, the more of Amber's surface that layer gets:
 
-| Layer           | Role in Amber                                                                                 | Priority |
-| --------------- | --------------------------------------------------------------------------------------------- | -------- |
-| `Governance`    | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest  |
-| `Verification`  | Doctor, audit, validation, review, and gate surfaces provide explicit checks.                 | High     |
-| `Observability` | Timelines, manifests, ledgers, and reports make behavior inspectable.                         | High     |
-| `Lifecycle`     | Routes, sessions, checkpoints, and worktrees organize work locally.                           | Medium   |
-| `Context`       | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit. | Medium   |
-| `Tooling`       | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces.   | Medium   |
-| `Execution`     | Minimal — Amber avoids becoming a general execution runtime or live agent platform.           | Low      |
+| Layer           | Role in Amber                                                                                                                                                                                           | Priority |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `Governance`    | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior.                                                                                                           | Highest  |
+| `Verification`  | Doctor, audit, validation, review, and gate surfaces provide explicit checks.                                                                                                                           | High     |
+| `Observability` | Timelines, manifests, ledgers, and reports make behavior inspectable.                                                                                                                                   | High     |
+| `Lifecycle`     | Routes, sessions, checkpoints, and worktrees organize work locally.                                                                                                                                     | Medium   |
+| `Context`       | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit.                                                                                                           | Medium   |
+| `Tooling`       | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces.                                                                                                             | Medium   |
+| `Execution`     | Gated and capability-bound — governed command execution exists behind four gates plus frozen per-attempt admission; there is no un-gated runtime, and no capability is registered in a vanilla install. | Low      |
 
 The through-line: strengthen `Governance`, `Verification`, and `Observability`; keep `Lifecycle` repository-local; avoid drifting into a full agent platform. The [governance model](./docs/architecture/governance-model.md) maps each layer to concrete commands.
 
@@ -197,6 +197,7 @@ These boundaries are part of the product, not TODOs:
 - No scheduled / cron / hook-triggered execution
 - No external writes (PRs, issue trackers, notifications) or agent tool-call interception
 - No automatic rewrite of existing project docs
+- No governed verb-stage execution in a vanilla install: the implementation-owned adapter table ships **empty** (there is no fallback), so `session run` stages fail closed until a capability is registered — and registering one is a reviewed code change, not a config edit
 
 ### Governed loop execution (opt-in, gated)
 
@@ -214,6 +215,18 @@ amber governance standards --target .   # honest OWASP-ASI coverage of what this
 ```
 
 For the full boundary notes, see [SPEC.md](./SPEC.md).
+
+### Governed trust layer (trusted-control contracts)
+
+Beyond the journey surface, Amber ships a contract-tested trust layer ([four canonical contracts](./docs/specs/) with product tests, all delivered):
+
+- **Governed execution attempts** — every `session run` attempt freezes its admission inputs (scope, policy, capability, request digest) before any effect; the gates re-verify against the frozen values, and authorization grants bind that frozen tuple with single-use consumption. Drift is refused at the gate, before execution.
+- **Evidence with assurance levels** — receipts carry `unavailable / observed / replayable / verified`, and a replay bundle (`amber handoff bundle --replay-scope`) rebuilds the authorization chain offline.
+- **Governed memory** — durable lessons flow through `amber memory` (request → ingest → human approve → book); `MEMORY.md` stays human-curated and hash-registered.
+- **Instruction-surface evals** — `amber eval run` replays deterministic model-independent checks of the agent-facing surfaces.
+- **MCP Action Types** — 20 thin projections of the governed verbs; mutating actions return `approvalRequired` and are never executed by the MCP surface.
+
+These surfaces are the protocol's reference implementation: governed verb stages currently **fail closed** (no capability is registered — see "What It Won't Do") and the canonical specs are awaiting their coordinator re-review.
 
 ## Documentation
 

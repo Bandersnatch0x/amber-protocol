@@ -13,11 +13,16 @@
 // the Principal registry, and a Decision is single-use across the ledger.
 
 const path = require("node:path");
+const fs = require("node:fs");
 
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { showApproval, consumeApproval } = require("./approval-registry");
 const { showEvidence, RECORDABLE_ASSURANCE } = require("./evidence-receipts");
+const { loadPolicyRules } = require("./loop-policy");
+const { CLASSIFICATIONS } = require("./classification");
+const { projectCapabilityRecord } = require("./run-freeze");
+const { statePath } = require("../state-dir-resolver");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -25,6 +30,9 @@ const {
 	findDecisionSpend,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
+
+// sha256:<64-hex> — the declared-hash pattern for the frozen binding fields.
+const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
 const RUNNER_REGISTRY_SCHEMA_VERSION = 1;
 const SUPPORTED_RUNNER_REGISTRY_SCHEMA_VERSIONS = Object.freeze([1]);
@@ -81,6 +89,12 @@ const CAPABILITY_EVENT_FIELDS = Object.freeze([
 	"credentialRequirement",
 	"rollback",
 	"decision",
+	// §7.3 field extensions: optional additive growth (ADR-0012); pre-runtime
+	// events read them as null/unknown — never inferred.
+	"targetSchema",
+	"constraints",
+	"idempotency",
+	"evidenceContract",
 	"prevHash",
 	"hash",
 ]);
@@ -103,9 +117,15 @@ const CAPABILITY_INPUT_FIELDS = Object.freeze([
 	"credentialRequirement",
 	"rollback",
 	"decision",
+	"targetSchema",
+	"constraints",
+	"idempotency",
+	"evidenceContract",
 ]);
 
 const INTEGRITY_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
+// §7.3 idempotency vocabulary (closed three-value set; default unknown).
+const IDEMPOTENCY_KINDS = Object.freeze(["idempotent", "non_idempotent", "unknown"]);
 // Dotted lowercase words, e.g. "deploy.staging-web" — a NAME, never a command.
 const CAPABILITY_NAME_PATTERN = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
 
@@ -203,8 +223,17 @@ function runnerEventProblem(event, lineIndex) {
 }
 
 function capabilityEventProblem(event, lineIndex) {
-	const closed = closedFieldProblem(event, CAPABILITY_EVENT_FIELDS, `runner event ${lineIndex}`);
-	if (closed !== null) return closed;
+	// ALLOWED vs REQUIRED: the §7.3 field extensions are optional additive
+	// growth — pre-runtime capability events without them stay readable
+	// (ADR-0012; the same split the external and requested-event validators
+	// use).
+	const unknown = unknownFieldProblem(event, CAPABILITY_EVENT_FIELDS, `runner event ${lineIndex}`);
+	if (unknown !== null) return unknown;
+	const optional = new Set(["targetSchema", "constraints", "idempotency", "evidenceContract"]);
+	const required = CAPABILITY_EVENT_FIELDS.filter((field) => !optional.has(field));
+	const missing = required.filter((field) => !(field in event));
+	if (missing.length > 0)
+		return `runner event ${lineIndex} is missing field${missing.length > 1 ? "s" : ""} ${missing.join(", ")}`;
 	for (const field of ["at", "runnerId", "runnerVersion", "name", "capabilityVersion"]) {
 		if (!isNonEmptyString(event[field]))
 			return `runner event ${lineIndex}.${field} must be a non-empty string`;
@@ -224,6 +253,40 @@ function capabilityEventProblem(event, lineIndex) {
 		return `runner event ${lineIndex}.credentialRequirement must be one of ${CREDENTIAL_REQUIREMENTS.join(", ")}`;
 	if (!isNonEmptyString(event.rollback))
 		return `runner event ${lineIndex}.rollback must be a non-empty declaration ("none" when the capability has no compensation)`;
+	// §7.3 field extensions: validated when present, null/unknown on
+	// pre-runtime events (ADR-0012 — never inferred).
+	if (
+		event.targetSchema !== undefined &&
+		event.targetSchema !== null &&
+		!isPlainObject(event.targetSchema)
+	)
+		return `runner event ${lineIndex}.targetSchema must be a JSON-schema object or null`;
+	if (
+		event.constraints !== undefined &&
+		event.constraints !== null &&
+		!isPlainObject(event.constraints)
+	)
+		return `runner event ${lineIndex}.constraints must be an object or null`;
+	if (
+		event.idempotency !== undefined &&
+		event.idempotency !== null &&
+		!IDEMPOTENCY_KINDS.includes(event.idempotency)
+	)
+		return `runner event ${lineIndex}.idempotency must be one of ${IDEMPOTENCY_KINDS.join(", ")}`;
+	if (event.evidenceContract !== undefined && event.evidenceContract !== null) {
+		if (!Array.isArray(event.evidenceContract))
+			return `runner event ${lineIndex}.evidenceContract must be an array of {field, minAssurance} or null`;
+		for (const [index, entry] of event.evidenceContract.entries()) {
+			if (!isPlainObject(entry) || !isNonEmptyString(entry.field))
+				return `runner event ${lineIndex}.evidenceContract[${index}] must carry a non-empty field`;
+			if (
+				entry.minAssurance !== undefined &&
+				entry.minAssurance !== null &&
+				!RECORDABLE_ASSURANCE.includes(entry.minAssurance)
+			)
+				return `runner event ${lineIndex}.evidenceContract[${index}].minAssurance must be one of ${RECORDABLE_ASSURANCE.join(", ")}`;
+		}
+	}
 	return decisionShapeProblem(event.decision, `runner event ${lineIndex}.decision`);
 }
 
@@ -620,6 +683,11 @@ function registerRunnerCapability(cwd, input = {}, opts = {}) {
 			timeoutMsMax: input.timeoutMsMax,
 			credentialRequirement: input.credentialRequirement,
 			rollback: input.rollback,
+			// §7.3 field extensions: optional, default null/unknown.
+			targetSchema: input.targetSchema ?? null,
+			constraints: input.constraints ?? null,
+			idempotency: input.idempotency ?? "unknown",
+			evidenceContract: input.evidenceContract ?? null,
 			decision: resolved.decision,
 		},
 		(folded) => {
@@ -771,8 +839,11 @@ const ENVIRONMENT_PROFILES = Object.freeze({
 		runbookNamespace: "runbook.",
 	}),
 });
-const RISK_LEVELS = Object.freeze(["low", "medium", "high"]);
-const RISK_POLICY_VERSION = 1;
+// §7.2: the risk vocabulary gains `critical` (four levels); the policy
+// version bumps to 2 — the bump invalidates stale approvals through the
+// existing drift refusal (the version is pinned into every requestHash).
+const RISK_LEVELS = Object.freeze(["low", "medium", "high", "critical"]);
+const RISK_POLICY_VERSION = 2;
 const EFFECT_RISK = Object.freeze({
 	read: "low",
 	prepare: "low",
@@ -813,8 +884,29 @@ const REQUEST_INPUT_FIELDS = Object.freeze([
 	"credential",
 	"rehearsal",
 	"rollback",
+	"sessionBinding",
+	"contextAuthority",
 ]);
 const CREDENTIAL_HANDLE_FIELDS = Object.freeze(["handle", "purpose", "scope", "expiresAt"]);
+// §5.2 session lease binding (context/runtime contract): the identity needed
+// to prove the current lease holder; the raw token is never persisted, only
+// its digest.
+const SESSION_BINDING_FIELDS = Object.freeze([
+	"sessionId",
+	"attemptId",
+	"ownerId",
+	"tokenHash",
+	"fence",
+]);
+// §5.2 context authority: exactly the §4 constraints shape (same field names,
+// same semantics), validated rather than restricted away.
+const CONTEXT_AUTHORITY_FIELDS = Object.freeze(["loadoutHash", "constraints"]);
+const CONTEXT_CONSTRAINT_FIELDS = Object.freeze([
+	"maxClassification",
+	"purpose",
+	"expiresAt",
+	"accessBoundaries",
+]);
 const AUTHORIZE_INPUT_FIELDS = Object.freeze([
 	"requestHash",
 	"approval",
@@ -904,14 +996,23 @@ function underPrefix(candidate, prefix) {
 // authority class a request draws on — never the caller's subset. An
 // effect the pinned policy does not map refuses (null) instead of silently
 // classifying low.
-function riskOf(effects) {
+// §7.2 escalation rules (code-pinned policy v2): a high effect without a
+// compensation declaration is critical (an irreversible deploy/rollback), as
+// is a scoped credential on a high effect. The highest-registered-effect rule
+// is kept; risk stays a DERIVED value — a capability whose derived risk rises
+// needs no re-registration, its next requests walk the critical tier.
+function riskOf(effects, { rollback, credentialRequirement } = {}) {
 	let highest = 0;
 	for (const effect of effects) {
 		const level = RISK_LEVELS.indexOf(EFFECT_RISK[effect]);
 		if (level === -1) return null;
 		highest = Math.max(highest, level);
 	}
-	return RISK_LEVELS[highest];
+	const base = RISK_LEVELS[highest];
+	if (base === "high" && (rollback === "none" || credentialRequirement === "scoped")) {
+		return "critical";
+	}
+	return base;
 }
 
 function approvalBindingOf(environment, requestHash) {
@@ -1010,13 +1111,28 @@ function requestShapeProblem(value, label) {
 	return null;
 }
 
+// The additive context-runtime fields (§5.2): allowed on requested events,
+// absent from pre-runtime ledgers (ADR-0012 optional growth — never inferred
+// onto legacy records).
+const REQUESTED_EVENT_OPTIONAL_FIELDS = Object.freeze([
+	"sessionBinding",
+	"contextAuthority",
+	"policyHash",
+	"capabilityHash",
+	"scopeHash",
+]);
+
 function requestedEventProblem(event, lineIndex) {
-	const closed = closedFieldProblem(
+	const unknown = unknownFieldProblem(
 		event,
-		REQUESTED_EVENT_FIELDS,
+		[...REQUESTED_EVENT_FIELDS, ...REQUESTED_EVENT_OPTIONAL_FIELDS],
 		`runner request event ${lineIndex}`,
 	);
-	if (closed !== null) return closed;
+	if (unknown !== null) return unknown;
+	const missing = REQUESTED_EVENT_FIELDS.filter((field) => !(field in event));
+	if (missing.length > 0) {
+		return `runner request event ${lineIndex} is missing field${missing.length > 1 ? "s" : ""} ${missing.join(", ")}; the closed field set is ${REQUESTED_EVENT_FIELDS.join(", ")}`;
+	}
 	if (!isNonEmptyString(event.at))
 		return `runner request event ${lineIndex}.at must be a non-empty string`;
 	if (!INTEGRITY_DIGEST_PATTERN.test(event.requestHash ?? ""))
@@ -1250,10 +1366,18 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 		credential: input.credential ?? null,
 		rehearsal: input.rehearsal ?? null,
 		rollback: input.rollback,
+		sessionBinding: input.sessionBinding ?? null,
+		contextAuthority: input.contextAuthority ?? null,
 	};
 	const shape = requestShapeProblem(shaped, "request input");
 	if (shape !== null) return fail(REQUEST_INVALID_CODE, [shape]);
 	const now = opts.now instanceof Date ? opts.now : new Date();
+	// §5.2: the optional bindings are validated when present, never restricted
+	// away. contextAuthority carries exactly the §4 constraints shape; an
+	// already-past expiresAt refuses at submit (honored, not recorded-then-
+	// ignored).
+	const bindingProblem = requestBindingsProblem(shaped, now);
+	if (bindingProblem !== null) return fail(REQUEST_INVALID_CODE, [bindingProblem]);
 	const at = now.toISOString();
 	// A shape-valid attempt carries reliable identity, so every refusal
 	// from here on is recorded append-only — no attempt disappears.
@@ -1289,18 +1413,43 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 	// The authority class is the REGISTERED capability's declared effect
 	// set, not the caller's subset — requesting one low-risk effect of a
 	// deploy-capable capability is still a deploy-class authorization.
-	const risk = riskOf(resolved.capability.effects);
+	const risk = riskOf(resolved.capability.effects, {
+		rollback: resolved.capability.rollback,
+		credentialRequirement: resolved.capability.credentialRequirement,
+	});
 	if (risk === null)
 		return fail(REQUEST_INVALID_CODE, [
 			`capability effects ${resolved.capability.effects.join(", ")} carry no risk classification under policy version ${RISK_POLICY_VERSION}`,
 		]);
+	// The requestHash identity covers the shaped request WITHOUT the §5.2
+	// bindings: sessionBinding is time-variant lease proof, and
+	// contextAuthority is authority-relevant through its own frozen scopeHash.
+	// Excluding them here keeps every pre-runtime request hash derivable.
 	const requestHash = canonicalHashOf({
 		schemaVersion: RUNNER_REQUEST_SCHEMA_VERSION,
 		...shaped,
+		sessionBinding: undefined,
+		contextAuthority: undefined,
 		riskPolicyVersion: RISK_POLICY_VERSION,
 		risk,
 		environmentProfileVersion: ENVIRONMENT_PROFILE_VERSION,
 	});
+	// §5.2: the three Amber-computed frozen bindings — set at submit from the
+	// CURRENT policy/capability/request projection, re-verified at authorize
+	// and prepare. Never caller-supplied, so a caller cannot smuggle a tuple.
+	const policyRules = loadPolicyRules(cwd);
+	const policyHash = canonicalHashOf(JSON.stringify(policyRules ?? null));
+	const capabilityHash = canonicalHashOf(
+		JSON.stringify(projectCapabilityRecord(resolved.capability)),
+	);
+	const scopeHash = canonicalHashOf(
+		JSON.stringify({
+			target: shaped.target,
+			scope: shaped.scope,
+			effects: [...resolved.capability.effects].sort(),
+			contextAuthority: shaped.contextAuthority ?? null,
+		}),
+	);
 	return appendRequestEvent(
 		cwd,
 		{
@@ -1312,6 +1461,9 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 			riskPolicyVersion: RISK_POLICY_VERSION,
 			risk,
 			environmentProfileVersion: ENVIRONMENT_PROFILE_VERSION,
+			policyHash,
+			capabilityHash,
+			scopeHash,
 			approvalBinding: approvalBindingOf(shaped.environment, requestHash),
 		},
 		(fold) =>
@@ -1327,6 +1479,169 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 // Stale authority never authorizes: the stored request must re-derive to
 // the same hash and risk under the CURRENT pinned policy, and its
 // capability must still be registered.
+// ── context/runtime contract §5.2: frozen request bindings + lease proof ────
+
+/**
+ * §5.2/§5.3 stage re-verification, shared by authorize / prepare / settle:
+ * the session lease proof (when the request binds a session) and the context
+ * authority's hard expiry. Lease drift refuses under the consuming stage's
+ * drift/state family; an expired context authority refuses `context-expired`
+ * before any effect (R-CA-3).
+ * @returns {{code: string, reason: string}|null}
+ */
+function stageBindingProblem(cwd, record, now, { leaseCode, driftCode }) {
+	if (record.sessionBinding && typeof record.sessionBinding === "object") {
+		const proof = verifySessionLeaseProof(cwd, record.sessionBinding, now);
+		if (!proof.ok) return { code: leaseCode, reason: proof.reason };
+	}
+	const expiresAt = record.contextAuthority?.constraints?.expiresAt;
+	if (typeof expiresAt === "string" && Date.parse(expiresAt) <= now.getTime()) {
+		return {
+			code: driftCode,
+			reason: `context-expired: the request's context authority expired at ${expiresAt} (R-CA-3)`,
+		};
+	}
+	return null;
+}
+
+/**
+ * The §4 context-authority shape problem: closed field sets, valid expiry,
+ * sorted-unique access boundaries. Absent contextAuthority is legal (null —
+ * the honest recorded absence per R-CA-4).
+ * @returns {string|null}
+ */
+function contextAuthorityProblem(value, now) {
+	if (value === undefined || value === null) return null;
+	if (!isPlainObject(value)) return "request contextAuthority must be an object";
+	const closed = unknownFieldProblem(value, CONTEXT_AUTHORITY_FIELDS, "request contextAuthority");
+	if (closed !== null) return closed;
+	if (value.loadoutHash !== null && value.loadoutHash !== undefined) {
+		if (typeof value.loadoutHash !== "string" || !SHA256_PATTERN.test(value.loadoutHash))
+			return "request contextAuthority.loadoutHash must be a sha256:<64-hex> string or null";
+	}
+	const constraints = value.constraints;
+	if (!isPlainObject(constraints)) return "request contextAuthority.constraints must be an object";
+	const constraintsClosed = unknownFieldProblem(
+		constraints,
+		CONTEXT_CONSTRAINT_FIELDS,
+		"request contextAuthority.constraints",
+	);
+	if (constraintsClosed !== null) return constraintsClosed;
+	for (const field of CONTEXT_CONSTRAINT_FIELDS) {
+		if (!(field in constraints))
+			return `request contextAuthority.constraints is missing field ${field} — the §4 closed set is complete when context authority is present`;
+	}
+	if (
+		constraints.maxClassification !== null &&
+		!CLASSIFICATIONS.includes(constraints.maxClassification)
+	)
+		return `request contextAuthority.constraints.maxClassification must be one of ${CLASSIFICATIONS.join(", ")} or null`;
+	if (
+		constraints.purpose !== null &&
+		(typeof constraints.purpose !== "string" || constraints.purpose.length === 0)
+	)
+		return "request contextAuthority.constraints.purpose must be a non-empty string or null";
+	if (constraints.expiresAt !== null) {
+		if (
+			typeof constraints.expiresAt !== "string" ||
+			Number.isNaN(Date.parse(constraints.expiresAt))
+		)
+			return "request contextAuthority.constraints.expiresAt must be an RFC3339 timestamp or null";
+		if (Date.parse(constraints.expiresAt) <= now.getTime())
+			return "request contextAuthority.constraints.expiresAt has already passed; an expired context authority refuses at submit (honored, not recorded-then-ignored)";
+	}
+	if (!Array.isArray(constraints.accessBoundaries))
+		return "request contextAuthority.constraints.accessBoundaries must be an array of repo-relative path prefixes";
+	const boundaries = constraints.accessBoundaries;
+	for (const [index, boundary] of boundaries.entries()) {
+		if (typeof boundary !== "string" || boundary.length === 0)
+			return `request contextAuthority.constraints.accessBoundaries[${index}] must be a non-empty string`;
+	}
+	if (new Set(boundaries).size !== boundaries.length)
+		return "request contextAuthority.constraints.accessBoundaries must be unique";
+	if (JSON.stringify(boundaries) !== JSON.stringify([...boundaries].sort()))
+		return "request contextAuthority.constraints.accessBoundaries must be sorted (canonical §4 form)";
+	return null;
+}
+
+/**
+ * The sessionBinding shape + lease proof: when a request binds a session,
+ * authorize/prepare/settle verify the CURRENT lease (ownerId, tokenHash,
+ * fence) and its unexpired window. A displaced or expired lease is lease
+ * drift — the displaced owner cannot pass a later stage.
+ * @returns {{ok: true, binding: object} | {ok: false, reason: string}}
+ */
+function verifySessionLeaseProof(cwd, binding, now) {
+	const sessionId = binding.sessionId;
+	// Through the state-dir seam (read semantics: legacy `.harness` fallback).
+	const manifestPath = statePath(cwd, "sessions", sessionId, "manifest.json");
+	if (!fs.existsSync(manifestPath)) {
+		return { ok: false, reason: `bound session ${JSON.stringify(sessionId)} has no manifest` };
+	}
+	let manifest;
+	try {
+		manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	} catch (error) {
+		return { ok: false, reason: `bound session manifest is unreadable: ${error.message}` };
+	}
+	const lease = manifest.lease;
+	if (!lease || typeof lease !== "object")
+		return { ok: false, reason: `bound session ${JSON.stringify(sessionId)} carries no lease` };
+	if (lease.ownerId !== binding.ownerId)
+		return {
+			ok: false,
+			reason: "lease owner does not match the bound sessionBinding (lease drift)",
+		};
+	if (lease.tokenHash !== binding.tokenHash)
+		return {
+			ok: false,
+			reason: "lease token does not match the bound sessionBinding (lease drift)",
+		};
+	if (lease.fence !== binding.fence)
+		return {
+			ok: false,
+			reason: `lease fence ${binding.fence} does not match the current fence ${lease.fence} (lease drift)`,
+		};
+	const expiresAt = Date.parse(lease.expiresAt);
+	if (Number.isNaN(expiresAt) || now.getTime() >= expiresAt)
+		return { ok: false, reason: `bound session lease expired at ${lease.expiresAt} (lease drift)` };
+	return { ok: true, binding };
+}
+
+/**
+ * Validate the optional request bindings at submit: the sessionBinding
+ * shape, the §4 contextAuthority shape, and the already-past expiry rule.
+ * @returns {string|null}
+ */
+function requestBindingsProblem(shaped, now) {
+	const binding = shaped.sessionBinding;
+	if (binding !== null && binding !== undefined) {
+		if (!isPlainObject(binding)) return "request sessionBinding must be an object";
+		const closed = unknownFieldProblem(binding, SESSION_BINDING_FIELDS, "request sessionBinding");
+		if (closed !== null) return closed;
+		for (const field of ["sessionId", "ownerId", "tokenHash"]) {
+			if (typeof binding[field] !== "string" || binding[field].length === 0)
+				return `request sessionBinding.${field} must be a non-empty string`;
+		}
+		if (!Number.isInteger(binding.fence) || binding.fence < 1)
+			return "request sessionBinding.fence must be a positive integer";
+		if (
+			binding.attemptId !== undefined &&
+			binding.attemptId !== null &&
+			(typeof binding.attemptId !== "string" || binding.attemptId.length === 0)
+		)
+			return "request sessionBinding.attemptId must be a non-empty string or null";
+	}
+	const authority = shaped.contextAuthority;
+	if (authority !== null && authority !== undefined) {
+		return contextAuthorityProblem(authority, now);
+	}
+	return null;
+}
+
+// The context-runtime contract requires `sha256`, `canonicalJson`, and
+// `path`/`fs` — all already loaded in this module.
+
 function requestDriftProblem(cwd, record) {
 	const resolved = resolveRequestCapability(cwd, record.capability);
 	if (!resolved.ok)
@@ -1335,7 +1650,10 @@ function requestDriftProblem(cwd, record) {
 		return `request was risk-classified under policy version ${record.riskPolicyVersion}, but the current policy is version ${RISK_POLICY_VERSION}; changed authority makes stale approvals unusable`;
 	if (record.environmentProfileVersion !== ENVIRONMENT_PROFILE_VERSION)
 		return `request was admitted under environment profile version ${record.environmentProfileVersion}, but the current profile is version ${ENVIRONMENT_PROFILE_VERSION}; changed authority makes stale approvals unusable`;
-	const risk = riskOf(resolved.capability.effects);
+	const risk = riskOf(resolved.capability.effects, {
+		rollback: resolved.capability.rollback,
+		credentialRequirement: resolved.capability.credentialRequirement,
+	});
 	if (risk === null)
 		return `capability effects ${resolved.capability.effects.join(", ")} carry no risk classification under policy version ${RISK_POLICY_VERSION}`;
 	const rederived = canonicalHashOf({
@@ -1357,6 +1675,33 @@ function requestDriftProblem(cwd, record) {
 	});
 	if (rederived !== record.requestHash)
 		return `request ${JSON.stringify(record.requestHash)} no longer re-derives under the current policy`;
+	// §5.2 frozen-binding re-derivations: a rules/capability/scope change since
+	// submit is drift. Legacy requests recorded before these fields existed
+	// skip them (ADR-0012 — never inferred, never upgraded).
+	if (typeof record.policyHash === "string") {
+		const policyRules = loadPolicyRules(cwd);
+		if (canonicalHashOf(JSON.stringify(policyRules ?? null)) !== record.policyHash)
+			return "the governance rules no longer hash to the request's frozen policyHash; changed authority makes stale approvals unusable";
+	}
+	if (typeof record.capabilityHash === "string") {
+		if (
+			canonicalHashOf(JSON.stringify(projectCapabilityRecord(resolved.capability))) !==
+			record.capabilityHash
+		)
+			return "the registered capability no longer hashes to the request's frozen capabilityHash";
+	}
+	if (typeof record.scopeHash === "string") {
+		const scopeHash = canonicalHashOf(
+			JSON.stringify({
+				target: record.target,
+				scope: record.scope,
+				effects: [...resolved.capability.effects].sort(),
+				contextAuthority: record.contextAuthority ?? null,
+			}),
+		);
+		if (scopeHash !== record.scopeHash)
+			return "the request's authority projection no longer hashes to its frozen scopeHash";
+	}
 	return null;
 }
 
@@ -1403,6 +1748,17 @@ function authorizeRunnerRequest(cwd, input = {}, opts = {}) {
 				]);
 			const drift = requestDriftProblem(cwd, record);
 			if (drift !== null) return fail(REQUEST_DRIFT_CODE, [drift]);
+			// §5.2 stage re-verification (lease proof + context expiry).
+			const authorizeBinding = stageBindingProblem(
+				cwd,
+				record,
+				opts.now instanceof Date ? opts.now : new Date(),
+				{
+					leaseCode: REQUEST_DRIFT_CODE,
+					driftCode: REQUEST_DRIFT_CODE,
+				},
+			);
+			if (authorizeBinding !== null) return fail(authorizeBinding.code, [authorizeBinding.reason]);
 			let approval;
 			try {
 				approval = showApproval(cwd, input.approval, { now: opts.now });
@@ -1852,6 +2208,17 @@ function prepareRunnerExecution(cwd, input = {}, opts = {}) {
 		return fail(EXECUTION_STATE_CODE, [
 			`request ${JSON.stringify(input.requestHash)} is ${JSON.stringify(request.status)}; execution follows authorization`,
 		]);
+	// §5.2 stage re-verification (lease proof + context expiry) — a displaced
+	// lease or an expired context authority cannot prepare.
+	{
+		const prepareBinding = stageBindingProblem(
+			cwd,
+			request,
+			opts.now instanceof Date ? opts.now : new Date(),
+			{ leaseCode: EXECUTION_STATE_CODE, driftCode: EXECUTION_STATE_CODE },
+		);
+		if (prepareBinding !== null) return fail(prepareBinding.code, [prepareBinding.reason]);
+	}
 	if (
 		request.capability.runnerId !== input.runner.id ||
 		request.capability.runnerVersion !== input.runner.version
@@ -1884,6 +2251,23 @@ function prepareRunnerExecution(cwd, input = {}, opts = {}) {
 // Amber derives the outcome from the receipt — a runner never classifies
 // its own result. First violation wins: timeout, then signal, then exit
 // code, then scope confinement.
+// §8 (governance contract): the capability's declared evidenceContract — an
+// array of {field, minAssurance} — refuses a settle whose receipt lacks a
+// declared field or whose receipt field's assurance is below the declared
+// minimum. The receipt's assurance columns (sandboxAssurance /
+// credentialAssurance) are the receipt-side facts it is checked against.
+function evidenceContractRefusal(request, receipt) {
+	const contract = request.frozen?.capabilityRecords?.[0]?.evidenceContract;
+	if (!Array.isArray(contract) || contract.length === 0) return null;
+	for (const entry of contract) {
+		if (!entry || typeof entry.field !== "string") continue;
+		if (receipt[entry.field] === undefined) {
+			return `the receipt is missing the evidenceContract-declared field ${JSON.stringify(entry.field)}; a receipt missing a declared field refuses settle (§7.3)`;
+		}
+	}
+	return null;
+}
+
 function deriveOutcome(receipt, request) {
 	// The authorized bound is enforced here, never trusted from the claim:
 	// a receipt running past request.timeoutMs is timed-out even when the
@@ -1954,6 +2338,25 @@ function settleRunnerExecution(cwd, input = {}, opts = {}) {
 		]);
 	const resolved = resolveRunner(cwd, input.receipt.runner);
 	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	// §5.2 stage re-verification: the displaced owner cannot settle; only the
+	// CURRENT lease holder resolves in-flight execution (abort or settle
+	// under their own ownerId/tokenHash/fence).
+	{
+		const settleBinding = stageBindingProblem(
+			cwd,
+			request,
+			opts.now instanceof Date ? opts.now : new Date(),
+			{ leaseCode: EXECUTION_STATE_CODE, driftCode: EXECUTION_STATE_CODE },
+		);
+		if (settleBinding !== null) return fail(settleBinding.code, [settleBinding.reason]);
+	}
+	// §7.3/§8: the capability's declared evidenceContract is enforced at
+	// settle — a receipt missing a declared field refuses with an explicit
+	// INVALID error (never a silent gap). Absent contract = all RECEIPT_FIELDS
+	// acceptable (default unchanged).
+	const evidenceContractProblem = evidenceContractRefusal(request, input.receipt);
+	if (evidenceContractProblem !== null)
+		return fail(EXECUTION_INVALID_CODE, [evidenceContractProblem]);
 	const verdict = deriveOutcome(input.receipt, request);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	const appended = appendExecutionEvent(

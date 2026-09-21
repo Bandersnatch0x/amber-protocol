@@ -1,0 +1,32 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Loop Policy Rules (v2)",
+	"description": "The PDP rules surface (governance contract §6.2). schemaVersion 2 files may carry both v1 command-text rules (action/match/pattern) and v2 capability rules (decision + match{capability,target,effect,constraints}); schemaVersion 1 files keep working untouched. No forced v1→v2 migration; deny-wins across versions and families.",
+	"type": "object",
+	"required": ["schemaVersion", "defaultAction", "rules"],
+	"properties": {
+		"schemaVersion": { "enum": [1, 2] },
+		"defaultAction": { "enum": ["allow", "deny", "unknown"] },
+		"confidence_gating": { "type": "object" },
+		"rules": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["id"],
+				"properties": {
+					"id": { "type": "string", "minLength": 1 },
+					"mapsTo": { "type": "array", "items": { "type": "string" } },
+					"action": { "enum": ["allow", "deny"] },
+					"match": {
+						"description": "v1 text match when string-typed (exact|prefix|regex + pattern); v2 capability face when object-typed (§6.2)."
+					},
+					"pattern": { "type": "string" },
+					"decision": {
+						"description": "v2 decision face (§6.1 closed five-value set).",
+						"enum": ["allow", "deny", "require_approval", "allow_with_limits"]
+					}
+				}
+			}
+		}
+	}
+}

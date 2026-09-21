@@ -328,6 +328,10 @@ test("runner request, authorize, prepare, and settle form the governed execution
 		"evidence/rehearsal-cli",
 		"--rollback",
 		"runbook/staging-rollback",
+		// The context-runtime contract types the request stage as an
+		// approval-required Action (amber.runner.request); the CLI executes
+		// under the explicit confirmation flag.
+		"--yes",
 		"--target",
 		dir,
 		"--json",
@@ -336,7 +340,8 @@ test("runner request, authorize, prepare, and settle form the governed execution
 	assert.equal(submitted.status, 0, submitted.stderr || submitted.stdout);
 	const request = payload(submitted);
 	assert.equal(request.status, "requested");
-	assert.equal(request.risk, "high");
+	// §7.2 escalation: scoped credential on deploy ⇒ critical.
+	assert.equal(request.risk, "critical");
 	assert.equal(request.approvalBinding, `runner-request:staging:${request.requestHash}`);
 
 	const denied = runCli(
@@ -436,6 +441,7 @@ test("runner request, authorize, prepare, and settle form the governed execution
 			request.requestHash,
 			"--receipt",
 			"receipt.json",
+			"--yes",
 			"--target",
 			dir,
 			"--json",

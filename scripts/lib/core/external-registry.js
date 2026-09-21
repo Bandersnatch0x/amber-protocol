@@ -33,6 +33,13 @@ const {
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { compileInline } = require("./schema-contract");
+const {
+	CLASSIFICATIONS,
+	effectiveClassificationOf,
+	admittedUnderCeiling,
+} = require("./classification");
+const { readPage } = require("./context-store");
+const { sha256, canonicalJson } = require("./context-hash");
 
 // v2 added the required `compensates` linkage to proposal events (F056
 // T4); v1 proposal events written before it stay readable with a null
@@ -104,6 +111,8 @@ const EFFECT_INPUT_FIELDS = Object.freeze([
 	"timeoutMs",
 	"adapter",
 	"decision",
+	"maxPayloadClassification",
+	"requiresPayloadProvenance",
 ]);
 const COMPENSATION_FIELDS = Object.freeze(["kind", "effect"]);
 const ADAPTER_PIN_FIELDS = Object.freeze(["id", "version"]);
@@ -126,14 +135,15 @@ const EFFECT_EVENT_FIELDS = Object.freeze([
 	"timeoutMs",
 	"adapter",
 	"decision",
+	"maxPayloadClassification",
+	"requiresPayloadProvenance",
 	"prevHash",
 	"hash",
 ]);
 // v1/v2 effect events predate the declared input schema; the closed set
-// keeps a legacy event from smuggling one in.
-const EFFECT_EVENT_FIELDS_LEGACY = Object.freeze(
-	EFFECT_EVENT_FIELDS.filter((field) => field !== "inputSchema"),
-);
+// keeps a legacy event from smuggling one in. Pre-context-runtime events
+// also predate the egress ceilings (context/runtime contract §3.5 R-EG-1) —
+// the split into optional fields lives beside effectEventProblem below.
 
 // A registered name can never be an execution vector: URL schemes,
 // whitespace, shell metacharacters, and ".." traversal segments refuse.
@@ -220,6 +230,19 @@ function effectShapeProblem(value, label) {
 	}
 	const compensation = compensationProblem(value.compensation, `${label}.compensation`);
 	if (compensation !== null) return compensation;
+	// R-EG-1 egress ceilings: optional at the shape level with registration
+	// defaults; a carried value must be well-formed.
+	if (value.maxPayloadClassification !== undefined && value.maxPayloadClassification !== null) {
+		if (!CLASSIFICATIONS.includes(value.maxPayloadClassification))
+			return `${label}.maxPayloadClassification must be one of ${CLASSIFICATIONS.join(", ")}`;
+	}
+	if (
+		value.requiresPayloadProvenance !== undefined &&
+		value.requiresPayloadProvenance !== null &&
+		typeof value.requiresPayloadProvenance !== "boolean"
+	) {
+		return `${label}.requiresPayloadProvenance must be a boolean`;
+	}
 	if (
 		!Number.isInteger(value.timeoutMs) ||
 		value.timeoutMs < 1 ||
@@ -231,14 +254,27 @@ function effectShapeProblem(value, label) {
 	return null;
 }
 
+// The closed field sets split into ALLOWED (closed vocabulary, unknown keys
+// refuse) and REQUIRED (a pre-context-runtime event without the additive
+// egress fields stays readable — ADR-0012 optional-growth discipline).
+const EFFECT_EVENT_OPTIONAL_FIELDS = Object.freeze([
+	"inputSchema",
+	"maxPayloadClassification",
+	"requiresPayloadProvenance",
+]);
+const EFFECT_EVENT_FIELDS_LEGACY = Object.freeze(
+	EFFECT_EVENT_FIELDS.filter((field) => !EFFECT_EVENT_OPTIONAL_FIELDS.includes(field)),
+);
+
 function effectEventProblem(event, lineIndex) {
 	const label = `external effect event ${lineIndex}`;
-	const closed = closedFieldProblem(
-		event,
-		event.schemaVersion >= 3 ? EFFECT_EVENT_FIELDS : EFFECT_EVENT_FIELDS_LEGACY,
-		label,
-	);
-	if (closed !== null) return closed;
+	const allowed = event.schemaVersion >= 3 ? EFFECT_EVENT_FIELDS : EFFECT_EVENT_FIELDS_LEGACY;
+	const unknown = unknownFieldProblem(event, allowed, label);
+	if (unknown !== null) return unknown;
+	const required = allowed.filter((field) => !EFFECT_EVENT_OPTIONAL_FIELDS.includes(field));
+	const missing = required.filter((field) => !(field in event));
+	if (missing.length > 0)
+		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${missing.join(", ")}; the closed field set is ${allowed.join(", ")}`;
 	if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
 		return `${label}.at must be an ISO-8601 timestamp`;
 	const shape = effectShapeProblem(event, label);
@@ -526,6 +562,12 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 			timeoutMs: input.timeoutMs,
 			adapter: { id: input.adapter.id, version: input.adapter.version },
 			decision: resolved.decision,
+			// R-EG-1 ceilings: registration defaults apply (internal / false).
+			maxPayloadClassification:
+				input.maxPayloadClassification === undefined || input.maxPayloadClassification === null
+					? "internal"
+					: input.maxPayloadClassification,
+			requiresPayloadProvenance: input.requiresPayloadProvenance === true,
 		},
 		(fold) => {
 			const problem = effectRegistrationProblem(fold, input);
@@ -574,13 +616,17 @@ const PROPOSAL_EVENT_FIELDS = Object.freeze([
 	"credentials",
 	"compensation",
 	"compensates",
+	"payloadSources",
 	"requestHash",
 	"prevHash",
 	"hash",
 ]);
 const PROPOSAL_EVENT_FIELDS_LEGACY = Object.freeze(
-	PROPOSAL_EVENT_FIELDS.filter((field) => field !== "compensates"),
+	PROPOSAL_EVENT_FIELDS.filter((field) => field !== "compensates" && field !== "payloadSources"),
 );
+// payloadSources is the additive R-EG-1 declaration: allowed on current
+// events, absent from pre-context-runtime ledgers.
+const PROPOSAL_EVENT_OPTIONAL_FIELDS = Object.freeze(["payloadSources"]);
 const PROPOSAL_AUTHORIZED_EVENT_FIELDS = Object.freeze([
 	"kind",
 	"schemaVersion",
@@ -601,15 +647,151 @@ function effectPinProblem(value, label) {
 	return null;
 }
 
+// R-EG-1 payload-source declaration shape: {kind, ref, rawHash}. The
+// declaration names the exact source revision claimed to feed the payload —
+// never the payload itself (payload bytes never enter Amber).
+const DECLARED_SOURCE_KINDS = Object.freeze(["page", "artifact", "contract-source"]);
+
+function declaredSourceShapeProblem(entry, label) {
+	if (!isPlainObject(entry)) return `${label} entries must be objects`;
+	const closed = closedFieldProblem(entry, ["kind", "ref", "rawHash"], label);
+	if (closed !== null) return closed;
+	if (!DECLARED_SOURCE_KINDS.includes(entry.kind))
+		return `${label}.kind must be one of ${DECLARED_SOURCE_KINDS.join(", ")}`;
+	if (!isNonEmptyString(entry.ref)) return `${label}.ref must be a non-empty string`;
+	if (!SHA256_PATTERN.test(entry.rawHash ?? ""))
+		return `${label}.rawHash must be a sha256:<64-hex> string`;
+	return null;
+}
+
+function payloadSourcesProblem(value, label) {
+	if (!Array.isArray(value)) return `${label} must be an array`;
+	for (const [index, entry] of value.entries()) {
+		const problem = declaredSourceShapeProblem(entry, `${label}[${index}]`);
+		if (problem !== null) return problem;
+	}
+	return null;
+}
+
+// Resolve one declared source against the target repository's CURRENT context
+// snapshot (the authoritative context store: pages, required artifacts, and
+// Distillation Contract sources) and classify it (§3.5). An unresolvable or
+// drifted reference refuses — never "treat as unconstrained". Returns
+// {classification} or {problem}.
+function resolveDeclaredContextSource(cwd, entry) {
+	const label = `declared ${entry.kind} source ${JSON.stringify(entry.ref)}`;
+	if (entry.kind === "page") {
+		const page = readPage(cwd, entry.ref);
+		if (!page) return { problem: `${label} does not resolve in the current context snapshot` };
+		const hash = sha256(canonicalJson(JSON.stringify(page)));
+		if (hash !== entry.rawHash)
+			return { problem: `${label} no longer hashes to the declared revision (rawHash drift)` };
+		return {
+			classification: effectiveClassificationOf({
+				stored: page.classification,
+				governed: true,
+			}).classification,
+		};
+	}
+	if (entry.kind === "artifact") {
+		// Required Artifacts are fixed-path governance surfaces; the route
+		// manifest exists per route, so the declared hash must match one of
+		// them (the resolved file is identified by content, not by route).
+		const fs = require("node:fs");
+		const path = require("node:path");
+		const { resolvePathWithin } = require("./fs-utils");
+		const candidates = [
+			"docs/wiki/agent/amber.md",
+			"docs/wiki/agent/context-loadout.md",
+			...fs
+				.readdirSync(path.join(cwd, "routes"))
+				.filter((file) => file.endsWith(".route.json"))
+				.map((file) => path.join("routes", file).split(path.sep).join("/")),
+		];
+		let resolvedAny = false;
+		for (const candidate of candidates) {
+			let fullPath;
+			try {
+				fullPath = resolvePathWithin(cwd, candidate, { label: "Required artifact" });
+			} catch {
+				continue;
+			}
+			if (!fs.existsSync(fullPath)) continue;
+			resolvedAny = true;
+			if (sha256(fs.readFileSync(fullPath, "utf8")) === entry.rawHash) {
+				// Required Artifacts carry the fixed internal classification (§3.1).
+				return { classification: "internal" };
+			}
+		}
+		if (!resolvedAny)
+			return { problem: `${label} does not resolve in the current context snapshot` };
+		return { problem: `${label} no longer hashes to the declared revision (rawHash drift)` };
+	}
+	// contract-source: the Distillation Contract sources of the repository —
+	// the ref+rawHash pair must match a bundled source of some recorded
+	// request; its classification is the request author's label (unknown when
+	// the contract predates labels).
+	const fs = require("node:fs");
+	const path = require("node:path");
+	const { requestsDir } = require("./context-store");
+	const requestsPath = requestsDir(cwd);
+	if (!fs.existsSync(requestsPath))
+		return { problem: `${label} does not resolve in the current context snapshot` };
+	for (const file of fs.readdirSync(requestsPath)) {
+		if (!file.endsWith(".json")) continue;
+		try {
+			const request = JSON.parse(fs.readFileSync(path.join(requestsPath, file), "utf8"));
+			const source = (request.sources || []).find(
+				(candidate) => candidate.ref === entry.ref || candidate.ref.split("#")[0] === entry.ref,
+			);
+			if (source && source.rawHash === entry.rawHash) {
+				return { classification: source.classification ?? "unknown" };
+			}
+		} catch {
+			continue;
+		}
+	}
+	return { problem: `${label} does not resolve in the current context snapshot` };
+}
+
+/**
+ * R-EG-1 validation, shared verbatim by propose and execute (drift at
+ * execute re-runs the same three checks against the CURRENT snapshot).
+ * @returns {string|null} the refusal reason, or null when the declared flow passes
+ */
+function declaredFlowProblem(cwd, payloadSources, effect) {
+	const requires = effect.requiresPayloadProvenance === true;
+	const sources = Array.isArray(payloadSources) ? payloadSources : [];
+	if (requires && sources.length === 0) {
+		return (
+			`effect ${JSON.stringify(effect.id)} requires payload provenance; a proposal without ` +
+			"payloadSources declarations is unverifiable and refuses (never silently passed)"
+		);
+	}
+	for (const entry of sources) {
+		const resolved = resolveDeclaredContextSource(cwd, entry);
+		if (resolved.problem) return resolved.problem;
+		const verdict = admittedUnderCeiling(resolved.classification, effect.maxPayloadClassification);
+		if (!verdict.ok) {
+			return (
+				`${verdict.refusal}: declared source ${JSON.stringify(entry.ref)} carries classification ` +
+				`${resolved.classification}, above the effect ceiling ${effect.maxPayloadClassification}`
+			);
+		}
+	}
+	return null;
+}
+
 function proposalEventProblem(event, lineIndex) {
 	const label = `external proposal event ${lineIndex}`;
 	if (event.kind === "proposal") {
-		const closed = closedFieldProblem(
-			event,
-			event.schemaVersion >= 2 ? PROPOSAL_EVENT_FIELDS : PROPOSAL_EVENT_FIELDS_LEGACY,
-			label,
-		);
-		if (closed !== null) return closed;
+		const allowed = event.schemaVersion >= 2 ? PROPOSAL_EVENT_FIELDS : PROPOSAL_EVENT_FIELDS_LEGACY;
+		const unknown = unknownFieldProblem(event, allowed, label);
+		if (unknown !== null) return unknown;
+		const required = allowed.filter((field) => !PROPOSAL_EVENT_OPTIONAL_FIELDS.includes(field));
+		const missing = required.filter((field) => !(field in event));
+		if (missing.length > 0)
+			return `${label} is missing field${missing.length > 1 ? "s" : ""} ${missing.join(", ")}; the closed field set is ${allowed.join(", ")}`;
 		if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
 			return `${label}.at must be an ISO-8601 timestamp`;
 		if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
@@ -639,6 +821,10 @@ function proposalEventProblem(event, lineIndex) {
 		}
 		if (!SHA256_PATTERN.test(event.requestHash ?? ""))
 			return `${label}.requestHash must be a sha256:<64-hex> string`;
+		if (event.payloadSources !== undefined && event.payloadSources !== null) {
+			const sources = payloadSourcesProblem(event.payloadSources, `${label}.payloadSources`);
+			if (sources !== null) return sources;
+		}
 		return null;
 	}
 	const closed = closedFieldProblem(event, PROPOSAL_AUTHORIZED_EVENT_FIELDS, label);
@@ -774,7 +960,11 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 	const now = opts.now instanceof Date ? opts.now : new Date();
 	if (Number.isNaN(now.getTime()))
 		return fail(EXTERNAL_INVALID_CODE, ["now must be a valid clock"]);
-	const inputClosed = unknownFieldProblem(input, ["id", "effect", "payloadHash"], "proposal input");
+	const inputClosed = unknownFieldProblem(
+		input,
+		["id", "effect", "payloadHash", "payloadSources"],
+		"proposal input",
+	);
 	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
 	if (!isNonEmptyString(input.id))
 		return fail(EXTERNAL_INVALID_CODE, ["id must be a non-empty string"]);
@@ -784,11 +974,35 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 		return fail(EXTERNAL_INVALID_CODE, [
 			"payloadHash must be a sha256:<64-hex> string — the canonical hash of the exact payload under review; the payload itself never enters the ledger",
 		]);
+	let payloadSources = null;
+	if (input.payloadSources !== undefined && input.payloadSources !== null) {
+		const sources = payloadSourcesProblem(input.payloadSources, "proposal input.payloadSources");
+		if (sources !== null) return fail(EXTERNAL_INVALID_CODE, [sources]);
+		payloadSources = input.payloadSources;
+	}
 	const derived = deriveRequestContent(cwd, input.effect, input.payloadHash);
 	if (derived.problem) return fail(derived.problem.code, derived.problem.errors);
 	if (derived.notFound) return fail(EXTERNAL_NOT_FOUND_CODE, [derived.notFound]);
 	if (derived.drift) return fail(EXTERNAL_INVALID_CODE, [derived.drift]);
-	return appendProposal(cwd, input.id, derived.content, null, now, () => null);
+	// R-EG-1: the declared data flow resolves against the current snapshot and
+	// stays under the effect's REGISTERED ceiling — at propose, and re-derived
+	// at execute. The payloadHash binding stays a declared-hash binding only.
+	let registeredEffect;
+	try {
+		registeredEffect = showExternalEffect(cwd, input.effect.id);
+	} catch (err) {
+		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	const flow = declaredFlowProblem(cwd, payloadSources ?? [], registeredEffect);
+	if (flow !== null) return fail(EXTERNAL_INVALID_CODE, [flow]);
+	return appendProposal(
+		cwd,
+		input.id,
+		{ ...derived.content, payloadSources },
+		null,
+		now,
+		() => null,
+	);
 }
 
 // The shared proposal append for plain requests and compensations: the
@@ -811,6 +1025,7 @@ function appendProposal(cwd, id, content, compensates, now, extraGuard) {
 			credentials: content.credentials,
 			compensation: content.compensation,
 			compensates,
+			...(Array.isArray(content.payloadSources) ? { payloadSources: content.payloadSources } : {}),
 			requestHash: content.requestHash,
 		},
 		(fold) => {
@@ -1350,11 +1565,18 @@ function executeExternalEffect(cwd, input = {}, opts = {}) {
 		return fail(EXTERNAL_DRIFT_CODE, [
 			`proposal ${JSON.stringify(input.request)} no longer matches what was authorized; propose and review a fresh request`,
 		]);
+	// R-EG-1 re-derivation at execute: the declared flow must STILL resolve in
+	// the current snapshot and stay under the ceiling — drift refuses exactly
+	// like the effect/adapter pin drift above.
 	let contract;
 	try {
 		contract = showExternalEffect(cwd, proposal.effect.id, proposal.effect.version);
 	} catch (err) {
 		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (Array.isArray(proposal.payloadSources)) {
+		const flow = declaredFlowProblem(cwd, proposal.payloadSources, contract);
+		if (flow !== null) return fail(EXTERNAL_DRIFT_CODE, [flow]);
 	}
 	const credential = input.credential ?? null;
 	const credentialProblem = executionCredentialProblem(contract, credential, at);
@@ -1740,4 +1962,9 @@ module.exports = {
 	listExternalExecutions,
 	compensateExternalEffect,
 	listExternalTransactions,
+	// Context/runtime contract §3.5: the declared-source shape and resolver are
+	// shared with the R-EG-2 research query seam so both egress surfaces read
+	// identical snapshot semantics.
+	declaredSourceShapeProblem,
+	resolveDeclaredContextSource,
 };

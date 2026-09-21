@@ -225,7 +225,8 @@
 									"memory",
 									"eval",
 									"external",
-									"breakglass"
+									"breakglass",
+									"runner"
 								]
 							},
 							"subcommand": { "type": "string" },
@@ -246,7 +247,8 @@
 						"memory",
 						"eval",
 						"external",
-						"breakglass"
+						"breakglass",
+						"runner"
 					],
 					"description": "Amber CLI command family this action maps to."
 				},

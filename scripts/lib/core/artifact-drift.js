@@ -10,8 +10,34 @@
 // evidence.date is hand-editable; the governance ledger is the tamper-evident layer.
 const { resolveTarget } = require("./fs-utils");
 const { loadFeatureList } = require("./validators");
-const { gitOutput } = require("./git-exec");
-const { isGitRepository } = require("./git-workflow-detector");
+// §5.5 split (governance contract G-9): the LOGIC is Core; the git EXECUTION
+// source is Adapter-injected (lazily defaulting to the Coding-domain seam).
+// Core never imports git-exec/git-workflow-detector at module load (G1/G8).
+let gitAdapterForartifactDrift = null;
+function defaultGitAdapterForThisModule() {
+	if (gitAdapterForartifactDrift === null) {
+		const gitExec = require("./git-exec");
+		let detector;
+		try {
+			detector = require("./git-workflow-detector");
+		} catch {
+			detector = {};
+		}
+		gitAdapterForartifactDrift = {
+			gitOutput: gitExec.gitOutput,
+			isGitRepository: detector.isGitRepository,
+		};
+	}
+	return gitAdapterForartifactDrift;
+}
+
+/**
+ * Test/adapter seam: inject the git runner. Pass null to restore the default.
+ */
+function setGitAdapterForThisModule(adapter) {
+	gitAdapterForartifactDrift = adapter;
+}
+
 const { classifyTarget } = require("./target-classification");
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,7 +61,13 @@ function classifyFeature(targetRoot, feature) {
 	if (anchor === "INVALID") return { classification: "anchor-invalid" };
 
 	// pathspec passed as an array (spawnSync, no shell) -> space/glob-safe, no injection.
-	const lastCommitRaw = gitOutput(targetRoot, ["log", "-1", "--format=%cI", "--", ...paths]);
+	const lastCommitRaw = defaultGitAdapterForThisModule().gitOutput(targetRoot, [
+		"log",
+		"-1",
+		"--format=%cI",
+		"--",
+		...paths,
+	]);
 	if (!lastCommitRaw) {
 		// exit 0 + empty stdout (gitOutput returns "") means no commit ever touched paths.
 		return { classification: "path-unknown", anchorDate: anchor, lastCommitDate: null };
@@ -63,7 +95,8 @@ function detectArtifactDrift(target) {
 	if (!data || !Array.isArray(data.features)) {
 		return unavailable("feature_list.json has no features array");
 	}
-	if (!isGitRepository(targetRoot)) return unavailable("n/a (non-git)");
+	if (!defaultGitAdapterForThisModule().isGitRepository(targetRoot))
+		return unavailable("n/a (non-git)");
 	if (classifyTarget(targetRoot).type === "product-repo") {
 		return unavailable("n/a (product-repo)");
 	}
@@ -94,4 +127,4 @@ function detectArtifactDrift(target) {
 	return { target: targetRoot, available: true, counts, skippedBreakdown, features };
 }
 
-module.exports = { detectArtifactDrift };
+module.exports = { setGitAdapterForThisModule, detectArtifactDrift };

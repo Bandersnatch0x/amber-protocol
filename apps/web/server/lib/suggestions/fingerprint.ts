@@ -47,3 +47,12 @@ export function frictionFingerprint(tool: string, error: string): string {
 export function excerptOf(error: string): string {
   return redactSecrets(firstLine(error)).slice(0, 240);
 }
+
+// Display-safe failure text for the structured attribution metadata (evolution
+// contract §3): redact FIRST, then normalize, so secret material never reaches
+// a rendered/persisted field and the existing normalization rules (digit/path
+// masking, lowercasing) operate on already-safe text. This is a display path
+// only — frictionFingerprint's identity algorithm above is unchanged.
+export function displayFailureMode(error: string): string {
+  return normalizeError(redactSecrets(error));
+}

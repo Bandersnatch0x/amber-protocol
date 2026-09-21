@@ -20,6 +20,7 @@ const TYPED_COMMAND_NAMES = new Set([
 	"eval",
 	"external",
 	"breakglass",
+	"runner",
 ]);
 
 // Per-command help text shown by `amber <command> --help`.
@@ -57,10 +58,14 @@ const COMMAND_HELP = {
 		"  bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.",
 		"  validate           Validate a handoff bundle directory.",
 		"",
+		"Options:",
+		"  --replay-scope <sessionId|runId>   Also write per-attempt replay slices (frozen admission values + replay decisions).",
+		"",
 		"Examples:",
 		"  amber handoff --target path/to/repo",
 		"  amber handoff bundle --target path/to/repo",
 		"  amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest",
+		"  amber handoff bundle --target path/to/repo --replay-scope run-<sessionId>-<attemptId>",
 		"  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
 	],
 	doctor: "Run Amber guardrail checks and target classification.",
@@ -1835,7 +1840,7 @@ const COMMAND_OUTPUT = {
 	handoff: {
 		usage: [
 			"Usage: amber handoff --target <repo> [--json]",
-			"       amber handoff bundle --target <repo> [--output-dir <dir>] [--json]",
+			"       amber handoff bundle --target <repo> [--output-dir <dir>] [--replay-scope <sessionId|runId>] [--json]",
 			"       amber handoff validate --target <repo> [--bundle-dir <dir>] [--json]",
 		].join("\n"),
 	},
@@ -2348,6 +2353,20 @@ const KNOWN_UNTYPED_SUBCOMMANDS = Object.freeze(
 		"breakglass/settle",
 		"breakglass/review",
 		"breakglass/status",
+		// Context/runtime contract §5.4: only the request and settle stages are
+		// projected as typed Actions (amber.runner.request / amber.runner.settle,
+		// both approval-required). Every other runner subcommand stays CLI
+		// surface with no MCP projection and no new authority.
+		"runner/register",
+		"runner/capability",
+		"runner/authorize",
+		"runner/requests",
+		"runner/prepare",
+		"runner/abort",
+		"runner/executions",
+		"runner/list",
+		"runner/rolled-back",
+		"runner/show",
 	]),
 );
 

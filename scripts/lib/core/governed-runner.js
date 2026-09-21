@@ -7,7 +7,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
 const { evaluateGovernedPolicy, loadPolicyRules } = require("./loop-policy");
 const {
@@ -15,10 +14,17 @@ const {
 	readLedger,
 	verifyLedgerChain,
 	latestUnconsumedApproval,
+	latestUnconsumedApprovalFor,
 } = require("./loop-ledger");
 const { codedError } = require("./error-catalog");
-const { createWorktree, removeWorktree } = require("../worktree-manager");
 const { recordEvidence } = require("./evidence-receipts");
+const { resolveRequestCapability } = require("./runner-registry");
+const {
+	capabilityHashOf,
+	inputDigestOf,
+	parseCapabilityPin,
+	policyHashOf,
+} = require("./run-freeze");
 
 function mergeRules(globalRules, contextRules) {
 	const g = Array.isArray(globalRules?.rules) ? globalRules.rules : [];
@@ -126,6 +132,153 @@ function policyDenial(targetRoot, ledgerPath, command, reason, subject, metadata
 	};
 }
 
+// ── trusted-control run contract: pre-effect gate verification (Slice 3) ────
+// R-AD-3: gates verify BEFORE any effect. The frozen binding (from the
+// attempt's captured admission record) is checked in order — request digest,
+// policy hash, capability hash — then the real policy evaluation runs, then
+// authorization-consumption eligibility (R-AU-3). Any mismatch appends a
+// `denied` record with the explicit refusal token and stops: nothing executes,
+// the approval is left unconsumed. Drift is refused at the gate, never merely
+// noticed in a later fold.
+
+/**
+ * Recompute the current registry hash for the pinned capability and compare it
+ * with the frozen capabilityHash (R-AD-3 check 3). A registry change to any
+ * pinned field is capability drift.
+ */
+function capabilityDriftProblem(targetRoot, frozen) {
+	const parts = parseCapabilityPin(frozen.attemptIdentity.capabilityPin);
+	if (!parts) {
+		return "the attempt's capability pin does not match the closed F052 grammar";
+	}
+	let resolution;
+	try {
+		resolution = resolveRequestCapability(targetRoot, parts);
+	} catch (err) {
+		return `the capability registry could not be resolved at the gate: ${err.message || String(err)}`;
+	}
+	if (!resolution.ok) {
+		return `the pinned capability no longer resolves from the registry: ${(resolution.errors || [])[0] || "unknown"}`;
+	}
+	if (capabilityHashOf([resolution.capability]) !== frozen.capabilityHash) {
+		return "the registry's capability record no longer hashes to the attempt's frozen capabilityHash";
+	}
+	return null;
+}
+
+/**
+ * R-AD-3 checks 1–3, in spec order, each refusing with an explicit token.
+ * `globalRules` is the SAME loaded rules object the policy evaluation will
+ * use — the check never verifies a different read of the file than the gate
+ * evaluates.
+ * @returns {{refusal: string, reason: string}|null}
+ */
+function frozenAdmissionProblem(targetRoot, frozen, resolvedCommand, globalRules) {
+	// (1) request binding: the request about to execute hashes to the frozen
+	// inputDigest — the executed request is the frozen request, never a
+	// re-derived or caller-substituted one (R-FR-0).
+	const liveDigest = inputDigestOf({
+		resolvedCommand: resolvedCommand ?? null,
+		argv: resolvedCommand === null || resolvedCommand === undefined ? null : [],
+		capabilityPin: frozen.attemptIdentity.capabilityPin,
+		routeHash: frozen.attemptIdentity.routeHash,
+		stageName: frozen.attemptIdentity.stageName,
+		attemptNumber: frozen.attemptIdentity.attemptNumber,
+		fence: frozen.attemptIdentity.fence,
+	});
+	if (liveDigest !== frozen.inputDigest) {
+		return {
+			refusal: "request-drift",
+			reason:
+				"the resolved request does not hash to the attempt's frozen inputDigest; the executed request must be the frozen request (R-AD-3.1)",
+		};
+	}
+	// (2) policy binding: the gate-loaded rules hash to the frozen policyHash.
+	if (frozen.policyHash !== undefined && frozen.policyHash !== null) {
+		const liveRules = globalRules ?? loadPolicyRules(targetRoot, { required: true });
+		if (policyHashOf(liveRules) !== frozen.policyHash) {
+			return {
+				refusal: "policy-drift",
+				reason:
+					"the gate-loaded rules do not hash to the attempt's frozen policyHash; policy drift is refused before evaluation (R-AD-3.2)",
+			};
+		}
+	}
+	// (3) capability binding: the current registry's pinned capability records
+	// hash to the frozen capabilityHash (F052 fail-closed drift refusal).
+	if (frozen.capabilityHash !== undefined && frozen.capabilityHash !== null) {
+		const drift = capabilityDriftProblem(targetRoot, frozen);
+		if (drift) return { refusal: "capability-drift", reason: drift };
+	}
+	// (3b) R-CA-3: a hard context expiry in the past at the consumption
+	// instant refuses — expiry is a boundary, not a warning.
+	if (typeof frozen.contextExpiresAt === "string") {
+		const expiry = Date.parse(frozen.contextExpiresAt);
+		if (Number.isNaN(expiry) || Date.now() >= expiry) {
+			return {
+				refusal: "context-expired",
+				reason: `the attempt's context authority expired at ${frozen.contextExpiresAt} (R-CA-3)`,
+			};
+		}
+	}
+	return null;
+}
+
+/**
+ * R-AU-3: consumption eligibility in order, each refusal explicit. Single-use
+ * (check 1) holds by construction — the candidate grant came from
+ * `latestUnconsumedApproval`, which only returns unconsumed grants. Binding
+ * fields a legacy grant never carried are recorded absences: the dimension is
+ * not checkable and is skipped, never fabricated (compat boundary, spec §8).
+ *
+ * @returns {{refusal: string, reason: string}|null}
+ */
+function eligibilityProblem(approval, frozen, attemptId) {
+	if (
+		approval.scopeHash !== undefined &&
+		approval.scopeHash !== null &&
+		approval.scopeHash !== frozen.scopeHash
+	) {
+		return {
+			refusal: "scope-drift",
+			reason: "the grant's scopeHash differs from the attempt's frozen scopeHash (R-AU-3.2)",
+		};
+	}
+	if (
+		approval.policyVersion !== undefined &&
+		approval.policyVersion !== null &&
+		approval.policyVersion !== frozen.policyHash
+	) {
+		return {
+			refusal: "policy-drift",
+			reason: "the grant's policyVersion differs from the attempt's frozen policyHash (R-AU-3.3)",
+		};
+	}
+	if (
+		approval.capabilityHash !== undefined &&
+		approval.capabilityHash !== null &&
+		approval.capabilityHash !== frozen.capabilityHash
+	) {
+		return {
+			refusal: "capability-drift",
+			reason:
+				"the grant's capabilityHash differs from the attempt's frozen capabilityHash (R-AU-3.4)",
+		};
+	}
+	if (
+		approval.boundAttemptId !== undefined &&
+		approval.boundAttemptId !== null &&
+		approval.boundAttemptId !== attemptId
+	) {
+		return {
+			refusal: "attempt-identity-mismatch",
+			reason:
+				"the grant is bound to a different attemptId; two attempts with identical hashes never silently share an attempt-bound grant (R-AU-3.5)",
+		};
+	}
+	return null;
+}
+
 function confidenceDenial(targetRoot, ledgerPath, command, verdict, subject, metadata = {}) {
 	const reason =
 		verdict.confidence === "medium"
@@ -158,7 +311,7 @@ function evaluateExecutionPolicy(
 	command,
 	subject,
 	contextRules,
-	{ globalRules: suppliedGlobalRules, commandId } = {},
+	{ globalRules: suppliedGlobalRules, commandId, v2Subject } = {},
 ) {
 	const globalRules = suppliedGlobalRules || loadPolicyRules(targetRoot, { required: true });
 	const namedCommand = commandId !== undefined;
@@ -174,7 +327,7 @@ function evaluateExecutionPolicy(
 		);
 	}
 	const ruleset = mergeRules(globalRules, contextRules);
-	const verdict = evaluateGovernedPolicy(command, ruleset);
+	const verdict = evaluateGovernedPolicy(command, ruleset, v2Subject ?? null);
 	if (!verdict.allowed)
 		return policyDenial(
 			targetRoot,
@@ -262,6 +415,28 @@ function canonicalOutputDigest({
 	};
 }
 
+// §5.5 row 11 split (governance contract G-9): the FOUR GATES (policy,
+// approval, ledger, frozen-admission verification) are Core; the worktree +
+// spawnSync EXECUTION semantics are Adapter-injected (the Coding domain's
+// ExecutionBoundary in execution-domain-adapter.js). Core never imports
+// worktree-manager or child_process at module load (guard G1/G8) — the
+// adapter is lazily required at the boundary and injectable for tests.
+let executionBoundaryAdapter = null;
+function defaultExecutionAdapter() {
+	if (executionBoundaryAdapter === null) {
+		executionBoundaryAdapter = require("./execution-domain-adapter");
+	}
+	return executionBoundaryAdapter;
+}
+
+/**
+ * Test/adapter seam: inject the ExecutionBoundary adapter. Pass null to
+ * restore the default lazy Coding-domain adapter.
+ */
+function setExecutionAdapter(adapter) {
+	executionBoundaryAdapter = adapter;
+}
+
 function executeInWorktree(
 	targetRoot,
 	command,
@@ -269,73 +444,9 @@ function executeInWorktree(
 	budgetMinutes,
 	{ captureDigest = false } = {},
 ) {
-	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
-	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-	const worktree = createWorktree(targetRoot, runId);
-	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
-	let result;
-	const startedAt = new Date().toISOString();
-	try {
-		const spawned = spawnSync(command, {
-			shell: true,
-			cwd: worktree.path,
-			// The legacy command seam intentionally keeps its historical UTF-8
-			// envelope.  Only the named-command/F062 seam needs raw bytes for the
-			// complete output digest.
-			encoding: captureDigest ? "buffer" : "utf8",
-			timeout: budgetMinutes * 60_000,
-		});
-		if (!captureDigest) {
-			result = {
-				command,
-				exitCode: spawned.status === null ? -1 : spawned.status,
-				stdout: (spawned.stdout || "").slice(-4000),
-				stderr: (spawned.stderr || "").slice(-2000),
-			};
-			return { result };
-		}
-		const stdout = Buffer.isBuffer(spawned.stdout)
-			? spawned.stdout
-			: Buffer.from(spawned.stdout || "", "utf8");
-		const stderr = Buffer.isBuffer(spawned.stderr)
-			? spawned.stderr
-			: Buffer.from(spawned.stderr || "", "utf8");
-		const timedOut = spawned.error?.code === "ETIMEDOUT";
-		const exitCode = spawned.status === null ? -1 : spawned.status;
-		const signal = spawned.signal || null;
-		const finishedAt = new Date().toISOString();
-		result = {
-			command,
-			exitCode,
-			signal,
-			timedOut,
-			startedAt,
-			finishedAt,
-			terminalStatus: timedOut ? "timed_out" : exitCode === 0 ? "succeeded" : "failed",
-			stdout,
-			stderr,
-		};
-	} catch (error) {
-		const finishedAt = new Date().toISOString();
-		result = {
-			command,
-			exitCode: -1,
-			...(captureDigest
-				? {
-						signal: error.signal || null,
-						timedOut: error.code === "ETIMEDOUT",
-						startedAt,
-						finishedAt,
-						terminalStatus: error.code === "ETIMEDOUT" ? "timed_out" : "failed",
-						stdout: Buffer.alloc(0),
-						stderr: Buffer.from(String(error.message || error), "utf8"),
-					}
-				: { stdout: "", stderr: String(error.message || error).slice(-2000) }),
-		};
-	} finally {
-		removeWorktree(targetRoot, runId);
-	}
-	return { result };
+	return defaultExecutionAdapter().executeInWorktree(targetRoot, command, label, budgetMinutes, {
+		captureDigest,
+	});
 }
 
 function attachExecutionDigest(execution, subject = {}) {
@@ -384,6 +495,11 @@ function recordExecutionEvidence(targetRoot, execution, subject = {}) {
 			terminalStatus: execution.terminalStatus,
 			requestId: subject.requestId || "none",
 			attemptId: subject.attemptId || "none",
+			// Run-contract join keys (plan Slice 4, spec R-RP-3): a receipt that
+			// cannot join to an admission record by (runId, scopeHash) scores an
+			// evidence-completeness gap downstream instead of a silent pass.
+			runId: subject.runId || "none",
+			scopeHash: subject.scopeHash || "none",
 		},
 		outputs: [`stdout:${execution.stdout.length} bytes`, `stderr:${execution.stderr.length} bytes`],
 		outputDigest: execution.outputDigest,
@@ -476,6 +592,7 @@ function runGovernedCommand({
 	subject = {},
 	label = "command",
 	contextRules,
+	frozen,
 }) {
 	const targetRoot = resolveTarget(target);
 	const executionSubject = {
@@ -551,17 +668,96 @@ function runGovernedCommand({
 		resolvedCommand = resolution.command;
 	}
 
+	// R-AD-3 checks 1–3 (frozen admission binding) run BEFORE policy
+	// evaluation, execution, or consumption: a mismatch appends its explicit
+	// denial and stops with the approval left unconsumed. The check verifies
+	// the same rules object the evaluation will use.
+	if (frozen) {
+		const admission = frozenAdmissionProblem(targetRoot, frozen, resolvedCommand, globalRules);
+		if (admission) {
+			appendLedgerRecord(lp, {
+				schemaVersion: 2,
+				kind: "denied",
+				gate: "frozen-admission",
+				refusal: admission.refusal,
+				...(namedCommand ? { commandId } : {}),
+				reason: admission.reason,
+				recordedAt: new Date().toISOString(),
+				executesAnything: false,
+				...subject,
+			});
+			return {
+				target: targetRoot,
+				...resultMetadata,
+				refusal: admission.refusal,
+				errors: [codedError("AMBER_E_POLICY_DENY", admission.reason)],
+				warnings: [],
+			};
+		}
+	}
+
+	// §6.2/C0 §3.3: the v2 subject feeds the classification-ceiling face — the
+	// capability NAME (the policy-rule vocabulary) and the attempt's own
+	// declared context ceiling (R-AU-1). Null classification is the honest
+	// absence (R-CA-4) and never satisfies a ceiling rule (fail-closed).
+	let v2Subject = null;
+	if (frozen) {
+		const pinParts = parseCapabilityPin(frozen.attemptIdentity.capabilityPin);
+		v2Subject = {
+			capability: pinParts ? pinParts.name : frozen.attemptIdentity.capabilityPin,
+			contextClassification: frozen.contextClassification ?? null,
+		};
+	}
+
 	const policyResult = evaluateExecutionPolicy(
 		targetRoot,
 		lp,
 		resolvedCommand,
 		executionSubject,
 		contextRules,
-		{ globalRules, ...(namedCommand ? { commandId } : {}) },
+		{ globalRules, ...(namedCommand ? { commandId } : {}), v2Subject },
 	);
 	if (policyResult && policyResult.errors.length > 0) return policyResult;
 	const matchedRule = namedCommand ? policyResult.matchedRule : undefined;
-	const approval = latestUnconsumedApproval(readLedger(lp));
+	// §6.5 `policy.evaluated`: the decision's own ledger event — the PDP
+	// verdict recorded as an assertive-redundancy fact whose policyHash equals
+	// the attempt's frozen value by construction (R-AD-4); a mismatch would
+	// itself be a tamper signal. Appended through the existing record pattern;
+	// no new ledger family (0045).
+	if (frozen && frozen.policyHash !== undefined && frozen.policyHash !== null) {
+		const policyNow = globalRules ?? loadPolicyRules(targetRoot, { required: true });
+		const { policyHashOf } = require("./run-freeze");
+		const evaluatedHash = policyHashOf(policyNow);
+		appendLedgerRecord(lp, {
+			kind: "policy.evaluated",
+			schemaVersion: 2,
+			at: new Date().toISOString(),
+			decision: policyResult && policyResult.allowed ? "allow" : "deny",
+			matchedRule: matchedRule ?? null,
+			reason:
+				(policyResult && policyResult.verdict?.reason) || "evaluated against the frozen policy",
+			policyHash: evaluatedHash,
+			scopeHash: frozen.scopeHash ?? null,
+			confidence: policyResult?.verdict?.confidence ?? null,
+			executesAnything: false,
+			...executionSubject,
+		});
+	}
+	// Grant selection (R-AD-6 mutual binding): a frozen attempt consumes the
+	// grant bound to IT (or an explicitly unbound legacy grant) — never a
+	// foreign attempt's orphaned grant, which by construction can never be
+	// consumed by its own attempt again. R-AU-3's explicit refusals then
+	// evaluate against the selected grant.
+	const ledgerRecords = readLedger(lp);
+	const approval = frozen
+		? latestUnconsumedApprovalFor(
+				ledgerRecords,
+				(grant) =>
+					grant.boundAttemptId === undefined ||
+					grant.boundAttemptId === null ||
+					grant.boundAttemptId === executionSubject.attemptId,
+			)
+		: latestUnconsumedApproval(ledgerRecords);
 	if (!approval) {
 		return {
 			target: targetRoot,
@@ -569,6 +765,34 @@ function runGovernedCommand({
 			errors: [codedError("AMBER_E_LOOP_NOT_APPROVED", `No unconsumed approval for ${label}`)],
 			warnings: [],
 		};
+	}
+
+	// R-AU-3: authorization-consumption eligibility, in order, before any
+	// effect. A refusal here leaves the grant unconsumed and terminates the
+	// attempt at the gate (drift is never noticed only in a later fold).
+	if (frozen) {
+		const eligibility = eligibilityProblem(approval, frozen, executionSubject.attemptId);
+		if (eligibility) {
+			appendLedgerRecord(lp, {
+				schemaVersion: 2,
+				kind: "denied",
+				gate: "approval-eligibility",
+				refusal: eligibility.refusal,
+				approvalKey: approval.approvalKey,
+				...(namedCommand ? { commandId } : {}),
+				reason: eligibility.reason,
+				recordedAt: new Date().toISOString(),
+				executesAnything: false,
+				...subject,
+			});
+			return {
+				target: targetRoot,
+				...resultMetadata,
+				refusal: eligibility.refusal,
+				errors: [codedError("AMBER_E_POLICY_DENY", eligibility.reason)],
+				warnings: [],
+			};
+		}
 	}
 
 	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
@@ -589,6 +813,21 @@ function runGovernedCommand({
 			errors: [execution.error],
 			warnings: [],
 		};
+	// §7.4 budget exhaustion: a timed-out run (the duration budget exhausted)
+	// appends the durable `budget.exhausted` ledger event with the observed
+	// values — never silently settled as a plain failure.
+	if (execution.result?.timedOut === true) {
+		appendLedgerRecord(lp, {
+			kind: "budget.exhausted",
+			schemaVersion: 2,
+			at: new Date().toISOString(),
+			dimension: "maxMinutes",
+			limit: budgetMinutes,
+			observed: budgetMinutes,
+			executesAnything: false,
+			...executionSubject,
+		});
+	}
 	execution.result = {
 		...execution.result,
 		...(namedCommand ? { commandId, matchedRule } : {}),
@@ -602,4 +841,6 @@ module.exports = {
 	resolveCommandId,
 	canonicalOutputDigest,
 	attachExecutionDigest,
+	eligibilityProblem,
+	setExecutionAdapter,
 };

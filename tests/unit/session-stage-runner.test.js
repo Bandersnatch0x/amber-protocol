@@ -110,6 +110,15 @@ function makeTarget({ stages, status = "executing", lease = true } = {}) {
 
 const CLAIM = { ownerId: "agent-a", tokenHash: TOKEN_HASH, leaseFence: 1 };
 
+function recordsOfKindFactory(sessionDir, kind) {
+	return fs
+		.readFileSync(path.join(sessionDir, "ledger.jsonl"), "utf8")
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => JSON.parse(line))
+		.filter((record) => record.kind === kind);
+}
+
 const HOST_AGENT = {
 	capabilityPin: PIN,
 	providerClass: "host-agent",
@@ -656,23 +665,60 @@ describe("session stage runner — legacy seams and lease minting", () => {
 			},
 		]);
 		try {
-			// The fixture root is not a git repository, so governed-runner
-			// refuses before any execution — exercising the rejected path.
+			// The run contract's capture-first path (R-AD-6): with no eligible
+			// grant the attempt stays captured and awaiting-authorization, so the
+			// gate refusals are exercised from a granted capture. This fixture
+			// root has no rules.json, so the governed call refuses (the command
+			// id does not resolve) — and the fixture root is not a git
+			// repository either. Either refusal settles the attempt rejected.
 			const { root, sessionDir } = makeTarget();
+			const capture = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+			assert.strictEqual(capture.awaitingAuthorization, true);
+			const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
+			appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
+				kind: "approved",
+				approvalKey: "s1:grant",
+			});
 			const outcome = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 			assert.strictEqual(outcome.success, false);
 
 			const ledger = fs.readFileSync(path.join(sessionDir, "ledger.jsonl"), "utf8");
-			const settled = ledger
+			const records = ledger
 				.split("\n")
 				.filter(Boolean)
-				.map((line) => JSON.parse(line))
-				.filter((record) => record.kind === "stage_attempt_settled");
+				.map((line) => JSON.parse(line));
+			const settled = records.filter((record) => record.kind === "stage_attempt_settled");
 			assert.strictEqual(settled.length, 1);
 			assert.strictEqual(settled[0].status, "rejected");
+			const denied = records.filter((record) => record.kind === "attempt_denied");
+			assert.strictEqual(denied.length, 1, "the admission outcome is its own event (R-AD-1)");
 
 			const manifest = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
 			assert.deepStrictEqual(manifest.completedStages, []);
+		} finally {
+			restore();
+		}
+	});
+
+	it("a bounded-command capture with no eligible grant stays captured and awaits authorization", async () => {
+		const restore = withAdapters([
+			{
+				capabilityPin: PIN,
+				providerClass: "bounded-command",
+				adapterId: "governed-runner",
+				adapterVersion: "1",
+			},
+		]);
+		try {
+			// R-AD-6 step 1 (run contract): the durable request exists, but with
+			// no eligible grant nothing executes and the attempt stays requested
+			// — the evolved behavior for the approval-missing case.
+			const { root, sessionDir } = makeTarget();
+			const outcome = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+			assert.strictEqual(outcome.success, true);
+			assert.strictEqual(outcome.awaitingAuthorization, true);
+			assert.strictEqual(recordsOfKindFactory(sessionDir, "stage_attempt_settled").length, 0);
+			assert.strictEqual(recordsOfKindFactory(sessionDir, "attempt_denied").length, 0);
 		} finally {
 			restore();
 		}

@@ -71,6 +71,7 @@ function signalFromFailure(
   tool: string,
   error: string,
   timestamp?: string,
+  sourceFile?: string,
 ): FrictionSignal {
   const safeTool = safeToolName(tool);
   return {
@@ -81,6 +82,9 @@ function signalFromFailure(
     excerpt: excerptOf(error),
     timestamp,
     fingerprint: frictionFingerprint(safeTool, error),
+    // The owning source of the V1 evidence reference (evolution contract
+    // §6) — never rendered or persisted on the card itself.
+    sourceFile: sourceFile ?? '',
   };
 }
 
@@ -106,29 +110,49 @@ function outputLooksFailed(output: unknown, success: unknown): boolean {
   return FAILURE_MARKERS.some((pattern) => pattern.test(output));
 }
 
-export function collectClaudeSignals(repoRoot: string, claudeHome?: string): FrictionSignal[] {
+export function collectClaudeSignals(
+  repoRoot: string,
+  claudeHome?: string,
+): { signals: FrictionSignal[]; transcriptsScanned: number } {
   const summaries = listRepoTranscripts(repoRoot, { claudeHome });
+  const scanned = summaries.slice(0, HOST_FILE_CEILING);
   const signals: FrictionSignal[] = [];
-  for (const summary of summaries.slice(0, HOST_FILE_CEILING)) {
+  for (const summary of scanned) {
     const content = readText(summary.sourceFile);
     if (content === null) continue;
     for (const failure of extractFailures(content, { redact: false })) {
       signals.push(
-        signalFromFailure('claude', summary.id, failure.tool, failure.error, failure.timestamp),
+        signalFromFailure(
+          'claude',
+          summary.id,
+          failure.tool,
+          failure.error,
+          failure.timestamp,
+          summary.sourceFile,
+        ),
       );
     }
   }
-  return signals;
+  return { signals, transcriptsScanned: scanned.length };
 }
 
-function collectCodexSignals(repoRoot: string, codexHome: string): FrictionSignal[] {
+function collectCodexSignals(
+  repoRoot: string,
+  codexHome: string,
+): { signals: FrictionSignal[]; transcriptsScanned: number } {
   const sessionsDir = path.join(codexHome, 'sessions');
   const files = newestFiles(sessionsDir, (name) => CODEX_ROLLOUT_RE.test(name));
   const signals: FrictionSignal[] = [];
+  // The exposure denominator is the window the collector read — every file it
+  // opened, including the ones that turned out to belong to another repo or
+  // held no failure. Counting only failing transcripts would make the rate a
+  // function of the numerator.
+  let transcriptsScanned = 0;
 
   for (const filePath of files) {
     const content = readText(filePath);
     if (content === null) continue;
+    transcriptsScanned += 1;
     const records = parseJsonl(content);
     const meta = records.find((row) => row.type === 'session_meta');
     const payload =
@@ -190,16 +214,20 @@ function collectCodexSignals(repoRoot: string, codexHome: string): FrictionSigna
               call?.tool ?? 'function',
               error,
               timestamp ?? call?.timestamp,
+              filePath,
             ),
           );
         }
       }
     }
   }
-  return signals;
+  return { signals, transcriptsScanned };
 }
 
-function collectCursorSignals(repoRoot: string, cursorHome: string): FrictionSignal[] {
+function collectCursorSignals(
+  repoRoot: string,
+  cursorHome: string,
+): { signals: FrictionSignal[]; transcriptsScanned: number } {
   const encoded = encodeProjectPath(repoRoot);
   const hashed = cursorWorkspaceHash(repoRoot);
   const roots = [
@@ -208,10 +236,13 @@ function collectCursorSignals(repoRoot: string, cursorHome: string): FrictionSig
   ];
   const files = roots.flatMap((root) => newestFiles(root, (name) => name.endsWith('.jsonl')));
   const signals: FrictionSignal[] = [];
+  // Same denominator rule as Codex: every read file counts, failing or not.
+  let transcriptsScanned = 0;
 
   for (const filePath of files) {
     const content = readText(filePath);
     if (content === null) continue;
+    transcriptsScanned += 1;
     const records = parseJsonl(content);
     const transcriptId = path.basename(filePath, '.jsonl');
     const pending = new Map<string, { tool: string; timestamp?: string }>();
@@ -257,7 +288,14 @@ function collectCursorSignals(repoRoot: string, cursorHome: string): FrictionSig
                 ? block.text
                 : 'tool error';
           signals.push(
-            signalFromFailure('cursor', transcriptId, call?.tool ?? 'unknown', error, timestamp),
+            signalFromFailure(
+              'cursor',
+              transcriptId,
+              call?.tool ?? 'unknown',
+              error,
+              timestamp,
+              filePath,
+            ),
           );
         }
       }
@@ -272,21 +310,36 @@ function collectCursorSignals(repoRoot: string, cursorHome: string): FrictionSig
         const call = id ? pending.get(id) : undefined;
         const error = typeof record.content === 'string' ? record.content : 'tool error';
         signals.push(
-          signalFromFailure('cursor', transcriptId, call?.tool ?? 'unknown', error, timestamp),
+          signalFromFailure(
+            'cursor',
+            transcriptId,
+            call?.tool ?? 'unknown',
+            error,
+            timestamp,
+            filePath,
+          ),
         );
       }
     }
   }
-  return signals;
+  return { signals, transcriptsScanned };
 }
 
 export function collectHostSignals(
   repoRoot: string,
   homes: SuggestionHomes,
-): { signals: FrictionSignal[]; scanned: { host: HostId; transcripts: number }[] } {
+): {
+  signals: FrictionSignal[];
+  scanned: { host: HostId; transcripts: number }[];
+  transcriptsScanned: number;
+} {
   const claude = collectClaudeSignals(repoRoot, homes.claudeHome);
-  const codex = homes.codexHome ? collectCodexSignals(repoRoot, homes.codexHome) : [];
-  const cursor = homes.cursorHome ? collectCursorSignals(repoRoot, homes.cursorHome) : [];
+  const codex = homes.codexHome
+    ? collectCodexSignals(repoRoot, homes.codexHome)
+    : { signals: [], transcriptsScanned: 0 };
+  const cursor = homes.cursorHome
+    ? collectCursorSignals(repoRoot, homes.cursorHome)
+    : { signals: [], transcriptsScanned: 0 };
 
   const count = (host: HostId, list: FrictionSignal[]) => ({
     host,
@@ -294,7 +347,16 @@ export function collectHostSignals(
   });
 
   return {
-    signals: [...claude, ...codex, ...cursor],
-    scanned: [count('claude', claude), count('codex', codex), count('cursor', cursor)],
+    signals: [...claude.signals, ...codex.signals, ...cursor.signals],
+    scanned: [
+      count('claude', claude.signals),
+      count('codex', codex.signals),
+      count('cursor', cursor.signals),
+    ],
+    // The recurrence exposure denominator (contract §9): the transcripts the
+    // scan actually read across the declared window — the same window the
+    // signals above came from.
+    transcriptsScanned:
+      claude.transcriptsScanned + codex.transcriptsScanned + cursor.transcriptsScanned,
   };
 }

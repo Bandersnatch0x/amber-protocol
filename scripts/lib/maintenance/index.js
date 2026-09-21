@@ -20,15 +20,35 @@ const { resolveTarget } = require("../core/fs-utils");
  *
  * Does not load or require Team Distribution registry state. Absent optional
  * evidence sources produce a complete empty result. Corrupt or unreadable
- * individual records are skipped, retained valid records are preserved, the
- * outcome is marked partial, and redacted warnings are emitted. Partial
- * evidence is warning-only and never becomes an error.
+ * REGRESSION records are skipped, retained valid records are preserved, the
+ * outcome is marked partial, and redacted warnings are emitted — regression
+ * partiality is warning-only. Structured `amber-finding` blocks are a different
+ * class: a malformed or secret-bearing block is an ERROR (a refusal at the
+ * pre-admission boundary, trusted-control evolution contract §5), never
+ * laundered as legacy findings.
+ *
+ * Recurrence evidence (contract §9, E8) rides `evolution.recurrence`: the
+ * log's occurrence count over its declared window's exposure denominator.
+ * Report-only — the rate is `unknown` when the denominator is zero or
+ * unavailable, and no before/after improvement claim is computed.
  *
  * @param {string} target
  * @returns {{
  *   target: string,
  *   availability: "complete"|"partial",
- *   evolution: { findings: object[], significant: object[] },
+ *   evolution: {
+ *     findings: object[],
+ *     significant: object[],
+ *     structured: object[],
+ *     carrier: object | null,
+ *     recurrence: {
+ *       occurrences: number,
+ *       transcriptsScanned: number | null,
+ *       recurrenceRate: number | null,
+ *       denominator: "measured" | "unknown",
+ *       window: string,
+ *     },
+ *   },
  *   regressionProposals: object[],
  *   warnings: string[],
  *   errors: string[],
