@@ -99,22 +99,22 @@ Desktop.ini
 # Vite writes a temp file next to a TS/MTS config while loading it
 *.timestamp-*.mjs
 
-# Local working files (notes, checklists, scratch data)
-notes.md
-MEMORY.md
-.release-checklist.md
-session-handoff.md
-tasks/
+# Local working files (notes, checklists, scratch data). Root-anchored: an
+# unanchored basename rule also matches a same-named file anywhere in the tree,
+# which silently swallows committed artifacts — `MEMORY.md` used to hide the
+# generated `apps/docs/docs/reference/cli/memory.md` on case-insensitive
+# filesystems, leaving it invisible to `git status` entirely.
+/notes.md
+/MEMORY.md
+/.release-checklist.md
+/session-handoff.md
+/tasks/
 # Governed shared memory (ADR-0018) — tracked by git by default, unlike the
 # local working files above; book entries via `amber memory book`.
 !/MEMORY.md
-# The docs site generates one CLI reference page per command, so the `memory`
-# command's page path collides with the MEMORY.md rule above on case-insensitive
-# filesystems. Re-include exactly that generated page.
-!apps/docs/docs/reference/cli/memory.md
 feature_list.json
 !/feature_list.json
-问题清单.md
+/问题清单.md
 
 # Local regression-test scratch (go-stock analysis reports and ad-hoc test scripts)
 test-reports/
