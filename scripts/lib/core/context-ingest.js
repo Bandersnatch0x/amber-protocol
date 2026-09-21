@@ -154,7 +154,8 @@ function classificationDowngradeProblem(targetRoot, existing, payload) {
 	const oldRank = rankOf(oldStored);
 	if (oldRank === null || oldRank < CLASSIFICATION_RANK.restricted) return null;
 	const newClassification =
-		typeof payload.classification === "string" && CLASSIFICATION_RANK[payload.classification] !== undefined
+		typeof payload.classification === "string" &&
+		CLASSIFICATION_RANK[payload.classification] !== undefined
 			? payload.classification
 			: "internal";
 	const newRank = rankOf(newClassification);
@@ -398,9 +399,7 @@ function validateFullPage(context, payload) {
 	if (downgradeProblem) {
 		return {
 			blocked: true,
-			findings: [
-				finding("AMBER_E_CONTEXT_DOWNGRADE_REFUSED", downgradeProblem, pageId),
-			],
+			findings: [finding("AMBER_E_CONTEXT_DOWNGRADE_REFUSED", downgradeProblem, pageId)],
 			errors: [downgradeProblem],
 		};
 	}

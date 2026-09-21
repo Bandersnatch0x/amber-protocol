@@ -226,12 +226,7 @@ function checkEvidence(targetRoot, evidenceReferences) {
 // ── V2 ──
 
 function normalizeOperationPath(value) {
-	return path
-		.normalize(String(value))
-		.split(path.sep)
-		.join("/")
-		.replace(/^\.\//, "")
-		.toLowerCase();
+	return path.normalize(String(value)).split(path.sep).join("/").replace(/^\.\//, "").toLowerCase();
 }
 
 /**

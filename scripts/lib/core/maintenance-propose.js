@@ -340,17 +340,16 @@ function carrierLeakProblem(inspection) {
 // contract E7).
 function scanPriorRejections(targetRoot, correlation) {
 	const unknown = { count: null, firstAt: null, lastAt: null, unknown: true };
-	const proposalsRoot = path.join(
-		resolveStateDirForRead(targetRoot),
-		"maintenance",
-		"proposals",
-	);
+	const proposalsRoot = path.join(resolveStateDirForRead(targetRoot), "maintenance", "proposals");
 	if (!pathExists(proposalsRoot)) {
 		return { count: 0, firstAt: null, lastAt: null, unknown: false };
 	}
 	let names;
 	try {
-		names = fs.readdirSync(proposalsRoot).filter((name) => name.endsWith(".md")).sort();
+		names = fs
+			.readdirSync(proposalsRoot)
+			.filter((name) => name.endsWith(".md"))
+			.sort();
 	} catch {
 		return unknown;
 	}
@@ -594,4 +593,8 @@ function proposeMaintenance(target, registryPath, priority, inspectMaintenance) 
 	};
 }
 
-module.exports = { buildMaintenanceProposalContent, buildMaintenanceRejectionContent, proposeMaintenance };
+module.exports = {
+	buildMaintenanceProposalContent,
+	buildMaintenanceRejectionContent,
+	proposeMaintenance,
+};

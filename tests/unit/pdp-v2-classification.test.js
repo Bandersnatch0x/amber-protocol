@@ -16,7 +16,10 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const crypto = require("node:crypto");
 
-const { evaluateGovernedPolicy, evaluateCommandPolicy } = require("../../scripts/lib/core/loop-policy");
+const {
+	evaluateGovernedPolicy,
+	evaluateCommandPolicy,
+} = require("../../scripts/lib/core/loop-policy");
 const stageRunner = require("../../scripts/lib/session-stage-runner");
 const { runSessionStage, grantSessionExecution } = stageRunner;
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -32,7 +35,12 @@ const TOKEN_HASH = crypto.createHash("sha256").update("opaque-token").digest("he
 
 const ALLOW_RULE_ID = COMMAND_ID; // decision 1: the capability NAME is the policy rule id
 const DENY_RULE_ID = "deny-over-internal";
-const ALLOW_RULE = { id: ALLOW_RULE_ID, action: "allow", match: "exact", pattern: "node --version" };
+const ALLOW_RULE = {
+	id: ALLOW_RULE_ID,
+	action: "allow",
+	match: "exact",
+	pattern: "node --version",
+};
 // The v2 ceiling-guard deny: fires when the consuming context exceeds internal.
 const DENY_RULE = {
 	id: DENY_RULE_ID,

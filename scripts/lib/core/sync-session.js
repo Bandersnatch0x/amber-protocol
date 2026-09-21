@@ -38,8 +38,6 @@ let gitAdapterForsyncSession = null;
 function defaultGitAdapterForThisModule() {
 	if (gitAdapterForsyncSession === null) {
 		const gitExec = require("./git-exec");
-		let detector = null;
-		try { detector = require("./git-workflow-detector"); } catch { detector = {}; }
 		gitAdapterForsyncSession = {
 			gitExec: gitExec.gitExec,
 		};
@@ -264,7 +262,8 @@ function runSyncSession(cwd) {
 	};
 }
 
-module.exports = { setGitAdapterForThisModule,
+module.exports = {
+	setGitAdapterForThisModule,
 	createSyncSession,
 	listEnvelopes,
 	pushEnvelopes,

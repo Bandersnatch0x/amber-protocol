@@ -25,23 +25,30 @@ const VALID_BLOCK = {
 
 describe("finding-attribution vocabulary", () => {
 	it("exposes the exact closed enums from the spec", () => {
-		assert.deepEqual([...ENTRY_SURFACES], [
-			"instruction-surface",
-			"tool-output",
-			"policy-rule",
-			"capability-request",
-		]);
-		assert.deepEqual([...IMPACT_SURFACES], ["target-repo", "context", "external", "governance-state"]);
-		assert.deepEqual([...RESPONSIBLE_ARTIFACTS], [
-			"instruction-surface",
-			"rules",
-			"memory",
-			"capability-registry",
-			"wiki",
-			"route",
-			"loop-contract",
-		]);
-		assert.deepEqual([...FIELDS], ["entrySurface", "impactSurface", "failureMode", "responsibleArtifact"]);
+		assert.deepEqual(
+			[...ENTRY_SURFACES],
+			["instruction-surface", "tool-output", "policy-rule", "capability-request"],
+		);
+		assert.deepEqual(
+			[...IMPACT_SURFACES],
+			["target-repo", "context", "external", "governance-state"],
+		);
+		assert.deepEqual(
+			[...RESPONSIBLE_ARTIFACTS],
+			[
+				"instruction-surface",
+				"rules",
+				"memory",
+				"capability-registry",
+				"wiki",
+				"route",
+				"loop-contract",
+			],
+		);
+		assert.deepEqual(
+			[...FIELDS],
+			["entrySurface", "impactSurface", "failureMode", "responsibleArtifact"],
+		);
 	});
 
 	it("freezes the exported vocabulary so no consumer can widen it", () => {
@@ -77,7 +84,10 @@ describe("finding-attribution validation (attributionProblem)", () => {
 	it("rejects non-object values with a repo-style problem string", () => {
 		for (const bad of [null, undefined, "tool-output", 42, [], () => {}]) {
 			const problem = attributionProblem(bad);
-			assert.ok(typeof problem === "string" && problem.length > 0, `must return a problem string for ${JSON.stringify(bad)}`);
+			assert.ok(
+				typeof problem === "string" && problem.length > 0,
+				`must return a problem string for ${JSON.stringify(bad)}`,
+			);
 			assert.ok(problem.startsWith("findingAttribution must be a plain object"), problem);
 		}
 	});
@@ -188,6 +198,10 @@ describe("finding-attribution validation (attributionProblem)", () => {
 
 		// Free-text field: same rule — the observed type is reported, not the text.
 		const modeProblem = attributionProblem({ ...VALID_BLOCK, failureMode: `Bearer ${shortToken}` });
-		assert.equal(modeProblem, null, "a secret-bearing string is still a non-empty string — shape-valid");
+		assert.equal(
+			modeProblem,
+			null,
+			"a secret-bearing string is still a non-empty string — shape-valid",
+		);
 	});
 });

@@ -61,8 +61,7 @@ function closedFieldCheck(event, label) {
 	if (unknown.length > 0)
 		return `${label} carries unknown field(s) ${unknown.join(", ")}; the closed field set is ${CITATION_EVENT_FIELDS.join(", ")}`;
 	const missing = CITATION_EVENT_FIELDS.filter((field) => !(field in event));
-	if (missing.length > 0)
-		return `${label} is missing field(s) ${missing.join(", ")}`;
+	if (missing.length > 0) return `${label} is missing field(s) ${missing.join(", ")}`;
 	return null;
 }
 
@@ -113,7 +112,9 @@ function citationEventBody(input, now) {
 			return { problem: `citation ${field} must be a non-empty string` };
 	}
 	if (!SHA256_PATTERN.test(input.rawHash ?? ""))
-		return { problem: "citation rawHash must be a sha256:<64-hex> digest of the exact fetched bytes" };
+		return {
+			problem: "citation rawHash must be a sha256:<64-hex> digest of the exact fetched bytes",
+		};
 	if (Number.isNaN(Date.parse(input.retrievedAt)))
 		return { problem: "citation retrievedAt must be an ISO-8601 timestamp" };
 	const at = now.toISOString();
@@ -175,7 +176,8 @@ function foldCitations(cwd) {
  * up. Any principal may run it.
  */
 function citationExists(cwd, citationId) {
-	if (!isNonEmptyString(citationId)) return { exists: false, reason: "citation id must be a non-empty string" };
+	if (!isNonEmptyString(citationId))
+		return { exists: false, reason: "citation id must be a non-empty string" };
 	const citations = foldCitations(cwd);
 	const found = citations.find((entry) => entry.citationId === citationId);
 	return found ? { exists: true, citation: found } : { exists: false };

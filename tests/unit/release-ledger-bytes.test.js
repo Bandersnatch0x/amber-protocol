@@ -358,8 +358,12 @@ test("the factory-assembled release ledgers match the pre-migration recording", 
 							try {
 								const ra = a[i] ? JSON.parse(a[i]) : null;
 								const rb = b[i] ? JSON.parse(b[i]) : null;
-								const keys = [...new Set([...(ra ? Object.keys(ra) : []), ...(rb ? Object.keys(rb) : [])])];
-								const changed = keys.filter((k) => JSON.stringify(ra?.[k]) !== JSON.stringify(rb?.[k]));
+								const keys = [
+									...new Set([...(ra ? Object.keys(ra) : []), ...(rb ? Object.keys(rb) : [])]),
+								];
+								const changed = keys.filter(
+									(k) => JSON.stringify(ra?.[k]) !== JSON.stringify(rb?.[k]),
+								);
 								diffs.push(`line ${i}: differs in [${changed.join(", ")}]`);
 							} catch {
 								diffs.push(`line ${i}: unparseable`);

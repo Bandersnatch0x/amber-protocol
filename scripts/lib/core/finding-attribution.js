@@ -16,7 +16,12 @@
 
 // Closed enum sets (spec §3 — extensions require a spec change, not an
 // implementation-side addition). Frozen so no consumer can widen them.
-const ENTRY_SURFACES = Object.freeze(["instruction-surface", "tool-output", "policy-rule", "capability-request"]);
+const ENTRY_SURFACES = Object.freeze([
+	"instruction-surface",
+	"tool-output",
+	"policy-rule",
+	"capability-request",
+]);
 const IMPACT_SURFACES = Object.freeze(["target-repo", "context", "external", "governance-state"]);
 const RESPONSIBLE_ARTIFACTS = Object.freeze([
 	"instruction-surface",
@@ -29,7 +34,12 @@ const RESPONSIBLE_ARTIFACTS = Object.freeze([
 ]);
 
 // The closed field set of the findingAttribution block.
-const FIELDS = Object.freeze(["entrySurface", "impactSurface", "failureMode", "responsibleArtifact"]);
+const FIELDS = Object.freeze([
+	"entrySurface",
+	"impactSurface",
+	"failureMode",
+	"responsibleArtifact",
+]);
 
 const ENUM_BY_FIELD = Object.freeze({
 	entrySurface: ENTRY_SURFACES,

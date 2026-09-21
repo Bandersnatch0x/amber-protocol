@@ -23,7 +23,10 @@ const {
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
-const { registerRunner, registerRunnerCapability } = require("../../scripts/lib/core/runner-registry");
+const {
+	registerRunner,
+	registerRunnerCapability,
+} = require("../../scripts/lib/core/runner-registry");
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
 
 const T0 = new Date("2026-09-19T00:00:00.000Z");

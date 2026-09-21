@@ -96,9 +96,9 @@ function policyHashOf(rules) {
  * @param {Array<object>} records - folded capability records (full bodies)
  */
 function capabilityHashOf(records) {
-	const projected = (records ?? []).map(projectCapabilityRecord).map((record) =>
-		JSON.stringify(canonicalJson(JSON.stringify(record))),
-	);
+	const projected = (records ?? [])
+		.map(projectCapabilityRecord)
+		.map((record) => JSON.stringify(canonicalJson(JSON.stringify(record))));
 	projected.sort();
 	return sha256Hex(`[${projected.join(",")}]`);
 }
@@ -133,7 +133,15 @@ function contractHashOf({ routeId, routeVersion, hashes }) {
  * `attemptNumber` and `fence` are numbers; `argv` is the ordered verbatim
  * vector ([] for a shell-string command — the honest value, there is none).
  */
-function inputDigestOf({ resolvedCommand, argv, capabilityPin, routeHash, stageName, attemptNumber, fence }) {
+function inputDigestOf({
+	resolvedCommand,
+	argv,
+	capabilityPin,
+	routeHash,
+	stageName,
+	attemptNumber,
+	fence,
+}) {
 	return canonicalHashOf({
 		resolvedCommand: resolvedCommand ?? null,
 		argv: argv ?? null,
@@ -217,10 +225,9 @@ function attemptMetricsOf(records) {
 		attempts_admitted_total: admitted.length,
 		attempts_denied_total: denied.length,
 		attempts_settled_total: settledTotal,
-		attempts_still_open:
-			requested.filter(
-				(record) => !admittedIds.has(record.requestId) && !deniedIds.has(record.requestId),
-			).length,
+		attempts_still_open: requested.filter(
+			(record) => !admittedIds.has(record.requestId) && !deniedIds.has(record.requestId),
+		).length,
 	};
 }
 

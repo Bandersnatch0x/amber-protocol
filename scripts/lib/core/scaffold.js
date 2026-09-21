@@ -29,8 +29,12 @@ let gitAdapterForscaffold = null;
 function defaultGitAdapterForThisModule() {
 	if (gitAdapterForscaffold === null) {
 		const gitExec = require("./git-exec");
-		let detector = null;
-		try { detector = require("./git-workflow-detector"); } catch { detector = {}; }
+		let detector;
+		try {
+			detector = require("./git-workflow-detector");
+		} catch {
+			detector = {};
+		}
 		gitAdapterForscaffold = {
 			detectGitWorkflow: detector.detectGitWorkflow,
 		};
@@ -377,7 +381,8 @@ function scaffoldWiki(target, options = {}) {
 	};
 }
 
-module.exports = { setGitAdapterForThisModule,
+module.exports = {
+	setGitAdapterForThisModule,
 	listTemplateFiles,
 	copyTemplateFiles,
 	scaffoldHarness,

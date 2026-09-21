@@ -43,7 +43,11 @@ function makeTarget() {
 		JSON.stringify({
 			schemaVersion: 1,
 			defaultAction: "deny",
-			confidence_gating: { enabled: true, byRule: { [COMMAND_ID]: "high" }, defaultConfidence: "low" },
+			confidence_gating: {
+				enabled: true,
+				byRule: { [COMMAND_ID]: "high" },
+				defaultConfidence: "low",
+			},
 			rules: [{ id: COMMAND_ID, action: "allow", match: "exact", pattern: "node --version" }],
 		}),
 	);

@@ -180,7 +180,11 @@ function appliedRecordsProblem(value) {
 	for (let index = 0; index < value.length; index += 1) {
 		const record = value[index];
 		if (!isPlainObject(record)) return `applied record #${index + 1} must be an object`;
-		const closed = closedFieldProblem(record, APPLIED_RECORD_FIELDS, `applied record #${index + 1}`);
+		const closed = closedFieldProblem(
+			record,
+			APPLIED_RECORD_FIELDS,
+			`applied record #${index + 1}`,
+		);
 		if (closed !== null) return closed;
 		if (!isNonEmptyString(record.path) || record.path.length > MAX_PATH_CHARS) {
 			return `applied record #${index + 1} path must be a non-empty string of at most ${MAX_PATH_CHARS} characters`;
@@ -200,7 +204,11 @@ function restoredRecordsProblem(value) {
 	for (let index = 0; index < value.length; index += 1) {
 		const record = value[index];
 		if (!isPlainObject(record)) return `restored record #${index + 1} must be an object`;
-		const closed = closedFieldProblem(record, RESTORED_RECORD_FIELDS, `restored record #${index + 1}`);
+		const closed = closedFieldProblem(
+			record,
+			RESTORED_RECORD_FIELDS,
+			`restored record #${index + 1}`,
+		);
 		if (closed !== null) return closed;
 		if (!isNonEmptyString(record.path) || record.path.length > MAX_PATH_CHARS) {
 			return `restored record #${index + 1} path must be a non-empty string of at most ${MAX_PATH_CHARS} characters`;
@@ -354,10 +362,7 @@ function eventShapeProblem(event, lineIndex) {
 	}
 	if (kind === "validated") {
 		const checks = event.checks;
-		if (
-			!isPlainObject(checks) ||
-			JSON.stringify(checks) !== JSON.stringify(VALIDATED_CHECKS)
-		) {
+		if (!isPlainObject(checks) || JSON.stringify(checks) !== JSON.stringify(VALIDATED_CHECKS)) {
 			return (
 				`${EVENT_LABEL} ${lineIndex} carries a V1–V3 pass summary that is not exactly ` +
 				`{v1: "pass", v2: "pass", v3: "pass"}; the admission validator only appends all-pass`
@@ -417,7 +422,9 @@ function applyReviewEvent(byFingerprint, event, lineIndex) {
 		if (record !== undefined) {
 			const opening = roundOpeningProblem(record, event);
 			if (opening !== null) {
-				throw impossible(`proposes fingerprint "${event.fingerprint}" a second time while ${opening}`);
+				throw impossible(
+					`proposes fingerprint "${event.fingerprint}" a second time while ${opening}`,
+				);
 			}
 			// A legal retry opens a new round: the current-round fields move to
 			// the retry's proposal; the rejection history and applied/undone
@@ -554,7 +561,9 @@ function reviewGuard(input) {
 		return (records) => {
 			const record = findRecord(records, fingerprint);
 			if (record === null) {
-				return fail(STATE_CODE, [`fingerprint "${fingerprint}" was never proposed; validation follows promotion`]);
+				return fail(STATE_CODE, [
+					`fingerprint "${fingerprint}" was never proposed; validation follows promotion`,
+				]);
 			}
 			if (record.validatedAt !== null) {
 				return fail(STATE_CODE, [
@@ -600,7 +609,9 @@ function reviewGuard(input) {
 			return fail(STATE_CODE, [`fingerprint "${fingerprint}" was never proposed`]);
 		}
 		if (record.appliedCount !== record.undoneCount + 1) {
-			return fail(STATE_CODE, [`fingerprint "${fingerprint}" is not currently applied; nothing to undo`]);
+			return fail(STATE_CODE, [
+				`fingerprint "${fingerprint}" is not currently applied; nothing to undo`,
+			]);
 		}
 		return null;
 	};
@@ -609,11 +620,8 @@ function reviewGuard(input) {
 function appendReviewEvent(cwd, input) {
 	const { body, problem } = eventBodyFor(input);
 	if (problem !== undefined) return argProblem(problem);
-	return REVIEW_LEDGER.append(
-		cwd,
-		body,
-		reviewGuard(input),
-		(records) => findRecord(records, input.fingerprint),
+	return REVIEW_LEDGER.append(cwd, body, reviewGuard(input), (records) =>
+		findRecord(records, input.fingerprint),
 	);
 }
 

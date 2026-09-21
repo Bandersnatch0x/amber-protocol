@@ -35,7 +35,8 @@ const RESEARCH_CAPABILITIES = Object.freeze([
 	{
 		name: "research.search",
 		effects: ["read"],
-		description: "Query external sources; the query text is available to Amber, the retrieval executes outside Amber.",
+		description:
+			"Query external sources; the query text is available to Amber, the retrieval executes outside Amber.",
 	},
 	{
 		name: "research.extract",
@@ -45,7 +46,8 @@ const RESEARCH_CAPABILITIES = Object.freeze([
 	{
 		name: "research.cite",
 		effects: ["write-target"],
-		description: "Write citation records to the research citation store — the one write path this boundary owns.",
+		description:
+			"Write citation records to the research citation store — the one write path this boundary owns.",
 	},
 ]);
 
@@ -144,7 +146,8 @@ function verifiers() {
  * @returns {{ ok: true } | { ok: false, reason: string }}
  */
 function validate(run) {
-	if (!isPlainObject(run)) return { ok: false, reason: "a research run declaration must be an object" };
+	if (!isPlainObject(run))
+		return { ok: false, reason: "a research run declaration must be an object" };
 	for (const writePath of run.writePaths ?? []) {
 		if (writePath !== CITATION_STORE_RELATIVE) {
 			return {
@@ -224,8 +227,7 @@ function recordClaimVerification(cwd, { claimRef, producer, verifier, verdict, e
 	const receipt = showEvidence(cwd, recorded.receipt.id);
 	return {
 		ok: true,
-		note:
-			"the verification receipt stays at observed assurance; `verified` is reachable only through an independent verification event per 0054",
+		note: "the verification receipt stays at observed assurance; `verified` is reachable only through an independent verification event per 0054",
 		receipt,
 	};
 }
@@ -241,7 +243,10 @@ function freshnessFlag(citation, freshnessBoundMs, now = new Date()) {
 	const recordedAt = citation.at ? Date.parse(citation.at) : now.getTime();
 	const gap = recordedAt - retrievedAt;
 	if (gap > freshnessBoundMs) {
-		return { flagged: true, reason: `recorded ${gap}ms after retrieval, beyond the ${freshnessBoundMs}ms bound` };
+		return {
+			flagged: true,
+			reason: `recorded ${gap}ms after retrieval, beyond the ${freshnessBoundMs}ms bound`,
+		};
 	}
 	return { flagged: false };
 }
@@ -261,7 +266,10 @@ function freshnessFlag(citation, freshnessBoundMs, now = new Date()) {
  * @returns {{ ok: true } | { ok: false, code: string, errors: string[] }}
  */
 function validateQueryDeclaration(cwd, { querySources, capability }) {
-	const { resolveDeclaredContextSource, declaredSourceShapeProblem } = require("./external-registry");
+	const {
+		resolveDeclaredContextSource,
+		declaredSourceShapeProblem,
+	} = require("./external-registry");
 	const sources = querySources ?? [];
 	for (const [index, entry] of sources.entries()) {
 		const shape = declaredSourceShapeProblem(entry, `querySources[${index}]`);

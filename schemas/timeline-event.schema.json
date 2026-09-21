@@ -39,11 +39,26 @@
 		},
 		"stage": { "type": "string" },
 		"data": { "type": "object" },
-		"runId": { "description": "Lossless derived run id (run contract R-ID-1) on run/projected events.", "type": "string" },
+		"runId": {
+			"description": "Lossless derived run id (run contract R-ID-1) on run/projected events.",
+			"type": "string"
+		},
 		"actor": { "description": "Acting principal id on actor-attributed events.", "type": "string" },
-		"sequence": { "description": "Chained run-events sequence number; appended gradually, absent on legacy events.", "type": "integer", "minimum": 1 },
-		"prevHash": { "description": "Chained run-events previous hash; absent on legacy plaintext events.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
-		"hash": { "description": "Chained run-events body hash; absent on legacy plaintext events.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+		"sequence": {
+			"description": "Chained run-events sequence number; appended gradually, absent on legacy events.",
+			"type": "integer",
+			"minimum": 1
+		},
+		"prevHash": {
+			"description": "Chained run-events previous hash; absent on legacy plaintext events.",
+			"type": "string",
+			"pattern": "^[0-9a-f]{64}$"
+		},
+		"hash": {
+			"description": "Chained run-events body hash; absent on legacy plaintext events.",
+			"type": "string",
+			"pattern": "^[0-9a-f]{64}$"
+		},
 		"error": {
 			"type": "object",
 			"properties": {

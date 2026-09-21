@@ -202,7 +202,9 @@ function v2RuleMatches(rule, subject) {
 			const prefix = String(match.target.pathPrefix);
 			const inside = subjectPaths.some((candidate) => {
 				const p = String(candidate);
-				return prefix.endsWith("/") ? p.startsWith(prefix) : p === prefix || p.startsWith(`${prefix}/`);
+				return prefix.endsWith("/")
+					? p.startsWith(prefix)
+					: p === prefix || p.startsWith(`${prefix}/`);
 			});
 			if (!inside) return false;
 		}

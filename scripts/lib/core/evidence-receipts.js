@@ -51,7 +51,13 @@ const EVIDENCE_SCHEMA_VERSION = 1;
 const SUPPORTED_EVIDENCE_SCHEMA_VERSIONS = Object.freeze([1]);
 
 /** The fixed four-level Assurance contract (F050 AC2). */
-const ASSURANCE_LEVELS = Object.freeze(["unavailable", "observed", "replayable", "verified", "attested"]);
+const ASSURANCE_LEVELS = Object.freeze([
+	"unavailable",
+	"observed",
+	"replayable",
+	"verified",
+	"attested",
+]);
 
 /**
  * The levels a receipt may be RECORDED with. `verified` is not recordable:

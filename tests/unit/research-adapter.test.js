@@ -13,7 +13,11 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
 const research = require("../../scripts/lib/core/research-adapter");
-const { recordCitation, citationExists, foldCitations } = require("../../scripts/lib/core/citation-store");
+const {
+	recordCitation,
+	citationExists,
+	foldCitations,
+} = require("../../scripts/lib/core/citation-store");
 const {
 	registerRunner,
 	registerRunnerCapability,
@@ -95,7 +99,11 @@ describe("research citation store (§6.1–6.2)", () => {
 				{ now: T0 },
 			);
 			assert.equal(recorded.ok, true, (recorded.errors || []).join("; "));
-			assert.strictEqual(recorded.record.retrievedAt !== recorded.record.at, true, "the two timestamps stay distinct");
+			assert.strictEqual(
+				recorded.record.retrievedAt !== recorded.record.at,
+				true,
+				"the two timestamps stay distinct",
+			);
 
 			// §6.1 freshness flag: the gap exceeding the declared bound flags.
 			const fresh = research.freshnessFlag(recorded.record, 3600_000);
@@ -191,8 +199,21 @@ function seedClassifiedPage(root, pageId, classification) {
 			supersedes: [],
 			sources: {
 				s1: s1.mutable
-					? { kind: s1.kind, ref: s1.ref, rawHash: s1.rawHash, normHash: s1.normHash, mutable: true }
-					: { kind: s1.kind, ref: s1.ref, rawHash: s1.rawHash, excerpt: s1.excerpt, excerptHash: s1.excerptHash, mutable: false },
+					? {
+							kind: s1.kind,
+							ref: s1.ref,
+							rawHash: s1.rawHash,
+							normHash: s1.normHash,
+							mutable: true,
+						}
+					: {
+							kind: s1.kind,
+							ref: s1.ref,
+							rawHash: s1.rawHash,
+							excerpt: s1.excerpt,
+							excerptHash: s1.excerptHash,
+							mutable: false,
+						},
 			},
 			blocks: [{ type: "prose", sources: ["s1"], text: `Content of ${pageId}.` }],
 			...(classification ? { classification } : {}),
@@ -294,7 +315,12 @@ describe("the §6.5 end-to-end research flow (fixture)", () => {
 			const submitted = submitRunnerRequest(
 				root,
 				{
-					capability: { runnerId: "runner/research", runnerVersion: "1.0.0", name: "research.search", capabilityVersion: "1" },
+					capability: {
+						runnerId: "runner/research",
+						runnerVersion: "1.0.0",
+						name: "research.search",
+						capabilityVersion: "1",
+					},
 					target: { repository: "repo", paths: ["docs/"] },
 					environment: "development",
 					scope: "docs/",
@@ -349,7 +375,11 @@ describe("the §6.5 end-to-end research flow (fixture)", () => {
 				root,
 				{
 					requestHash: submitted.record.requestHash,
-					runner: { id: "runner/research", version: "1.0.0", integrityDigest: `sha256:${"a".repeat(64)}` },
+					runner: {
+						id: "runner/research",
+						version: "1.0.0",
+						integrityDigest: `sha256:${"a".repeat(64)}`,
+					},
 				},
 				{ now: T0 },
 			);
@@ -359,7 +389,11 @@ describe("the §6.5 end-to-end research flow (fixture)", () => {
 				{
 					requestHash: submitted.record.requestHash,
 					receipt: {
-						runner: { id: "runner/research", version: "1.0.0", integrityDigest: `sha256:${"a".repeat(64)}` },
+						runner: {
+							id: "runner/research",
+							version: "1.0.0",
+							integrityDigest: `sha256:${"a".repeat(64)}`,
+						},
 						exitCode: 0,
 						signal: null,
 						timedOut: false,

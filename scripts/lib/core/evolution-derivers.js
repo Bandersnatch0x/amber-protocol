@@ -109,12 +109,12 @@ const REJECTION_RECORD_DEPENDENCIES = Object.freeze({
 	"loop-contract": Object.freeze({
 		hasRecordPath: false,
 		missing:
-			"The loop governance ledger records approvals/executions only; a loop-contract refusal has no record shape: a frozen record kind (e.g. \"contract-refused\") carrying exactly attributionFingerprint, reasonCode, recordedAt, summary (non-echoing), appended to the loop ledger. Owner: loop typed-mutation surface (open dependency).",
+			'The loop governance ledger records approvals/executions only; a loop-contract refusal has no record shape: a frozen record kind (e.g. "contract-refused") carrying exactly attributionFingerprint, reasonCode, recordedAt, summary (non-echoing), appended to the loop ledger. Owner: loop typed-mutation surface (open dependency).',
 	}),
 	rules: Object.freeze({
 		hasRecordPath: false,
 		missing:
-			"0051 rules v2 has landed (schemas/loop-policy.schema.json + the typed mutation), but no proposal-refusal record shape exists on the surface yet: a frozen record kind (e.g. \"rule-refused\") carrying exactly attributionFingerprint, reasonCode, recordedAt, summary (non-echoing) is the 0051 owner's decision (open dependency).",
+			'0051 rules v2 has landed (schemas/loop-policy.schema.json + the typed mutation), but no proposal-refusal record shape exists on the surface yet: a frozen record kind (e.g. "rule-refused") carrying exactly attributionFingerprint, reasonCode, recordedAt, summary (non-echoing) is the 0051 owner\'s decision (open dependency).',
 	}),
 });
 
@@ -232,7 +232,9 @@ function deriveEvolutionDrafts(destination, findings, options) {
 	}
 	const targetRoot = options && options.targetRoot;
 	if (typeof targetRoot !== "string" || targetRoot.trim() === "") {
-		throw new Error("deriveEvolutionDrafts requires options.targetRoot (V1–V3 admission needs the owning target)");
+		throw new Error(
+			"deriveEvolutionDrafts requires options.targetRoot (V1–V3 admission needs the owning target)",
+		);
 	}
 	const minCluster =
 		options && Number.isInteger(options.minCluster) && options.minCluster >= 1

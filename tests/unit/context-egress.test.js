@@ -105,7 +105,13 @@ function seedPage(root, pageId, classification) {
 			supersedes: [],
 			sources: {
 				s1: s1.mutable
-					? { kind: s1.kind, ref: s1.ref, rawHash: s1.rawHash, normHash: s1.normHash, mutable: true }
+					? {
+							kind: s1.kind,
+							ref: s1.ref,
+							rawHash: s1.rawHash,
+							normHash: s1.normHash,
+							mutable: true,
+						}
 					: {
 							kind: s1.kind,
 							ref: s1.ref,
@@ -181,7 +187,10 @@ describe("F056 egress declarations (R-EG-1, spec §8 cases 1 and 4)", () => {
 			assert.equal(raised.record.requiresPayloadProvenance, true);
 			const invalid = registerExternalEffect(
 				root,
-				effectInput({ decision: { identity: "decision/effect-2", revision: 1 }, maxPayloadClassification: "banana" }),
+				effectInput({
+					decision: { identity: "decision/effect-2", revision: 1 },
+					maxPayloadClassification: "banana",
+				}),
 				{ now: NOW },
 			);
 			assert.equal(invalid.ok, false);
@@ -225,9 +234,7 @@ describe("F056 egress declarations (R-EG-1, spec §8 cases 1 and 4)", () => {
 					id: "request/1",
 					effect: { id: "effect/ticket-comment", version: "1" },
 					payloadHash: `sha256:${"a".repeat(64)}`,
-					payloadSources: [
-						{ kind: "page", ref: "restricted-notes", rawHash: restrictedHash },
-					],
+					payloadSources: [{ kind: "page", ref: "restricted-notes", rawHash: restrictedHash }],
 				},
 				{ now: NOW },
 			);
@@ -253,9 +260,7 @@ describe("F056 egress declarations (R-EG-1, spec §8 cases 1 and 4)", () => {
 					id: "request/2",
 					effect: { id: "effect/ticket-comment", version: "2" },
 					payloadHash: `sha256:${"a".repeat(64)}`,
-					payloadSources: [
-						{ kind: "page", ref: "restricted-notes", rawHash: restrictedHash },
-					],
+					payloadSources: [{ kind: "page", ref: "restricted-notes", rawHash: restrictedHash }],
 				},
 				{ now: NOW },
 			);
@@ -272,11 +277,7 @@ describe("F056 egress declarations (R-EG-1, spec §8 cases 1 and 4)", () => {
 	it("refuses an unverifiable proposal when the effect requires provenance and none is declared", () => {
 		const root = makeTarget();
 		try {
-			registerExternalEffect(
-				root,
-				effectInput({ requiresPayloadProvenance: true }),
-				{ now: NOW },
-			);
+			registerExternalEffect(root, effectInput({ requiresPayloadProvenance: true }), { now: NOW });
 			const refused = proposeExternalEffect(
 				root,
 				{

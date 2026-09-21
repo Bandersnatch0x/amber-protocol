@@ -56,7 +56,9 @@ function capabilities(cwd) {
  */
 function contexts(cwd) {
 	const loadoutDir = statePath(cwd, "context", "loadouts");
-	const loadouts = fs.existsSync(loadoutDir) ? fs.readdirSync(loadoutDir).filter((f) => f.endsWith(".json")) : [];
+	const loadouts = fs.existsSync(loadoutDir)
+		? fs.readdirSync(loadoutDir).filter((f) => f.endsWith(".json"))
+		: [];
 	return {
 		adapterId: CODING_DOMAIN_ADAPTER_ID,
 		loadouts,
@@ -75,7 +77,8 @@ function executions() {
 		adapterId: CODING_DOMAIN_ADAPTER_ID,
 		family: "CodingWorktree",
 		isolation: "git-worktree",
-		notes: "the four governance gates stay in governed-runner (Core); this adapter carries only worktree/spawn semantics",
+		notes:
+			"the four governance gates stay in governed-runner (Core); this adapter carries only worktree/spawn semantics",
 	};
 }
 
@@ -87,7 +90,11 @@ function executions() {
 function verifiers() {
 	return [
 		{ verifier: "evidence.verify", kind: "deterministic" },
-		{ verifier: "execution-validator", kind: "heuristic", note: "worktree-clean metadata check; the .git mtime heuristic extracts to this adapter during migration" },
+		{
+			verifier: "execution-validator",
+			kind: "heuristic",
+			note: "worktree-clean metadata check; the .git mtime heuristic extracts to this adapter during migration",
+		},
 	];
 }
 
@@ -208,7 +215,12 @@ function prepare(targetRoot, label) {
  * spawn seam the governed-runner uses).
  */
 function execute(worktreePath, command, { timeoutMs = 300_000 } = {}) {
-	const spawned = spawnSync(command, { shell: true, cwd: worktreePath, encoding: "utf8", timeout: timeoutMs });
+	const spawned = spawnSync(command, {
+		shell: true,
+		cwd: worktreePath,
+		encoding: "utf8",
+		timeout: timeoutMs,
+	});
 	return {
 		ok: spawned.status === null ? false : spawned.status === 0,
 		exitCode: spawned.status === null ? -1 : spawned.status,
@@ -224,7 +236,11 @@ function execute(worktreePath, command, { timeoutMs = 300_000 } = {}) {
 function observe(targetRoot) {
 	const { getRepoSnapshot } = require("./git-state");
 	const snapshot = getRepoSnapshot(targetRoot);
-	return { adapterId: CODING_DOMAIN_ADAPTER_ID, dirty: snapshot.dirty ?? false, dirtyPaths: snapshot.dirtyPaths ?? [] };
+	return {
+		adapterId: CODING_DOMAIN_ADAPTER_ID,
+		dirty: snapshot.dirty ?? false,
+		dirtyPaths: snapshot.dirtyPaths ?? [],
+	};
 }
 
 /**

@@ -77,7 +77,9 @@ function seedSignificantStructured(target, overrides = {}) {
 		evidenceReferences: overrides.evidenceReferences || [
 			{ kind: "path", path: "docs/wiki/runbook.md", line: 1 },
 		],
-		...(overrides.expectedEffect === null ? {} : { expectedEffect: overrides.expectedEffect || TWO_AXIS_EFFECT }),
+		...(overrides.expectedEffect === null
+			? {}
+			: { expectedEffect: overrides.expectedEffect || TWO_AXIS_EFFECT }),
 		...(overrides.operations ? { operations: overrides.operations } : {}),
 	};
 	writeEvolution(
@@ -100,7 +102,12 @@ function proposalsDir(target) {
 
 function listProposalFiles(target) {
 	const dir = proposalsDir(target);
-	return dir ? fs.readdirSync(dir).filter((name) => name.endsWith(".md")).sort() : [];
+	return dir
+		? fs
+				.readdirSync(dir)
+				.filter((name) => name.endsWith(".md"))
+				.sort()
+		: [];
 }
 
 function readProposal(target, relativePath) {
@@ -213,9 +220,13 @@ test("malformed, mis-shaped, and secret-bearing blocks are problems, never findi
 				"",
 				structuredBlock({ findingAttribution: { ...ATTRIBUTION, extra: "unknown field" } }),
 				"",
-				structuredBlock({ findingAttribution: { ...ATTRIBUTION, responsibleArtifact: "prod-database" } }),
+				structuredBlock({
+					findingAttribution: { ...ATTRIBUTION, responsibleArtifact: "prod-database" },
+				}),
 				"",
-				structuredBlock({ findingAttribution: { ...ATTRIBUTION, failureMode: `Bearer ${secret}` } }),
+				structuredBlock({
+					findingAttribution: { ...ATTRIBUTION, failureMode: `Bearer ${secret}` },
+				}),
 				"",
 			].join("\n"),
 		);
@@ -260,14 +271,22 @@ test("two significant findings with distinct attributions yield no carrier and a
 		const first = seedSignificantStructured(target);
 		const second = {
 			...first,
-			findingAttribution: { ...ATTRIBUTION, responsibleArtifact: "route", failureMode: "route drift blocks handoff" },
+			findingAttribution: {
+				...ATTRIBUTION,
+				responsibleArtifact: "route",
+				failureMode: "route drift blocks handoff",
+			},
 		};
 		fs.appendFileSync(
 			evolutionPath(target),
 			`Finding: ${second.findingAttribution.failureMode}\n\n${structuredBlock(second)}`,
 		);
 		const outcome = collectEvidence(target);
-		assert.equal(outcome.evolution.carrier, null, "no attribution is invented to collapse two claims");
+		assert.equal(
+			outcome.evolution.carrier,
+			null,
+			"no attribution is invented to collapse two claims",
+		);
 		assert.ok(
 			outcome.warnings.some((warning) => /distinct attributed recurring findings/.test(warning)),
 			"the ambiguity is visible, not silent",
@@ -283,16 +302,24 @@ test("an insignificant structured finding produces no carrier and no warning", (
 		fs.mkdirSync(path.dirname(evolutionPath(target)), { recursive: true });
 		fs.writeFileSync(
 			evolutionPath(target),
-			["# Amber Evolution Log", "", structuredBlock({
-				findingAttribution: ATTRIBUTION,
-				evidenceReferences: [{ kind: "path", path: "docs/wiki/runbook.md" }],
-				expectedEffect: TWO_AXIS_EFFECT,
-			})].join("\n"),
+			[
+				"# Amber Evolution Log",
+				"",
+				structuredBlock({
+					findingAttribution: ATTRIBUTION,
+					evidenceReferences: [{ kind: "path", path: "docs/wiki/runbook.md" }],
+					expectedEffect: TWO_AXIS_EFFECT,
+				}),
+			].join("\n"),
 		);
 		const outcome = collectEvidence(target);
 		assert.equal(outcome.evolution.carrier, null);
 		assert.deepEqual(outcome.warnings, []);
-		assert.equal(outcome.evolution.structured.length, 1, "still listed — visibility without promotion");
+		assert.equal(
+			outcome.evolution.structured.length,
+			1,
+			"still listed — visibility without promotion",
+		);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 	}
@@ -335,7 +362,11 @@ test("inspectMaintenance surfaces the carrier as own keys only when structured e
 		writeEvolution(legacy, "Finding: plain legacy finding\nFinding: plain legacy finding\n");
 		const legacyInspection = runMaintenanceAction("inspect", legacy, {});
 		assert.equal(legacyInspection.errors.length, 0);
-		assert.equal(Object.hasOwn(legacyInspection, "findingAttribution"), false, "legacy stays legacy: no own key");
+		assert.equal(
+			Object.hasOwn(legacyInspection, "findingAttribution"),
+			false,
+			"legacy stays legacy: no own key",
+		);
 		assert.equal(Object.hasOwn(legacyInspection, "evidenceReferences"), false);
 		assert.equal(Object.hasOwn(legacyInspection, "expectedEffect"), false);
 		assert.deepEqual(legacyInspection.structuredFindings, []);
@@ -432,14 +463,20 @@ test("V2 and V3 failures write rejected records with their closed reason codes",
 		const v2Result = runMaintenanceAction("propose", v2, {});
 		assert.equal(v2Result.validity.code, "validity:capability-reduction");
 		assert.equal(v2Result.rejection.code, "validity:capability-reduction");
-		assert.match(readProposal(v2, v2Result.proposalPath), /^- Reason code: `validity:capability-reduction`$/m);
+		assert.match(
+			readProposal(v2, v2Result.proposalPath),
+			/^- Reason code: `validity:capability-reduction`$/m,
+		);
 
 		seedSignificantStructured(v3, {
 			expectedEffect: { readiness: "eval F058 passes", effectiveness: "see eval results" },
 		});
 		const v3Result = runMaintenanceAction("propose", v3, {});
 		assert.equal(v3Result.validity.code, "validity:eval-only-claim");
-		assert.match(readProposal(v3, v3Result.proposalPath), /^- Reason code: `validity:eval-only-claim`$/m);
+		assert.match(
+			readProposal(v3, v3Result.proposalPath),
+			/^- Reason code: `validity:eval-only-claim`$/m,
+		);
 
 		// A block with no effect statement at all is also a V3 failure.
 		const v3b = tmpTarget("reject-v3-missing");
@@ -500,7 +537,11 @@ test("a still-failing retry records the prior rejection count in its own record"
 
 		const second = runMaintenanceAction("propose", target, {});
 		assert.equal(second.validity.ok, false);
-		assert.equal(second.priorRejections.count, 1, "the retry finds the prior rejection by correlation");
+		assert.equal(
+			second.priorRejections.count,
+			1,
+			"the retry finds the prior rejection by correlation",
+		);
 		const written = readProposal(target, second.proposalPath);
 		assert.match(written, /^- Prior rejections with this correlation: 1 \(first: /m);
 		assert.equal(listProposalFiles(target).length, 2);
@@ -640,10 +681,16 @@ test("a validity rejection never writes anything outside the owning proposal rec
 		assert.equal(result.validity.ok, false);
 		const after = snapshotTree(target);
 		const added = Object.keys(after).filter((key) => !before[key]);
-		const changed = Object.keys(before).filter((key) => after[key] && !before[key].equals(after[key]));
+		const changed = Object.keys(before).filter(
+			(key) => after[key] && !before[key].equals(after[key]),
+		);
 		assert.deepEqual(changed, [], "no pre-existing file changed");
 		for (const key of added) {
-			assert.match(key, /^\.amber\/maintenance\/proposals\/.+\.md$/, `only the owning record is added: ${key}`);
+			assert.match(
+				key,
+				/^\.amber\/maintenance\/proposals\/.+\.md$/,
+				`only the owning record is added: ${key}`,
+			);
 		}
 		assert.equal(added.length, 1);
 	} finally {
@@ -713,7 +760,10 @@ test("multiline effect statements render as quoted data and cannot become headin
 		assert.deepEqual(result.errors, []);
 		const written = readProposal(target, result.proposalPath);
 		const normalized = written.replace(/\r\n?/g, "\n");
-		assert.ok(!/^# UNTRUSTED_\w+_MARKER$/m.test(normalized), "no raw heading from untrusted effect text");
+		assert.ok(
+			!/^# UNTRUSTED_\w+_MARKER$/m.test(normalized),
+			"no raw heading from untrusted effect text",
+		);
 		assert.match(written, /^ {2}> # UNTRUSTED_READINESS_MARKER\r?$/m);
 		assert.match(written, /^ {2}> # UNTRUSTED_EFFECT_MARKER\r?$/m);
 		assert.match(written, /^ {2}> readiness text\r?$/m);

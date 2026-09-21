@@ -83,7 +83,12 @@ function sealLedger(target, options = {}) {
 }
 
 function latestSealTag(targetRoot) {
-	const list = defaultGitAdapter().gitOutput(targetRoot, ["tag", "-l", `${SEAL_PREFIX}*`, "--sort=-creatordate"]);
+	const list = defaultGitAdapter().gitOutput(targetRoot, [
+		"tag",
+		"-l",
+		`${SEAL_PREFIX}*`,
+		"--sort=-creatordate",
+	]);
 	if (!list) return null;
 	return (
 		list

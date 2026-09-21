@@ -84,7 +84,11 @@ test("V1 fails when evidenceReferences is absent, empty, or not an array", () =>
 				evidenceReferences,
 				expectedEffect: TWO_AXIS_EFFECT,
 			});
-			assert.equal(result.ok, false, `absent/empty/malformed must fail: ${JSON.stringify(evidenceReferences)}`);
+			assert.equal(
+				result.ok,
+				false,
+				`absent/empty/malformed must fail: ${JSON.stringify(evidenceReferences)}`,
+			);
 			assert.equal(result.code, "validity:no-evidence");
 		}
 	} finally {
@@ -366,7 +370,11 @@ test("V3 fails when the effect statement is absent or malformed", () => {
 				evidenceReferences: evidence,
 				expectedEffect,
 			});
-			assert.equal(result.ok, false, `absent/malformed effect must fail: ${JSON.stringify(expectedEffect)}`);
+			assert.equal(
+				result.ok,
+				false,
+				`absent/malformed effect must fail: ${JSON.stringify(expectedEffect)}`,
+			);
 			assert.equal(result.code, "validity:eval-only-claim");
 		}
 	} finally {
@@ -391,7 +399,11 @@ test("V3 fails when an axis is missing, empty, or not a string", () => {
 				evidenceReferences: evidence,
 				expectedEffect,
 			});
-			assert.equal(result.ok, false, `missing/empty axis must fail: ${JSON.stringify(expectedEffect)}`);
+			assert.equal(
+				result.ok,
+				false,
+				`missing/empty axis must fail: ${JSON.stringify(expectedEffect)}`,
+			);
 			assert.equal(result.code, "validity:eval-only-claim");
 		}
 	} finally {
@@ -463,7 +475,14 @@ test("rules run in V1→V2→V3 order; the first failure wins", () => {
 });
 
 test("isEvalOnlyReference detects eval-only text and keeps real statements", () => {
-	const evalOnly = ["eval", "F058 eval", "see eval results", "the eval suite passes", "eval run report F063", "Eval: F050"];
+	const evalOnly = [
+		"eval",
+		"F058 eval",
+		"see eval results",
+		"the eval suite passes",
+		"eval run report F063",
+		"Eval: F050",
+	];
 	for (const text of evalOnly) {
 		assert.equal(isEvalOnlyReference(text), true, `must classify as eval-only: ${text}`);
 	}

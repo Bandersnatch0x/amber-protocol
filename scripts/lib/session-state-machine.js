@@ -18,7 +18,13 @@ const TRANSITIONS = {
 	[STATES.ROUTED]: [STATES.EXECUTING, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
 	// +BLOCKED (governance contract §10.1): budget exhaustion / no-progress
 	// block the session as a recoverable state — same family as paused.
-	[STATES.EXECUTING]: [STATES.PAUSED, STATES.BLOCKED, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
+	[STATES.EXECUTING]: [
+		STATES.PAUSED,
+		STATES.BLOCKED,
+		STATES.COMPLETED,
+		STATES.FAILED,
+		STATES.ABORTED,
+	],
 	[STATES.PAUSED]: [STATES.EXECUTING, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
 	// BLOCKED → EXECUTING (human-review recovery) | ABORTED only.
 	// BLOCKED → COMPLETED is illegal: unblocking precedes completion.

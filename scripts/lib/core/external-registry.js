@@ -622,9 +622,7 @@ const PROPOSAL_EVENT_FIELDS = Object.freeze([
 	"hash",
 ]);
 const PROPOSAL_EVENT_FIELDS_LEGACY = Object.freeze(
-	PROPOSAL_EVENT_FIELDS.filter(
-		(field) => field !== "compensates" && field !== "payloadSources",
-	),
+	PROPOSAL_EVENT_FIELDS.filter((field) => field !== "compensates" && field !== "payloadSources"),
 );
 // payloadSources is the additive R-EG-1 declaration: allowed on current
 // events, absent from pre-context-runtime ledgers.
@@ -787,8 +785,7 @@ function declaredFlowProblem(cwd, payloadSources, effect) {
 function proposalEventProblem(event, lineIndex) {
 	const label = `external proposal event ${lineIndex}`;
 	if (event.kind === "proposal") {
-		const allowed =
-			event.schemaVersion >= 2 ? PROPOSAL_EVENT_FIELDS : PROPOSAL_EVENT_FIELDS_LEGACY;
+		const allowed = event.schemaVersion >= 2 ? PROPOSAL_EVENT_FIELDS : PROPOSAL_EVENT_FIELDS_LEGACY;
 		const unknown = unknownFieldProblem(event, allowed, label);
 		if (unknown !== null) return unknown;
 		const required = allowed.filter((field) => !PROPOSAL_EVENT_OPTIONAL_FIELDS.includes(field));
@@ -998,7 +995,14 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 	}
 	const flow = declaredFlowProblem(cwd, payloadSources ?? [], registeredEffect);
 	if (flow !== null) return fail(EXTERNAL_INVALID_CODE, [flow]);
-	return appendProposal(cwd, input.id, { ...derived.content, payloadSources }, null, now, () => null);
+	return appendProposal(
+		cwd,
+		input.id,
+		{ ...derived.content, payloadSources },
+		null,
+		now,
+		() => null,
+	);
 }
 
 // The shared proposal append for plain requests and compensations: the

@@ -46,7 +46,12 @@ function hashBody(record, prevHash) {
 }
 
 function isChained(record) {
-	return record && typeof record === "object" && typeof record.prevHash === "string" && typeof record.hash === "string";
+	return (
+		record &&
+		typeof record === "object" &&
+		typeof record.prevHash === "string" &&
+		typeof record.hash === "string"
+	);
 }
 
 /**

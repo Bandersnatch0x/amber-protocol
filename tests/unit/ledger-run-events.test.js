@@ -34,17 +34,25 @@ describe("run-events chained family (governance contract §10.3)", () => {
 			appendSessionEvent(sessionDir, { type: "route_selected", data: { route: "probe" } });
 			const legacy = fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8");
 
-			const first = appendChainedTimelineEvent(sessionDir, { type: "run_started", data: { stage: "check" } });
+			const first = appendChainedTimelineEvent(sessionDir, {
+				type: "run_started",
+				data: { stage: "check" },
+			});
 			assert.match(first.hash, /^[0-9a-f]{64}$/);
 			assert.strictEqual(first.prevHash, "0".repeat(64), "genesis at the first chained line");
 			assert.strictEqual(first.sequence, 1);
-			const second = appendChainedTimelineEvent(sessionDir, { type: "run_completed", data: { stage: "check" } });
+			const second = appendChainedTimelineEvent(sessionDir, {
+				type: "run_completed",
+				data: { stage: "check" },
+			});
 			assert.strictEqual(second.prevHash, first.hash);
 			assert.strictEqual(second.sequence, 2);
 
 			// The legacy prefix bytes are unchanged (never re-chained, never
 			// backfilled).
-			assert.ok(fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8").startsWith(legacy));
+			assert.ok(
+				fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8").startsWith(legacy),
+			);
 
 			const records = readTimelineVerified(sessionDir);
 			assert.strictEqual(records.length, 4);
@@ -70,7 +78,8 @@ describe("run-events chained family (governance contract §10.3)", () => {
 			fs.writeFileSync(filePath, tampered.join("\n") + "\n");
 			assert.throws(
 				() => readTimelineVerified(sessionDir),
-				(error) => error.amberCode === RUN_EVENTS_CORRUPT_CODE && /body hash|prevHash/.test(error.message),
+				(error) =>
+					error.amberCode === RUN_EVENTS_CORRUPT_CODE && /body hash|prevHash/.test(error.message),
 			);
 		} finally {
 			fs.rmSync(path.dirname(sessionDir), { recursive: true, force: true });
@@ -81,10 +90,18 @@ describe("run-events chained family (governance contract §10.3)", () => {
 		const sessionDir = makeSessionDir();
 		try {
 			appendChainedTimelineEvent(sessionDir, { type: "run_started", data: {} });
-			const second = appendChainedTimelineEvent(sessionDir, { type: "run_completed", data: {}, sequence: 99 });
+			const second = appendChainedTimelineEvent(sessionDir, {
+				type: "run_completed",
+				data: {},
+				sequence: 99,
+			});
 			assert.strictEqual(second.sequence, 99);
 			const third = appendChainedTimelineEvent(sessionDir, { type: "policy_denied", data: {} });
-			assert.strictEqual(third.sequence, 100, "the next sequence continues past the explicit high-water mark");
+			assert.strictEqual(
+				third.sequence,
+				100,
+				"the next sequence continues past the explicit high-water mark",
+			);
 		} finally {
 			fs.rmSync(path.dirname(sessionDir), { recursive: true, force: true });
 		}

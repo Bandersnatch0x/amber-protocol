@@ -891,7 +891,13 @@ const CREDENTIAL_HANDLE_FIELDS = Object.freeze(["handle", "purpose", "scope", "e
 // §5.2 session lease binding (context/runtime contract): the identity needed
 // to prove the current lease holder; the raw token is never persisted, only
 // its digest.
-const SESSION_BINDING_FIELDS = Object.freeze(["sessionId", "attemptId", "ownerId", "tokenHash", "fence"]);
+const SESSION_BINDING_FIELDS = Object.freeze([
+	"sessionId",
+	"attemptId",
+	"ownerId",
+	"tokenHash",
+	"fence",
+]);
 // §5.2 context authority: exactly the §4 constraints shape (same field names,
 // same semantics), validated rather than restricted away.
 const CONTEXT_AUTHORITY_FIELDS = Object.freeze(["loadoutHash", "constraints"]);
@@ -1525,7 +1531,10 @@ function contextAuthorityProblem(value, now) {
 		if (!(field in constraints))
 			return `request contextAuthority.constraints is missing field ${field} — the §4 closed set is complete when context authority is present`;
 	}
-	if (constraints.maxClassification !== null && !CLASSIFICATIONS.includes(constraints.maxClassification))
+	if (
+		constraints.maxClassification !== null &&
+		!CLASSIFICATIONS.includes(constraints.maxClassification)
+	)
 		return `request contextAuthority.constraints.maxClassification must be one of ${CLASSIFICATIONS.join(", ")} or null`;
 	if (
 		constraints.purpose !== null &&
@@ -1533,7 +1542,10 @@ function contextAuthorityProblem(value, now) {
 	)
 		return "request contextAuthority.constraints.purpose must be a non-empty string or null";
 	if (constraints.expiresAt !== null) {
-		if (typeof constraints.expiresAt !== "string" || Number.isNaN(Date.parse(constraints.expiresAt)))
+		if (
+			typeof constraints.expiresAt !== "string" ||
+			Number.isNaN(Date.parse(constraints.expiresAt))
+		)
 			return "request contextAuthority.constraints.expiresAt must be an RFC3339 timestamp or null";
 		if (Date.parse(constraints.expiresAt) <= now.getTime())
 			return "request contextAuthority.constraints.expiresAt has already passed; an expired context authority refuses at submit (honored, not recorded-then-ignored)";
@@ -1576,9 +1588,15 @@ function verifySessionLeaseProof(cwd, binding, now) {
 	if (!lease || typeof lease !== "object")
 		return { ok: false, reason: `bound session ${JSON.stringify(sessionId)} carries no lease` };
 	if (lease.ownerId !== binding.ownerId)
-		return { ok: false, reason: "lease owner does not match the bound sessionBinding (lease drift)" };
+		return {
+			ok: false,
+			reason: "lease owner does not match the bound sessionBinding (lease drift)",
+		};
 	if (lease.tokenHash !== binding.tokenHash)
-		return { ok: false, reason: "lease token does not match the bound sessionBinding (lease drift)" };
+		return {
+			ok: false,
+			reason: "lease token does not match the bound sessionBinding (lease drift)",
+		};
 	if (lease.fence !== binding.fence)
 		return {
 			ok: false,
@@ -1731,10 +1749,15 @@ function authorizeRunnerRequest(cwd, input = {}, opts = {}) {
 			const drift = requestDriftProblem(cwd, record);
 			if (drift !== null) return fail(REQUEST_DRIFT_CODE, [drift]);
 			// §5.2 stage re-verification (lease proof + context expiry).
-			const authorizeBinding = stageBindingProblem(cwd, record, opts.now instanceof Date ? opts.now : new Date(), {
-				leaseCode: REQUEST_DRIFT_CODE,
-				driftCode: REQUEST_DRIFT_CODE,
-			});
+			const authorizeBinding = stageBindingProblem(
+				cwd,
+				record,
+				opts.now instanceof Date ? opts.now : new Date(),
+				{
+					leaseCode: REQUEST_DRIFT_CODE,
+					driftCode: REQUEST_DRIFT_CODE,
+				},
+			);
 			if (authorizeBinding !== null) return fail(authorizeBinding.code, [authorizeBinding.reason]);
 			let approval;
 			try {

@@ -196,7 +196,11 @@ function frozenBinding(real, overrides = {}) {
 		capabilityHash: overrides.capabilityHash ?? real.capabilityHash,
 		inputDigest:
 			overrides.inputDigest ??
-			inputDigestOf({ resolvedCommand, argv: resolvedCommand === null ? null : [], ...attemptIdentity }),
+			inputDigestOf({
+				resolvedCommand,
+				argv: resolvedCommand === null ? null : [],
+				...attemptIdentity,
+			}),
 		attemptIdentity,
 	};
 }
@@ -374,7 +378,10 @@ describe("run contract — capture → grant → execute (spec §10.7, §10.10)"
 			assert.strictEqual(granted.grant.boundAttemptId, capture.request.attemptId);
 			assert.strictEqual(granted.grant.scopeHash, capture.request.frozen.hashes.scopeHash);
 			assert.strictEqual(granted.grant.policyVersion, capture.request.frozen.hashes.policyHash);
-			assert.strictEqual(granted.grant.capabilityHash, capture.request.frozen.hashes.capabilityHash);
+			assert.strictEqual(
+				granted.grant.capabilityHash,
+				capture.request.frozen.hashes.capabilityHash,
+			);
 
 			const executed = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 			assert.strictEqual(executed.success, true, JSON.stringify(executed));
@@ -630,10 +637,10 @@ describe("run contract — replay slices (spec §10.4, §10.8; plan Slice 5)", (
 			sessionId: "s1",
 			attemptId: null,
 		});
-		assert.deepStrictEqual(
-			handoffBundle.parseReplayScope(`run-${sessionId}-${attemptId}`),
-			{ sessionId, attemptId },
-		);
+		assert.deepStrictEqual(handoffBundle.parseReplayScope(`run-${sessionId}-${attemptId}`), {
+			sessionId,
+			attemptId,
+		});
 		assert.strictEqual(
 			handoffBundle.parseReplayScope(`run-${sessionId}-${attemptId.slice(0, 8)}`),
 			null,
@@ -680,9 +687,7 @@ describe("run contract — attempt metrics fold (spec §7 R2; plan Slice 7)", ()
 			// Attempt 1: executes and fails (exit 3).
 			fs.writeFileSync(
 				path.join(root, ".amber", "governance", "rules.json"),
-				JSON.stringify(
-					rulesObject({ ...ALLOW_RULE, pattern: 'node -e "process.exit(3)"' }),
-				),
+				JSON.stringify(rulesObject({ ...ALLOW_RULE, pattern: 'node -e "process.exit(3)"' })),
 			);
 			const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 			grantSessionExecution(root, "s1", { attemptId: first.request.attemptId });
@@ -721,7 +726,9 @@ describe("run contract — attempt metrics fold (spec §7 R2; plan Slice 7)", ()
 			// requested = admitted + denied + still-open holds.
 			assert.strictEqual(
 				metrics.attempts_requested_total,
-				metrics.attempts_admitted_total + metrics.attempts_denied_total + metrics.attempts_still_open,
+				metrics.attempts_admitted_total +
+					metrics.attempts_denied_total +
+					metrics.attempts_still_open,
 			);
 		} finally {
 			stageRunner._restoreAdapterTableForTest();

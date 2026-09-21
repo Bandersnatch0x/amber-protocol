@@ -183,7 +183,9 @@ test("an unresolvable evidence reference refuses the draft with validity:no-evid
 	assert.equal(outcome.refusals[0].reasonCode, "validity:no-evidence");
 	assert.equal(
 		outcome.refusals[0].attributionFingerprint,
-		attributionFingerprintOf(finding({ evidenceReferences: [{ kind: "path", path: "docs/wiki/invented.md" }] })),
+		attributionFingerprintOf(
+			finding({ evidenceReferences: [{ kind: "path", path: "docs/wiki/invented.md" }] }),
+		),
 	);
 	assert.equal(Object.hasOwn(outcome.refusals[0], "summary"), true);
 });
@@ -227,11 +229,9 @@ test("an eval-only effect statement refuses the draft with validity:eval-only-cl
 
 test("refusal entries carry exactly the in-memory correlation set — no fabricated timestamp or record", () => {
 	const target = makeTarget("refusal-shape");
-	const outcome = deriveEvolutionDrafts(
-		"route",
-		[finding({ evidenceReferences: [] })],
-		{ targetRoot: target },
-	);
+	const outcome = deriveEvolutionDrafts("route", [finding({ evidenceReferences: [] })], {
+		targetRoot: target,
+	});
 	assert.equal(outcome.refusals.length, 1);
 	assert.deepEqual(Object.keys(outcome.refusals[0]).sort(), [
 		"attributionFingerprint",
@@ -253,7 +253,9 @@ test("the capability-registry draft is an additive F052 registration request ske
 			responsibleArtifact: "capability-registry",
 		},
 	});
-	const outcome = deriveEvolutionDrafts("capability-registry", [attributed], { targetRoot: target });
+	const outcome = deriveEvolutionDrafts("capability-registry", [attributed], {
+		targetRoot: target,
+	});
 	assert.equal(outcome.drafts.length, 1);
 	const draft = outcome.drafts[0];
 	assert.equal(draft.kind, "registration-request-draft");
@@ -330,7 +332,10 @@ test("the required correlation field set matches the contract §8.5 four fields"
 // ── input hygiene ──
 
 test("an unknown destination is a programmer error, not a silent refusal", () => {
-	assert.throws(() => deriveEvolutionDrafts("wiki", [], { targetRoot: "t" }), /unknown deriver destination/);
+	assert.throws(
+		() => deriveEvolutionDrafts("wiki", [], { targetRoot: "t" }),
+		/unknown deriver destination/,
+	);
 });
 
 test("a missing targetRoot is refused: admission cannot run without the owning target", () => {

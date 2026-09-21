@@ -164,7 +164,11 @@ test("evidence constants pin the assurance vocabulary and the schema contract", 
 	]);
 	assert.deepEqual(RECORDABLE_ASSURANCE, ["unavailable", "observed", "replayable"]);
 	assert.equal(RECORDABLE_ASSURANCE.includes("verified"), false, "verified is not recordable");
-	assert.equal(RECORDABLE_ASSURANCE.includes("attested"), false, "attested is reserved, not recordable");
+	assert.equal(
+		RECORDABLE_ASSURANCE.includes("attested"),
+		false,
+		"attested is reserved, not recordable",
+	);
 	assert.deepEqual(EVIDENCE_STATUSES, ["pass", "fail"]);
 	assert.equal(EVIDENCE_SCHEMA_VERSION, 1);
 	assert.deepEqual(SUPPORTED_EVIDENCE_SCHEMA_VERSIONS, [1]);

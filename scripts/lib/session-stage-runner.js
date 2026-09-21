@@ -367,16 +367,28 @@ function freezeAttemptInputs(projectRoot, resolved, manifest, route, attemptNumb
  */
 function attemptStatusOf(records, request) {
 	const requestId = request.requestId;
-	if (records.some((record) => record.kind === "stage_attempt_expired" && record.requestId === requestId)) {
+	if (
+		records.some(
+			(record) => record.kind === "stage_attempt_expired" && record.requestId === requestId,
+		)
+	) {
 		return "expired";
 	}
-	if (records.some((record) => record.kind === "stage_attempt_settled" && record.requestId === requestId)) {
+	if (
+		records.some(
+			(record) => record.kind === "stage_attempt_settled" && record.requestId === requestId,
+		)
+	) {
 		return "settled";
 	}
-	if (records.some((record) => record.kind === "attempt_denied" && record.requestId === requestId)) {
+	if (
+		records.some((record) => record.kind === "attempt_denied" && record.requestId === requestId)
+	) {
 		return "denied";
 	}
-	if (records.some((record) => record.kind === "attempt_admitted" && record.requestId === requestId)) {
+	if (
+		records.some((record) => record.kind === "attempt_admitted" && record.requestId === requestId)
+	) {
 		return "admitted";
 	}
 	return "requested";
@@ -609,7 +621,14 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 				resolved,
 				attemptNumber,
 				latestUnconsumedApproval(cursorRead.records)?.approvalKey ?? null,
-				freezeAttemptInputs(projectRoot, resolved, session.manifest, route, attemptNumber, resolved.fence),
+				freezeAttemptInputs(
+					projectRoot,
+					resolved,
+					session.manifest,
+					route,
+					attemptNumber,
+					resolved.fence,
+				),
 			),
 			providerClass: resolved.adapter.providerClass,
 		};
@@ -645,7 +664,15 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
  * contract §3) rides the request and fills the native `inputDigest` field
  * (R-FR-0 — declared before this contract, never consumed until now).
  */
-function buildRequest(sessionId, manifest, route, resolved, attemptNumber, approvalRef, frozenBundle) {
+function buildRequest(
+	sessionId,
+	manifest,
+	route,
+	resolved,
+	attemptNumber,
+	approvalRef,
+	frozenBundle,
+) {
 	const routeHash = routeHashOf(route);
 	const idempotencyKey = idempotencyKeyOf({
 		sessionId,

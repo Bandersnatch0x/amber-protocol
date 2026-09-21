@@ -261,7 +261,8 @@ function eligibilityProblem(approval, frozen, attemptId) {
 	) {
 		return {
 			refusal: "capability-drift",
-			reason: "the grant's capabilityHash differs from the attempt's frozen capabilityHash (R-AU-3.4)",
+			reason:
+				"the grant's capabilityHash differs from the attempt's frozen capabilityHash (R-AU-3.4)",
 		};
 	}
 	if (
@@ -733,7 +734,8 @@ function runGovernedCommand({
 			at: new Date().toISOString(),
 			decision: policyResult && policyResult.allowed ? "allow" : "deny",
 			matchedRule: matchedRule ?? null,
-			reason: (policyResult && policyResult.verdict?.reason) || "evaluated against the frozen policy",
+			reason:
+				(policyResult && policyResult.verdict?.reason) || "evaluated against the frozen policy",
 			policyHash: evaluatedHash,
 			scopeHash: frozen.scopeHash ?? null,
 			confidence: policyResult?.verdict?.confidence ?? null,

@@ -17,8 +17,12 @@ let gitAdapterForartifactDrift = null;
 function defaultGitAdapterForThisModule() {
 	if (gitAdapterForartifactDrift === null) {
 		const gitExec = require("./git-exec");
-		let detector = null;
-		try { detector = require("./git-workflow-detector"); } catch { detector = {}; }
+		let detector;
+		try {
+			detector = require("./git-workflow-detector");
+		} catch {
+			detector = {};
+		}
 		gitAdapterForartifactDrift = {
 			gitOutput: gitExec.gitOutput,
 			isGitRepository: detector.isGitRepository,
@@ -57,7 +61,13 @@ function classifyFeature(targetRoot, feature) {
 	if (anchor === "INVALID") return { classification: "anchor-invalid" };
 
 	// pathspec passed as an array (spawnSync, no shell) -> space/glob-safe, no injection.
-	const lastCommitRaw = defaultGitAdapterForThisModule().gitOutput(targetRoot, ["log", "-1", "--format=%cI", "--", ...paths]);
+	const lastCommitRaw = defaultGitAdapterForThisModule().gitOutput(targetRoot, [
+		"log",
+		"-1",
+		"--format=%cI",
+		"--",
+		...paths,
+	]);
 	if (!lastCommitRaw) {
 		// exit 0 + empty stdout (gitOutput returns "") means no commit ever touched paths.
 		return { classification: "path-unknown", anchorDate: anchor, lastCommitDate: null };
@@ -85,7 +95,8 @@ function detectArtifactDrift(target) {
 	if (!data || !Array.isArray(data.features)) {
 		return unavailable("feature_list.json has no features array");
 	}
-	if (!defaultGitAdapterForThisModule().isGitRepository(targetRoot)) return unavailable("n/a (non-git)");
+	if (!defaultGitAdapterForThisModule().isGitRepository(targetRoot))
+		return unavailable("n/a (non-git)");
 	if (classifyTarget(targetRoot).type === "product-repo") {
 		return unavailable("n/a (product-repo)");
 	}

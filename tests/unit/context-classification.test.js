@@ -61,7 +61,11 @@ describe("classification vocabulary and projection (§3.1)", () => {
 			ok: false,
 			refusal: "classification-unknown",
 		});
-		assert.deepStrictEqual(admittedUnderCeiling("secret", null), { ok: true }, "no ceiling configures no constraint");
+		assert.deepStrictEqual(
+			admittedUnderCeiling("secret", null),
+			{ ok: true },
+			"no ceiling configures no constraint",
+		);
 	});
 
 	it("parses ISO durations deterministically", () => {
@@ -70,7 +74,10 @@ describe("classification vocabulary and projection (§3.1)", () => {
 		assert.strictEqual(parseIsoDuration("P1Y"), 365 * 24 * 3600 * 1000);
 		assert.strictEqual(parseIsoDuration("nonsense"), null);
 		assert.strictEqual(parseIsoDuration("P"), null);
-		assert.strictEqual(expiresAtFromTtl({ ttl: "P1D" }, "2026-09-19T00:00:00.000Z"), "2026-09-20T00:00:00.000Z");
+		assert.strictEqual(
+			expiresAtFromTtl({ ttl: "P1D" }, "2026-09-19T00:00:00.000Z"),
+			"2026-09-20T00:00:00.000Z",
+		);
 		assert.strictEqual(expiresAtFromTtl({ ttl: null }, "2026-09-19T00:00:00.000Z"), null);
 	});
 });
@@ -114,7 +121,16 @@ function payloadFor(req, extra = {}) {
 		knowledgeKind: req.request.target.knowledgeKind || "unspecified",
 		scope: [],
 		supersedes: [],
-		sources: { s1: { kind: s1.kind, ref: s1.ref, rawHash: s1.rawHash, excerpt: s1.excerpt, excerptHash: s1.excerptHash, mutable: false } },
+		sources: {
+			s1: {
+				kind: s1.kind,
+				ref: s1.ref,
+				rawHash: s1.rawHash,
+				excerpt: s1.excerpt,
+				excerptHash: s1.excerptHash,
+				mutable: false,
+			},
+		},
 		blocks: [{ type: "prose", sources: ["s1"], text: "Governed execution needs preconditions." }],
 		...extra,
 	};
@@ -230,10 +246,12 @@ function registerDecisionFixture(root) {
 	execFileSync("git", ["init", "-q"], { cwd: root });
 	execFileSync("git", ["config", "user.email", "t@e.com"], { cwd: root });
 	execFileSync("git", ["config", "user.name", "T"], { cwd: root });
-	registerDecisionFixture.principalDone = registerDecisionFixture.principalDone || (() => {
-		const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
-		registerPrincipal(root, { id: "alice@example.com", principalKind: "human" });
-	})();
+	registerDecisionFixture.principalDone =
+		registerDecisionFixture.principalDone ||
+		(() => {
+			const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+			registerPrincipal(root, { id: "alice@example.com", principalKind: "human" });
+		})();
 	admitArtifact(root, { type: "intent", identity: "intent/relabel", body: "# Relabel\n" });
 	admitArtifact(root, {
 		type: "decision",
@@ -266,7 +284,16 @@ describe("load-build metadata projection and authority exclusions (§3.1-3.3)", 
 				knowledgeKind: req.request.target.knowledgeKind || "unspecified",
 				scope: [],
 				supersedes: [],
-				sources: { s1: { kind: s1.kind, ref: s1.ref, rawHash: s1.rawHash, excerpt: s1.excerpt, excerptHash: s1.excerptHash, mutable: false } },
+				sources: {
+					s1: {
+						kind: s1.kind,
+						ref: s1.ref,
+						rawHash: s1.rawHash,
+						excerpt: s1.excerpt,
+						excerptHash: s1.excerptHash,
+						mutable: false,
+					},
+				},
 				blocks: [{ type: "prose", sources: ["s1"], text: `Content of ${pageId}.` }],
 				...extra,
 			},
@@ -304,7 +331,11 @@ describe("load-build metadata projection and authority exclusions (§3.1-3.3)", 
 	it("projects the effective classification and the ttl expiry; no ceiling denies nothing", async () => {
 		const root = makeLoadTarget();
 		try {
-			seedPage(root, "labeled-page", { classification: "confidential", purpose: "probe", ttl: "P1D" });
+			seedPage(root, "labeled-page", {
+				classification: "confidential",
+				purpose: "probe",
+				ttl: "P1D",
+			});
 			seedPage(root, "unlabeled-page");
 			const preview = previewLoadout(root, { route: "probe", budget: 4000 });
 			assert.deepEqual(preview.errors, [], JSON.stringify(preview.errors));
@@ -342,7 +373,11 @@ describe("load-build metadata projection and authority exclusions (§3.1-3.3)", 
 			fs.writeFileSync(pagePath, JSON.stringify(page, null, 2) + "\n");
 			require("../../scripts/lib/core/context-projection").rebuildProjection(root);
 
-			const preview = previewLoadout(root, { route: "probe", budget: 4000, maxClassification: "internal" });
+			const preview = previewLoadout(root, {
+				route: "probe",
+				budget: 4000,
+				maxClassification: "internal",
+			});
 			assert.deepEqual(preview.errors, [], JSON.stringify(preview.errors));
 			const loadout = preview.loadout;
 			assert.ok(loadout.pages["quiet-page"], "within-ceiling page included");

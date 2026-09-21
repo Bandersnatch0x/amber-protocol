@@ -286,14 +286,15 @@ function attemptReplaySlice(record, records) {
 	// The recorded admission verdict, joined by requestId (the fold source for
 	// the reproduced-verdict comparison).
 	const admitted = (records ?? []).find(
-		(candidate) => candidate.kind === "attempt_admitted" && candidate.requestId === record.requestId,
+		(candidate) =>
+			candidate.kind === "attempt_admitted" && candidate.requestId === record.requestId,
 	);
 	return {
 		...base,
 		replayable: true,
 		frozen,
 		inputDigest: record.inputDigest,
-		recordedVerdict: admitted ? admitted.policyVerdict ?? null : null,
+		recordedVerdict: admitted ? (admitted.policyVerdict ?? null) : null,
 	};
 }
 
@@ -336,7 +337,10 @@ function replayPolicyDecision(slice) {
 function collectAttemptReplaySlices(targetRoot, replayScope) {
 	const scope = parseReplayScope(replayScope);
 	if (!scope) {
-		return { ok: false, errors: [`--replay-scope must be a sessionId or a full runId (${replayScope})`] };
+		return {
+			ok: false,
+			errors: [`--replay-scope must be a sessionId or a full runId (${replayScope})`],
+		};
 	}
 	const sessionDir = path.join(resolveStateDirForRead(targetRoot), "sessions", scope.sessionId);
 	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
@@ -395,7 +399,8 @@ function replayPolicyDecisions(targetRoot, replayScope, { rules = null } = {}) {
 			rows.push({
 				runId: slice.runId,
 				state: "NON_REPLAYABLE",
-				reason: "NON_REPLAYABLE: the frozen request carries no resolved command (host-agent window)",
+				reason:
+					"NON_REPLAYABLE: the frozen request carries no resolved command (host-agent window)",
 				original: null,
 				replayed: null,
 			});
@@ -476,9 +481,13 @@ function buildReplayBundle(targetRoot, replayScope) {
 		? fs.readFileSync(manifestCopy, "utf8")
 		: null;
 	const governed = records.filter((record) =>
-		["policy.evaluated", "executed", "budget.exhausted", "attempt_admitted", "attempt_denied"].includes(
-			record.kind,
-		),
+		[
+			"policy.evaluated",
+			"executed",
+			"budget.exhausted",
+			"attempt_admitted",
+			"attempt_denied",
+		].includes(record.kind),
 	);
 	files["governed-ledger.jsonl"] =
 		governed.length > 0 ? governed.map((record) => JSON.stringify(record)).join("\n") + "\n" : null;
@@ -493,7 +502,11 @@ function buildReplayBundle(targetRoot, replayScope) {
 			: null;
 	})();
 	files["capabilities.json"] = (() => {
-		const pins = [...new Set(collected.slices.map((slice) => slice.frozen?.capabilityRecords?.[0]).filter(Boolean))];
+		const pins = [
+			...new Set(
+				collected.slices.map((slice) => slice.frozen?.capabilityRecords?.[0]).filter(Boolean),
+			),
+		];
 		return pins.length > 0 ? pins : null;
 	})();
 	files["receipts.jsonl"] = fs.existsSync(receiptsPath)
@@ -518,7 +531,8 @@ function buildReplayBundle(targetRoot, replayScope) {
 		if (content === null) continue;
 		const serialized = typeof content === "string" ? content : JSON.stringify(content, null, 2);
 		files[name] = serialized;
-		manifest.files[name] = `sha256:${crypto.createHash("sha256").update(serialized, "utf8").digest("hex")}`;
+		manifest.files[name] =
+			`sha256:${crypto.createHash("sha256").update(serialized, "utf8").digest("hex")}`;
 	}
 	return {
 		ok: true,

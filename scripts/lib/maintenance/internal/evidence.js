@@ -39,7 +39,11 @@ const MAX_REGRESSION_PROPOSALS = 50;
 function evolutionLogWindow(targetRoot) {
 	const parsed = parseEvolutionLog(targetRoot);
 	if (parsed === null) {
-		return { parsed: null, transcriptsScanned: null, window: "docs/wiki/engineering/harness-evolution.md (absent)" };
+		return {
+			parsed: null,
+			transcriptsScanned: null,
+			window: "docs/wiki/engineering/harness-evolution.md (absent)",
+		};
 	}
 	const legacy = parsed.outsideLines.filter((line) => /Finding:\s*(.+?)\s*$/.test(line)).length;
 	return {
@@ -94,11 +98,15 @@ function evolutionLogOccurrences(parsed) {
 // the structured findings stay visible on the envelope and a warning names
 // the ambiguity. Unstructured legacy observations never reach the carrier.
 function selectAttributionCarrier(structuredFindings) {
-	const significant = structuredFindings.filter((finding) => finding.count >= EVOLUTION_FINDING_MIN_COUNT);
+	const significant = structuredFindings.filter(
+		(finding) => finding.count >= EVOLUTION_FINDING_MIN_COUNT,
+	);
 	if (significant.length === 0) {
 		return { carrier: null, warning: null };
 	}
-	const distinct = new Set(significant.map((finding) => canonicalHashOf(finding.findingAttribution)));
+	const distinct = new Set(
+		significant.map((finding) => canonicalHashOf(finding.findingAttribution)),
+	);
 	if (distinct.size > 1) {
 		return {
 			carrier: null,

@@ -386,7 +386,8 @@ const CATALOG = {
 	},
 	AMBER_E_RESEARCH_CITATIONS_LOCK: {
 		title: "Research citation store is locked by another writer",
-		cause: "another process holds the citations lock; concurrent citation appends serialize through it.",
+		cause:
+			"another process holds the citations lock; concurrent citation appends serialize through it.",
 		remedy: "Retry the citation append once the writer finishes; never delete the lock file.",
 		layer: "Context",
 		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
@@ -395,7 +396,8 @@ const CATALOG = {
 		title: "Research citation store would exceed its size ceiling",
 		cause:
 			"appending this citation would grow the store beyond its size ceiling (AMBER_RESEARCH_CITATIONS_MAX_BYTES); the write is refused before any durable state changes.",
-		remedy: "Raise the ceiling explicitly via the env variable after reviewing the store, or archive old citations through a governed retention decision.",
+		remedy:
+			"Raise the ceiling explicitly via the env variable after reviewing the store, or archive old citations through a governed retention decision.",
 		layer: "Context",
 		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
 	},

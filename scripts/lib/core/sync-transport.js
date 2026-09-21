@@ -37,8 +37,6 @@ let gitAdapterForsyncTransport = null;
 function defaultGitAdapterForThisModule() {
 	if (gitAdapterForsyncTransport === null) {
 		const gitExec = require("./git-exec");
-		let detector = null;
-		try { detector = require("./git-workflow-detector"); } catch { detector = {}; }
 		gitAdapterForsyncTransport = {
 			gitExec: gitExec.gitExec,
 		};
@@ -179,7 +177,11 @@ function denied(targetRoot, lp, gate, code, reason, subject) {
 // load-bearing confinement: a pathspec add cannot sweep working-tree changes,
 // but anything pre-staged by someone else would ride along in the commit.
 function stagedIndexPaths(targetRoot) {
-	const res = defaultGitAdapterForThisModule().gitExec(targetRoot, ["diff", "--cached", "--name-only"]);
+	const res = defaultGitAdapterForThisModule().gitExec(targetRoot, [
+		"diff",
+		"--cached",
+		"--name-only",
+	]);
 	if (!res.ok) return null;
 	return res.stdout.length ? res.stdout.split(/\r?\n/) : [];
 }
@@ -483,7 +485,10 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 	};
 
 	// 1. Stage the envelopes (pathspec-confined; the ledger is never staged).
-	const addEnvelopes = defaultGitAdapterForThisModule().gitExec(targetRoot, ["add", ENVELOPES_HOME]);
+	const addEnvelopes = defaultGitAdapterForThisModule().gitExec(targetRoot, [
+		"add",
+		ENVELOPES_HOME,
+	]);
 	if (!addEnvelopes.ok) {
 		return failure({
 			action: {
@@ -514,7 +519,10 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 
 	// 3. Decision record (pre-commit so it rides in the same commit).
 	const decisionPath = writeDecisionRecord(targetRoot, batchId, approval, report, subject, ops);
-	const addDecisions = defaultGitAdapterForThisModule().gitExec(targetRoot, ["add", DECISIONS_HOME]);
+	const addDecisions = defaultGitAdapterForThisModule().gitExec(targetRoot, [
+		"add",
+		DECISIONS_HOME,
+	]);
 	if (!addDecisions.ok) {
 		return failure({
 			action: {
@@ -528,7 +536,11 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 
 	// 4. Commit with the derived message (whole index — the empty-index gate
 	// above is what makes this safe).
-	const commit = defaultGitAdapterForThisModule().gitExec(targetRoot, ["commit", "-m", commitOp.message]);
+	const commit = defaultGitAdapterForThisModule().gitExec(targetRoot, [
+		"commit",
+		"-m",
+		commitOp.message,
+	]);
 	if (!commit.ok) {
 		return failure({
 			action: {
@@ -539,7 +551,10 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 			},
 		});
 	}
-	const commitSha = defaultGitAdapterForThisModule().gitExec(targetRoot, ["rev-parse", "HEAD"]).stdout;
+	const commitSha = defaultGitAdapterForThisModule().gitExec(targetRoot, [
+		"rev-parse",
+		"HEAD",
+	]).stdout;
 	executedRecord({
 		commitSha,
 		stopReason: "completed",
@@ -562,7 +577,8 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 	};
 }
 
-module.exports = { setGitAdapterForThisModule,
+module.exports = {
+	setGitAdapterForThisModule,
 	proposedOpText,
 	STAGE_A_ADD_PATHS,
 	stageAOps,

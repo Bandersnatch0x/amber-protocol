@@ -54,13 +54,10 @@ function propose(root, fingerprint = "fp-1") {
 }
 
 test("family declares one ledger under .amber/suggestions/review.jsonl with a closed five-kind set", () => {
-	assert.deepEqual([...review.SUGGESTION_REVIEW_KINDS], [
-		"proposed",
-		"validated",
-		"rejected",
-		"applied",
-		"undone",
-	]);
+	assert.deepEqual(
+		[...review.SUGGESTION_REVIEW_KINDS],
+		["proposed", "validated", "rejected", "applied", "undone"],
+	);
 	assert.equal(
 		review.reviewLedgerPath("/repo"),
 		path.join("/repo", ".amber", "suggestions", "review.jsonl"),
@@ -116,7 +113,7 @@ test("full lifecycle writes proposed → validated → applied → undone with c
 		assert.match(proposed.operationsDigest, /^sha256:[0-9a-f]{64}$/);
 		assert.deepEqual(proposed.hosts, ["claude"]);
 		assert.deepEqual(proposed.attribution, ATTRIBUTION);
-		assert.equal(JSON.stringify(proposed).includes("friction/abc123.md\""), false);
+		assert.equal(JSON.stringify(proposed).includes('friction/abc123.md"'), false);
 		assert.deepEqual(lines[1].checks, { v1: "pass", v2: "pass", v3: "pass" });
 		assert.match(lines[2].appliedDigest, /^sha256:[0-9a-f]{64}$/);
 		assert.match(lines[3].restoredDigest, /^sha256:[0-9a-f]{64}$/);
@@ -267,7 +264,12 @@ test("fold fails closed on tampered bytes, broken chains, and hand-built legal-c
 		// walk passes and the domain fold must refuse the kind itself.
 		propose(root, "fp-1");
 		const head = ledgerLines(root).at(-1).hash;
-		const bogus = { kind: "mystery", schemaVersion: 1, at: "2026-09-16T00:00:00.000Z", fingerprint: "fp-1" };
+		const bogus = {
+			kind: "mystery",
+			schemaVersion: 1,
+			at: "2026-09-16T00:00:00.000Z",
+			fingerprint: "fp-1",
+		};
 		fs.appendFileSync(
 			file,
 			`${JSON.stringify({ ...bogus, prevHash: head, hash: chainHash(bogus, head) })}\n`,
@@ -422,7 +424,12 @@ test("writer inputs are validated fail-closed: closed sets, digests, no credenti
 			evidence: [],
 			hosts: ["claude"],
 			operations: [],
-			attribution: { entrySurface: "tool-output", impactSurface: "nowhere", failureMode: "x", responsibleArtifact: "wiki" },
+			attribution: {
+				entrySurface: "tool-output",
+				impactSurface: "nowhere",
+				failureMode: "x",
+				responsibleArtifact: "wiki",
+			},
 		});
 		assert.equal(invalidAttribution.ok, false);
 		assert.equal(invalidAttribution.code, INVALID_ARG_CODE);
@@ -447,10 +454,15 @@ test("writer inputs are validated fail-closed: closed sets, digests, no credenti
 		assert.equal(leaky.code, INVALID_ARG_CODE);
 
 		// Unknown kind; unknown field on an applied record.
-		assert.equal(review.precheckSuggestionReviewAppend(root, { kind: "mystery" }).code, INVALID_ARG_CODE);
+		assert.equal(
+			review.precheckSuggestionReviewAppend(root, { kind: "mystery" }).code,
+			INVALID_ARG_CODE,
+		);
 		const extraField = review.recordSuggestionApplied(root, {
 			fingerprint: "fp-3",
-			applied: [{ path: "docs/wiki/a.md", beforeHash: null, afterHash: null, previousContents: "x" }],
+			applied: [
+				{ path: "docs/wiki/a.md", beforeHash: null, afterHash: null, previousContents: "x" },
+			],
 		});
 		assert.equal(extraField.ok, false);
 		assert.equal(extraField.code, INVALID_ARG_CODE);

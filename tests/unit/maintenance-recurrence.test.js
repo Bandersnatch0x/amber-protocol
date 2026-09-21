@@ -31,7 +31,10 @@ test("absent log: recurrence reports unknown, never a fabricated rate", () => {
 		assert.equal(outcome.evolution.recurrence.denominator, "unknown");
 		assert.equal(outcome.evolution.recurrence.recurrenceRate, null);
 		assert.equal(outcome.evolution.recurrence.transcriptsScanned, null);
-		assert.equal(outcome.evolution.recurrence.window, "docs/wiki/engineering/harness-evolution.md (absent)");
+		assert.equal(
+			outcome.evolution.recurrence.window,
+			"docs/wiki/engineering/harness-evolution.md (absent)",
+		);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 	}
@@ -97,7 +100,13 @@ test("structured-only log: blocks count as occurrences, not denominator-only wei
 			].join("\n");
 		writeEvolutionLog(
 			target,
-			["# Amber Evolution Log", "", block("only failure mode"), block("only failure mode"), block("only failure mode")].join("\n"),
+			[
+				"# Amber Evolution Log",
+				"",
+				block("only failure mode"),
+				block("only failure mode"),
+				block("only failure mode"),
+			].join("\n"),
 		);
 		const recurrence = maintenance.evidence(target).evolution.recurrence;
 		assert.equal(recurrence.transcriptsScanned, 3);
@@ -114,14 +123,9 @@ test("a block that names no failure mode stays in the denominator without invent
 	try {
 		writeEvolutionLog(
 			target,
-			[
-				"Finding: real failure mode",
-				"",
-				"```amber-finding",
-				"{ not valid json",
-				"```",
-				"",
-			].join("\n"),
+			["Finding: real failure mode", "", "```amber-finding", "{ not valid json", "```", ""].join(
+				"\n",
+			),
 		);
 		const recurrence = maintenance.evidence(target).evolution.recurrence;
 		// The unparseable block is a window observation (denominator 2) but
@@ -153,23 +157,20 @@ test("empty log (denominator 0): unknown, not a zero rate", () => {
 test("inspection carries the same recurrence evidence (report-only envelope)", () => {
 	const target = makeTarget();
 	try {
-		writeEvolutionLog(
-			target,
-			"Finding: repeat\nFinding: repeat\n",
-		);
+		writeEvolutionLog(target, "Finding: repeat\nFinding: repeat\n");
 		const inspection = maintenance.inspect(target);
 		const recurrence = inspection.recurrence;
-		assert.deepEqual(
-			Object.keys(recurrence).sort(),
-			["denominator", "occurrences", "recurrenceRate", "transcriptsScanned", "window"],
-		);
+		assert.deepEqual(Object.keys(recurrence).sort(), [
+			"denominator",
+			"occurrences",
+			"recurrenceRate",
+			"transcriptsScanned",
+			"window",
+		]);
 		assert.equal(recurrence.occurrences, 2);
 		assert.equal(recurrence.recurrenceRate, 1);
 		// No improvement-claim fields exist on the envelope.
-		assert.equal(
-			JSON.stringify(recurrence).match(/delta|improve|reduction|before|after/i),
-			null,
-		);
+		assert.equal(JSON.stringify(recurrence).match(/delta|improve|reduction|before|after/i), null);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 	}
