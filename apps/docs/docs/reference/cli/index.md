@@ -51,7 +51,7 @@ amber <command> --target <repo> [options]
 | <code>gate</code> | Evaluate Gates and inspect their immutable outcomes (F050): the | No | [Docs](/reference/cli/gate) |
 | <code>policy</code> | Evaluate deny-wins Policy Contracts and inspect immutable Policy Outcomes (F050). | No | [Docs](/reference/cli/policy) |
 | <code>adapter</code> | Register read-only Adapters, record immutable read receipts, and prepare migration candidates (F051). | No | [Docs](/reference/cli/adapter) |
-| <code>runner</code> | Register controlled Runners, their closed operation capabilities, and governed | No | [Docs](/reference/cli/runner) |
+| <code>runner</code> | Register controlled Runners, their closed operation capabilities, and governed | Yes | [Docs](/reference/cli/runner) |
 | <code>release</code> | Prepare governed release candidates (F053 T1). | No | [Docs](/reference/cli/release) |
 | <code>maintain</code> | Register Control Band detectors, record deterministic Findings, derive | No | [Docs](/reference/cli/maintain) |
 | <code>retention</code> | Classify records into governed retention classes, evaluate expiry | No | [Docs](/reference/cli/retention) |

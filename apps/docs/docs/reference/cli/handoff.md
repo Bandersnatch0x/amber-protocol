@@ -24,7 +24,7 @@ Regenerate live handoff state or produce the portable handoff bundle.
 
 ```bash
 amber handoff --target <repo> [--json]
-       amber handoff bundle --target <repo> [--output-dir <dir>] [--json]
+       amber handoff bundle --target <repo> [--output-dir <dir>] [--replay-scope <sessionId|runId>] [--json]
        amber handoff validate --target <repo> [--bundle-dir <dir>] [--json]
 ```
 
@@ -54,10 +54,14 @@ Subcommands:
   bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.
   validate           Validate a handoff bundle directory.
 
+Options:
+  --replay-scope <sessionId|runId>   Also write per-attempt replay slices (frozen admission values + replay decisions).
+
 Examples:
   amber handoff --target path/to/repo
   amber handoff bundle --target path/to/repo
   amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest
+  amber handoff bundle --target path/to/repo --replay-scope run-<sessionId>-<attemptId>
   amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest
 ```
 
@@ -73,6 +77,10 @@ amber handoff bundle --target path/to/repo
 
 ```bash
 amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest
+```
+
+```bash
+amber handoff bundle --target path/to/repo --replay-scope run-<sessionId>-<attemptId>
 ```
 
 ```bash

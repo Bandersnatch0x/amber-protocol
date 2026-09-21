@@ -183,7 +183,7 @@
       "path": "reference/cli/handoff.md",
       "group": "Reference",
       "title": "amber handoff",
-      "description": "Regenerate live handoff state or produce the portable handoff bundle.\n\nSubcommands:\n  (none)             Regenerate session-handoff.md from live state and validate it.\n  bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.\n  validate           Validate a handoff bundle directory.\n\nExamples:\n  amber handoff --target path/to/repo\n  amber handoff bundle --target path/to/repo\n  amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest\n  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
+      "description": "Regenerate live handoff state or produce the portable handoff bundle.\n\nSubcommands:\n  (none)             Regenerate session-handoff.md from live state and validate it.\n  bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.\n  validate           Validate a handoff bundle directory.\n\nOptions:\n  --replay-scope <sessionId|runId>   Also write per-attempt replay slices (frozen admission values + replay decisions).\n\nExamples:\n  amber handoff --target path/to/repo\n  amber handoff bundle --target path/to/repo\n  amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest\n  amber handoff bundle --target path/to/repo --replay-scope run-<sessionId>-<attemptId>\n  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
       "layer": "Generated"
     },
     {
