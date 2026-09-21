@@ -480,10 +480,15 @@ function proposeMaintenance(target, registryPath, priority, inspectMaintenance) 
 		"maintenance",
 		"proposals",
 	);
-	const proposalPath = path.join(
-		proposalRoot,
-		`${new Date().toISOString().replace(/[:.]/g, "-")}-maintenance-proposal.md`,
-	);
+	// The stamp has millisecond resolution, so two Propose runs landing in the
+	// same millisecond would render the same filename and the second write would
+	// silently overwrite the first — destroying the rejection history that
+	// scanPriorRejections exists to preserve. Disambiguate instead of losing it.
+	const proposalStamp = new Date().toISOString().replace(/[:.]/g, "-");
+	let proposalPath = path.join(proposalRoot, `${proposalStamp}-maintenance-proposal.md`);
+	for (let n = 2; pathExists(proposalPath); n += 1) {
+		proposalPath = path.join(proposalRoot, `${proposalStamp}-${n}-maintenance-proposal.md`);
+	}
 	const relativeProposalPath = relativeSlash(filteredInspection.target, proposalPath);
 	const refusal = (message) => ({
 		target: filteredInspection.target,
