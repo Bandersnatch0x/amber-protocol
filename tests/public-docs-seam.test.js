@@ -23,6 +23,21 @@ const {
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const MANIFEST_PATH = path.join(ROOT_DIR, "apps", "docs", "docs-manifest.json");
+const BUILD_DIR = path.join(ROOT_DIR, "apps", "docs", "build");
+
+// The seam mirrors `npm run docs:verify`, which is authoritative and runs in the
+// CI docs job right after a build. The root test job has neither the build nor
+// the apps/docs dependencies, and calling the gate functions directly bypasses
+// Gate 1's build-presence check — so without a build the other gates iterate zero
+// files and pass vacuously. Skip them there instead of reporting a green that
+// verified nothing.
+const needsBuild = fs.existsSync(BUILD_DIR)
+	? {}
+	: { skip: "no apps/docs/build — run `npm run docs:build` first (the docs CI job does)" };
+
+function buildTest(name, fn) {
+	test(name, needsBuild, fn);
+}
 
 test("public docs manifest has valid structure and unique paths", () => {
 	assert.ok(fs.existsSync(MANIFEST_PATH), "docs-manifest.json must exist");
@@ -95,40 +110,43 @@ test("public docs CommandBlock nature values match the component contract", () =
 	);
 });
 
-test("public docs verification seam: 1. Build and Page Count Gate", () => {
+buildTest("public docs verification seam: 1. Build and Page Count Gate", () => {
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 	const errors = verifyBuildAndPageCount(manifest);
 	assert.deepEqual(errors, [], `Build and page count check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 2. Reference Drift Gate", () => {
+buildTest("public docs verification seam: 2. Reference Drift Gate", () => {
 	const errors = verifyReferenceDrift();
 	assert.deepEqual(errors, [], `CLI reference drift check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 3. C-Layer Deny Gate", () => {
+buildTest("public docs verification seam: 3. C-Layer Deny Gate", () => {
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 	const errors = verifyCLayerDeny(manifest);
 	assert.deepEqual(errors, [], `C-layer deny check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 4. Content Safety / Secrets & Absolute Paths Gate", () => {
-	const errors = verifyContentSafety();
-	assert.deepEqual(errors, [], `Content safety check failed: ${errors.join("; ")}`);
-});
+buildTest(
+	"public docs verification seam: 4. Content Safety / Secrets & Absolute Paths Gate",
+	() => {
+		const errors = verifyContentSafety();
+		assert.deepEqual(errors, [], `Content safety check failed: ${errors.join("; ")}`);
+	},
+);
 
-test("public docs verification seam: 5. Internal Links & Anchors Gate", () => {
+buildTest("public docs verification seam: 5. Internal Links & Anchors Gate", () => {
 	const errors = verifyLinksAndAnchors();
 	assert.deepEqual(errors, [], `Link & anchor check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 6. Search Index Gate", () => {
+buildTest("public docs verification seam: 6. Search Index Gate", () => {
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 	const errors = verifySearchIndex(manifest);
 	assert.deepEqual(errors, [], `Search index check failed: ${errors.join("; ")}`);
 });
 
-test("search index coverage gate reports a published page that has no index entry", () => {
+buildTest("search index coverage gate reports a published page that has no index entry", () => {
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 	// A non-empty index is not a covered one: a page can stay reachable by URL
 	// while being unlocatable through the site's own search box. Hand the gate a
@@ -147,7 +165,7 @@ test("search index coverage gate reports a published page that has no index entr
 	);
 });
 
-test("search index coverage gate reports index entries outside the curated corpus", () => {
+buildTest("search index coverage gate reports index entries outside the curated corpus", () => {
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 	const victim = manifest.documents.find((d) => d.id === "reference/cli/next");
 	assert.ok(victim, "expected the 'amber next' reference page in the manifest");
@@ -168,37 +186,37 @@ test("search index coverage gate reports index entries outside the curated corpu
 	);
 });
 
-test("public docs verification seam: 7. Accessibility Floor & Responsive Gate", () => {
+buildTest("public docs verification seam: 7. Accessibility Floor & Responsive Gate", () => {
 	const errors = verifyAccessibilityAndResponsive();
 	assert.deepEqual(errors, [], `Accessibility & responsive check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 8. SEO Baseline Gate", () => {
+buildTest("public docs verification seam: 8. SEO Baseline Gate", () => {
 	const errors = verifySeoBaseline();
 	assert.deepEqual(errors, [], `SEO baseline check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 9. Edit Links Gate", () => {
+buildTest("public docs verification seam: 9. Edit Links Gate", () => {
 	const errors = verifyEditLinks();
 	assert.deepEqual(errors, [], `Edit links check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 10. Zero Telemetry Gate", () => {
+buildTest("public docs verification seam: 10. Zero Telemetry Gate", () => {
 	const errors = verifyZeroTelemetry();
 	assert.deepEqual(errors, [], `Zero telemetry check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 11. Version & Support Matrix Gate", () => {
+buildTest("public docs verification seam: 11. Version & Support Matrix Gate", () => {
 	const errors = verifyVersionSync();
 	assert.deepEqual(errors, [], `Version sync check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam: 12. Replayable Reader Result Scenarios", () => {
+buildTest("public docs verification seam: 12. Replayable Reader Result Scenarios", () => {
 	const errors = verifyReaderScenarios();
 	assert.deepEqual(errors, [], `Reader scenarios check failed: ${errors.join("; ")}`);
 });
 
-test("public docs verification seam runs end-to-end and returns exit code 0", () => {
+buildTest("public docs verification seam runs end-to-end and returns exit code 0", () => {
 	const code = runVerification();
 	assert.equal(code, 0, "runVerification must return exit code 0");
 });
