@@ -261,3 +261,27 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F064-Improvement-suggestions.md`
 - Review status: ready
 - Feature: F064 status → accepted in feature_list.json
+
+## 2026-09-22 docs/plans/F064-suggestion-review-closeout.md
+
+- Plan: `docs/plans/F064-suggestion-review-closeout.md`
+- Review status: ready
+- Required user action: none
+
+## 2026-09-22 docs/plans/trusted-control-context-runtime.md
+
+- Plan: `docs/plans/trusted-control-context-runtime.md`
+- Review status: ready
+- Required user action: none
+
+## 2026-09-22 docs/plans/trusted-control-governance.md
+
+- Plan: `docs/plans/trusted-control-governance.md`
+- Review status: ready
+- Required user action: none
+
+## 2026-09-22 docs/plans/trusted-control-run-contract.md
+
+- Plan: `docs/plans/trusted-control-run-contract.md`
+- Review status: ready
+- Required user action: none

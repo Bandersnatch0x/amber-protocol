@@ -2,7 +2,7 @@
 
 Spec: `docs/specs/trusted-control-run-contract.md` (spec_id `trusted-control-run-contract`, status `proposed`, updated 2026-09-16)
 Feature: F062
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 Origin ticket: `issues/0050-run-runscope-snapshot.md` (correction appended 2026-09-16)
 Baseline HEAD: `0a9cbeab85898bd043e1ab9f7c89ea71193cbb78`
@@ -12,7 +12,7 @@ No new F-number is introduced; F064 and the feature catalog are untouched.
 
 Knowledge surfaces only (specs, ADRs, plan contracts); code paths ride F062's booked paths.
 
-- implement: docs/specs/trusted-control-run-contract.md, docs/plans/trusted-control-run-contract.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, docs/adr/0012-schema-growth.md, issues/0050-run-runscope-snapshot.md
+- implement: docs/specs/trusted-control-run-contract.md, docs/plans/trusted-control-run-contract.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, docs/adr/0012-protocol-and-schema-versioning.md, issues/0050-run-runscope-snapshot.md
 - review: docs/specs/trusted-control-run-contract.md, docs/plans/trusted-control-run-contract.md, .scratch/orchestration/run-contract-impl-2026-09-19/REVIEW-spec-plan.md
 
 ## Goal
@@ -49,9 +49,9 @@ legacy records.
   registry fold exactly; mitigation: compute from the same fold the registry exports,
   red-first fixtures pin the canonical form.
 
-## Vertical Slices (tracer bullets)
+## Vertical Slices
 
-Order matters and follows the real dependency: a grant can only bind an attempt
+Tracer-bullet slices. Order matters and follows the real dependency: a grant can only bind an attempt
 that was durably captured first (spec §5 R-AD-6), and gates can only consume a
 binding that grant writers already produce. Slices 1→2→3 are therefore
 capture → grant-binding → gate-consumption; 4-7 are the consumers, each gated on
@@ -178,9 +178,14 @@ its owning ticket's adopted rereview.
    offline replay reproduces verdicts from bundle values only.
 4. No consumer surface diverges from the field names pinned by the spec; shared
    files land only with their owning ticket's adopted rereview.
-5. Full gates (`npm test`, `manifests`, `doctor`, `gen:agents:check`) pass at the
-   end of the slice sequence — run by the implementing packet, verified by the
-   coordinator; this plan does not self-approve.
+5. **Phase boundary:** this phase covers the run contract only — per-attempt frozen
+   admission records, authorization binding, the pre-effect gate, the evidence join,
+   the replay slices, and the timeline run records. It ships no new default CLI verb
+   and no scheduler; the Governance and Context/Runtime contracts land as separate
+   plans in the same packet.
+6. Existing Amber guardrails still pass: `npm test`, `manifests`, `doctor`,
+   `gen:agents:check` — run by the implementing packet, verified by the coordinator;
+   this plan does not self-approve.
 
 ## Verification
 

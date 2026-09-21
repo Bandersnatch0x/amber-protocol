@@ -2,7 +2,7 @@
 
 Spec: `docs/specs/trusted-control-governance-contract.md` (spec_id `trusted-control-governance-contract`, status `proposed`, updated 2026-09-16)
 Feature: F062
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 Origin tickets: `issues/0044`, `issues/0045`, `issues/0046`, `issues/0049`, `issues/0051`, `issues/0052`, `issues/0054`, `issues/0055`, `issues/0056`, `issues/0060` (D0 consolidation Log entries appended 2026-09-16)
 Baseline HEAD: `0a9cbeab85898bd043e1ab9f7c89ea71193cbb78`
@@ -58,7 +58,9 @@ legacy surface tolerated as pre-field.
   unit tests stay green); (4) `RISK_POLICY_VERSION` bump invalidates stale
   approvals by design — the release note must say so.
 
-## Slices (each lands green with tests)
+## Vertical Slices
+
+Each slice lands green with tests.
 
 - [x] **Slice G-1 — Core/Adapter dependency guards (spec §5.5/§5.6).**
   Files: new `tests/unit/core-domain-separation.test.js`; a layer marker
@@ -228,10 +230,14 @@ legacy surface tolerated as pre-field.
 3. Default help output is byte-identical to the F063 seven-verb surface.
 4. Legacy tolerance is proven per surface (pre-field reads, legacy prefix,
    NON_REPLAYABLE) — never an upgrade, never a default fill.
-5. Full gates (`npm test`, `manifests`, `doctor`, `gen:agents:check`; web
-   typecheck/test when G-10 lands) pass at the end of the sequence — run by
-   the implementing packet, verified by the coordinator; this plan does not
-   self-approve.
+5. **Phase boundary:** this phase covers the governance contract only — dependency
+   guards, the run-events family, BLOCKED state, the risk model, PDP v2, evidence
+   columns, replay R0/R1, metrics, core splits, the web badge, and docs. It ships no
+   new default CLI verb and no scheduler; the Context/Runtime and Run contracts land
+   as separate plans in the same packet.
+6. Existing Amber guardrails still pass: `npm test`, `manifests`, `doctor`,
+   `gen:agents:check` (web typecheck/test when G-10 lands) — run by the implementing
+   packet, verified by the coordinator; this plan does not self-approve.
 
 ## Verification
 

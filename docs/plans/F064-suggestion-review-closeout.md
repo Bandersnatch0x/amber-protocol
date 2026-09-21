@@ -1,7 +1,7 @@
 # Plan: F064 suggestion-review close-out (trusted-control packet follow-up backlog)
 
 Feature: F064
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -111,8 +111,13 @@ Knowledge surfaces only (specs, ADRs, plan contracts); code paths ride F064's bo
   `commit-io-degraded` (never a throw, never silent), proven by regression tests.
 - Web-visible card behavior unchanged; no new CLI verb, MCP Action, schema file,
   or `amber next` change.
-- Full gates green: root `npm test`, apps/web vitest, `npm run manifests`,
-  `npm run doctor`, `npm run gen:agents:check`, typecheck, targeted ESLint.
+- **Phase boundary:** this close-out stays inside the trusted-control evolution
+  contract's existing surface — spec text, the suggestion-review ledger fold, and
+  their tests. It ships no new product behavior and no new default CLI verb, so
+  the accepted F064 web mount is unchanged by this phase.
+- Existing Amber guardrails still pass: root `npm test`, apps/web vitest,
+  `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`, typecheck,
+  targeted ESLint.
 
 ## Verification
 

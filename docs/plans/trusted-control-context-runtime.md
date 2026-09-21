@@ -2,7 +2,7 @@
 
 Spec: `docs/specs/trusted-control-context-runtime-contract.md` (spec_id `trusted-control-context-runtime-contract`, status `proposed`, updated 2026-09-16)
 Feature: F062
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 Revised 2026-09-16 (C0R repair): F056 payloadHash ceiling narrowed to declared-hash
 binding; session lease binding completed (full `ownerId`/`tokenHash`/`fence` proof at
@@ -172,8 +172,12 @@ independent of A-C except for the seam shapes they project.
 4. No surface claims containment, network absence, sole-human verification, or
    actual-payload identity (the F056 `payloadHash` binds declared hashes only — the
    bytes actually sent are an executor claim, E2).
-5. Full gates (`npm test`, `manifests`, `doctor`, `gen:agents:check`) pass at the end of
-   the slice sequence — run by the implementing packet, verified by the coordinator;
+5. **Phase boundary:** this phase covers the context/runtime boundary only — ingress
+   classification metadata, F056 egress declarations, F052 frozen bindings, MCP
+   projection, and their tests. It ships no new default CLI verb and no scheduler;
+   the Governance and Run contracts land as separate plans in the same packet.
+6. Existing Amber guardrails still pass: `npm test`, `manifests`, `doctor`,
+   `gen:agents:check` — run by the implementing packet, verified by the coordinator;
    this plan does not self-approve.
 
 ## Resume Checkpoint
@@ -184,6 +188,16 @@ independent of A-C except for the seam shapes they project.
 - Recovery Instructions: reopen this plan and continue at the first unchecked slice; do not regenerate unless the plan file is missing.
 - Recovery Instructions: reopen this plan and continue at the first unchecked slice;
   do not regenerate unless the plan file is missing.
+
+## Verification
+
+- Root gates: `npm test` (full, logged); `node scripts/run-tests.js tests/unit/<suite>`
+  for each touched suite; `npm run manifests`; `npm run doctor`; `npm run gen:agents:check`.
+- Product tests at the real seam for every spec §8 invariant case, plus the four
+  counterexample families staying refused.
+- The §6.5 Research flow fixture re-run with its two timestamps distinct.
+- Logs under `.scratch/orchestration/context-runtime-impl-2026-09-19/`; the dual-axis
+  review verdict sits in the same directory.
 
 ## Evidence Schema
 
