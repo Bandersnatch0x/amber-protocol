@@ -35,7 +35,7 @@ Verify your installation:
   context="Local Workstation"
   nature="read-only"
   command="amber --version"
-  expectedSignal="1.6.0"
+  expectedSignal="The version currently published by the amber-protocol package."
 />
 
 ## In-Repository Development Setup
@@ -58,13 +58,15 @@ The bare CLI executable `amber <command>` and the script execution `node scripts
 
 ## Verification Signal
 
-After installing, verify that Amber can inspect your target repository:
+After installing, verify that Amber can inspect your target repository. `audit` is read-only and works on any repository, whether or not it has been initialized:
 
 <CommandBlock
   context="Target Repository"
   nature="read-only"
-  command="amber doctor --target ."
-  expectedSignal="✅ Target repository classified and Amber guardrails checked."
+  command="amber audit --target . --summary"
+  expectedSignal="Read-only audit summary: target type, count of missing starter files, and the next safe command (0 files written)."
 />
+
+`amber doctor --target .` is the guardrail suite, and it is a **post-`init`** check: on a repository that has not been scaffolded yet it reports the missing guardrails and exits non-zero. That is the expected signal before `init`, not a failure of the installation. Run it after scaffolding, as in step 3 of the [First Governed Workflow](/start-here/first-governed-workflow).
 
 Next, follow the [First Governed Workflow](/start-here/first-governed-workflow).

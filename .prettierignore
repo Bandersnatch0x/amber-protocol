@@ -40,6 +40,12 @@ docs/
 # Brand assets
 assets/
 
+# Hand-tuned standalone landing prototype (root-anchored: only this one file).
+# Preserved from the in-flight docs redesign; referenced by no build, test, or
+# publish path, so prettier's reformatting would only add churn to a page that
+# is being redesigned. Revisit when the redesign lands.
+/index.html
+
 # Output directory
 output/
 

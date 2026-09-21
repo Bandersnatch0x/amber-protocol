@@ -128,6 +128,46 @@ test("public docs verification seam: 6. Search Index Gate", () => {
 	assert.deepEqual(errors, [], `Search index check failed: ${errors.join("; ")}`);
 });
 
+test("search index coverage gate reports a published page that has no index entry", () => {
+	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+	// A non-empty index is not a covered one: a page can stay reachable by URL
+	// while being unlocatable through the site's own search box. Hand the gate a
+	// corpus the index cannot satisfy to see the parity check actually bite.
+	const doctored = {
+		...manifest,
+		documents: [
+			...manifest.documents,
+			{ id: "phantom/page", path: "phantom/page.md", group: "Reference", title: "phantom" },
+		],
+	};
+	const errors = verifySearchIndex(doctored);
+	assert.ok(
+		errors.some((e) => e.includes("coverage incomplete") && e.includes("phantom/page")),
+		`Expected an incomplete-coverage error naming phantom/page, got: ${errors.join("; ")}`,
+	);
+});
+
+test("search index coverage gate reports index entries outside the curated corpus", () => {
+	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
+	const victim = manifest.documents.find((d) => d.id === "reference/cli/next");
+	assert.ok(victim, "expected the 'amber next' reference page in the manifest");
+	// Removing a document from the corpus makes its genuine index entries
+	// "extra" — the other direction of the same parity requirement.
+	const doctored = {
+		...manifest,
+		documents: manifest.documents.filter((d) => d !== victim),
+	};
+	const errors = verifySearchIndex(doctored);
+	assert.ok(
+		errors.some((e) => e.includes("outside the curated corpus")),
+		`Expected an out-of-corpus error, got: ${errors.join("; ")}`,
+	);
+	assert.ok(
+		!errors.some((e) => e.includes("coverage incomplete")),
+		`Removing a document must not report missing coverage: ${errors.join("; ")}`,
+	);
+});
+
 test("public docs verification seam: 7. Accessibility Floor & Responsive Gate", () => {
 	const errors = verifyAccessibilityAndResponsive();
 	assert.deepEqual(errors, [], `Accessibility & responsive check failed: ${errors.join("; ")}`);

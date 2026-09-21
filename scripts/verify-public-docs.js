@@ -278,7 +278,7 @@ function verifyLinksAndAnchors() {
 }
 
 // 6. Search Index Gate
-function verifySearchIndex(_manifest) {
+function verifySearchIndex(manifest) {
 	const errors = [];
 	const searchIndexPath = path.join(BUILD_DIR, "search-index.json");
 	if (!fs.existsSync(searchIndexPath)) {
@@ -290,6 +290,7 @@ function verifySearchIndex(_manifest) {
 		errors.push(`Search index 'search-index.json' is unexpectedly small (${stat.size} bytes).`);
 	}
 
+	let groups = [];
 	try {
 		const data = JSON.parse(fs.readFileSync(searchIndexPath, "utf8"));
 		const totalDocs = Array.isArray(data)
@@ -298,8 +299,55 @@ function verifySearchIndex(_manifest) {
 		if (totalDocs === 0) {
 			errors.push("Search index contains 0 documents.");
 		}
+		groups = Array.isArray(data) ? data.filter((chunk) => Array.isArray(chunk.documents)) : [];
 	} catch (e) {
 		errors.push(`Failed to parse search index JSON: ${e.message}`);
+	}
+
+	// Coverage parity (0020 Layer 1 row 6). A non-empty index is not the same as
+	// a covered one: a page whose entries silently drop out stays reachable by
+	// URL yet becomes unlocatable through the site's own search box. Compare the
+	// indexed URL set against the curated corpus in both directions.
+	if (groups.length > 0 && manifest && Array.isArray(manifest.documents)) {
+		const normalize = (u) =>
+			String(u)
+				.replace(/\/$/, "")
+				.replace(/\/index$/, "");
+		const indexedUrls = new Set();
+		for (const group of groups) {
+			for (const doc of group.documents) {
+				if (doc && typeof doc.u === "string") indexedUrls.add(normalize(doc.u));
+			}
+		}
+
+		const expected = manifest.documents.map((doc) => {
+			const cleaned = String(doc.path)
+				.replace(/^\/amber-protocol\//, "")
+				.replace(/^\/+/, "")
+				.replace(/\.mdx?$/, "");
+			const url =
+				cleaned === "" || cleaned === "index"
+					? "/amber-protocol"
+					: normalize(`/amber-protocol/${cleaned}`);
+			return { id: doc.id, url };
+		});
+
+		const missing = expected.filter((e) => !indexedUrls.has(e.url));
+		if (missing.length > 0) {
+			errors.push(
+				`Search index coverage incomplete: ${missing.length} published page(s) have no search entry — ${missing
+					.map((m) => m.id)
+					.join(", ")}.`,
+			);
+		}
+
+		const expectedUrls = new Set(expected.map((e) => e.url));
+		const extra = [...indexedUrls].filter((u) => !expectedUrls.has(u));
+		if (extra.length > 0) {
+			errors.push(
+				`Search index contains entries for ${extra.length} URL(s) outside the curated corpus — ${extra.join(", ")}.`,
+			);
+		}
 	}
 
 	return errors;
