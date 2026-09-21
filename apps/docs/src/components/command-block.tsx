@@ -3,7 +3,13 @@ import styles from './command-block.module.css';
 
 export interface CommandBlockProps {
   context: string;
-  nature: 'read-only' | 'governed-append' | 'gated-execution' | 'scaffold';
+  nature:
+    | 'read-only'
+    | 'governed-append'
+    | 'governed-write'
+    | 'idempotent-write'
+    | 'gated-execution'
+    | 'scaffold';
   command: string;
   expectedSignal: string;
 }
@@ -26,10 +32,12 @@ export const CommandBlock: React.FC<CommandBlockProps> = ({
     }
   };
 
+  // Anything not matched falls through to the scaffold style, so every member
+  // of the `nature` union above needs a deliberate branch here.
   const natureBadgeClass =
     nature === 'read-only'
       ? styles.badgeReadOnly
-      : nature === 'governed-append'
+      : nature === 'governed-append' || nature === 'governed-write'
         ? styles.badgeGoverned
         : nature === 'gated-execution'
           ? styles.badgeGated

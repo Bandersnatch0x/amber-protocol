@@ -51,6 +51,50 @@ test("public docs manifest has valid structure and unique paths", () => {
 	}
 });
 
+// Every `nature` a page hands to CommandBlock must be a member of the
+// component's accepted union. Anything outside it silently renders with the
+// scaffold badge style, and hand-written pages have drifted from this contract
+// before (a non-existent `expectedOutput` prop survived review the same way),
+// so the agreement is checked mechanically rather than by reading pages.
+test("public docs CommandBlock nature values match the component contract", () => {
+	const componentPath = path.join(
+		ROOT_DIR,
+		"apps",
+		"docs",
+		"src",
+		"components",
+		"command-block.tsx",
+	);
+	const unionMatch = fs.readFileSync(componentPath, "utf8").match(/nature:\s*([\s\S]+?);/);
+	assert.ok(unionMatch, "command-block.tsx must declare a `nature` prop type");
+
+	const accepted = new Set([...unionMatch[1].matchAll(/'([a-z-]+)'/g)].map((m) => m[1]));
+	assert.ok(accepted.size >= 4, `Could not parse the nature union: ${unionMatch[1]}`);
+
+	const offenders = [];
+	const walk = (dir) => {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory()) {
+				walk(full);
+			} else if (entry.name.endsWith(".md")) {
+				for (const match of fs.readFileSync(full, "utf8").matchAll(/nature="([^"]+)"/g)) {
+					if (!accepted.has(match[1])) {
+						offenders.push(`${path.relative(ROOT_DIR, full)}: nature="${match[1]}"`);
+					}
+				}
+			}
+		}
+	};
+	walk(path.join(ROOT_DIR, "apps", "docs", "docs"));
+
+	assert.deepEqual(
+		offenders,
+		[],
+		`CommandBlock nature values outside the contract [${[...accepted].join(", ")}]:\n${offenders.join("\n")}`,
+	);
+});
+
 test("public docs verification seam: 1. Build and Page Count Gate", () => {
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 	const errors = verifyBuildAndPageCount(manifest);
