@@ -9,8 +9,13 @@ write a file whose pixels or colour type would change, which is what makes the
 resulting binary diff reviewable: `git diff` cannot show you a raster, but this
 can prove the raster did not move.
 
-    python scripts/optimize-images.py           # report only, writes nothing
-    python scripts/optimize-images.py --write   # rewrite files that shrink
+    python scripts/optimize-images.py                  # report only, writes nothing
+    python scripts/optimize-images.py --write          # rewrite files that shrink
+    python scripts/optimize-images.py --verify master  # audit a committed re-encode
+
+`--verify` is the review tool: for every image that differs from the given ref it
+decodes both sides and reports whether pixels, mode, dimensions, colour type, and
+alpha survived the re-encode. Exits non-zero if anything but the encoding moved.
 
 GIF and SVG are listed as skipped: GIF has no lossless re-encode worth doing
 (re-quantising the palette changes pixels, and ImgBot's attempt at it widened a
@@ -62,10 +67,60 @@ def reencode(original: bytes) -> bytes:
     return buffer.getvalue()
 
 
+def git_bytes(ref: str, rel: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{ref}:{rel}"],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+    ).stdout
+
+
+def verify(ref: str) -> int:
+    """Audit a committed re-encode: every changed image must differ only in encoding."""
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", ref, "--"],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    changed = [p for p in changed if p.lower().endswith(RASTER)]
+
+    bad = 0
+    for rel in changed:
+        old_raw, new_raw = git_bytes(ref, rel), (REPO / rel).read_bytes()
+        old, new = Image.open(io.BytesIO(old_raw)), Image.open(io.BytesIO(new_raw))
+        checks = {
+            "pixels": pixels(old) == pixels(new),
+            "mode": old.mode == new.mode,
+            "dims": old.size == new.size,
+            "colourType": colour_type(old_raw) == colour_type(new_raw),
+        }
+        if old.mode in ("RGBA", "LA"):
+            checks["alpha"] = old.convert("RGBA").getchannel("A").tobytes() == new.convert(
+                "RGBA"
+            ).getchannel("A").tobytes()
+        ok = all(checks.values())
+        bad += not ok
+        verdict = " ".join(f"{k}={'same' if v else 'CHANGED'}" for k, v in checks.items())
+        print(
+            f"  {'ok  ' if ok else 'FAIL'} {rel} "
+            f"({len(old_raw) / 1024:.0f} -> {len(new_raw) / 1024:.0f} KiB): {verdict}"
+        )
+
+    print(f"\n{bad} of {len(changed)} images changed in more than their encoding")
+    return 1 if bad else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true", help="rewrite files that shrink")
+    parser.add_argument("--verify", metavar="REF", help="audit changed images against a git ref")
     args = parser.parse_args()
+
+    if args.verify:
+        return verify(args.verify)
 
     before_total = after_total = 0
     written = skipped = 0
