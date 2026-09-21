@@ -1,0 +1,305 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/distributed-governance-contract-registry.schema.json",
+	"title": "Amber Distributed Governance Contract Registry",
+	"description": "Versioned inventory of distributed-governance contracts, artifacts and invariants, each carrying a MEASURED implementation status with a file pointer, plus the deterministic compatibility matrix. The schema is the single source of truth for the identifier sets: the validator (scripts/lib/core/distributed-governance-contract-registry.js) reads the version-domain and bounded-context enumerations from here rather than restating them.",
+	"type": "object",
+	"required": [
+		"registryId",
+		"registryVersion",
+		"sourceBaseline",
+		"status",
+		"method",
+		"layers",
+		"authorityBoundaries",
+		"versionDomains",
+		"retiredVersionDomains",
+		"boundedContexts",
+		"entries",
+		"compatibility"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"registryId": { "const": "amber.distributed-governance.contract-registry" },
+		"registryVersion": { "$ref": "#/definitions/semver" },
+		"sourceBaseline": { "const": "docs/architecture/distributed-governance-baseline.md" },
+		"status": { "const": "implementation-measured" },
+		"languageBoundary": { "type": "string", "minLength": 1 },
+		"method": {
+			"type": "object",
+			"required": ["what", "why", "grepIsNotEvidence", "supersedes", "droppedFields"],
+			"additionalProperties": false,
+			"properties": {
+				"what": { "type": "string", "minLength": 1 },
+				"why": { "type": "string", "minLength": 1 },
+				"grepIsNotEvidence": { "type": "string", "minLength": 1 },
+				"supersedes": { "type": "string", "minLength": 1 },
+				"droppedFields": {
+					"type": "object",
+					"minProperties": 1,
+					"additionalProperties": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"layers": {
+			"type": "object",
+			"required": ["contract", "artifact", "invariant"],
+			"additionalProperties": false,
+			"properties": {
+				"contract": { "type": "string", "minLength": 1 },
+				"artifact": { "type": "string", "minLength": 1 },
+				"invariant": { "type": "string", "minLength": 1 }
+			}
+		},
+		"authorityBoundaries": {
+			"type": "object",
+			"required": ["repositoryLocalAuthority", "offlineCapability", "executesAnything", "evidence"],
+			"additionalProperties": false,
+			"properties": {
+				"repositoryLocalAuthority": { "const": true },
+				"offlineCapability": { "const": true },
+				"executesAnything": { "const": false },
+				"evidence": {
+					"type": "array",
+					"minItems": 1,
+					"items": { "$ref": "#/definitions/repoPath" }
+				},
+				"note": { "type": "string", "minLength": 1 }
+			}
+		},
+		"versionDomains": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": [
+					"id",
+					"currentVersion",
+					"deprecatedVersions",
+					"refusedVersions",
+					"masterState",
+					"paths"
+				],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"description": "Declared in canonical order: this order is what a combination's derived evidence identifier is computed over.",
+						"enum": ["contract-schema", "runtime-protocol", "projection-rule"]
+					},
+					"currentVersion": { "$ref": "#/definitions/semver" },
+					"deprecatedVersions": { "$ref": "#/definitions/semverList" },
+					"refusedVersions": { "$ref": "#/definitions/semverList" },
+					"masterState": {
+						"enum": ["implemented", "designed-not-implemented", "superseded"]
+					},
+					"paths": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "$ref": "#/definitions/repoPath" }
+					},
+					"note": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"retiredVersionDomains": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["id", "reason"],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^(capability|component-generation|source-generation)$"
+					},
+					"reason": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"boundedContexts": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["id", "title", "implementation", "paths"],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"enum": [
+							"amber-core",
+							"governance-graph",
+							"governed-knowledge-base",
+							"organization-control-plane",
+							"sync-runtime",
+							"visualization-workbench"
+						]
+					},
+					"title": { "type": "string", "minLength": 1 },
+					"implementation": {
+						"enum": ["implemented", "designed-not-implemented", "superseded"]
+					},
+					"paths": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "$ref": "#/definitions/repoPath" }
+					},
+					"note": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"entries": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": [
+					"id",
+					"kind",
+					"title",
+					"versionDomain",
+					"owningContext",
+					"implementation",
+					"compatibility",
+					"masterConcept",
+					"paths"
+				],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^amber\\.distributed-governance\\.(contract|artifact|invariant)\\.[a-z0-9-]+$"
+					},
+					"kind": { "enum": ["contract", "artifact", "invariant"] },
+					"title": { "type": "string", "minLength": 1 },
+					"versionDomain": {
+						"description": "Null for artifacts (the artifact layer versions through each schema's own schemaVersion, ADR-0012) and for invariants (cross-cutting, unowned by any domain).",
+						"enum": ["contract-schema", "projection-rule", "runtime-protocol", null]
+					},
+					"owningContext": {
+						"description": "Null for invariants only.",
+						"enum": [
+							"amber-core",
+							"governance-graph",
+							"governed-knowledge-base",
+							"organization-control-plane",
+							"sync-runtime",
+							"visualization-workbench",
+							null
+						]
+					},
+					"crossCutting": {
+						"description": "Present and true on invariants only.",
+						"const": true
+					},
+					"implementation": {
+						"description": "Measured, never declared: `implemented` means the concept exists on master at one of `paths`; `designed-not-implemented` means specified but absent; `superseded` means the baseline identifier is not master's identifier.",
+						"enum": ["implemented", "designed-not-implemented", "superseded"]
+					},
+					"compatibility": {
+						"description": "Derived from `implementation`, not chosen: `supported` exactly when `implementation` is `implemented`, `unknown` otherwise. An unregistered identifier fails closed as unknown.",
+						"enum": ["supported", "unknown"]
+					},
+					"masterConcept": {
+						"description": "The master concept the entry crosswalks to. Null exactly when `implementation` is `designed-not-implemented`: there is nothing on master to name.",
+						"type": ["string", "null"]
+					},
+					"paths": {
+						"description": "Repo-relative POSIX paths. Non-empty when `implementation` is `implemented`; a non-implemented entry instead carries its justification in `note`, `nearMisses` or `nameCollision`.",
+						"type": "array",
+						"items": { "$ref": "#/definitions/repoPath" }
+					},
+					"note": { "type": "string", "minLength": 1 },
+					"nameCollision": { "type": "string", "minLength": 1 },
+					"supersededBy": { "type": "string", "minLength": 1 },
+					"nearMisses": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "object",
+							"required": ["path", "why"],
+							"additionalProperties": false,
+							"properties": {
+								"path": { "$ref": "#/definitions/repoPath" },
+								"why": { "type": "string", "minLength": 1 }
+							}
+						}
+					},
+					"sourceResolutions": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "type": "string", "pattern": "^#[0-9]+$" }
+					},
+					"affectedAdrs": {
+						"type": "array",
+						"minItems": 1,
+						"items": { "type": "string", "pattern": "^ADR-[0-9]{4}$" }
+					}
+				}
+			}
+		},
+		"compatibility": {
+			"type": "object",
+			"required": ["outcomePrecedence", "note", "entryRollup", "cases"],
+			"additionalProperties": false,
+			"properties": {
+				"outcomePrecedence": {
+					"const": ["unknown", "refused", "deprecated", "supported"]
+				},
+				"note": { "type": "string", "minLength": 1 },
+				"entryRollup": {
+					"type": "object",
+					"required": ["supported", "unknown", "note"],
+					"additionalProperties": false,
+					"properties": {
+						"supported": { "type": "integer", "minimum": 0 },
+						"unknown": { "type": "integer", "minimum": 0 },
+						"note": { "type": "string", "minLength": 1 }
+					}
+				},
+				"cases": {
+					"type": "array",
+					"minItems": 4,
+					"items": {
+						"type": "object",
+						"required": ["caseId", "description", "combination", "expectedOutcome", "evidenceId"],
+						"additionalProperties": false,
+						"properties": {
+							"caseId": { "type": "string", "pattern": "^DG-COMPAT-[A-Z]+-[0-9]{3}$" },
+							"description": { "type": "string", "minLength": 1 },
+							"combination": {
+								"type": "object",
+								"required": ["contractSchema", "projectionRule", "runtimeProtocol"],
+								"additionalProperties": false,
+								"properties": {
+									"contractSchema": { "$ref": "#/definitions/semver" },
+									"projectionRule": { "$ref": "#/definitions/semver" },
+									"runtimeProtocol": { "$ref": "#/definitions/semver" }
+								}
+							},
+							"expectedOutcome": {
+								"enum": ["unknown", "refused", "deprecated", "supported"]
+							},
+							"evidenceId": {
+								"type": "string",
+								"pattern": "^amber\\.distributed-governance\\.evidence\\.compatibility\\.(supported|deprecated|refused|unknown)\\.[a-z0-9.]+$"
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"definitions": {
+		"semver": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+		"semverList": {
+			"type": "array",
+			"items": { "$ref": "#/definitions/semver" }
+		},
+		"repoPath": {
+			"type": "string",
+			"minLength": 1,
+			"pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?/)!?[^\\\\]+$"
+		}
+	}
+}

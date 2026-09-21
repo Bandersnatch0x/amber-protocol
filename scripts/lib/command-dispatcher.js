@@ -89,6 +89,7 @@ const { principalDispatch } = require("./principal-commands");
 const { evalDispatch } = require("./eval-commands");
 const { evidenceDispatch } = require("./evidence-commands");
 const { approvalDispatch } = require("./approval-commands");
+const { contractsDispatch } = require("./contracts-commands");
 const { gateDispatch } = require("./gate-commands");
 const { policyDispatch } = require("./policy-commands");
 const { adapterDispatch } = require("./adapter-commands");
@@ -1131,6 +1132,10 @@ function handleApproval(args) {
 	return approvalDispatch(args);
 }
 
+function handleContracts(args) {
+	return contractsDispatch(args);
+}
+
 function handlePolicy(args) {
 	return policyDispatch(args);
 }
@@ -1308,6 +1313,7 @@ const COMMAND_HANDLERS = {
 	eval: handleEval,
 	evidence: handleEvidence,
 	approval: handleApproval,
+	contracts: handleContracts,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

@@ -79,6 +79,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"eval",
 	"evidence",
 	"approval",
+	"contracts",
 ];
 
 test("one Command registry drives help, policy, dispatch, and the public command list", () => {

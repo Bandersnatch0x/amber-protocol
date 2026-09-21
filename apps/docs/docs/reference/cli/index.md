@@ -88,6 +88,7 @@ amber <command> --target <repo> [options]
 | <code>eval</code> | Run deterministic instruction-surface Evals (F050 Evidence; F058). | Yes | [Docs](/reference/cli/eval) |
 | <code>evidence</code> | Record and independently verify Evidence receipts, each binding the | No | [Docs](/reference/cli/evidence) |
 | <code>approval</code> | Grant, revoke, consume, and inspect Approvals — the human | No | [Docs](/reference/cli/approval) |
+| <code>contracts</code> | Validate the distributed-governance contract registry against its schema and | Yes | [Docs](/reference/cli/contracts) |
 
 ### ⚠️ Deprecated Commands (v1 Compatibility)
 

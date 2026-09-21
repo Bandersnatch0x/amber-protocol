@@ -1,15 +1,19 @@
 {
-	"$schema": "./distributed-governance-contract-registry.schema.json",
 	"registryId": "amber.distributed-governance.contract-registry",
 	"registryVersion": "2.0.0",
 	"sourceBaseline": "docs/architecture/distributed-governance-baseline.md",
 	"status": "implementation-measured",
 	"languageBoundary": "Amber internal language only. This registry names no implementation technology and no external project, product, protocol, or research source.",
 	"method": {
-		"what": "Every entry's `implementation` is a measured value, not a declared intent: it records whether master's code and schemas actually carry the concept, with a file pointer for each verdict.",
+		"what": "Every entry's `implementation` is a measured value, not a declared intent: it records whether master's code and schemas actually carry the concept, with a file pointer for each verdict. An entry that is not `implemented` must carry its justification instead of a pointer — a `note`, a `nearMisses` list, or a `nameCollision` — so a negative verdict states what was found rather than what was assumed.",
 		"why": "The superseded 1.1.0 registry marked all 49 entries `disposition: supported`. At least 12 of them have no artifact on master, and the organization-control-plane entries are contradicted directly by docs/specs/deployment-profiles.md ('purely declarative no-op'). A registry that declares support for paper contracts hides exactly the drift it exists to expose.",
 		"grepIsNotEvidence": "Registry vocabulary and master vocabulary do not overlap, so name search both misses and misleads. `read-snapshot` has zero hits while master carries a full projection read model; `repository-registration` has zero hits while structural-identity owns `repositoryId`; `checkpoint` has many hits but means the projection read checkpoint (`--checkpoint <sha256>`) and the phase rollback checkpoint, not a sync-stream checkpoint. Every verdict below was reached by reading the named file, not by a search count.",
-		"supersedes": "registryVersion 1.1.0 (commit 586ae63, never merged). Version domains 6 -> 3 (Slice 0); artifacts split from contracts; invariants listed as cross-cutting."
+		"supersedes": "registryVersion 1.1.0 (commit 586ae63, never merged). Version domains 6 -> 3 (Slice 0); artifacts split from contracts; invariants listed as cross-cutting.",
+		"droppedFields": {
+			"disposition": "Replaced by the derived pair `implementation` + `compatibility`. `disposition: supported` was a declaration that could not disagree with anything; the replacement is measured.",
+			"bindings": "All 29 contracts carried a byte-identical six-domain `{domain}:1.0.0` object, and all 20 artifact+invariant entries carried none. A field that is constant for every entry of a kind carries no traceability, so it was dropped rather than repopulated.",
+			"entryVersion": "Every entry restated its version domain's version as 1.0.0. The domain carries the version; a per-entry copy is a second place to drift."
+		}
 	},
 	"layers": {
 		"contract": "An interchange or read contract with a version domain. 29 entries.",
@@ -32,7 +36,9 @@
 	"versionDomains": [
 		{
 			"id": "contract-schema",
-			"version": "1.0.0",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": ["0.9.0"],
+			"refusedVersions": ["0.8.0"],
 			"masterState": "implemented",
 			"paths": [
 				"schemas/sync-envelope.schema.json",
@@ -43,7 +49,9 @@
 		},
 		{
 			"id": "runtime-protocol",
-			"version": "1.0.0",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": ["0.9.0"],
+			"refusedVersions": ["0.8.0"],
 			"masterState": "implemented",
 			"paths": [
 				"scripts/lib/core/sync-remote.js",
@@ -54,7 +62,9 @@
 		},
 		{
 			"id": "projection-rule",
-			"version": "1.0.0",
+			"currentVersion": "1.0.0",
+			"deprecatedVersions": ["0.9.0"],
+			"refusedVersions": ["0.8.0"],
 			"masterState": "implemented",
 			"paths": [
 				"scripts/lib/core/projection-registry.js",
@@ -143,7 +153,6 @@
 			"title": "Sync Envelope",
 			"versionDomain": "runtime-protocol",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Sync Envelope",
@@ -160,7 +169,6 @@
 			"title": "Domain Fact",
 			"versionDomain": "contract-schema",
 			"owningContext": "amber-core",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -178,7 +186,6 @@
 			"title": "Domain Event",
 			"versionDomain": "contract-schema",
 			"owningContext": "amber-core",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -196,7 +203,6 @@
 			"title": "Sync Control Record",
 			"versionDomain": "runtime-protocol",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -215,7 +221,6 @@
 			"title": "Sync Session",
 			"versionDomain": "runtime-protocol",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Sync Session",
@@ -228,7 +233,6 @@
 			"title": "Sync Operation",
 			"versionDomain": "runtime-protocol",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "proposedOps (closed verb set) + Sync Session.operation",
@@ -241,7 +245,6 @@
 			"title": "Checkpoint",
 			"versionDomain": "runtime-protocol",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -254,7 +257,6 @@
 			"title": "Ownership Handoff",
 			"versionDomain": "runtime-protocol",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -272,7 +274,6 @@
 			"title": "Conflict",
 			"versionDomain": "contract-schema",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Conflict",
@@ -285,7 +286,6 @@
 			"title": "Resolution",
 			"versionDomain": "contract-schema",
 			"owningContext": "amber-core",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Resolution",
@@ -298,7 +298,6 @@
 			"title": "Rejection",
 			"versionDomain": "contract-schema",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Refusal (applied/refused ledger family)",
@@ -311,7 +310,6 @@
 			"title": "Corruption",
 			"versionDomain": "contract-schema",
 			"owningContext": "sync-runtime",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Content-hash mismatch on admit",
@@ -324,7 +322,6 @@
 			"title": "Read Snapshot",
 			"versionDomain": "contract-schema",
 			"owningContext": "visualization-workbench",
-			"version": "1.0.0",
 			"implementation": "superseded",
 			"compatibility": "unknown",
 			"masterConcept": "Projection manifest + strict-query read surface",
@@ -341,7 +338,6 @@
 			"title": "Query Contract",
 			"versionDomain": "contract-schema",
 			"owningContext": "governance-graph",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Strict Governance Graph query",
@@ -358,7 +354,6 @@
 			"title": "Projection Query Envelope",
 			"versionDomain": "projection-rule",
 			"owningContext": "governance-graph",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "strict-query parameter contract",
@@ -371,7 +366,6 @@
 			"title": "Projection Read Receipt",
 			"versionDomain": "projection-rule",
 			"owningContext": "visualization-workbench",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Projection read receipt",
@@ -384,7 +378,6 @@
 			"title": "Knowledge Candidate",
 			"versionDomain": "contract-schema",
 			"owningContext": "governed-knowledge-base",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Memory request / proposal (the pre-admission stage)",
@@ -401,7 +394,6 @@
 			"title": "Knowledge Record",
 			"versionDomain": "contract-schema",
 			"owningContext": "governed-knowledge-base",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Memory entry (admitted record) + Knowledge Record",
@@ -418,7 +410,6 @@
 			"title": "Context Page",
 			"versionDomain": "contract-schema",
 			"owningContext": "amber-core",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Context Page",
@@ -431,7 +422,6 @@
 			"title": "Projection Generation",
 			"versionDomain": "projection-rule",
 			"owningContext": "governance-graph",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "buildProjection / rebuildProjection / projectionStatus",
@@ -444,7 +434,6 @@
 			"title": "Person Identity",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Personal Node identity bootstrap (personId)",
@@ -457,7 +446,6 @@
 			"title": "Agent Identity",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -475,7 +463,6 @@
 			"title": "Tenant and Organization Structure",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Deterministic local Tenant/Organization scope",
@@ -492,7 +479,6 @@
 			"title": "Team",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -505,7 +491,6 @@
 			"title": "Membership",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -523,7 +508,6 @@
 			"title": "Repository Registration",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "implemented",
 			"compatibility": "supported",
 			"masterConcept": "Structural identity (repositoryId / repositoryGeneration / transferRecord)",
@@ -536,7 +520,6 @@
 			"title": "Role Assignment",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -554,7 +537,6 @@
 			"title": "Policy Assignment",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -572,7 +554,6 @@
 			"title": "Administrative Fencing",
 			"versionDomain": "contract-schema",
 			"owningContext": "organization-control-plane",
-			"version": "1.0.0",
 			"implementation": "designed-not-implemented",
 			"compatibility": "unknown",
 			"masterConcept": null,
@@ -912,7 +893,7 @@
 	],
 	"compatibility": {
 		"outcomePrecedence": ["unknown", "refused", "deprecated", "supported"],
-		"note": "This matrix is a declaration over the three surviving version domains. It is not the runtime check: checkCompatibility() in scripts/lib/core/sync-remote.js compares a single minCompatibleVersion scalar per envelope and refuses a newer major or a silent downgrade. A domain-level combination matrix has no runtime counterpart, and this registry does not add one.",
+		"note": "This matrix is a declaration over the three surviving version domains, not the runtime check: checkCompatibility() in scripts/lib/core/sync-remote.js compares a single minCompatibleVersion scalar per envelope and refuses a newer major or a silent downgrade. A domain-level combination matrix has no runtime counterpart, and this registry does not add one. The deprecated and refused ranges are declared version policy rather than released versions — master has no deprecated tier and checkCompatibility() implements only the refused side — but the registry must state what it declares, otherwise the four outcomes are not testable. Each case's evidenceId is derived rather than authored: the outcome plus the first 16 hex of sha256 over the combination in version-domain order, so a case identifier cannot drift from its input combination.",
 		"entryRollup": {
 			"supported": 37,
 			"unknown": 12,
@@ -928,7 +909,7 @@
 					"projectionRule": "1.0.0"
 				},
 				"expectedOutcome": "supported",
-				"evidenceId": "amber.distributed-governance.evidence.compatibility.supported.v1"
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.supported.592bfbead4ee74a3"
 			},
 			{
 				"caseId": "DG-COMPAT-DEPRECATED-001",
@@ -939,7 +920,7 @@
 					"projectionRule": "0.9.0"
 				},
 				"expectedOutcome": "deprecated",
-				"evidenceId": "amber.distributed-governance.evidence.compatibility.deprecated.v1"
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.deprecated.91e6c972e5bf36e6"
 			},
 			{
 				"caseId": "DG-COMPAT-REFUSED-001",
@@ -950,7 +931,7 @@
 					"projectionRule": "0.8.0"
 				},
 				"expectedOutcome": "refused",
-				"evidenceId": "amber.distributed-governance.evidence.compatibility.refused.v1"
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.refused.1de207385ce17a2e"
 			},
 			{
 				"caseId": "DG-COMPAT-UNKNOWN-001",
@@ -961,7 +942,7 @@
 					"projectionRule": "1.0.0"
 				},
 				"expectedOutcome": "unknown",
-				"evidenceId": "amber.distributed-governance.evidence.compatibility.unknown.v1"
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.unknown.a6498d2ebefea075"
 			}
 		]
 	}

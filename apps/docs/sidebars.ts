@@ -102,7 +102,8 @@ const sidebars: SidebarsConfig = {
           "reference/cli/principal",
           "reference/cli/eval",
           "reference/cli/evidence",
-          "reference/cli/approval"
+          "reference/cli/approval",
+          "reference/cli/contracts"
 ],
         },
         'reference/schemas',

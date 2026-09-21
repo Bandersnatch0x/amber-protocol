@@ -2793,6 +2793,34 @@ node scripts/amber.js memory status --target . --json
 Run `amber memory --help` for the full subcommand reference; the design contract is
 `docs/specs/2026-08-21-governed-memory-layer.md`.
 
+## Contracts Commands
+
+`amber contracts validate` checks the distributed-governance contract registry
+(`docs/architecture/distributed-governance-contract-registry.json`) against its schema, against
+itself, and against the files it points at. Report-only: nothing is written and the exit code is
+`1` on any finding. It answers whether each entry's declared implementation status is still backed
+by a real artifact — not whether the runtime still honours the contract it names.
+
+`--target` names **another Amber checkout**, not a target project: the registry describes Amber
+itself, so omitting the flag validates the running installation.
+
+```bash
+node scripts/amber.js contracts validate                    # validate the running installation
+node scripts/amber.js contracts validate --target ../amber  # validate another checkout
+node scripts/amber.js contracts validate --json             # machine envelope (errors[] + tallies)
+```
+
+The check covers schema conformance, taxonomy consistency (unique ids; version domains in their
+declared order; no version in two dispositions; every kind present) and entry self-consistency
+(derived `evidenceId`, `compatibility` derived from `implementation`, non-implemented entries
+justified rather than assumed). Every pointer the registry claims must resolve on disk.
+
+The compatibility matrix is a declaration over the three version domains, not the runtime gate:
+the runtime carries one `versionNegotiation.minCompatibleVersion` scalar per envelope
+(`schemas/sync-envelope.schema.json`), compared by `checkCompatibility()` in
+`scripts/lib/core/sync-remote.js`. A domain-level combination matrix has no runtime counterpart
+and this command does not add one.
+
 ## Error Codes
 
 ### explain
