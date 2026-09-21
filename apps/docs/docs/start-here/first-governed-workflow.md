@@ -31,7 +31,7 @@ First, inspect your target repository to assess its structure, existing agent fi
   context="Target Repository"
   nature="read-only"
   command="amber audit --target . --summary"
-  expectedSignal="Readiness score, detected agent rules, and missing governance files reported (0 files written)."
+  expectedSignal="Read-only audit summary: target type, count of missing starter files, and the next safe command (0 files written)."
 />
 
 ---
@@ -44,7 +44,7 @@ Initialize missing Amber starter files (including `.amber/` configuration and st
   context="Target Repository"
   nature="idempotent-write"
   command="amber init --target ."
-  expectedSignal="Created .amber/ structure and starter files. Skipped existing user files."
+  expectedSignal="Created: N starter files (each listed); files you already authored are skipped, never overwritten."
 />
 
 To preview what files would be created beforehand without touching disk, add `--dry-run`:
@@ -63,7 +63,7 @@ Run the Amber Doctor guardrail suite to verify that the scaffolding, schema rule
   context="Target Repository"
   nature="read-only"
   command="amber doctor --target ."
-  expectedSignal="✅ All Amber guardrail checks passed; 0 errors."
+  expectedSignal="Every guardrail check reports [PASS], and the run ends with Errors: 0."
 />
 
 ---
@@ -72,12 +72,16 @@ Run the Amber Doctor guardrail suite to verify that the scaffolding, schema rule
 
 Start a governed engineering session. Amber creates an immutable session record and timeline under `.amber/sessions/<session-id>/` to track lifecycle stages and evidence.
 
+Starting a session writes to your repository, so Amber classifies it as a typed mutation and refuses to run it without explicit approval. A person grants that approval with `--yes`:
+
 <CommandBlock
   context="Target Repository"
   nature="governed-write"
-  command='amber session start --goal "Evaluate Amber Protocol governance" --target .'
-  expectedSignal="Session initialized with ID <session-id>. Active timeline registered."
+  command='amber session start --goal "Evaluate Amber Protocol governance" --target . --yes'
+  expectedSignal="Session created: <session-id> — route selected and timeline registered under .amber/sessions/."
 />
+
+Without `--yes` the command exits non-zero with `This typed mutation requires explicit approval (--yes or --confirm).` and no session is created. The flag _is_ the human approval step: an agent must never pass it on your behalf.
 
 ---
 
@@ -89,7 +93,7 @@ Query Amber's route engine for deterministic guidance on what to do next based o
   context="Target Repository"
   nature="read-only"
   command="amber next --target ."
-  expectedSignal="Recommended route stage and actionable command suggestions printed (no LLM decision)."
+  expectedSignal="Context: <feature id>, the next lifecycle step, why it is next, and the exact command to run (deterministic route advice, no LLM decision)."
 />
 
 ---
