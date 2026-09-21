@@ -1,0 +1,968 @@
+{
+	"$schema": "./distributed-governance-contract-registry.schema.json",
+	"registryId": "amber.distributed-governance.contract-registry",
+	"registryVersion": "2.0.0",
+	"sourceBaseline": "docs/architecture/distributed-governance-baseline.md",
+	"status": "implementation-measured",
+	"languageBoundary": "Amber internal language only. This registry names no implementation technology and no external project, product, protocol, or research source.",
+	"method": {
+		"what": "Every entry's `implementation` is a measured value, not a declared intent: it records whether master's code and schemas actually carry the concept, with a file pointer for each verdict.",
+		"why": "The superseded 1.1.0 registry marked all 49 entries `disposition: supported`. At least 12 of them have no artifact on master, and the organization-control-plane entries are contradicted directly by docs/specs/deployment-profiles.md ('purely declarative no-op'). A registry that declares support for paper contracts hides exactly the drift it exists to expose.",
+		"grepIsNotEvidence": "Registry vocabulary and master vocabulary do not overlap, so name search both misses and misleads. `read-snapshot` has zero hits while master carries a full projection read model; `repository-registration` has zero hits while structural-identity owns `repositoryId`; `checkpoint` has many hits but means the projection read checkpoint (`--checkpoint <sha256>`) and the phase rollback checkpoint, not a sync-stream checkpoint. Every verdict below was reached by reading the named file, not by a search count.",
+		"supersedes": "registryVersion 1.1.0 (commit 586ae63, never merged). Version domains 6 -> 3 (Slice 0); artifacts split from contracts; invariants listed as cross-cutting."
+	},
+	"layers": {
+		"contract": "An interchange or read contract with a version domain. 29 entries.",
+		"artifact": "A canonical repository artifact family. 8 entries, crosswalked to scripts/lib/core/canonical-artifact-contracts.js TYPE_REGISTRY. No version domain: the artifact layer versions through each schema's own schemaVersion (ADR-0012).",
+		"invariant": "A cross-cutting constraint, not owned by any version domain. 12 entries, one per row of the baseline's invariant traceability matrix."
+	},
+	"authorityBoundaries": {
+		"repositoryLocalAuthority": true,
+		"offlineCapability": true,
+		"executesAnything": false,
+		"evidence": [
+			"CLAUDE.md",
+			"scripts/lib/core/governed-runner.js",
+			"docs/adr/0001-governance-first-artifact-first.md",
+			"docs/adr/0003-governance-gated-execution.md",
+			"docs/adr/0005-experimental-execution-removal.md"
+		],
+		"note": "CLAUDE.md carries the Product Boundary and Non-Goals section; governed-runner.js is the executable gate."
+	},
+	"versionDomains": [
+		{
+			"id": "contract-schema",
+			"version": "1.0.0",
+			"masterState": "implemented",
+			"paths": [
+				"schemas/sync-envelope.schema.json",
+				"schemas/structural-identity.schema.json",
+				"scripts/lib/core/schema-contract.js"
+			],
+			"note": "Absorbs the retired `source-generation` domain, which held exactly one contract and one invariant, both Core-owned. 20 entries."
+		},
+		{
+			"id": "runtime-protocol",
+			"version": "1.0.0",
+			"masterState": "implemented",
+			"paths": [
+				"scripts/lib/core/sync-remote.js",
+				"scripts/lib/core/sync-envelope-contract.js",
+				"schemas/sync-envelope.schema.json"
+			],
+			"note": "ENVELOPE_SCHEMA_VERSION = 1.0.0 (scripts/lib/core/sync-remote.js:26). 6 entries."
+		},
+		{
+			"id": "projection-rule",
+			"version": "1.0.0",
+			"masterState": "implemented",
+			"paths": [
+				"scripts/lib/core/projection-registry.js",
+				"scripts/lib/core/strict-query.js"
+			],
+			"note": "SCHEMA_VERSION = 1.0.0 (scripts/lib/core/projection-registry.js:33). Absorbs the retired `component-generation` domain, which held exactly one entry. 3 entries."
+		}
+	],
+	"retiredVersionDomains": [
+		{
+			"id": "source-generation",
+			"reason": "Held one contract (context-page) and one invariant; both Core-owned and already in contract-schema. Merged."
+		},
+		{
+			"id": "capability",
+			"reason": "Held zero contracts. Its two invariants are cross-cutting and are listed separately."
+		},
+		{
+			"id": "component-generation",
+			"reason": "Held one entry (projection-generation), a projection concern. Merged into projection-rule."
+		}
+	],
+	"boundedContexts": [
+		{
+			"id": "amber-core",
+			"title": "Amber Core",
+			"implementation": "implemented",
+			"paths": ["scripts/lib/core/", "schemas/", "action-types/"]
+		},
+		{
+			"id": "sync-runtime",
+			"title": "Sync Runtime",
+			"implementation": "implemented",
+			"paths": [
+				"scripts/lib/core/sync-session.js",
+				"scripts/lib/core/sync-remote.js",
+				"scripts/lib/core/sync-conflicts.js",
+				"schemas/sync-envelope.schema.json"
+			],
+			"note": "Envelope, session, admission, conflict, refusal and transport preparation are real. Subscription, cancellation settlement, reconnect and a sync-stream checkpoint are not (see the entries)."
+		},
+		{
+			"id": "governance-graph",
+			"title": "Governance Graph",
+			"implementation": "implemented",
+			"paths": [
+				"scripts/lib/core/strict-query.js",
+				"scripts/lib/core/knowledge-graph.js",
+				"schemas/knowledge-graph.schema.json"
+			]
+		},
+		{
+			"id": "governed-knowledge-base",
+			"title": "Governed Knowledge Base",
+			"implementation": "implemented",
+			"paths": [
+				"scripts/lib/core/knowledge-base.js",
+				"schemas/memory-entry.schema.json",
+				"schemas/memory-request.schema.json"
+			],
+			"note": "`amber knowledge` (ADR-0009 amendment) owns the admitted record lifecycle; `amber memory` (ADR-0018) owns request/ingest/approve/book. Together they cover candidate through retired."
+		},
+		{
+			"id": "visualization-workbench",
+			"title": "Visualization Workbench",
+			"implementation": "implemented",
+			"paths": [
+				"scripts/lib/core/projection-registry.js",
+				"scripts/lib/core/projection-receipts.js",
+				"apps/web/"
+			],
+			"note": "Read-only viewer boundary per ADR-0007. The superseded registry's `read-snapshot` contract is realized here as the projection manifest plus the strict-query read surface."
+		},
+		{
+			"id": "organization-control-plane",
+			"title": "Organization Control Plane",
+			"implementation": "designed-not-implemented",
+			"paths": ["scripts/lib/core/identity.js", "schemas/structural-identity.schema.json"],
+			"note": "Only the Personal Node bootstrap exists (ADR-0019 decision D4): one deterministic local Tenant/Organization/Person scope plus a repository identity. Team, Membership, Role Assignment, Policy Assignment and administrative fencing have no master artifact, and docs/specs/deployment-profiles.md states the declared profile selects no runtime behavior. 3 of its 9 contracts are implemented, in bootstrap form only."
+		}
+	],
+	"entries": [
+		{
+			"id": "amber.distributed-governance.contract.sync-envelope",
+			"kind": "contract",
+			"title": "Sync Envelope",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Sync Envelope",
+			"paths": [
+				"schemas/sync-envelope.schema.json",
+				"scripts/lib/core/sync-envelope-contract.js",
+				"scripts/lib/core/sync-remote.js"
+			],
+			"note": "Carries envelopeId, artifactRef {path, hash}, a required scope {tenantId, repositoryId, repositoryGeneration}, profile, and versionNegotiation {amberProtocolVersion, minCompatibleVersion, capabilities}."
+		},
+		{
+			"id": "amber.distributed-governance.contract.domain-fact",
+			"kind": "contract",
+			"title": "Domain Fact",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "scripts/lib/core/knowledge-graph.js",
+					"why": "The graph has a closed six-verb edge vocabulary and a node set derived from pages, artifacts and wiki documents, but no fact type."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.domain-event",
+			"kind": "contract",
+			"title": "Domain Event",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "schemas/timeline-event.schema.json",
+					"why": "Session telemetry over a session's own stages, not a canonical domain fact-change event."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.sync-control-record",
+			"kind": "contract",
+			"title": "Sync Control Record",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"note": "None of the control-plane concerns the Sync Runtime owns in the baseline — subscription, cancellation settlement, reconnect — has a master artifact.",
+			"nearMisses": [
+				{
+					"path": "schemas/sync-transport-report.schema.json",
+					"why": "A transport preparation report (mode is always `prepare`). Synchronization telemetry, not a control record."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.sync-session",
+			"kind": "contract",
+			"title": "Sync Session",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Sync Session",
+			"paths": ["scripts/lib/core/sync-session.js", "scripts/lib/command-registry.js"],
+			"note": "Session record is {sessionId, operation, startedAt, status, target}. Its ledgers live under .amber/sync/ (applied.jsonl, refused.jsonl, conflicts.jsonl). CLI surface: amber sync session <run|push|pull|list|replay|conflicts|approve|ledger>."
+		},
+		{
+			"id": "amber.distributed-governance.contract.sync-operation",
+			"kind": "contract",
+			"title": "Sync Operation",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "proposedOps (closed verb set) + Sync Session.operation",
+			"paths": ["schemas/sync-transport-report.schema.json", "scripts/lib/core/sync-session.js"],
+			"note": "The preparation-side shape is implemented: a closed verb set with confined paths or a derived commit message, never a shell string. The operation lifecycle — cancellation settlement, reconnect — is not implemented; see sync-control-record."
+		},
+		{
+			"id": "amber.distributed-governance.contract.checkpoint",
+			"kind": "contract",
+			"title": "Checkpoint",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nameCollision": "The word `checkpoint` names two unrelated master mechanisms: the projection read checkpoint `amber projection strict-query --checkpoint <sha256>` (derived from the projection's canonical source set) and `amber phase rollback --checkpoint <id>`. Neither is the sync-stream checkpoint this entry means, and neither resumes a sync."
+		},
+		{
+			"id": "amber.distributed-governance.contract.ownership-handoff",
+			"kind": "contract",
+			"title": "Ownership Handoff",
+			"versionDomain": "runtime-protocol",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "action-types/session-lease.json",
+					"why": "The ADR-0029 section 8.1 session lease fence (a request carrying an older fence can never settle). Stage-run ownership, a different domain from sync-runtime ownership handoff."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.conflict",
+			"kind": "contract",
+			"title": "Conflict",
+			"versionDomain": "contract-schema",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Conflict",
+			"paths": ["scripts/lib/core/sync-conflicts.js"],
+			"note": "CONFLICT_TYPES closes at four: concurrent-edit, generation-mismatch, version-mismatch, identity-mismatch. Recorded append-only in .amber/sync/conflicts.jsonl."
+		},
+		{
+			"id": "amber.distributed-governance.contract.resolution",
+			"kind": "contract",
+			"title": "Resolution",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Resolution",
+			"paths": ["scripts/lib/core/sync-conflicts.js"],
+			"note": "RESOLUTIONS closes at four: pending, local-wins, remote-wins, manual-merge-required. Resolution is recorded and governed, never auto-applied — every refusal preserves the local artifact (`local artifact preserved`)."
+		},
+		{
+			"id": "amber.distributed-governance.contract.rejection",
+			"kind": "contract",
+			"title": "Rejection",
+			"versionDomain": "contract-schema",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Refusal (applied/refused ledger family)",
+			"paths": ["scripts/lib/core/sync-conflicts.js", "scripts/lib/core/sync-remote.js"],
+			"note": "Refusal is a first-class ledger family, not an error path: markEnvelopeRefused writes .amber/sync/refused.jsonl. Semantic refusals carry a conflict type; path/type/schema violations return status `invalid` instead."
+		},
+		{
+			"id": "amber.distributed-governance.contract.corruption",
+			"kind": "contract",
+			"title": "Corruption",
+			"versionDomain": "contract-schema",
+			"owningContext": "sync-runtime",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Content-hash mismatch on admit",
+			"paths": ["scripts/lib/core/sync-remote.js"],
+			"note": "A local artifact whose sha256 differs from the envelope's artifactRef.hash is refused as concurrent-edit and the local artifact is preserved (sync-remote.js:401). There is no separately-named Corruption contract; the concern is covered by the refusal paths."
+		},
+		{
+			"id": "amber.distributed-governance.contract.read-snapshot",
+			"kind": "contract",
+			"title": "Read Snapshot",
+			"versionDomain": "contract-schema",
+			"owningContext": "visualization-workbench",
+			"version": "1.0.0",
+			"implementation": "superseded",
+			"compatibility": "unknown",
+			"masterConcept": "Projection manifest + strict-query read surface",
+			"paths": [
+				"scripts/lib/core/projection-registry.js",
+				"schemas/projection.schema.json",
+				"scripts/lib/core/strict-query.js"
+			],
+			"note": "The capability is real and is what the workbench reads, but the identifier is not registered: master exposes it as the rebuildable projection manifest (SCHEMA_VERSION 1.0.0) plus strict-query. A peer presenting `read-snapshot` gets no match, hence compatibility `unknown`."
+		},
+		{
+			"id": "amber.distributed-governance.contract.query-contract",
+			"kind": "contract",
+			"title": "Query Contract",
+			"versionDomain": "contract-schema",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Strict Governance Graph query",
+			"paths": [
+				"scripts/lib/core/strict-query.js",
+				"action-types/object-query.json",
+				"scripts/lib/core/knowledge-graph.js"
+			],
+			"note": "Exact scope, checkpoint, projection version, limit, sort, depth and an expiring cursor are all required parameters; an unknown scope is denied and a stale dependency is refused. The knowledge side adds an exact-scope `amber knowledge query --scope` where an unknown scope is denied."
+		},
+		{
+			"id": "amber.distributed-governance.contract.projection-query-envelope",
+			"kind": "contract",
+			"title": "Projection Query Envelope",
+			"versionDomain": "projection-rule",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "strict-query parameter contract",
+			"paths": ["scripts/lib/core/strict-query.js"],
+			"note": "Master splits this into the strict-query parameter contract (amber projection strict-query --scope --checkpoint --projection-version --limit --sort --depth [--cursor]) and the read-receipt record that closes the read. There is no wrapper artifact carrying the name."
+		},
+		{
+			"id": "amber.distributed-governance.contract.projection-read-receipt",
+			"kind": "contract",
+			"title": "Projection Read Receipt",
+			"versionDomain": "projection-rule",
+			"owningContext": "visualization-workbench",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Projection read receipt",
+			"paths": ["scripts/lib/core/projection-receipts.js"],
+			"note": "recordReadReceipt({scope, projectionType, resultHash}) writes the receipt; verifyReceipt(receiptId) re-derives it. listReadReceipts is the read path."
+		},
+		{
+			"id": "amber.distributed-governance.contract.knowledge-candidate",
+			"kind": "contract",
+			"title": "Knowledge Candidate",
+			"versionDomain": "contract-schema",
+			"owningContext": "governed-knowledge-base",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Memory request / proposal (the pre-admission stage)",
+			"paths": [
+				"schemas/memory-request.schema.json",
+				"schemas/memory-entry.schema.json",
+				"scripts/lib/command-registry.js"
+			],
+			"note": "The candidate stage is the memory request at .amber/memory/requests/<requestId>.json (trigger, conversion, escape-hatch and ratification channels). `amber memory ingest` mechanically admits request entries into the registry as proposals; `amber memory approve` is the entry-level human review gate."
+		},
+		{
+			"id": "amber.distributed-governance.contract.knowledge-record",
+			"kind": "contract",
+			"title": "Knowledge Record",
+			"versionDomain": "contract-schema",
+			"owningContext": "governed-knowledge-base",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Memory entry (admitted record) + Knowledge Record",
+			"paths": [
+				"scripts/lib/core/knowledge-base.js",
+				"schemas/memory-entry.schema.json",
+				"scripts/lib/command-registry.js"
+			],
+			"note": "Lifecycle closes at draft/proposal/active/superseded/needs-re-review/abandoned — the baseline's candidate/review/accepted/stale/refresh-required/superseded/retired in master vocabulary. The ADR-0009 amendment is real: `amber knowledge admit --page <id>` admits a record from a canonical Context Page, and `amber knowledge status` reports fresh/stale."
+		},
+		{
+			"id": "amber.distributed-governance.contract.context-page",
+			"kind": "contract",
+			"title": "Context Page",
+			"versionDomain": "contract-schema",
+			"owningContext": "amber-core",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Context Page",
+			"paths": ["schemas/context-page.schema.json", "schemas/context-request.schema.json"],
+			"note": "Reassigned from the retired `source-generation` domain, which held this one contract plus one invariant. Both were Core-owned, so the domain carried no distinct version surface."
+		},
+		{
+			"id": "amber.distributed-governance.contract.projection-generation",
+			"kind": "contract",
+			"title": "Projection Generation",
+			"versionDomain": "projection-rule",
+			"owningContext": "governance-graph",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "buildProjection / rebuildProjection / projectionStatus",
+			"paths": ["scripts/lib/core/projection-registry.js"],
+			"note": "Reassigned from the retired `component-generation` domain, which held exactly this entry. PROJECTION_TYPES closes at governance-graph, knowledge-base, visualization-workbench; rebuild regenerates from canonical state and drift is reported by projectionStatus."
+		},
+		{
+			"id": "amber.distributed-governance.contract.person-identity",
+			"kind": "contract",
+			"title": "Person Identity",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Personal Node identity bootstrap (personId)",
+			"paths": ["scripts/lib/core/identity.js", "schemas/structural-identity.schema.json"],
+			"note": "Bootstrap only (ADR-0019 decision D4): personId resolves from .amber/identity.json, else git config user.name/user.email, else null. There is no admission step, no cross-repository Person, and no authority beyond the local administrative scope."
+		},
+		{
+			"id": "amber.distributed-governance.contract.agent-identity",
+			"kind": "contract",
+			"title": "Agent Identity",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "scripts/lib/core/identity.js",
+					"why": "`agentId` is a declared field on every resolved identity that resolveIdentity sets to null unconditionally. The slot exists; the identity type does not."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.tenant-and-organization-structure",
+			"kind": "contract",
+			"title": "Tenant and Organization Structure",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Deterministic local Tenant/Organization scope",
+			"paths": [
+				"scripts/lib/core/identity.js",
+				"schemas/structural-identity.schema.json",
+				"schemas/sync-envelope.schema.json"
+			],
+			"note": "One deterministic local scope — DEFAULT_TENANT_ID 'local' and DEFAULT_ORGANIZATION_ID 'personal' — overridable per field by .amber/identity.json, and carried on every envelope as a required scope. There is no multi-tenant structure, no Tenant lifecycle, and no nesting."
+		},
+		{
+			"id": "amber.distributed-governance.contract.team",
+			"kind": "contract",
+			"title": "Team",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nameCollision": "`amber team` is a deprecated verb that inspects local team-distribution metadata and is marked for removal in v2 — unrelated to Organization Control Plane teams. Separately, the `team-hub` deployment profile is a declarative label: docs/specs/deployment-profiles.md states its only runtime consumer is the provenance stamp on sync envelopes."
+		},
+		{
+			"id": "amber.distributed-governance.contract.membership",
+			"kind": "contract",
+			"title": "Membership",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "scripts/lib/core/approval-registry.js",
+					"why": "The F050 principal snapshot carries a `membership` field. That registry is repository-local approval authority (PRINCIPAL_SNAPSHOT_FIELDS in approval-registry.js:139), not tenant-wide Organization Control Plane membership."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.repository-registration",
+			"kind": "contract",
+			"title": "Repository Registration",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Structural identity (repositoryId / repositoryGeneration / transferRecord)",
+			"paths": ["schemas/structural-identity.schema.json", "scripts/lib/core/identity.js"],
+			"note": "The superseded registry listed this among the zero-hit contracts; that was a grep miss. resolveRepositoryId derives a stable identity from .amber/identity.json, else the git remote, else a bootstrap default, and never from the directory name. repositoryGeneration plus transferRecord carry the fenced-transfer record — at schema level only; enforcement does not exist (see administrative-fencing)."
+		},
+		{
+			"id": "amber.distributed-governance.contract.role-assignment",
+			"kind": "contract",
+			"title": "Role Assignment",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "scripts/lib/core/approval-registry.js",
+					"why": "`amber principal register --role` assigns a repository-local approval role validated against a closed field set. The baseline's Role Assignment is tenant-wide and belongs to the Organization Control Plane, which does not exist."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.policy-assignment",
+			"kind": "contract",
+			"title": "Policy Assignment",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "scripts/lib/core/governed-runner.js",
+					"why": "Deny-wins command policy (F050, `amber policy`) is evaluated against the target repository's .amber/governance/rules.json and gates repository-local work. Assigning a policy to an organization role, and the org-wide deny-wins ceiling the baseline requires, do not exist."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.contract.administrative-fencing",
+			"kind": "contract",
+			"title": "Administrative Fencing",
+			"versionDomain": "contract-schema",
+			"owningContext": "organization-control-plane",
+			"version": "1.0.0",
+			"implementation": "designed-not-implemented",
+			"compatibility": "unknown",
+			"masterConcept": null,
+			"paths": [],
+			"nearMisses": [
+				{
+					"path": "schemas/structural-identity.schema.json",
+					"why": "transferRecord records a tenant transfer and its previousGeneration. It is a record, not a fence: nothing enforces that a transferred repository starts with no target-Tenant authorization."
+				},
+				{
+					"path": "action-types/session-settle.json",
+					"why": "leaseFence guards stage-run settlement against a stale owner. A different fence in a different plane."
+				}
+			]
+		},
+		{
+			"id": "amber.distributed-governance.artifact.work",
+			"kind": "artifact",
+			"title": "Work Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Canonical artifact revision (intent / spec / plan)",
+			"paths": [
+				"scripts/lib/core/canonical-artifact-contracts.js",
+				"scripts/lib/core/canonical-artifacts.js"
+			],
+			"note": "The baseline's 'canonical work' is master's committed canonical artifact revision store under .amber/artifacts/<type>/<identity-slug>/, with a type registry, lifecycle states, traces and a committed-only visibility rule. `work` is not a master type name."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.decision",
+			"kind": "artifact",
+			"title": "Decision Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Decision (canonical artifact type + ledger Decision primitive)",
+			"paths": [
+				"scripts/lib/core/canonical-artifact-contracts.js",
+				"scripts/lib/core/registry-ledger.js"
+			],
+			"note": "TYPE_REGISTRY.decision, state `recorded` only, requiring exactly one `decides` trace onto a committed artifact revision. Admission binds the acting Principal verified against the registry."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.evidence",
+			"kind": "artifact",
+			"title": "Evidence Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Evidence receipt / evidence run",
+			"paths": [
+				"scripts/lib/core/evidence-receipts.js",
+				"scripts/lib/core/evidence-runner.js",
+				"docs/specs/F050-decisions-gates-evidence-assurance.md"
+			],
+			"note": "Evidence discipline per ADR-0004. The web surface consumes the same records through apps/web/server/services/evidence-jobs.ts."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.approval",
+			"kind": "artifact",
+			"title": "Approval Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Approval registry event",
+			"paths": ["scripts/lib/core/approval-registry.js", "action-types/session-approve.json"],
+			"note": "Append-only event ledger under .amber/principals/ protected by a tamper-evident hash chain: a fold over an edited ledger fails closed as corruption. Each event binds the previous event's hash; there is no in-place mutation path."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.context",
+			"kind": "artifact",
+			"title": "Context Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Context Page / Context Request / Context Loadout",
+			"paths": [
+				"schemas/context-page.schema.json",
+				"schemas/context-request.schema.json",
+				"schemas/context-loadout.schema.json"
+			],
+			"note": "ADR-0009/ADR-0010. The context page is simultaneously the Core form of the Knowledge Record lifecycle (see the knowledge-record contract)."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.learning",
+			"kind": "artifact",
+			"title": "Learning Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Learning write-back inspection",
+			"paths": [
+				"scripts/lib/core/learning-writeback.js",
+				"scripts/lib/core/learning-owner-routing.js"
+			],
+			"note": "Reached through `amber learnings`, which inspects whether accepted work hit a knowledge write-back trigger and books the review under --reviewed."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.ledger",
+			"kind": "artifact",
+			"title": "Ledger Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Tamper-evident ledger family",
+			"paths": [
+				"scripts/lib/core/registry-ledger.js",
+				"scripts/lib/core/ledger-family.js",
+				"scripts/lib/core/ledger-seal.js",
+				"scripts/lib/core/ledger-export.js"
+			],
+			"note": "Append-only lineage with a hash chain, per ADR-0004. Written through the governed runner so a mutation cannot bypass the ledger gate."
+		},
+		{
+			"id": "amber.distributed-governance.artifact.acceptance",
+			"kind": "artifact",
+			"title": "Acceptance Artifact",
+			"versionDomain": null,
+			"owningContext": "amber-core",
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Acceptance entry in the evolution log",
+			"paths": [
+				"scripts/lib/core/planning.js",
+				"docs/wiki/engineering/harness-evolution.md"
+			],
+			"note": "`amber accept` appends the entry, sets the plan's own Status field to accepted, and updates feature_list.json only when the feature is not already accepted. It is fail-closed: a refusal writes nothing."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.repository-local-authority",
+			"kind": "invariant",
+			"title": "Repository-local authority",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#153", "#157"],
+			"affectedAdrs": ["ADR-0001"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Repository-local authority",
+			"paths": ["CLAUDE.md", "docs/adr/0001-governance-first-artifact-first.md"],
+			"note": "The baseline asks ADR-0001 to distinguish repository-local Core from optional non-executing distributed contexts. ADR-0001 is present and the product boundary in CLAUDE.md states the distinction; the amendment itself is not visible as a separate ADR revision."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.offline-operation",
+			"kind": "invariant",
+			"title": "Offline operation",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#150", "#153"],
+			"affectedAdrs": ["ADR-0001", "ADR-0011"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Offline-first, fail-closed",
+			"paths": ["docs/adr/0011-safety-philosophy-upgrades.md", "scripts/lib/core/sync-remote.js"],
+			"note": "Amber state is repository-local and every read path is a local file read. The sync runtime shells out to git only and never opens a network connection of its own."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.optional-non-executing-sync-runtime",
+			"kind": "invariant",
+			"title": "Optional non-executing Sync Runtime",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#149", "#157"],
+			"affectedAdrs": ["ADR-0001", "ADR-0005"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Optional, non-executing sync",
+			"paths": ["CLAUDE.md", "scripts/lib/core/sync-remote.js"],
+			"note": "The sync surface is opt-in and the transport report's mode is always `prepare`: proposedOps are structured verbs, never shell strings, and Amber never executes them. The one governed local sync commit rides ADR-0003's narrow exception (ADR-0020 Stage A) under single-use human approval."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"kind": "invariant",
+			"title": "One versioned protocol and artifact model",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#149", "#152"],
+			"affectedAdrs": ["ADR-0012"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Versioned envelope + version negotiation",
+			"paths": [
+				"schemas/sync-envelope.schema.json",
+				"scripts/lib/core/sync-remote.js",
+				"scripts/lib/core/schema-contract.js"
+			],
+			"note": "ENVELOPE_SCHEMA_VERSION and the envelope's versionNegotiation block carry amberProtocolVersion, minCompatibleVersion and a closed capability list. checkCompatibility refuses a newer major and refuses a silent downgrade below minCompatibleVersion. Schema versioning runs through the single schema-contract seam."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"kind": "invariant",
+			"title": "Rebuildable read-only projections",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#148", "#150", "#156", "#157"],
+			"affectedAdrs": ["ADR-0007", "ADR-0012"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Rebuildable read-only projections",
+			"paths": [
+				"scripts/lib/core/projection-registry.js",
+				"docs/adr/0007-web-viewer-role.md",
+				"scripts/lib/core/projection-receipts.js"
+			],
+			"note": "`amber projection rebuild` regenerates from canonical state at any time and projectionStatus reports missing/current/drifted. ADR-0007's supervised read-only viewer boundary is preserved."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"kind": "invariant",
+			"title": "Exact-scope deny-wins authorization and privacy minimization",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#151", "#156"],
+			"affectedAdrs": ["ADR-0011"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Deny-wins command policy (repository-local)",
+			"paths": [
+				"scripts/lib/core/approval-registry.js",
+				"docs/adr/0011-safety-philosophy-upgrades.md",
+				"docs/specs/F050-decisions-gates-evidence-assurance.md"
+			],
+			"note": "Deny-wins evaluation over .amber/governance/rules.json with defaultAction=deny is real and repository-local, with an explicit minimization marker on retention events. The organization-wide exact-scope authorization the baseline pairs with it does not exist, because the Organization Control Plane does not."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.fail-closed-degraded-read-only",
+			"kind": "invariant",
+			"title": "Fail-closed degraded read-only",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#150", "#151", "#156"],
+			"affectedAdrs": ["ADR-0011"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Fail-closed on unreadable state",
+			"paths": ["scripts/lib/core/projection-registry.js", "docs/adr/0011-safety-philosophy-upgrades.md"],
+			"note": "A corrupt projection source makes the source unreadable rather than the projection partial: the artifact half of the governance-graph source is read through the strictly read-only listArtifactRevisions seam so corruption fails closed. Corrupt or missing governance state is a blocker, never an empty state."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"kind": "invariant",
+			"title": "Append-only lineage and immutable records",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#148", "#151", "#155"],
+			"affectedAdrs": ["ADR-0004"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Append-only ledger + immutable evidence chain",
+			"paths": [
+				"scripts/lib/core/registry-ledger.js",
+				"scripts/lib/core/jsonl.js",
+				"scripts/lib/core/approval-registry.js"
+			],
+			"note": "jsonl ledgers are append-only and hash-chained; `amber phase transitions` exposes the append-only lineage and `amber phase rollback` is explicitly non-destructive. The principal registry carries no in-place mutation path."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"kind": "invariant",
+			"title": "Source and Resolution ownership",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#148", "#149", "#155"],
+			"affectedAdrs": ["ADR-0009", "ADR-0012"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Context Page as the Core form of the Knowledge Record",
+			"paths": ["schemas/context-page.schema.json", "docs/adr/0009-contract-driven-context-distillation.md"],
+			"note": "The amendment the baseline asks for is implemented: `amber knowledge admit --page <id> --auth <authorization>` admits a Knowledge Record from a canonical Context Page, so the page keeps source ownership and the record owns resolution."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.conflict-preservation-and-governed-resolution",
+			"kind": "invariant",
+			"title": "Conflict preservation and governed resolution",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#148", "#155"],
+			"affectedAdrs": ["ADR-0004", "ADR-0015"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Conflict ledger + deterministic refusal",
+			"paths": ["scripts/lib/core/sync-conflicts.js", "docs/adr/0015-review-blocker-remediation-contracts.md"],
+			"note": "Conflicts are recorded in an append-only ledger and every refusal that concerns an existing local artifact preserves it, so resolution is a governed human act (manual-merge-required) rather than an automatic overwrite."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"kind": "invariant",
+			"title": "Tenant and Repository isolation",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#146", "#151", "#152"],
+			"affectedAdrs": ["ADR-0012"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Structural isolation on the envelope scope",
+			"paths": ["scripts/lib/core/sync-remote.js", "schemas/structural-identity.schema.json"],
+			"note": "Isolation is structural, not policy-level: the envelope scope {tenantId, repositoryId, repositoryGeneration} is required, and admitEnvelope compares identity before any artifact content is read or hashed, refusing a foreign tenant, repository or generation."
+		},
+		{
+			"id": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"kind": "invariant",
+			"title": "No hidden authority or execution",
+			"crossCutting": true,
+			"versionDomain": null,
+			"owningContext": null,
+			"sourceResolutions": ["#145", "#147", "#149", "#153", "#154", "#157"],
+			"affectedAdrs": ["ADR-0001", "ADR-0003", "ADR-0005"],
+			"implementation": "implemented",
+			"compatibility": "supported",
+			"masterConcept": "Governed execution gates, no hidden authority",
+			"paths": [
+				"scripts/lib/core/governed-runner.js",
+				"CLAUDE.md",
+				"docs/adr/0003-governance-gated-execution.md"
+			],
+			"note": "Every mutation returns through the governed runner's ledger, policy, confidence, approval and worktree gates. ADR-0005 removed execution authority; ADR-0003's narrow governed exception is preserved and ADR-0020 Stage A rides it. No context intercepts tools, dispatches workers, or executes target-repository work."
+		}
+	],
+	"compatibility": {
+		"outcomePrecedence": ["unknown", "refused", "deprecated", "supported"],
+		"note": "This matrix is a declaration over the three surviving version domains. It is not the runtime check: checkCompatibility() in scripts/lib/core/sync-remote.js compares a single minCompatibleVersion scalar per envelope and refuses a newer major or a silent downgrade. A domain-level combination matrix has no runtime counterpart, and this registry does not add one.",
+		"entryRollup": {
+			"supported": 37,
+			"unknown": 12,
+			"note": "Per-entry compatibility is derived from measured implementation: `supported` exactly when the concept exists on master, `unknown` otherwise (an unregistered identifier fails closed). The 12 unknown entries are the superseded registry's false 'supported' claims: 11 designed-not-implemented contracts plus the superseded read-snapshot."
+		},
+		"cases": [
+			{
+				"caseId": "DG-COMPAT-SUPPORTED-001",
+				"description": "All three version domains are at their current supported versions.",
+				"combination": {
+					"contractSchema": "1.0.0",
+					"runtimeProtocol": "1.0.0",
+					"projectionRule": "1.0.0"
+				},
+				"expectedOutcome": "supported",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.supported.v1"
+			},
+			{
+				"caseId": "DG-COMPAT-DEPRECATED-001",
+				"description": "All three version domains are in their declared deprecated ranges.",
+				"combination": {
+					"contractSchema": "0.9.0",
+					"runtimeProtocol": "0.9.0",
+					"projectionRule": "0.9.0"
+				},
+				"expectedOutcome": "deprecated",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.deprecated.v1"
+			},
+			{
+				"caseId": "DG-COMPAT-REFUSED-001",
+				"description": "All three version domains are in their declared refused ranges.",
+				"combination": {
+					"contractSchema": "0.8.0",
+					"runtimeProtocol": "0.8.0",
+					"projectionRule": "0.8.0"
+				},
+				"expectedOutcome": "refused",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.refused.v1"
+			},
+			{
+				"caseId": "DG-COMPAT-UNKNOWN-001",
+				"description": "The Runtime Protocol version is not registered, so the combination fails closed as unknown.",
+				"combination": {
+					"contractSchema": "1.0.0",
+					"runtimeProtocol": "2.0.0",
+					"projectionRule": "1.0.0"
+				},
+				"expectedOutcome": "unknown",
+				"evidenceId": "amber.distributed-governance.evidence.compatibility.unknown.v1"
+			}
+		]
+	}
+}
