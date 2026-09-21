@@ -107,8 +107,8 @@
       "layer": "A"
     },
     {
-      "id": "guides/session-handoff",
-      "path": "guides/session-handoff.md",
+      "id": "guides/session-handoff-and-continuity",
+      "path": "guides/session-handoff-and-continuity.md",
       "group": "Guides",
       "title": "Session Handoff & Continuity",
       "description": "Generating portable session handoff bundles and validating continuation state.",

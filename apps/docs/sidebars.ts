@@ -34,7 +34,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'guides/index',
         'guides/adopting-existing-project',
-        'guides/session-handoff',
+        'guides/session-handoff-and-continuity',
         'guides/governance-gates-and-audit',
       ],
     },

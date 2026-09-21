@@ -35,7 +35,7 @@ Verify your installation:
   context="Local Workstation"
   nature="read-only"
   command="amber --version"
-  expectedOutput="1.6.0"
+  expectedSignal="1.6.0"
 />
 
 ## In-Repository Development Setup
@@ -64,7 +64,7 @@ After installing, verify that Amber can inspect your target repository:
   context="Target Repository"
   nature="read-only"
   command="amber doctor --target ."
-  expectedOutput="✅ Target repository classified and Amber guardrails checked."
+  expectedSignal="✅ Target repository classified and Amber guardrails checked."
 />
 
 Next, follow the [First Governed Workflow](/start-here/first-governed-workflow).

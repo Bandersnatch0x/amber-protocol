@@ -349,7 +349,7 @@ export const AmberHero: React.FC = () => {
     { number: '01', label: 'SESSIONS', delay: 350, to: '/start-here' },
     { number: '02', label: 'EVIDENCE_GATES', delay: 450, to: '/concepts/evidence' },
     { number: '03', label: 'ONTOLOGY_GRAPH', delay: 550, to: '/concepts' },
-    { number: '04', label: 'CONTINUITY', delay: 650, to: '/guides/session-handoff' },
+    { number: '04', label: 'CONTINUITY', delay: 650, to: '/guides/session-handoff-and-continuity' },
   ];
 
   return (

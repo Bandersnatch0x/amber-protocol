@@ -31,7 +31,7 @@ First, inspect your target repository to assess its structure, existing agent fi
   context="Target Repository"
   nature="read-only"
   command="amber audit --target . --summary"
-  expectedOutput="Readiness score, detected agent rules, and missing governance files reported (0 files written)."
+  expectedSignal="Readiness score, detected agent rules, and missing governance files reported (0 files written)."
 />
 
 ---
@@ -44,7 +44,7 @@ Initialize missing Amber starter files (including `.amber/` configuration and st
   context="Target Repository"
   nature="idempotent-write"
   command="amber init --target ."
-  expectedOutput="Created .amber/ structure and starter files. Skipped existing user files."
+  expectedSignal="Created .amber/ structure and starter files. Skipped existing user files."
 />
 
 To preview what files would be created beforehand without touching disk, add `--dry-run`:
@@ -63,7 +63,7 @@ Run the Amber Doctor guardrail suite to verify that the scaffolding, schema rule
   context="Target Repository"
   nature="read-only"
   command="amber doctor --target ."
-  expectedOutput="✅ All Amber guardrail checks passed; 0 errors."
+  expectedSignal="✅ All Amber guardrail checks passed; 0 errors."
 />
 
 ---
@@ -76,7 +76,7 @@ Start a governed engineering session. Amber creates an immutable session record 
   context="Target Repository"
   nature="governed-write"
   command='amber session start --goal "Evaluate Amber Protocol governance" --target .'
-  expectedOutput="Session initialized with ID <session-id>. Active timeline registered."
+  expectedSignal="Session initialized with ID <session-id>. Active timeline registered."
 />
 
 ---
@@ -89,7 +89,7 @@ Query Amber's route engine for deterministic guidance on what to do next based o
   context="Target Repository"
   nature="read-only"
   command="amber next --target ."
-  expectedOutput="Recommended route stage and actionable command suggestions printed (no LLM decision)."
+  expectedSignal="Recommended route stage and actionable command suggestions printed (no LLM decision)."
 />
 
 ---

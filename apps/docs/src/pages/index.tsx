@@ -34,7 +34,7 @@ const PILLARS = [
     title: 'Resumable Session Handoff',
     description:
       'Preserve multi-turn context, timeline checkpoints, uncommitted diffs, and recovery loadouts across agent boundaries and developer shifts.',
-    link: '/guides/session-handoff',
+    link: '/guides/session-handoff-and-continuity',
     linkText: 'Read session handoff guide →',
   },
   {

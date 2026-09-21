@@ -20,6 +20,8 @@ Amber Protocol believes that developer tooling and governance infrastructure mus
 
 ## Safety & Non-Execution Boundaries
 
+**No dynamic workflow execution.** Amber records, verifies, and gates work; it never runs a dynamic workflow, dispatches a live agent, or schedules a loop run on your behalf. Everything that executes does so inside a declared, approval-gated route.
+
 | Boundary Dimension | Enforcement Mechanism | Failure Mode |
 | --- | --- | --- |
 | **No Dynamic Code Execution** | Amber does not automatically run tests or target build scripts unless explicitly instructed via `--execute`. | Operation refuses or records claim as unverified. |
@@ -27,3 +29,4 @@ Amber Protocol believes that developer tooling and governance infrastructure mus
 | **No Silent Overwrites** | `init` and `wiki` skip existing user-authored files. | File untouched; skipped notification printed. |
 | **Fail-Closed Security** | Corrupt ledgers, invalid signatures, or missing approval tokens halt execution. | Process exits with non-zero exit code. |
 | **Single-Use Approvals** | Human authorizations expire and settle atomically with exactly one decision. | Replay attempts fail closed. |
+| **No Dynamic Workflow Execution** | Route stages run only behind owner proof, a live lease, an explicit approval, and the session ledger; no live agent is ever started by Amber. | Stage is refused; the governed lifecycle must be used instead. |

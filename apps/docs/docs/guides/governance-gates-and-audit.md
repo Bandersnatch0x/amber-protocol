@@ -19,7 +19,7 @@ The `amber drift` command verifies that artifacts, wiki files, schemas, and scaf
   context="Target Repository (CI)"
   nature="read-only"
   command="amber drift --target . --format gh-annotations"
-  expectedOutput="Exit code 0 if fully in sync; non-zero if artifact/wiki drift detected."
+  expectedSignal="Exit code 0 if fully in sync; non-zero if artifact/wiki drift detected."
 />
 
 ## Evaluating Gate Contracts
@@ -30,7 +30,7 @@ A Gate Contract defines explicit evidence criteria, minimum assurance levels, an
   context="Target Repository"
   nature="governed-write"
   command="amber gate evaluate --target . --gate gate/release-readiness"
-  expectedOutput="Appends immutable evaluated outcome event to .amber/gates/outcomes.jsonl."
+  expectedSignal="Appends immutable evaluated outcome event to .amber/gates/outcomes.jsonl."
 />
 
 ## Governance Readiness Report
@@ -41,5 +41,5 @@ To score overall repository governance maturity:
   context="Target Repository"
   nature="read-only"
   command="amber governance report --target ."
-  expectedOutput="Readiness score, risk assessment, and structured next actions printed."
+  expectedSignal="Readiness score, risk assessment, and structured next actions printed."
 />

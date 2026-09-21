@@ -19,7 +19,7 @@ Run a read-only audit to inspect the existing project:
   context="Target Repository"
   nature="read-only"
   command="amber audit --target . --summary"
-  expectedOutput="Project readiness score, existing documentation files, and scaffolding suggestions."
+  expectedSignal="Project readiness score, existing documentation files, and scaffolding suggestions."
 />
 
 ## Step 2: Initialize Scaffolding
@@ -30,7 +30,7 @@ Scaffold Amber governance files without overwriting user files:
   context="Target Repository"
   nature="idempotent-write"
   command="amber init --target . --with-wiki"
-  expectedOutput="Generated .amber/ directory structure, governance rules, and wiki skeleton."
+  expectedSignal="Generated .amber/ directory structure, governance rules, and wiki skeleton."
 />
 
 ## Step 3: Verify Doctor Compliance
@@ -41,7 +41,7 @@ Run the Doctor suite to verify all guardrails:
   context="Target Repository"
   nature="read-only"
   command="amber doctor --target ."
-  expectedOutput="✅ All Amber guardrail checks passed; 0 errors."
+  expectedSignal="✅ All Amber guardrail checks passed; 0 errors."
 />
 
 ## Step 4: Add Drift Gate to CI

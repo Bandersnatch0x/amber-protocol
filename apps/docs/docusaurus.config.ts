@@ -158,7 +158,7 @@ const config: Config = {
             },
             {
               label: 'Session Handoffs',
-              to: '/guides/session-handoff',
+              to: '/guides/session-handoff-and-continuity',
             },
           ],
         },

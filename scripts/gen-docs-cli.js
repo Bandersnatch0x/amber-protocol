@@ -252,7 +252,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'guides/index',
         'guides/adopting-existing-project',
-        'guides/session-handoff',
+        'guides/session-handoff-and-continuity',
         'guides/governance-gates-and-audit',
       ],
     },
@@ -412,8 +412,8 @@ function generateCuratedManifest(pkgMeta) {
 			layer: "A",
 		},
 		{
-			id: "guides/session-handoff",
-			path: "guides/session-handoff.md",
+			id: "guides/session-handoff-and-continuity",
+			path: "guides/session-handoff-and-continuity.md",
 			group: "Guides",
 			title: "Session Handoff & Continuity",
 			description: "Generating portable session handoff bundles and validating continuation state.",
