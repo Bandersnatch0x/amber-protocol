@@ -31,7 +31,7 @@ graph TD
     subgraph C["Layer C: Strictly Denied (Internal Only)"]
         C1["AGENTS.md, CLAUDE.md, MEMORY.md, LOOP.md"]
         C2[".amber/ state ledgers, session transcripts, tokens"]
-        C3["Draft PR reviews, historical superpowers plans"]
+        C3["Draft PR reviews, historical internal plan drafts"]
     end
 ```
 

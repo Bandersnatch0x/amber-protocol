@@ -120,7 +120,6 @@ function verifyCLayerDeny(manifest) {
 		"LOOP.md",
 		".amber",
 		"docs/agents",
-		"docs/superpowers",
 		"docs/reference/week-c6-settings-draft",
 		"docs/plans",
 		"docs/reviews",
@@ -144,7 +143,7 @@ function verifyCLayerDeny(manifest) {
 	for (const file of htmlFiles) {
 		const content = fs.readFileSync(file, "utf8");
 		const rel = path.relative(BUILD_DIR, file).replace(/\\/g, "/");
-		for (const pattern of ["week-c6-settings-draft", "superpowers/plans", "docs/agents/"]) {
+		for (const pattern of ["week-c6-settings-draft", "docs/agents/"]) {
 			if (content.includes(pattern)) {
 				errors.push(`C-layer forbidden string "${pattern}" found in HTML: ${rel}`);
 			}

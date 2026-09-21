@@ -525,6 +525,10 @@ function generateCuratedManifest(pkgMeta) {
 		version: pkgMeta.version,
 		totalDocuments: entries.length,
 		documents: entries,
+		// Every entry here is written into the committed manifest, so it is public
+		// surface: only corpus names this repository owns can be listed. A denied
+		// corpus named after an external framework has to be caught by an
+		// allowlist check instead of enumerated by name.
 		denyPatterns: [
 			"AGENTS.md",
 			"CLAUDE.md",
@@ -532,7 +536,6 @@ function generateCuratedManifest(pkgMeta) {
 			"LOOP.md",
 			".amber/**",
 			"docs/agents/**",
-			"docs/superpowers/**",
 			"docs/reference/week-c6-settings-draft/**",
 			"docs/plans/**",
 			"docs/reviews/**",
