@@ -12,6 +12,8 @@ const {
 	inferNextStep,
 	remedyFor,
 	resolvePendingGate,
+	planFor,
+	acceptLogged,
 } = require("../../scripts/lib/core/lifecycle");
 const { appendSessionEvent } = require("../../scripts/lib/session-timeline");
 
@@ -204,9 +206,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 		const step = inferNextStep(
 			ctxOf({
 				features: [{ id: "F001", status: "not_started", evidence: [] }],
-				plans: [
-					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: false, mtimeMs: 1 },
-				],
+				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: false }],
 			}),
 		);
 		assert.equal(step.id, "gate");
@@ -217,9 +217,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 		const step = inferNextStep(
 			ctxOf({
 				features: [{ id: "F001", status: "not_started", evidence: [] }],
-				plans: [
-					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
-				],
+				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true }],
 			}),
 		);
 		assert.equal(step.id, "feature-evidence");
@@ -235,9 +233,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 						evidence: [{ command: "x", result: "y", date: "2026-06-27" }],
 					},
 				],
-				plans: [
-					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
-				],
+				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true }],
 			}),
 		);
 		assert.equal(step.id, "accept");
@@ -327,9 +323,7 @@ describe("acceptLogged via synthetic ctx + real evolution log", () => {
 						evidence: [{ command: "x", result: "y", date: "2026-06-27" }],
 					},
 				],
-				plans: [
-					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
-				],
+				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true }],
 			},
 			{ type: "feature", id: "F001" },
 		);
@@ -354,14 +348,63 @@ describe("acceptLogged via synthetic ctx + real evolution log", () => {
 						evidence: [{ command: "x", result: "y", date: "2026-08-14" }],
 					},
 				],
-				plans: [
-					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
-				],
+				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true }],
 			},
 			{ type: "feature", id: "F001" },
 		);
 
 		assert.equal(inferNextStep(ctx), null);
+	});
+});
+
+// Issue 0064: "current plan" used to be decided by mtimeMs. Every clone or
+// checkout rewrites all plan mtimes to roughly the same instant, so the verdict
+// depended on filesystem write order — one `touch` flipped a feature between
+// accepted and not-accepted. Recency must come from the evolution log instead.
+describe("plan recency is a property of the tree, not of mtimes (#0064)", () => {
+	function seedTwoRounds(dir, features) {
+		const evoDir = path.join(dir, "docs", "wiki", "engineering");
+		fs.mkdirSync(evoDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(evoDir, "harness-evolution.md"),
+			"## 2026-06-27 docs/plans/F001-a.md\n",
+		);
+		writeFeatureList(dir, features);
+		writePlan(dir, "F001-a.md", "Feature: F001\nUser Confirmation: confirmed\n");
+		writePlan(dir, "F001-b.md", "Feature: F001\nUser Confirmation: confirmed\n");
+	}
+
+	function touchNewest(filePath) {
+		const future = new Date(Date.now() + 86_400_000);
+		fs.utimesSync(filePath, future, future);
+	}
+
+	it("keeps the verdict when a checkout rewrites the accepted plan's mtime", () => {
+		const dir = tmpRepo();
+		seedTwoRounds(dir, [{ id: "F001", title: "A", status: "accepted", evidence: [] }]);
+
+		const before = buildContext(dir, { feature: "F001" });
+		assert.equal(planFor(before).path, "docs/plans/F001-b.md");
+		assert.equal(acceptLogged(before), false);
+
+		touchNewest(path.join(dir, "docs", "plans", "F001-a.md"));
+
+		const after = buildContext(dir, { feature: "F001" });
+		assert.equal(planFor(after).path, "docs/plans/F001-b.md");
+		assert.equal(acceptLogged(after), false);
+	});
+
+	it("auto-selects the highest-priority feature with a round awaiting accept", () => {
+		const dir = tmpRepo();
+		seedTwoRounds(dir, [
+			{ id: "F001", title: "A", status: "accepted", priority: 1, evidence: [] },
+			{ id: "F002", title: "B", status: "passing", priority: 2, evidence: [] },
+		]);
+		writePlan(dir, "F002-b.md", "Feature: F002\nUser Confirmation: confirmed\n");
+		// F001's plan is the newest file on disk, but its round is already accepted.
+		touchNewest(path.join(dir, "docs", "plans", "F001-a.md"));
+
+		assert.equal(buildContext(dir, {}).focus.id, "F002");
 	});
 });
 

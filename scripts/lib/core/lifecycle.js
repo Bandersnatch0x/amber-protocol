@@ -1,6 +1,5 @@
 "use strict";
 
-const fs = require("node:fs");
 const path = require("node:path");
 
 const { pathExists, readText, collectFilesBySuffix, toPortablePath } = require("./fs-utils");
@@ -9,14 +8,6 @@ const { classifyTarget } = require("./target-classification");
 const { shellQuote } = require("./text-utils");
 
 // ── State gathering ──────────────────────────────────────────────────────────
-
-function safeMtimeMs(filePath) {
-	try {
-		return fs.statSync(filePath).mtimeMs;
-	} catch {
-		return 0;
-	}
-}
 
 function parsePlanFile(targetRoot, filePath) {
 	let content;
@@ -31,7 +22,6 @@ function parsePlanFile(targetRoot, filePath) {
 		path: toPortablePath(path.relative(targetRoot, filePath)),
 		featureId: featureMatch ? featureMatch[1] : null,
 		confirmed: Boolean(confirmMatch && confirmMatch[1].toLowerCase() === "confirmed"),
-		mtimeMs: safeMtimeMs(filePath),
 	};
 }
 
@@ -139,11 +129,39 @@ function resolvePendingGate(targetRoot, sessionId) {
 
 // ── State-derived helpers (operate on the context built below) ───────────────
 
+// The evolution log is the record of which plan a feature's current round is on:
+// every accepted plan is named there. A plan file's mtime is NOT such a record —
+// any clone or checkout rewrites every plan's mtime to the same instant, so
+// "newest plan" really meant "whichever the filesystem happened to write last",
+// and a single `touch` could flip a feature between accepted and not-accepted.
+function evolutionLogText(targetRoot) {
+	const evoPath = path.join(targetRoot, "docs", "wiki", "engineering", "harness-evolution.md");
+	if (!pathExists(evoPath)) return "";
+	try {
+		return toPortablePath(readText(evoPath));
+	} catch {
+		return "";
+	}
+}
+
+function planIsLogged(logText, plan) {
+	return logText.includes(toPortablePath(plan.path));
+}
+
 function planFor(ctx) {
 	if (ctx.focus.type !== "feature") return undefined;
-	return ctx.state.plans
-		.filter((p) => p.featureId === ctx.focus.id)
-		.sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+	const mine = ctx.state.plans.filter((p) => p.featureId === ctx.focus.id);
+	if (mine.length === 0) return undefined;
+	// A plan the log never named is a round still awaiting accept, and the current
+	// round is the newest of those. Once every plan is logged, the current round is
+	// simply the feature's own latest one. Ties break on path, so the answer is the
+	// same on every checkout of the same tree.
+	const logText = evolutionLogText(ctx.state.targetRoot);
+	const pending = mine.filter((p) => !planIsLogged(logText, p));
+	return (pending.length > 0 ? pending : mine)
+		.slice()
+		.sort((a, b) => a.path.localeCompare(b.path))
+		.at(-1);
 }
 
 function featureHasEvidence(ctx) {
@@ -154,19 +172,7 @@ function featureHasEvidence(ctx) {
 function acceptLogged(ctx) {
 	const plan = planFor(ctx);
 	if (!plan) return false;
-	const evoPath = path.join(
-		ctx.state.targetRoot,
-		"docs",
-		"wiki",
-		"engineering",
-		"harness-evolution.md",
-	);
-	if (!pathExists(evoPath)) return false;
-	try {
-		return toPortablePath(readText(evoPath)).includes(toPortablePath(plan.path));
-	} catch {
-		return false;
-	}
+	return planIsLogged(evolutionLogText(ctx.state.targetRoot), plan);
 }
 
 function sessionMissing(ctx) {
@@ -379,6 +385,11 @@ function countOthers(state, focusedId) {
 	return state.features.filter((f) => f.id !== focusedId).length;
 }
 
+function priorityOf(state, featureId) {
+	const feature = state.features.find((f) => f.id === featureId);
+	return feature && typeof feature.priority === "number" ? feature.priority : -1;
+}
+
 function resolveFocus(state, options) {
 	if (options.session) {
 		return { type: "session", id: options.session, autoSelected: false, othersPending: 0 };
@@ -394,15 +405,22 @@ function resolveFocus(state, options) {
 	if (state.activeSessionId) {
 		return { type: "session", id: state.activeSessionId, autoSelected: true, othersPending: 0 };
 	}
-	const recentPlan = [...state.plans]
-		.filter((p) => p.featureId)
-		.sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
-	if (recentPlan) {
+	// Auto-selecting on the newest plan's mtime made the focus depend on which
+	// files this checkout happened to write last (see planFor). The deterministic
+	// equivalent of "some feature has a round in flight": the highest-priority
+	// feature whose current round is still awaiting accept.
+	const logText = evolutionLogText(state.targetRoot);
+	const pendingFocus = [
+		...new Set(
+			state.plans.filter((p) => p.featureId && !planIsLogged(logText, p)).map((p) => p.featureId),
+		),
+	].sort((a, b) => priorityOf(state, b) - priorityOf(state, a) || a.localeCompare(b))[0];
+	if (pendingFocus) {
 		return {
 			type: "feature",
-			id: recentPlan.featureId,
+			id: pendingFocus,
 			autoSelected: true,
-			othersPending: countOthers(state, recentPlan.featureId),
+			othersPending: countOthers(state, pendingFocus),
 		};
 	}
 	const feature =
