@@ -188,14 +188,14 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 
 Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级越高，Amber 投入该层的表面就越多：
 
-| 层              | 在 Amber 中的角色                                                    | 优先级 |
-| --------------- | -------------------------------------------------------------------- | ------ |
-| `Governance`    | 审批记录、安全默认值、策略边界和采纳控制约束行为。                   | 最高   |
-| `Verification`  | doctor、audit、校验、review 和 gate 表面提供显式检查。               | 高     |
-| `Observability` | 时间线、manifest、ledger 和报告让行为可检视。                        | 高     |
-| `Lifecycle`     | route、session、checkpoint 和 worktree 在本地组织工作。              | 中     |
-| `Context`       | starter 文档、wiki 骨架、manifest 和交接产物保持项目上下文显式。     | 中     |
-| `Tooling`       | CLI 命令、schema、validator、workflow pack 和 profile 暴露显式接口。 | 中     |
+| 层              | 在 Amber 中的角色                                                                                                                   | 优先级 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `Governance`    | 审批记录、安全默认值、策略边界和采纳控制约束行为。                                                                                  | 最高   |
+| `Verification`  | doctor、audit、校验、review 和 gate 表面提供显式检查。                                                                              | 高     |
+| `Observability` | 时间线、manifest、ledger 和报告让行为可检视。                                                                                       | 高     |
+| `Lifecycle`     | route、session、checkpoint 和 worktree 在本地组织工作。                                                                             | 中     |
+| `Context`       | starter 文档、wiki 骨架、manifest 和交接产物保持项目上下文显式。                                                                    | 中     |
+| `Tooling`       | CLI 命令、schema、validator、workflow pack 和 profile 暴露显式接口。                                                                | 中     |
 | `Execution`     | 门禁化且绑定能力注册——受治理的命令执行存在于四道门 + 冻结的 per-attempt 准入之后；没有无门运行时，原生安装也未注册任何 capability。 | 低     |
 
 主线：强化 `Governance`、`Verification` 和 `Observability`；让 `Lifecycle` 保持仓库本地；避免漂移成完整的 agent 平台。[治理模型文档](./docs/architecture/governance-model.md)把每一层映射到具体命令。

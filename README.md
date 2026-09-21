@@ -166,14 +166,14 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 
 Amber organizes governance into seven control layers, weighted toward safety — the higher the priority, the more of Amber's surface that layer gets:
 
-| Layer           | Role in Amber                                                                                 | Priority |
-| --------------- | --------------------------------------------------------------------------------------------- | -------- |
-| `Governance`    | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest  |
-| `Verification`  | Doctor, audit, validation, review, and gate surfaces provide explicit checks.                 | High     |
-| `Observability` | Timelines, manifests, ledgers, and reports make behavior inspectable.                         | High     |
-| `Lifecycle`     | Routes, sessions, checkpoints, and worktrees organize work locally.                           | Medium   |
-| `Context`       | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit. | Medium   |
-| `Tooling`       | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces.   | Medium   |
+| Layer           | Role in Amber                                                                                                                                                                                           | Priority |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `Governance`    | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior.                                                                                                           | Highest  |
+| `Verification`  | Doctor, audit, validation, review, and gate surfaces provide explicit checks.                                                                                                                           | High     |
+| `Observability` | Timelines, manifests, ledgers, and reports make behavior inspectable.                                                                                                                                   | High     |
+| `Lifecycle`     | Routes, sessions, checkpoints, and worktrees organize work locally.                                                                                                                                     | Medium   |
+| `Context`       | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit.                                                                                                           | Medium   |
+| `Tooling`       | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces.                                                                                                             | Medium   |
 | `Execution`     | Gated and capability-bound — governed command execution exists behind four gates plus frozen per-attempt admission; there is no un-gated runtime, and no capability is registered in a vanilla install. | Low      |
 
 The through-line: strengthen `Governance`, `Verification`, and `Observability`; keep `Lifecycle` repository-local; avoid drifting into a full agent platform. The [governance model](./docs/architecture/governance-model.md) maps each layer to concrete commands.
