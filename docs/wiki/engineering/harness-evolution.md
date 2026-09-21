@@ -255,3 +255,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F063-Product-closeout-seven-verb-default-surface-verb-skills-spec-status-directory-co.md`
 - Review status: ready
 - Feature: F063 status → accepted in feature_list.json
+
+## 2026-09-21 docs/plans/F064-Improvement-suggestions.md
+
+- Plan: `docs/plans/F064-Improvement-suggestions.md`
+- Review status: ready
+- Feature: F064 status → accepted in feature_list.json
