@@ -139,14 +139,6 @@
       "layer": "Generated"
     },
     {
-      "id": "reference/cli/init",
-      "path": "reference/cli/init.md",
-      "group": "Reference",
-      "title": "amber init",
-      "description": "Create missing Amber starter files without overwriting existing files. Supports --dry-run.",
-      "layer": "Generated"
-    },
-    {
       "id": "reference/cli/audit",
       "path": "reference/cli/audit.md",
       "group": "Reference",
@@ -155,11 +147,11 @@
       "layer": "Generated"
     },
     {
-      "id": "reference/cli/wiki",
-      "path": "reference/cli/wiki.md",
+      "id": "reference/cli/init",
+      "path": "reference/cli/init.md",
       "group": "Reference",
-      "title": "amber wiki",
-      "description": "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.\n\nSubcommands:\n  (none)             Scaffold the base wiki skeleton (idempotent).\n  knowledge          Knowledge Plan + Structured Knowledge Base (declarative plan format).\n    knowledge plan        Pre-flight inspection + propose or update the plan.\n    knowledge scaffold    Scaffold docs/wiki/knowledge-plan.json (or --yaml).\n    knowledge inspect     Dump the loaded plan.\n    knowledge report      Coverage report against declared documents + notes + cards.\n    knowledge validate    Schema validation of the plan.\n    knowledge build       Materialize structured knowledge pages under docs/wiki/knowledge/.\n\nExamples:\n  amber wiki knowledge plan --target .\n  amber wiki knowledge scaffold --target . --yaml\n  amber wiki knowledge build --target .\n  amber wiki knowledge report --target .",
+      "title": "amber init",
+      "description": "Create missing Amber starter files without overwriting existing files. Supports --dry-run.",
       "layer": "Generated"
     },
     {
@@ -171,11 +163,11 @@
       "layer": "Generated"
     },
     {
-      "id": "reference/cli/handoff",
-      "path": "reference/cli/handoff.md",
+      "id": "reference/cli/next",
+      "path": "reference/cli/next.md",
       "group": "Reference",
-      "title": "amber handoff",
-      "description": "Regenerate live handoff state or produce the portable handoff bundle.\n\nSubcommands:\n  (none)             Regenerate session-handoff.md from live state and validate it.\n  bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.\n  validate           Validate a handoff bundle directory.\n\nExamples:\n  amber handoff --target path/to/repo\n  amber handoff bundle --target path/to/repo\n  amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest\n  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
+      "title": "amber next",
+      "description": "Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).\n\nLifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept → learnings (when write-back triggers matched).\nSession evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).\nExisting projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.\n\nOptions:\n  --target <dir>     Path to the target repository.\n  --feature <id>     Focus a specific feature's lifecycle.\n  --session <id>     Focus a specific session's lifecycle.\n  --objective <text> Give an objective; next suggests a matching route and\n                     workflow pack from route manifest metadata (read-only advisor).\n  --json             Emit the machine-readable envelope.\n\nWith no --feature/--session, next auto-selects a focus and states which it chose.\nWithout --objective, next is the pure lifecycle inference (unchanged).\n\nExamples:\n  amber next --target .\n  amber next --target . --feature F001\n  amber next --target . --session <session-id> --json\n  amber next --target . --objective \"add payment integration\"\n  amber next --target . --objective \"fix login bug\" --json",
       "layer": "Generated"
     },
     {
@@ -184,6 +176,30 @@
       "group": "Reference",
       "title": "amber plan",
       "description": "Create a feature-linked vertical-slice plan from a registered feature.\n\nRequired options:\n  --target <dir>       Path to the target repository.\n  --feature <id>       Feature id (e.g. F001) — must already exist in feature_list.json.\n  --title <text>       Short human-readable title for the plan.\n\nOptional:\n  --dry-run            Preview without writing files.\n\nExamples:\n  amber plan --target . --feature F001 --title \"Small slice\"\n  amber plan --target . --feature F002 --title \"AccountChargeDrawer dual-step\" --dry-run",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/handoff",
+      "path": "reference/cli/handoff.md",
+      "group": "Reference",
+      "title": "amber handoff",
+      "description": "Regenerate live handoff state or produce the portable handoff bundle.\n\nSubcommands:\n  (none)             Regenerate session-handoff.md from live state and validate it.\n  bundle             Write README, summary, evidence, next-actions, risks, recovery commands, and manifest.\n  validate           Validate a handoff bundle directory.\n\nExamples:\n  amber handoff --target path/to/repo\n  amber handoff bundle --target path/to/repo\n  amber handoff bundle --target path/to/repo --output-dir .amber/handoff/latest\n  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/session",
+      "path": "reference/cli/session.md",
+      "group": "Reference",
+      "title": "amber session",
+      "description": "Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.\n\nSubcommands:\n  start --goal \"...\" [--route <id>] [--budget <n>] [--worktree] [--mode interactive]\n      Create a new session, write manifest + timeline, optionally create worktree.\n  status [<id>]\n      Show status of current session or specified session by ID.\n  list\n      List all sessions in reverse chronological order.\n  abort <id>\n      Set session status to aborted, write abort event, cleanup worktree.\n  continue [<id>]\n      Continue a paused or incomplete session from its current stage.\n  complete-check --session <id> [--strict]\n      Report whether a session has enough evidence to be treated as complete.\n  complete --session <id> [--strict]\n      Mark a session completed (governance terminal state). Requires complete-check to pass.\n  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute] [--budget-minutes <n>]\n      Record verification evidence. Without --execute, records a self-reported claim.\n      With --execute, runs --command and records the real exit code (default 5-minute\n      budget; raise it for long suites, capped at 60).\n  approve --session <id> [--gate <gate-id>]\n      Record a gate_passed event so complete-check sees approval evidence.\n  lease --session <id> --owner-id <agent> --token-hash <hash>\n      Reacquire the session lease for the current owner: a fresh token and a\n      new fence (explicit, owner-bound; ADR-0029 §8.1).\n  run --session <id> [--dry-run|--execute]\n      Execute the current verb stage (F062). Dry-run resolves without executing.\n  settle --session <id> --request-id <id> --attempt-id <id> --request-hash <hash> --result <json>\n      Settle a pending host-agent request and advance the cursor on success.\n\nSession completion flow:\n  amber session start --goal \"...\"\n  amber session continue\n  amber session verify --session <id>\n  amber session approve --session <id> --gate <gate-id>\n  amber session complete-check --session <id>\n  amber session complete --session <id>\n\nRoute auto-matching:\n  Goals are matched against route trigger goalPattern regexes:\n    bugfix-quick     — ^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)\n    feature-standard — ^(add|implement|create|build)\\s+.*feature\n    refactor-safe    — ^(refactor|restructure|clean\\s*up|simplify|extract)\\b\n  Pass --route <id> to bypass auto-matching.\n\nTwo-layer approval gates:\n  Plan-level:  amber gate --confirm  → edits User Confirmation in the plan .md file.\n  Session-level: amber session approve → records gate_passed in the session timeline.\n  Both layers must be satisfied for complete-check --strict to pass.\n\nExamples:\n  amber session start --goal \"implement user auth\" --confirm\n  amber session start --goal \"fix login bug\" --route bugfix-quick --worktree --confirm\n  amber session start --goal \"add feature\" --mode interactive --confirm\n  amber session status\n  amber session list\n  amber session abort <session-id>\n  amber session continue\n  amber session complete-check --session <session-id>\n  amber session verify --session <session-id> --confirm\n  amber session approve --session <session-id>\n  amber session run --session <session-id> --dry-run\n  amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{\"status\":\"succeeded\"}'",
+      "layer": "Generated"
+    },
+    {
+      "id": "reference/cli/wiki",
+      "path": "reference/cli/wiki.md",
+      "group": "Reference",
+      "title": "amber wiki",
+      "description": "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.\n\nSubcommands:\n  (none)             Scaffold the base wiki skeleton (idempotent).\n  knowledge          Knowledge Plan + Structured Knowledge Base (declarative plan format).\n    knowledge plan        Pre-flight inspection + propose or update the plan.\n    knowledge scaffold    Scaffold docs/wiki/knowledge-plan.json (or --yaml).\n    knowledge inspect     Dump the loaded plan.\n    knowledge report      Coverage report against declared documents + notes + cards.\n    knowledge validate    Schema validation of the plan.\n    knowledge build       Materialize structured knowledge pages under docs/wiki/knowledge/.\n\nExamples:\n  amber wiki knowledge plan --target .\n  amber wiki knowledge scaffold --target . --yaml\n  amber wiki knowledge build --target .\n  amber wiki knowledge report --target .",
       "layer": "Generated"
     },
     {
@@ -379,14 +395,6 @@
       "layer": "Generated"
     },
     {
-      "id": "reference/cli/session",
-      "path": "reference/cli/session.md",
-      "group": "Reference",
-      "title": "amber session",
-      "description": "Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete.\n\nSubcommands:\n  start --goal \"...\" [--route <id>] [--budget <n>] [--worktree] [--mode interactive]\n      Create a new session, write manifest + timeline, optionally create worktree.\n  status [<id>]\n      Show status of current session or specified session by ID.\n  list\n      List all sessions in reverse chronological order.\n  abort <id>\n      Set session status to aborted, write abort event, cleanup worktree.\n  continue [<id>]\n      Continue a paused or incomplete session from its current stage.\n  complete-check --session <id> [--strict]\n      Report whether a session has enough evidence to be treated as complete.\n  complete --session <id> [--strict]\n      Mark a session completed (governance terminal state). Requires complete-check to pass.\n  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute]\n      Record verification evidence. Without --execute, records a self-reported claim.\n      With --execute, runs --command and records the real exit code.\n  approve --session <id> [--gate <gate-id>]\n      Record a gate_passed event so complete-check sees approval evidence.\n\nSession completion flow:\n  amber session start --goal \"...\"\n  amber session continue\n  amber session verify --session <id>\n  amber session approve --session <id> --gate <gate-id>\n  amber session complete-check --session <id>\n  amber session complete --session <id>\n\nRoute auto-matching:\n  Goals are matched against route trigger goalPattern regexes:\n    bugfix-quick     — ^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)\n    feature-standard — ^(add|implement|create|build)\\s+.*feature\n    refactor-safe    — ^(refactor|restructure|clean\\s*up|simplify|extract)\\b\n  Pass --route <id> to bypass auto-matching.\n\nTwo-layer approval gates:\n  Plan-level:  amber gate --confirm  → edits User Confirmation in the plan .md file.\n  Session-level: amber session approve → records gate_passed in the session timeline.\n  Both layers must be satisfied for complete-check --strict to pass.\n\nExamples:\n  amber session start --goal \"implement user auth\" --confirm\n  amber session start --goal \"fix login bug\" --route bugfix-quick --worktree --confirm\n  amber session start --goal \"add feature\" --mode interactive --confirm\n  amber session status\n  amber session list\n  amber session abort <session-id>\n  amber session continue\n  amber session complete-check --session <session-id>\n  amber session verify --session <session-id> --confirm\n  amber session approve --session <session-id>",
-      "layer": "Generated"
-    },
-    {
       "id": "reference/cli/status",
       "path": "reference/cli/status.md",
       "group": "Reference",
@@ -456,14 +464,6 @@
       "group": "Reference",
       "title": "amber clean",
       "description": "Remove amber-generated files from the target repository (reverse of init).\n\nOptions:\n  --dry-run    Preview which files would be removed without deleting them.\n\nExamples:\n  amber clean --target path/to/repo\n  amber clean --target path/to/repo --dry-run",
-      "layer": "Generated"
-    },
-    {
-      "id": "reference/cli/next",
-      "path": "reference/cli/next.md",
-      "group": "Reference",
-      "title": "amber next",
-      "description": "Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).\n\nLifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept → learnings (when write-back triggers matched).\nSession evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).\nExisting projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.\n\nOptions:\n  --target <dir>     Path to the target repository.\n  --feature <id>     Focus a specific feature's lifecycle.\n  --session <id>     Focus a specific session's lifecycle.\n  --objective <text> Give an objective; next suggests a matching route and\n                     workflow pack from route manifest metadata (read-only advisor).\n  --json             Emit the machine-readable envelope.\n\nWith no --feature/--session, next auto-selects a focus and states which it chose.\nWithout --objective, next is the pure lifecycle inference (unchanged).\n\nExamples:\n  amber next --target .\n  amber next --target . --feature F001\n  amber next --target . --session <session-id> --json\n  amber next --target . --objective \"add payment integration\"\n  amber next --target . --objective \"fix login bug\" --json",
       "layer": "Generated"
     },
     {

@@ -2,7 +2,7 @@
 id: session
 title: "amber session"
 sidebar_label: "session"
-description: "Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete."
+description: "Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle."
 ---
 
 import CommandBlock from '@site/src/components/command-block';
@@ -18,12 +18,12 @@ import CommandBlock from '@site/src/components/command-block';
 
 ## Summary
 
-Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete.
+Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.
 
 ## Usage
 
 ```bash
-amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger> [--target <repo>] [--session <id>] [--goal <goal>] [--json]
+amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger|lease|run|settle> [--target <repo>] [--session <id>] [--goal <goal>] [--json]
 ```
 
 ## Execution Contract
@@ -44,7 +44,10 @@ amber session <start|status|list|abort|continue|complete-check|verify|approve|ve
 | <code>complete</code> | Subcommand action for <code>session</code> |
 | <code>complete-check</code> | Subcommand action for <code>session</code> |
 | <code>continue</code> | Subcommand action for <code>session</code> |
+| <code>lease</code> | Subcommand action for <code>session</code> |
 | <code>list</code> | Subcommand action for <code>session</code> |
+| <code>run</code> | Subcommand action for <code>session</code> |
+| <code>settle</code> | Subcommand action for <code>session</code> |
 | <code>start</code> | Subcommand action for <code>session</code> |
 | <code>status</code> | Subcommand action for <code>session</code> |
 | <code>verify</code> | Subcommand action for <code>session</code> |
@@ -53,7 +56,7 @@ amber session <start|status|list|abort|continue|complete-check|verify|approve|ve
 ## Command Details
 
 ```text
-Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete.
+Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.
 
 Subcommands:
   start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive]
@@ -70,11 +73,19 @@ Subcommands:
       Report whether a session has enough evidence to be treated as complete.
   complete --session <id> [--strict]
       Mark a session completed (governance terminal state). Requires complete-check to pass.
-  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute]
+  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute] [--budget-minutes <n>]
       Record verification evidence. Without --execute, records a self-reported claim.
-      With --execute, runs --command and records the real exit code.
+      With --execute, runs --command and records the real exit code (default 5-minute
+      budget; raise it for long suites, capped at 60).
   approve --session <id> [--gate <gate-id>]
       Record a gate_passed event so complete-check sees approval evidence.
+  lease --session <id> --owner-id <agent> --token-hash <hash>
+      Reacquire the session lease for the current owner: a fresh token and a
+      new fence (explicit, owner-bound; ADR-0029 §8.1).
+  run --session <id> [--dry-run|--execute]
+      Execute the current verb stage (F062). Dry-run resolves without executing.
+  settle --session <id> --request-id <id> --attempt-id <id> --request-hash <hash> --result <json>
+      Settle a pending host-agent request and advance the cursor on success.
 
 Session completion flow:
   amber session start --goal "..."
@@ -107,6 +118,8 @@ Examples:
   amber session complete-check --session <session-id>
   amber session verify --session <session-id> --confirm
   amber session approve --session <session-id>
+  amber session run --session <session-id> --dry-run
+  amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{"status":"succeeded"}'
 ```
 
 ## Examples
@@ -149,6 +162,14 @@ amber session verify --session <session-id> --confirm
 
 ```bash
 amber session approve --session <session-id>
+```
+
+```bash
+amber session run --session <session-id> --dry-run
+```
+
+```bash
+amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{"status":"succeeded"}'
 ```
 
 ## Boundaries & Safety

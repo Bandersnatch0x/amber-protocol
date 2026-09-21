@@ -36,12 +36,18 @@ amber <command> --target <repo> [options]
 
 | Command | Summary | Governed | Link |
 | --- | --- | --- | --- |
-| <code>init</code> | Create missing Amber starter files without overwriting existing files. Supports --dry-run. | No | [Docs](/reference/cli/init) |
 | <code>audit</code> | Inspect an existing project without writing files. Supports --summary for bounded text output. | No | [Docs](/reference/cli/audit) |
-| <code>wiki</code> | Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run. | No | [Docs](/reference/cli/wiki) |
+| <code>init</code> | Create missing Amber starter files without overwriting existing files. Supports --dry-run. | No | [Docs](/reference/cli/init) |
 | <code>doctor</code> | Run Amber guardrail checks and target classification. | No | [Docs](/reference/cli/doctor) |
-| <code>handoff</code> | Regenerate live handoff state or produce the portable handoff bundle. | No | [Docs](/reference/cli/handoff) |
 | <code>plan</code> | Create a feature-linked vertical-slice plan from a registered feature. | No | [Docs](/reference/cli/plan) |
+| <code>handoff</code> | Regenerate live handoff state or produce the portable handoff bundle. | No | [Docs](/reference/cli/handoff) |
+| <code>session</code> | Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle. | Yes | [Docs](/reference/cli/session) |
+
+### ⚙️ Expert & Inspection Commands
+
+| Command | Summary | Governed | Link |
+| --- | --- | --- | --- |
+| <code>wiki</code> | Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run. | No | [Docs](/reference/cli/wiki) |
 | <code>gate</code> | Evaluate Gates and inspect their immutable outcomes (F050): the | No | [Docs](/reference/cli/gate) |
 | <code>policy</code> | Evaluate deny-wins Policy Contracts and inspect immutable Policy Outcomes (F050). | No | [Docs](/reference/cli/policy) |
 | <code>adapter</code> | Register read-only Adapters, record immutable read receipts, and prepare migration candidates (F051). | No | [Docs](/reference/cli/adapter) |
@@ -55,12 +61,23 @@ amber <command> --target <repo> [options]
 | <code>accept</code> | Accept a reviewed plan and append an Amber evolution record. | No | [Docs](/reference/cli/accept) |
 | <code>learnings</code> | Inspect post-accept learning write-back triggers for a feature, or book the review. | No | [Docs](/reference/cli/learnings) |
 | <code>break-loop</code> | Scaffold and validate a post-mortem for a defect class that recurred after a fix (recurrence >= 2). | No | [Docs](/reference/cli/break-loop) |
+| <code>pack</code> | Inspect or validate declarative workflow packs without executing them. | No | [Docs](/reference/cli/pack) |
+| <code>maintenance</code> | Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals. | No | [Docs](/reference/cli/maintenance) |
 | <code>loop</code> | Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling. | Yes | [Docs](/reference/cli/loop) |
 | <code>ledger</code> | Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM. | Yes | [Docs](/reference/cli/ledger) |
 | <code>route</code> | Inspect, validate, and dry-run delivery routes from routes/*.route.json. | Yes | [Docs](/reference/cli/route) |
-| <code>session</code> | Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete. | Yes | [Docs](/reference/cli/session) |
+| <code>status</code> | Show a curated one-line overview of repo state: git branch, Amber init status, | No | [Docs](/reference/cli/status) |
+| <code>drift</code> | CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail. | No | [Docs](/reference/cli/drift) |
+| <code>sync</code> | Detect scaffold and artifact drift between installed files and shipped | No | [Docs](/reference/cli/sync) |
+| <code>migrate</code> | Backfill version metadata in recognized Amber JSON artifacts, or migrate | No | [Docs](/reference/cli/migrate) |
 | <code>governance</code> | Create, inspect, and report governance controls for a target repository. | Yes | [Docs](/reference/cli/governance) |
+| <code>execution</code> | Validate execution boundaries and integration contracts. | No | [Docs](/reference/cli/execution) |
+| <code>security</code> | Run security governance checks in report-only mode. | No | [Docs](/reference/cli/security) |
 | <code>feature</code> | Add, list, remove features in feature_list.json, record verification evidence, and book feature paths. | No | [Docs](/reference/cli/feature) |
+| <code>clean</code> | Remove amber-generated files from the target repository (reverse of init). | No | [Docs](/reference/cli/clean) |
+| <code>explain</code> | Look up Amber error codes, or regenerate the troubleshooting reference. | No | [Docs](/reference/cli/explain) |
+| <code>hooks</code> | Manage the opt-in git pre-commit governance guard. | No | [Docs](/reference/cli/hooks) |
+| <code>workflow</code> | Assess agent-workflow effectiveness across five dimensions, separate from | No | [Docs](/reference/cli/workflow) |
 | <code>context</code> | Govern the context write and load paths (ADR-0009/0010/0015): emit distillation | Yes | [Docs](/reference/cli/context) |
 | <code>memory</code> | Govern the memory write-back pipeline (Governed Memory Layer): request, ingest, | Yes | [Docs](/reference/cli/memory) |
 | <code>projection</code> | Manage rebuildable read-only projections (ADR-0019 D5; ADR-0012 amendment): | No | [Docs](/reference/cli/projection) |
@@ -71,23 +88,6 @@ amber <command> --target <repo> [options]
 | <code>eval</code> | Run deterministic instruction-surface Evals (F050 Evidence; F058). | Yes | [Docs](/reference/cli/eval) |
 | <code>evidence</code> | Record and independently verify Evidence receipts, each binding the | No | [Docs](/reference/cli/evidence) |
 | <code>approval</code> | Grant, revoke, consume, and inspect Approvals — the human | No | [Docs](/reference/cli/approval) |
-
-### ⚙️ Expert & Inspection Commands
-
-| Command | Summary | Governed | Link |
-| --- | --- | --- | --- |
-| <code>pack</code> | Inspect or validate declarative workflow packs without executing them. | No | [Docs](/reference/cli/pack) |
-| <code>maintenance</code> | Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals. | No | [Docs](/reference/cli/maintenance) |
-| <code>status</code> | Show a curated one-line overview of repo state: git branch, Amber init status, | No | [Docs](/reference/cli/status) |
-| <code>drift</code> | CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail. | No | [Docs](/reference/cli/drift) |
-| <code>sync</code> | Detect scaffold and artifact drift between installed files and shipped | No | [Docs](/reference/cli/sync) |
-| <code>migrate</code> | Backfill version metadata in recognized Amber JSON artifacts, or migrate | No | [Docs](/reference/cli/migrate) |
-| <code>execution</code> | Validate execution boundaries and integration contracts. | No | [Docs](/reference/cli/execution) |
-| <code>security</code> | Run security governance checks in report-only mode. | No | [Docs](/reference/cli/security) |
-| <code>clean</code> | Remove amber-generated files from the target repository (reverse of init). | No | [Docs](/reference/cli/clean) |
-| <code>explain</code> | Look up Amber error codes, or regenerate the troubleshooting reference. | No | [Docs](/reference/cli/explain) |
-| <code>hooks</code> | Manage the opt-in git pre-commit governance guard. | No | [Docs](/reference/cli/hooks) |
-| <code>workflow</code> | Assess agent-workflow effectiveness across five dimensions, separate from | No | [Docs](/reference/cli/workflow) |
 
 ### ⚠️ Deprecated Commands (v1 Compatibility)
 
