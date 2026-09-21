@@ -11,7 +11,7 @@ on:
       - "v*"
   schedule:
     # Scheduled public-docs and health-check verification: daily at 04:00 UTC
-    - cron: '0 4 * * *'
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
