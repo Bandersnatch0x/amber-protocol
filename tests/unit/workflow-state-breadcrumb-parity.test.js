@@ -149,7 +149,6 @@ function probeContexts() {
 		path: PLAN_REL,
 		featureId: "F022",
 		confirmed: true,
-		mtimeMs: 1,
 	};
 	const feature = {
 		id: "F022",
