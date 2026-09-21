@@ -28,7 +28,6 @@ const { statePathForCreate } = require("../state-dir-resolver");
 let gitAdapterForscaffold = null;
 function defaultGitAdapterForThisModule() {
 	if (gitAdapterForscaffold === null) {
-		const gitExec = require("./git-exec");
 		let detector;
 		try {
 			detector = require("./git-workflow-detector");
