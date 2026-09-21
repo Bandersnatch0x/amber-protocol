@@ -107,6 +107,32 @@ Use the `gh` CLI for all operations.
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
+### Closing an issue as complete
+
+Closing a bug as fixed requires **delivery evidence**: the change merged into the default
+branch. A reviewer's local run is *not* delivery evidence — it verifies a working tree, not a
+repository state, and the two can diverge. Issue #176 was closed as `COMPLETED` after a human
+reviewer independently re-ran `contracts:validate`, the focused suite, the full test suite,
+lint, doctor, wiki, manifests and `gen:agents:check`, and recorded that verdict on the issue.
+No pull request ever carried the work, and the default branch still has no artifact for it.
+Every check that was run was green and the delivery was absent; nothing in the lifecycle
+forced the distinction.
+
+So, before recording a completion verdict:
+
+1. Find the closing PR — `gh issue view <n> --json closedByPullRequestsReferences`, or the
+   `closes #<n>` reference in a merged PR body.
+2. Confirm it is **merged** — not merely approved, not merely open.
+3. Confirm the work is on the default branch, not only in a branch, a worktree, or a
+   reviewer's checkout. `git log origin/master --oneline` and `git show origin/master:<path>`
+   read the merged state; an unpushed commit or a dirty worktree does not count.
+
+Record the PR number in the closing comment. **No merged closing PR means the issue is not
+complete**: close it as not planned, or leave it open and state what is still missing. The
+only exception is a resolution that genuinely is not a code change — a triage decision, a
+duplicate, a spec migration, a question answered — and then the closing comment must say so
+explicitly rather than let the verdict imply a delivery.
+
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone. If no remote is configured, pass `--repo Bandersnatch0x/amber-protocol` explicitly.
 
 Do not open new spec, research, planning, map, or task issues on GitHub. Put normative spec
