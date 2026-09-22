@@ -33,6 +33,9 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness execution prepare --contract <id> --run <id> --target <repo> [--json]
        amber harness execution evaluate --run <id> [--file observed.json] --target <repo> [--json]
        amber harness execution inspect (--contract <id> | --run <id>) --target <repo> [--json]
+       amber harness context admit --file <grant.json> --target <repo> [--json]
+       amber harness context check --subject <s> --resource <prefix> --purpose <p> [--classification <c>] [--now <iso>] [--run <id>] --target <repo> [--json]
+       amber harness context revoke --grant <id> --revoker <who> --target <repo> [--json]
        amber harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...] --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
@@ -53,6 +56,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | <code>admit</code> | Subcommand action for <code>harness</code> |
 | <code>advance</code> | Subcommand action for <code>harness</code> |
 | <code>bind</code> | Subcommand action for <code>harness</code> |
+| <code>context</code> | Subcommand action for <code>harness</code> |
 | <code>execution</code> | Subcommand action for <code>harness</code> |
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
@@ -107,6 +111,16 @@ Subcommands:
                       Subcommands: admit (--file), list, inspect
                       (--contract | --run), prepare (--contract --run),
                       evaluate (--run [--file observed.json]).
+  context             Context grants (F069, report-first firewall): admit a
+                      grant binding one subject to resource prefixes for one
+                      purpose inside a half-open TTL under a classification
+                      ceiling; revoke terminally (records stay listable);
+                      check — deterministic, label-only — whether subject S
+                      may see resource R for purpose P now. Denials land on
+                      the trail as context.denied events. Subcommands:
+                      admit (--file), list, inspect (--grant <id>), check
+                      (--subject --resource --purpose [--classification]
+                      [--now] [--run]), revoke (--grant --revoker).
   advance             Move a Run along its closed nine-state machine. Advancing to
                       admitted requires the complete six-check AdmissionReceipt:
                       --check <name:pointer> for identity, contract, policy,
