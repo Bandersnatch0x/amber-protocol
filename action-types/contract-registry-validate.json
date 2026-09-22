@@ -1,0 +1,28 @@
+{
+	"actionTypeId": "amber.contracts.validate",
+	"version": 1,
+	"title": "Validate the contract registry",
+	"goal": "Check the distributed-governance contract registry against its schema, against itself, and against the files it points at — reporting whether each entry's measured implementation status is still backed by a real artifact. Read-only: no registry, schema or repository file is written.",
+	"mode": "dry-run",
+	"parameters": {},
+	"submissionCriteria": [],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#read-only-projection",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "contracts",
+		"subcommand": "validate",
+		"args": [{ "flag": "--json", "flagOnly": true }]
+	}
+}

@@ -21,6 +21,7 @@ const TYPED_COMMAND_NAMES = new Set([
 	"external",
 	"breakglass",
 	"runner",
+	"contracts",
 ]);
 
 // Per-command help text shown by `amber <command> --help`.
@@ -1586,6 +1587,27 @@ const COMMAND_HELP = {
 		'  amber breakglass review --target . --id breakglass/incident-42-restore --outcome "service restored" --necessity "release path was 40 minutes out" --impact "one ticket comment created" --follow-up "add a standing runbook" --decision-identity decision/breakglass-review-42 --revision 1 --json',
 		"  amber breakglass status --target . --id breakglass/incident-42-restore --now 2026-09-01T00:00:00.000Z --json",
 	],
+	contracts: [
+		"Validate the distributed-governance contract registry against its schema and",
+		"against itself. Report-only: it reads the registry and the file pointers each",
+		"entry claims, writes nothing, and exits 1 on any finding.",
+		"",
+		"The registry is Amber's own ledger of distributed-governance contracts,",
+		"artifacts and invariants, each annotated with a MEASURED implementation status",
+		"and a pointer to the file that carries it. It is not the runtime compatibility",
+		"check — that is the single minCompatibleVersion comparison in sync-remote.js;",
+		"the registry's matrix is a declaration whose outcomes are testable.",
+		"",
+		"Subcommands:",
+		"  validate              Check schema conformance, entry self-consistency, the",
+		"                        compatibility matrix, and that every pointer resolves.",
+		"                        Optional: --target <amber-checkout>.",
+		"",
+		"Examples:",
+		"  amber contracts validate",
+		"  amber contracts validate --json",
+		"  amber contracts validate --target path/to/amber-checkout",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1941,6 +1963,9 @@ const COMMAND_OUTPUT = {
 			"       amber approval list --target <repo> [--json]",
 		].join("\n"),
 	},
+	contracts: {
+		usage: "Usage: amber contracts validate [--target <amber-checkout>] [--json]",
+	},
 	policy: {
 		usage: [
 			"Usage: amber policy <evaluate|show|list> --target <repo> [--json]",
@@ -2117,6 +2142,7 @@ const COMMANDS = Object.freeze([
 	"eval",
 	"evidence",
 	"approval",
+	"contracts",
 ]);
 // F063: the default help surface is the seven primary verbs (audit, init,
 // doctor, next, plan, handoff, session); every other governance command is
@@ -2160,6 +2186,7 @@ const TIER_BY_COMMAND = {
 	eval: "expert",
 	evidence: "expert",
 	approval: "expert",
+	contracts: "expert",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",
