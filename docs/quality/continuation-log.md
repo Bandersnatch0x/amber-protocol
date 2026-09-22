@@ -1,6 +1,6 @@
 # Continuation Log
 
-手工续接判定账本。北极星的唯一数据源：不读旧聊天、仅凭仓内 plan/evidence/handoff，由新人或新 agent 正确继续的真实任务比例。Dogfood 与外部仓分开记账；本表是手工表格，不埋点、不改代码。测量规则见 `docs/wiki/product/user-scenarios.md` 旅程指标与 goals 校准（2026-09-22）：`init` 次数、命令退出码、文件存在性、session 计数一律不进分子；判定人不得是刚写出该 handoff 的同一会话。
+手工续接判定账本。北极星的唯一数据源：不读旧聊天、仅凭仓内 plan/evidence/handoff，由新人或新 agent 正确继续的真实任务比例。Dogfood 与外部仓分开记账；本表是手工表格，不埋点、不改代码。测量规则见 `docs/wiki/product/user-scenarios.md` 旅程指标；goals 校准（2026-09-22，即下句）：`init` 次数、命令退出码、文件存在性、session 计数一律不进分子；判定人不得是刚写出该 handoff 的同一会话。
 
 ## 记录
 
@@ -54,7 +54,7 @@
 - 后继者为 AI 盲读代理而非人类；此为披露的限制，不冒充用户测试。
 - 修复提交：5b62594（contract-core list 重推导 + 坟碑 + 用例）。
 
-| T4（dogfood，计入本月 4 次分母） | 2026-09-22 | 本仓（dogfood） | post-T3 状态续接（无新修复；验证 Recent-commits 叙事在 HEAD=2fad145 仍成立） | 2026-09-22T15:26:58Z（HEAD=2fad145，J0 时 `amber handoff` 重新生成） | `session-handoff.md`（`amber handoff` 生成） | 新 agent 会话（盲读 handoff 单文件，未运行命令） | 是 | ①改了什么=**对**（Recent commits 五条逐字重建：2fad145/5b62594/1de4af9/5f2a7a7/60c0196；F065–F069 状态、master/clean 全对） ②谁批准=**对**（五批确认 0069/0076/0082/0088/0094「按推荐」全部读到，并如实披露无具名审批人） ③证据在哪=**对**（判定人独立复跑：harness-context 6/6、tool+execution 12/12、harness-*.test.js 52/52、F049/F050 grep 区间端点全真、日志文件存在） ④下一步=**对**（"start the next feature"，无误触发；如实披露下一 feature 编号不可知） | **通过（4/4，置信度 high）** | 独立判定 agent（首次满足账本头「判定人≠handoff 写出会话」规则；对照地面真值 + 本机只读复验） | 否 | 无 |
+| T4（dogfood，计入本月 4 次分母） | 2026-09-22 | 本仓（dogfood） | post-T3 状态续接（无新修复；验证 Recent-commits 叙事在 HEAD=2fad145 仍成立） | 2026-09-22T15:26:58Z（HEAD=2fad145，J0 时 `amber handoff` 重新生成） | `session-handoff.md`（`amber handoff` 生成） | 新 agent 会话（盲读 handoff 单文件，未运行命令） | 是 | ①改了什么=**对**（Recent commits 五条逐字重建：2fad145/5b62594/1de4af9/5f2a7a7/60c0196；F065–F069 状态、master/clean 全对） ②谁批准=**对**（五批确认 0069/0076/0082/0088/0094「按推荐」全部读到，并如实披露无具名审批人） ③证据在哪=**对**（判定人独立复跑：harness-context 6/6、tool+execution 12/12、harness-*.test.js 52/52、F049/F050 grep 区间端点全真、日志文件存在） ④下一步=**对**（"start the next feature"，无误触发；如实披露下一 feature 编号不可知） | **通过（4/4，置信度 high）** | 独立判定 agent（首次满足账本头「判定人≠handoff 写出会话」规则；对照地面真值 + 本机只读复验） | 否 | 无新增（同 T3 遗留：无具名审批人、无路线图） |
 
 ### T4 判定依据
 
@@ -63,7 +63,8 @@
 - ②③④ 无新缺口；「无具名审批人（issues 粒度）」与「无路线图故不知下一 feature 编号」与 T3 相同，为固有形态，如实披露不扣格。
 - 后继者为 AI 盲读代理而非人类；此为披露的限制，不冒充用户测试。
 - 本行无修复提交（T4 为纯测量行，树上无新变更）；工件存档：`.scratch/orchestration/continuation-t4/successor-answer.md` 与 `judge-verdict.md`。
-- 附注（Time to Trusted Continuation 首个样本）：J0=15:26:58Z，后继者完整作答≈J0+5min（盲读单文件、未运行命令）。
+- 附注（Time to Trusted Continuation 首个样本）：J0=15:26:58Z，后继者完整作答≈J0+5min（盲读单文件、未运行命令）。成文定义是「J0 到首次通过 J2」——项目级首次通过是 T2，但 T2/T3 未记精确 J0 时钟故不可采样，首样本取自本行（行级时延）；未来行的存档记作答完成时刻。
+- 判定依据引用的存档（`.scratch/orchestration/continuation-t4/`）为本地工件，不入 git；本行即方法主张的入版记录。
 
 ## 护栏快照
 
@@ -79,7 +80,7 @@
 
 本仓 dogfood 账本 ≥4 次禁读聊天的续接尝试，全有判定（比例允许 0/4）；每次失败记录缺失工件名；本仓 Activation 分母记 1 或 0（doctor 可复验 + 本月 ≥1 次通过 J2），并得出第一个 Time to Trusted Continuation。不招募外部仓。
 
-进展（2026-09-22，T4 后）：计入分母的 4 次尝试（T1–T4）已全部完成且全有判定——T1 2/4、T2 4/4、T3 4/4、T4 4/4（3/4 通过，判定人自 T4 起为独立 agent）。月度「≥4 次全有判定」条件已满足；首次尝试通过时点为 T2（2026-09-22）；首个 Time to Trusted Continuation 样本见 T4 附注（≈5 分钟，盲读单文件）。
+进展（2026-09-22，T4 后）：计入分母的 4 次尝试（T1–T4）已全部完成且全有判定——T1 2/4、T2 4/4、T3 4/4、T4 4/4，四次尝试中 3 次通过（T2/T3/T4），判定人自 T4 起为独立 agent。T0 为校准前试跑，不计分子亦不计入分母（含 T0 的宽口径为 5 次尝试 3 次通过，同样满足下句条件）。月度「≥4 次全有判定」条件已满足；首次尝试通过时点为 T2（2026-09-22）；首个 Time to Trusted Continuation 样本见 T4 附注（行级 ≈5 分钟，盲读单文件）。Activation 分母记 1（doctor 复验 errors=0，2026-09-22；本月 T2/T3/T4 ≥1 次通过 J2）。
 
 ## 本季验收（至 2026-12-22）
 
