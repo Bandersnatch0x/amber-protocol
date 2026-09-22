@@ -1,9 +1,9 @@
 # F068: Harness H2 — Execution Boundary (Contracts, Adapters, Comparable Boundaries)
 
 **spec_id:** F068
-**Status:** draft
+**Status:** accepted
 **Updated:** 2026-09-22
-**Provenance:** Harness v2 proposal §13/§24/§31 (Execution Boundary) and §23 (drift table); F052 runner declared prefixes / F062 stage verbs / F066 vertical slice as the existing authority surfaces; `scripts/lib/worktree-manager.js` (the one worktree seam the governed runner already uses); ADR-0100/0101/0102; wayfinder map `issues/0066`
+**Provenance:** Harness v2 proposal §13/§24/§31 (Execution Boundary) and §23 (drift table); F052 runner declared prefixes / F062 stage verbs / F066 vertical slice as the existing authority surfaces; `scripts/lib/worktree-manager.js` (the one worktree seam the governed runner already uses); ADR-0100/0101/0102; wayfinder map `issues/0066`; user confirmation 2026-09-22 (`issues/0088`, 「按推荐」)
 **Feature:** F068
 
 ## Problem Statement
@@ -98,6 +98,6 @@ A **staged H2** (this spec = H2a; the governed-runner wiring is H2b):
 
 ## Further Notes
 
-- Design decisions above are **recommendations adopted per the standing 「按推荐」 directive**;
-  the HITL confirmation ticket for this spec is `issues/0088`.
+- Design decisions above were **confirmed by the user 2026-09-22 (`issues/0088`, 「按推荐」)**;
+  the confirmation ticket is closed and this spec is accepted.
 - Naming/seam/guard constraints identical to F065–F067 batches.
