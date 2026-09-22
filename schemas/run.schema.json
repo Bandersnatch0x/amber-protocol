@@ -42,7 +42,47 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"ref": { "type": "string", "maxLength": 256 }
+				"ref": { "type": "string", "maxLength": 256 },
+				"contract": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"contractSnapshotHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+				"effective": { "$ref": "#/$defs/executionBoundary" },
+				"observed": {
+					"type": "object",
+					"required": ["entries"],
+					"additionalProperties": false,
+					"properties": {
+						"entries": {
+							"type": "array",
+							"items": { "$ref": "#/$defs/observedEntry" },
+							"maxItems": 256
+						},
+						"collectedAt": { "type": "string", "format": "date-time" }
+					}
+				},
+				"comparison": {
+					"type": "object",
+					"required": ["verdict", "findings"],
+					"additionalProperties": false,
+					"properties": {
+						"verdict": { "enum": ["ok", "violation", "unevaluated"] },
+						"findings": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["severity", "kind", "detail"],
+								"additionalProperties": false,
+								"properties": {
+									"severity": { "enum": ["violation", "info"] },
+									"kind": { "type": "string", "minLength": 1, "maxLength": 64 },
+									"detail": { "type": "string", "maxLength": 1000 },
+									"source": { "type": "string", "maxLength": 256 }
+								}
+							},
+							"maxItems": 256
+						},
+						"evaluatedAt": { "type": "string", "format": "date-time" }
+					}
+				}
 			}
 		},
 		"events": {
@@ -129,6 +169,71 @@
 		}
 	},
 	"$defs": {
+		"prefixList": {
+			"type": "array",
+			"items": { "type": "string", "minLength": 1, "maxLength": 256 },
+			"maxItems": 64
+		},
+		"executionBoundary": {
+			"type": "object",
+			"required": ["workspace"],
+			"additionalProperties": false,
+			"properties": {
+				"workspace": {
+					"type": "object",
+					"required": ["type", "path"],
+					"additionalProperties": false,
+					"properties": {
+						"type": { "enum": ["git-worktree", "local"] },
+						"path": { "type": "string", "minLength": 1, "maxLength": 512 },
+						"base": { "type": "string", "maxLength": 128 },
+						"branch": { "type": "string", "maxLength": 128 }
+					}
+				},
+				"filesystem": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"read": { "$ref": "#/$defs/prefixList" },
+						"write": { "$ref": "#/$defs/prefixList" },
+						"deny": { "$ref": "#/$defs/prefixList" }
+					}
+				},
+				"network": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": { "mode": { "enum": ["deny", "allow"] } }
+				},
+				"resources": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"timeoutMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+						"maxChildren": { "type": "integer", "minimum": 1, "maximum": 256 }
+					}
+				},
+				"mutation": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": { "mode": { "enum": ["isolated", "restricted"] } }
+				}
+			}
+		},
+		"observedEntry": {
+			"type": "object",
+			"required": ["kind"],
+			"additionalProperties": false,
+			"properties": {
+				"kind": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"paths": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1, "maxLength": 256 },
+					"maxItems": 64
+				},
+				"timeoutMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+				"source": { "type": "string", "minLength": 1, "maxLength": 256 }
+			}
+		},
 		"admissionCheck": {
 			"type": "object",
 			"required": ["result", "pointer"],

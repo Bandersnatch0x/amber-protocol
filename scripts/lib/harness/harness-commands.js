@@ -9,6 +9,7 @@
 
 const { defineCommand } = require("../subcommand-dispatcher");
 const { resolveTarget } = require("../command-helpers");
+const path = require("node:path");
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -36,7 +37,7 @@ function requiredFlag(args, key, label, example) {
 
 const dispatch = defineCommand({
 	command: "harness",
-	actions: ["admit", "inspect", "start", "advance", "status", "bind", "tool"],
+	actions: ["admit", "inspect", "start", "advance", "status", "bind", "tool", "execution"],
 	handlers: {
 		admit: (args) => {
 			const { admitHarnessContract } = require("./contract-core");
@@ -272,6 +273,102 @@ const dispatch = defineCommand({
 				} else {
 					return invalidArg(
 						"harness tool requires admit, list, inspect, or check. Example: amber harness tool admit --file path/to/tool.json",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		execution: (args) => {
+			const sub = args._?.[1];
+			const target = resolveTarget(args);
+			let result;
+			try {
+				if (sub === "admit") {
+					const { admitExecutionContract } = require("./execution-core");
+					const file = requiredFlag(
+						args,
+						"file",
+						"--file",
+						"amber harness execution admit --file path/to/contract.json --target <repo>",
+					);
+					if (file.error) return invalidArg(file.error);
+					result = admitExecutionContract(target, { contractPath: file.value });
+					const body = {
+						id: result.id,
+						snapshotHash: result.snapshotHash,
+						admittedAt: result.admittedAt,
+						contractFile: result.contractFile,
+						idempotent: result.idempotent,
+					};
+					return {
+						...body,
+						text: JSON.stringify(body, null, 2),
+						warnings: result.idempotent
+							? [
+									`execution contract "${result.id}" was already admitted; byte-identical re-admission left the record unchanged`,
+								]
+							: [],
+						ok: true,
+					};
+				}
+				if (sub === "list") {
+					const { listExecutionContracts } = require("./execution-core");
+					const { listPreparedExecutions } = require("./execution-adapter");
+					result = {
+						ok: true,
+						contracts: listExecutionContracts(target),
+						executions: listPreparedExecutions(target),
+					};
+				} else if (sub === "inspect") {
+					if (args.contract) {
+						const { inspectExecutionContract } = require("./execution-core");
+						result = inspectExecutionContract(target, { contractId: args.contract });
+					} else if (args.run) {
+						const { inspectExecution } = require("./execution-adapter");
+						result = inspectExecution(target, { runId: args.run });
+					} else {
+						return invalidArg(
+							"--contract <id> or --run <id> is required for harness execution inspect",
+						);
+					}
+				} else if (sub === "prepare") {
+					const { prepareExecution } = require("./execution-adapter");
+					const contract = requiredFlag(
+						args,
+						"contract",
+						"--contract",
+						"amber harness execution prepare --contract <id> --run <id> --target <repo>",
+					);
+					if (contract.error) return invalidArg(contract.error);
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness execution prepare --contract <id> --run <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					result = prepareExecution(target, { contractId: contract.value, runId: run.value });
+				} else if (sub === "evaluate") {
+					const { evaluateExecution } = require("./execution-adapter");
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness execution evaluate --run <id> --file observed.json --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					let observedEntries = [];
+					if (args.file) {
+						const fs = require("node:fs");
+						const parsed = JSON.parse(fs.readFileSync(path.resolve(target, args.file), "utf8"));
+						observedEntries = Array.isArray(parsed) ? parsed : parsed.entries || [];
+					}
+					result = evaluateExecution(target, { runId: run.value, observedEntries });
+				} else {
+					return invalidArg(
+						"harness execution requires admit, list, inspect, prepare, or evaluate. Example: amber harness execution admit --file path/to/contract.json",
 					);
 				}
 			} catch (err) {

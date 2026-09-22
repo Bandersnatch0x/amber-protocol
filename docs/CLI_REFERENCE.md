@@ -2865,6 +2865,19 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   verdict the existing policy surface would give the tool (deny-wins, default-action
   fallback), never enforcing anything. Runs record the tool-registry snapshot hash they
   operated under (`AMBER_E_HARNESS_TOOL_*` stable codes).
+- `harness execution admit --file <contract.json>` / `list` / `inspect (--contract <id> |
+  --run <id>)` / `prepare --contract <id> --run <id>` / `evaluate --run <id>
+  [--file observed.json]` (F068, declared/effective/observed comparable) — ExecutionContracts
+  declare the workspace/filesystem/network/resources/mutation boundary as an admitted immutable
+  artifact (repo-relative prefix shapes enforced in core). `prepare` selects the adapter by the
+  declared workspace type — the git-worktree adapter composes the existing worktree seam (one
+  workspace per run) — and reports the EFFECTIVE boundary field-comparably to the declaration.
+  `evaluate` folds observed entries into a closed verdict: `ok`, `unevaluated` (no observed
+  entries — never an invented ok), or `violation`, which lands the BLOCK posture (`execution.failed`
+  event with pointers to the violating sources; a running run blocks, a created/admitted run
+  cancels). The three boundaries ride the run's additive `execution` section
+  (`AMBER_E_HARNESS_EXEC_*` stable codes). H2b (the governed runner consuming adapter-prepared
+  workspaces; per-mutation observation) is a separate ticket behind this evidence.
 - `harness status [--run <id>]` — show one Run or list runs.
 - `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
   (Agent → Contract → Run → Events) from one read-only command.

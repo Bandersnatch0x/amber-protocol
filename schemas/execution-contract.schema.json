@@ -1,0 +1,87 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Execution Contract (v1)",
+	"description": "F068 (Harness v2 §13/§24/§31): the DECLARED boundary of one governed execution as an admitted, immutable artifact. Declared vs Effective vs Observed must be comparable; observed outside declared BLOCKs, never silently continues. Adapters prepare and report — Amber does not own the sandbox (§24): isolation stays with the existing worktree seam and the governed gates. Absence of an optional section means 'governed by the existing gates', never unbounded.",
+	"type": "object",
+	"required": ["apiVersion", "kind", "metadata", "workspace"],
+	"additionalProperties": false,
+	"properties": {
+		"apiVersion": { "const": "amber.dev/v1" },
+		"kind": { "const": "ExecutionContract" },
+		"metadata": {
+			"type": "object",
+			"required": ["id", "version"],
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128,
+					"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+				},
+				"version": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"description": { "type": "string", "maxLength": 2000 }
+			}
+		},
+		"workspace": {
+			"type": "object",
+			"required": ["type", "base"],
+			"additionalProperties": false,
+			"properties": {
+				"type": { "enum": ["git-worktree", "local"] },
+				"base": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128,
+					"description": "The declared base (e.g. HEAD or a branch). The adapter reports the effective base it actually prepared."
+				}
+			}
+		},
+		"filesystem": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"read": { "$ref": "#/$defs/prefixList" },
+				"write": { "$ref": "#/$defs/prefixList" },
+				"deny": { "$ref": "#/$defs/prefixList" }
+			}
+		},
+		"network": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"mode": {
+					"enum": ["deny", "allow"],
+					"description": "Default posture is deny (Harness v2 §4.1/§22). H2a declares it; enforcement stays with the existing gates."
+				}
+			}
+		},
+		"resources": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"timeoutMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+				"maxChildren": { "type": "integer", "minimum": 1, "maximum": 256 }
+			}
+		},
+		"mutation": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"mode": { "enum": ["isolated", "restricted"] }
+			}
+		}
+	},
+	"$defs": {
+		"prefixList": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256,
+				"description": "A repo-relative path prefix (posix-style). Absolute paths, '.'/'..' segments, and backslashes refuse in core."
+			},
+			"maxItems": 64
+		}
+	}
+}

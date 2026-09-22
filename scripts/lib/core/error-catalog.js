@@ -2830,6 +2830,75 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_HARNESS_TOOL_IMMUTABLE"],
 	},
+	AMBER_E_HARNESS_EXEC_PREPARE_FAILED: {
+		title: "Execution workspace could not be prepared",
+		cause:
+			"The adapter failed to prepare the declared workspace (e.g. the git worktree could not be created from the current base). Amber does not own the sandbox: the adapter reports, it never forces a fallback workspace.",
+		remedy:
+			"Resolve the underlying workspace error (branch state, dirty worktree), then retry; the declared contract is never widened to make preparation pass.",
+		layer: "Execution",
+		related: ["AMBER_E_HARNESS_EXEC_NOT_FOUND", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_EXEC_ALREADY_PREPARED: {
+		title: "Execution already prepared for this run",
+		cause:
+			"One workspace per run: a second prepare for the same run id was refused so the effective boundary stays single-sourced.",
+		remedy:
+			"Inspect the existing record (amber harness execution inspect --run <id>); a changed contract means a new run.",
+		layer: "Execution",
+		related: ["AMBER_E_HARNESS_EXEC_IMMUTABLE"],
+	},
+	AMBER_E_HARNESS_EXEC_ALREADY_EVALUATED: {
+		title: "Execution boundary already evaluated",
+		cause:
+			"The execution record already carries a declared/effective/observed comparison. Observed growth is an H2b concern; re-evaluation would rewrite a recorded verdict.",
+		remedy:
+			"Read the recorded comparison (amber harness execution inspect --run <id>); boundary violations are resolved by contract revision, never by widening.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_EXEC_RECORD_CORRUPT"],
+	},
+	AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND: {
+		title: "Prepared execution record not found",
+		cause: "A harness execution command referenced a run that has no prepared workspace record.",
+		remedy: "Run `amber harness execution prepare --contract <id> --run <id>` first.",
+		layer: "Execution",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_EXEC_RECORD_CORRUPT: {
+		title: "Execution record failed its closed shape",
+		cause:
+			"The stored execution record is not valid JSON or fails its closed-shape check (kind, boundaries, comparison verdict).",
+		remedy:
+			"Investigate the record under the harness state area; reads fail closed rather than presenting a broken boundary.",
+		layer: "Execution",
+		related: ["AMBER_E_HARNESS_EXEC_IMMUTABLE"],
+	},
+	AMBER_E_HARNESS_EXEC_IMMUTABLE: {
+		title: "Execution contract is immutable after admission",
+		cause:
+			"An admitted execution contract id was re-admitted with different bytes. Declared boundaries are frozen at admission; prepared executions record the snapshot, so a silent rewrite would break boundary provenance.",
+		remedy:
+			"Admit the changed document under a new id or version; the admitted record is left untouched.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_EXEC_NOT_FOUND: {
+		title: "Admitted execution contract not found",
+		cause: "A harness execution command referenced a contract id that has not been admitted.",
+		remedy:
+			"Run `amber harness execution admit --file <contract.json>` first; `amber harness execution list` lists admitted ids.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_EXEC_CORRUPT: {
+		title: "Admitted execution contract failed its snapshot re-hash",
+		cause:
+			"The stored contract record no longer hashes to its Snapshot Hash (edited in place or corrupt storage). Reads fail closed.",
+		remedy:
+			"Re-admit the intended document under a new id/version and investigate how the admitted bytes changed.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_EXEC_IMMUTABLE"],
+	},
 	AMBER_E_HARNESS_CONTRACT_IMMUTABLE: {
 		title: "Harness Contract is immutable after admission",
 		cause:

@@ -2468,6 +2468,40 @@
 				"The check is report-only and writes nothing; enforcement stays with the existing gates. Replay (H5) and scheduler (H7) stay out of scope."
 			],
 			"updated": "2026-09-22"
+		},
+		{
+			"id": "F068",
+			"priority": 68,
+			"area": "governance",
+			"paths": [
+				"schemas/execution-contract.schema.json",
+				"schemas/run.schema.json",
+				"scripts/lib/harness/execution-core.js",
+				"scripts/lib/harness/execution-adapter.js",
+				"docs/specs/F068-harness-execution-boundary.md",
+				"docs/plans/F068-harness-execution-boundary.md"
+			],
+			"title": "Harness H2a Execution Boundary (declared/effective/observed comparable)",
+			"user_visible_behavior": "amber harness execution admit|list|inspect|prepare|evaluate (expert tier, untyped): an admitted ExecutionContract declares the workspace/filesystem/network/resources/mutation boundary; preparing selects the adapter by declared type (the git-worktree adapter composes the existing worktree seam) and reports the EFFECTIVE boundary field-comparably; evaluating folds observed entries into an ok/violation/unevaluated verdict — observed outside declared BLOCKs the run (execution.failed event, never silent continuation) and lands the three boundaries on the run record.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-execution.test.js",
+				"amber harness execution prepare --contract <id> --run <id> then evaluate with an observed trail; inspect --run presents declared/effective/observed/comparison"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/harness-execution.test.js",
+					"result": "pass: 6/6 focused tests green (real temp git repos for the worktree adapter; deterministic fold cases ok/violation/unevaluated)",
+					"date": "2026-09-22",
+					"notes": "stage 6 exit pending full-suite gate"
+				}
+			],
+			"notes": [
+				"H2a is a staged boundary: adapters prepare/report/cleanup only (Amber does not own the sandbox, §24); execution stays with the existing governed gates.",
+				"H2b (governed-runner consumes adapter-prepared workspaces; per-mutation observation) is a separate named ticket behind H2a evidence.",
+				"Observed entries are mapped from records that already exist; no new observation mechanism in H2a."
+			],
+			"updated": "2026-09-22"
 		}
 	]
 }
