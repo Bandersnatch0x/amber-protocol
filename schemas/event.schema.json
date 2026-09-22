@@ -3,7 +3,7 @@
 	"title": "Amber Harness Event (v1)",
 	"description": "ADR-0102 (F065 H0): one append-only, run-scoped, typed fact of the harness event ledger. This schema validates the event BODY as submitted; the governed-ledger core adds the chain fields (prevHash/hash) at append time. Events are never edited or deleted; the type enum is closed and grows only by additive schema change.",
 	"type": "object",
-	"required": ["kind", "schemaVersion", "at", "runId"],
+	"required": ["kind", "schemaVersion", "at"],
 	"additionalProperties": false,
 	"properties": {
 		"kind": {
@@ -24,12 +24,20 @@
 				"execution.started",
 				"execution.completed",
 				"execution.failed",
-				"validation.completed"
+				"validation.completed",
+				"context.granted",
+				"context.denied",
+				"context.revoked"
 			]
 		},
 		"schemaVersion": { "const": 1 },
 		"at": { "type": "string", "format": "date-time" },
-		"runId": { "type": "string", "minLength": 1, "maxLength": 128 },
+		"runId": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"description": "Required for run-scoped kinds (run.*/execution.*/policy.*/validation.*/approval.*); context.* events carry actor/action instead (ADR-0102 amendment, F069)."
+		},
 		"actor": { "type": "string", "maxLength": 128 },
 		"action": {
 			"type": "object",

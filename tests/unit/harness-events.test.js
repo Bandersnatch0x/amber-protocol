@@ -94,6 +94,10 @@ test("an unknown event kind or a missing runId refuses with stable codes", () =>
 			(err) => err.amberCode === HARNESS_EVENT_INVALID_CODE,
 			"an unknown event kind is an argument error, refused before the ledger",
 		);
+		// F069: runId is optional in the schema (context.* events carry
+		// actor/action instead), so the run-scoped runId invariant is enforced
+		// at the write seam — a typed refusal before the ledger, never a
+		// silent append.
 		assert.throws(
 			() =>
 				emitHarnessEvent(target, {
@@ -102,7 +106,7 @@ test("an unknown event kind or a missing runId refuses with stable codes", () =>
 					at: "2026-09-22T00:00:00.000Z",
 				}),
 			(err) => err.amberCode === HARNESS_EVENT_INVALID_CODE,
-			"an unscoped event is an argument error, refused before the ledger",
+			"an unscoped run-scoped-kind event is an argument error, refused before the ledger",
 		);
 		assert.equal(readHarnessEvents(target).length, 0, "refused bodies never reach the chain");
 	} finally {

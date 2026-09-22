@@ -42,6 +42,20 @@ const HARNESS_EVENT_TYPES = Object.freeze([
 	"execution.completed",
 	"execution.failed",
 	"validation.completed",
+	"context.granted",
+	"context.denied",
+	"context.revoked",
+]);
+
+// Run-scoped kinds name their run (ADR-0102); context.* events (F069) carry
+// actor/action instead — the check reads labels, not values, and is not a
+// run concern.
+const RUN_SCOPED_EVENT_PREFIXES = Object.freeze([
+	"run.",
+	"policy.",
+	"approval.",
+	"execution.",
+	"validation.",
 ]);
 
 const HARNESS_FAMILY = defineLedgerFamily({
@@ -74,9 +88,19 @@ const HARNESS_FAMILY = defineLedgerFamily({
 						);
 					if (typeof event.at !== "string" || event.at.length === 0)
 						throw EVENTS_LEDGER.corrupt(`harness-event event ${lineIndex} carries no timestamp`);
-					if (typeof event.runId !== "string" || event.runId.length === 0)
+					const runScoped = RUN_SCOPED_EVENT_PREFIXES.some((prefix) =>
+						event.kind.startsWith(prefix),
+					);
+					if (runScoped && (typeof event.runId !== "string" || event.runId.length === 0))
 						throw EVENTS_LEDGER.corrupt(
-							`harness-event event ${lineIndex} is not run-scoped: runId is required`,
+							`harness-event event ${lineIndex} is not run-scoped: runId is required for ${JSON.stringify(event.kind)}`,
+						);
+					if (
+						event.runId !== undefined &&
+						(typeof event.runId !== "string" || event.runId.length === 0)
+					)
+						throw EVENTS_LEDGER.corrupt(
+							`harness-event event ${lineIndex} carries a malformed runId`,
 						);
 					state.events.push(event);
 				},
@@ -90,7 +114,19 @@ const EVENTS_LEDGER = HARNESS_FAMILY.ledgers.events;
 
 function eventProblem(candidate) {
 	const validate = compileSchema("event");
-	if (validate(candidate)) return null;
+	if (validate(candidate)) {
+		// The schema keeps runId optional (context.* events carry actor/action
+		// instead — ADR-0102 amendment), so the RUN-SCOPED runId invariant is
+		// enforced here at the write seam: a refused body must never reach the
+		// chain (the fold only walks events already on it).
+		if (
+			RUN_SCOPED_EVENT_PREFIXES.some((prefix) => candidate.kind.startsWith(prefix)) &&
+			(typeof candidate.runId !== "string" || candidate.runId.length === 0)
+		) {
+			return `run-scoped kind ${JSON.stringify(candidate.kind)} requires a runId`;
+		}
+		return null;
+	}
 	const detail = (validate.errors || [])
 		.map((e) => `${e.instancePath || "/"} ${e.message}`)
 		.join("; ");

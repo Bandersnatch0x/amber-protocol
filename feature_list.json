@@ -2502,6 +2502,39 @@
 				"Observed entries are mapped from records that already exist; no new observation mechanism in H2a."
 			],
 			"updated": "2026-09-22"
+		},
+		{
+			"id": "F069",
+			"priority": 69,
+			"area": "governance",
+			"paths": [
+				"schemas/context-grant.schema.json",
+				"schemas/event.schema.json",
+				"scripts/lib/harness/context-core.js",
+				"docs/specs/F069-harness-context-firewall.md",
+				"docs/plans/F069-harness-context-firewall.md"
+			],
+			"title": "Harness H3a Context Firewall (grants, TTL, purpose, denials)",
+			"user_visible_behavior": "amber harness context admit|list|inspect|check|revoke (expert tier, untyped): a ContextGrant binds one subject to resource prefixes for one purpose inside a half-open TTL under a classification ceiling from the loadout vocabulary; the deterministic report-first check answers allow-with-pointer or deny-with-closed-reason (no-grant/expired/revoked/purpose-mismatch/classification-above-ceiling, unrated unknown fails closed) reading labels only; revocation is a terminal record and expiry a read-time projection; context.granted/denied/revoked events land on the tamper-evident trail (runId required only for run-scoped kinds, ADR-0102 amendment).",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-context.test.js",
+				"amber harness context check --subject <s> --resource <prefix> --purpose <p> with an admitted grant; denials carry closed reasons and land on the trail"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/harness-context.test.js",
+					"result": "pass: 6/6 focused tests green (TTL boundaries, five deny reasons, ceiling ordering incl. fail-closed unknown, revocation terminality, event assertions, tamper fail-closed)",
+					"date": "2026-09-22",
+					"notes": "stage 6 exit pending full-suite gate"
+				}
+			],
+			"notes": [
+				"Compose-not-duplicate: the classification vocabulary and redaction reasons reuse the loadout contract; the check reads labels only and never gates the F017/F027 lifecycle.",
+				"H3b (verdict wiring into the actual context-loading path) is a separate named ticket behind this evidence.",
+				"ADR-0102 amendment: runId is required only for run-scoped event kinds, enforced at the write seam."
+			],
+			"updated": "2026-09-22"
 		}
 	]
 }

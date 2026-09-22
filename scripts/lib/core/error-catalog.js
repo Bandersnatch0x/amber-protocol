@@ -2830,6 +2830,39 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_HARNESS_TOOL_IMMUTABLE"],
 	},
+	AMBER_E_HARNESS_CTX_IMMUTABLE: {
+		title: "Context grant is immutable after admission",
+		cause:
+			"An admitted context grant id was re-admitted with different bytes. Grants are frozen at admission; changed access means a new grant while the old one expires or is revoked.",
+		remedy:
+			"Admit the changed document under a new id or version; the admitted record is left untouched.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_CTX_NOT_FOUND: {
+		title: "Admitted context grant not found",
+		cause: "A harness context command referenced a grant id that has not been admitted.",
+		remedy:
+			"Run `amber harness context admit --file <grant.json>` first; `amber harness context list` lists admitted ids.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_CTX_CORRUPT: {
+		title: "Admitted context grant failed its snapshot re-hash",
+		cause:
+			"The stored grant record no longer hashes to its Snapshot Hash (edited in place or corrupt storage). Reads fail closed.",
+		remedy:
+			"Re-admit the intended document under a new id/version and investigate how the admitted bytes changed.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_CTX_IMMUTABLE"],
+	},
+	AMBER_E_HARNESS_CTX_ALREADY_REVOKED: {
+		title: "Context grant is already revoked",
+		cause: "A second revocation was attempted on a grant whose revocation record is terminal.",
+		remedy: "Revocation is terminal and the grant stays listable; no action is needed.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_CTX_NOT_FOUND"],
+	},
 	AMBER_E_HARNESS_EXEC_PREPARE_FAILED: {
 		title: "Execution workspace could not be prepared",
 		cause:

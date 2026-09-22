@@ -2878,6 +2878,18 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   cancels). The three boundaries ride the run's additive `execution` section
   (`AMBER_E_HARNESS_EXEC_*` stable codes). H2b (the governed runner consuming adapter-prepared
   workspaces; per-mutation observation) is a separate ticket behind this evidence.
+- `harness context admit --file <grant.json>` / `list` / `inspect --grant <id>` / `check
+  --subject <s> --resource <prefix> --purpose <p> [--classification <c>] [--now <iso>]
+  [--run <id>]` / `revoke --grant <id> --revoker <who>` (F069, report-first firewall) —
+  ContextGrants bind one subject to resource prefixes for one purpose inside a half-open TTL
+  `[validFrom, validUntil)` under a classification ceiling from the loadout vocabulary. The
+  deterministic check answers allow-with-pointer or deny-with-closed-reason (`no-grant`,
+  `expired`, `revoked`, `purpose-mismatch`, `classification-above-ceiling`; unrated `unknown`
+  resources fail closed), reading labels only — never values. Revocation is a terminal record
+  (revoked grants stay listable forever) and expiry is a read-time projection.
+  `context.granted`/`context.denied`/`context.revoked` events land on the tamper-evident trail;
+  denials optionally scope to a run via `--run` (`AMBER_E_HARNESS_CTX_*` stable codes). H3b
+  (wiring the verdict into the actual context-loading path) is a separate ticket.
 - `harness status [--run <id>]` — show one Run or list runs.
 - `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
   (Agent → Contract → Run → Events) from one read-only command.

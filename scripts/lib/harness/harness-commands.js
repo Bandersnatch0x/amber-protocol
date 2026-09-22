@@ -37,7 +37,17 @@ function requiredFlag(args, key, label, example) {
 
 const dispatch = defineCommand({
 	command: "harness",
-	actions: ["admit", "inspect", "start", "advance", "status", "bind", "tool", "execution"],
+	actions: [
+		"admit",
+		"inspect",
+		"start",
+		"advance",
+		"status",
+		"bind",
+		"tool",
+		"execution",
+		"context",
+	],
 	handlers: {
 		admit: (args) => {
 			const { admitHarnessContract } = require("./contract-core");
@@ -261,15 +271,19 @@ const dispatch = defineCommand({
 				if (sub === "list") {
 					result = { ok: true, tools: listHarnessTools(target) };
 				} else if (sub === "inspect") {
-					if (!args.tool) {
+					// `--tool` maps to toolVal in FLAG_SPECS (the evidence command
+					// owns the accumulate form); tests may pass `tool` directly.
+					const toolId = args.toolVal || args.tool;
+					if (!toolId) {
 						return invalidArg("--tool <id> is required for harness tool inspect");
 					}
-					result = inspectHarnessTool(target, { toolId: args.tool });
+					result = inspectHarnessTool(target, { toolId });
 				} else if (sub === "check") {
-					if (!args.tool) {
+					const toolId = args.toolVal || args.tool;
+					if (!toolId) {
 						return invalidArg("--tool <id> is required for harness tool check");
 					}
-					result = checkHarnessTool(target, { toolId: args.tool });
+					result = checkHarnessTool(target, { toolId });
 				} else {
 					return invalidArg(
 						"harness tool requires admit, list, inspect, or check. Example: amber harness tool admit --file path/to/tool.json",
@@ -369,6 +383,82 @@ const dispatch = defineCommand({
 				} else {
 					return invalidArg(
 						"harness execution requires admit, list, inspect, prepare, or evaluate. Example: amber harness execution admit --file path/to/contract.json",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		context: (args) => {
+			const sub = args._?.[1];
+			const target = resolveTarget(args);
+			let result;
+			try {
+				if (sub === "admit") {
+					const { admitContextGrant } = require("./context-core");
+					const file = requiredFlag(
+						args,
+						"file",
+						"--file",
+						"amber harness context admit --file path/to/grant.json --target <repo>",
+					);
+					if (file.error) return invalidArg(file.error);
+					result = admitContextGrant(target, { grantPath: file.value });
+					const body = {
+						id: result.id,
+						snapshotHash: result.snapshotHash,
+						admittedAt: result.admittedAt,
+						grantFile: result.grantFile,
+						idempotent: result.idempotent,
+					};
+					return {
+						...body,
+						text: JSON.stringify(body, null, 2),
+						warnings: result.idempotent
+							? [
+									`context grant "${result.id}" was already admitted; byte-identical re-admission left the record unchanged`,
+								]
+							: [],
+						ok: true,
+					};
+				}
+				if (sub === "list") {
+					const { listContextGrants } = require("./context-core");
+					result = { ok: true, grants: listContextGrants(target) };
+				} else if (sub === "inspect") {
+					const { inspectContextGrant } = require("./context-core");
+					if (!args.grant) {
+						return invalidArg("--grant <id> is required for harness context inspect");
+					}
+					result = inspectContextGrant(target, { grantId: args.grant });
+				} else if (sub === "check") {
+					const { checkContextAccess } = require("./context-core");
+					result = checkContextAccess(target, {
+						subject: args.subject,
+						resource: args.resource,
+						purpose: args.purpose,
+						classification: args.classification,
+						now: args.now,
+						runId: args.run,
+					});
+				} else if (sub === "revoke") {
+					const { revokeContextGrant } = require("./context-core");
+					const grant = requiredFlag(
+						args,
+						"grant",
+						"--grant",
+						"amber harness context revoke --grant <id> --revoker <who> --target <repo>",
+					);
+					if (grant.error) return invalidArg(grant.error);
+					result = revokeContextGrant(target, {
+						grantId: grant.value,
+						revoker: args.revoker,
+						reason: args.reason,
+					});
+				} else {
+					return invalidArg(
+						"harness context requires admit, list, inspect, check, or revoke. Example: amber harness context check --subject worker --resource docs/ --purpose review --target <repo>",
 					);
 				}
 			} catch (err) {

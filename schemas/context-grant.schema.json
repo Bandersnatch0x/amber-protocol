@@ -1,0 +1,76 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Context Grant (v1)",
+	"description": "F069 (Harness v2 §11): Grant = Subject × Resource × Purpose × Time × Policy. The admitted, immutable authorization for one subject to read resource prefixes for one purpose inside a half-open TTL window, under a classification ceiling from the loadout vocabulary (public < internal < confidential < restricted < secret; 'unknown' is unrated and fails closed). The grant authorizes READING labels and the covered resources — it never carries values, and the report-first check never gates the existing context lifecycle (H3b wires that).",
+	"type": "object",
+	"required": [
+		"apiVersion",
+		"kind",
+		"metadata",
+		"subject",
+		"resources",
+		"purpose",
+		"classificationCeiling",
+		"validFrom",
+		"validUntil"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"apiVersion": { "const": "amber.dev/v1" },
+		"kind": { "const": "ContextGrant" },
+		"metadata": {
+			"type": "object",
+			"required": ["id", "version"],
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128,
+					"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+				},
+				"version": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"description": { "type": "string", "maxLength": 2000 }
+			}
+		},
+		"subject": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"description": "The granted principal (agent id, human id, or role label) — one subject per grant."
+		},
+		"resources": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256,
+				"description": "A repo-relative posix resource prefix (same shape rules as execution contracts)."
+			},
+			"minItems": 1,
+			"maxItems": 64
+		},
+		"purpose": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"description": "The bound purpose (exact-match at check time)."
+		},
+		"classificationCeiling": {
+			"enum": ["public", "internal", "confidential", "restricted", "secret"],
+			"description": "The highest classification this grant covers. 'unknown' resources are unrated and deny fail-closed."
+		},
+		"validFrom": { "type": "string", "format": "date-time" },
+		"validUntil": {
+			"type": "string",
+			"format": "date-time",
+			"description": "Half-open window [validFrom, validUntil) with no clock-skew tolerance; expiry is a read-time projection, never an edit."
+		},
+		"policy": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256,
+			"description": "Reference to the governing policy pin."
+		}
+	}
+}
