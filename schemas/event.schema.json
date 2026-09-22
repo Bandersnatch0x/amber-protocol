@@ -50,6 +50,12 @@
 		},
 		"inputHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
 		"outputHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-		"reason": { "type": "string", "maxLength": 2000 }
+		"reason": { "type": "string", "maxLength": 2000 },
+		"pointers": {
+			"description": "F066: optional additive field — the governed-artifact pointers this event witnessed (e.g. the six AdmissionReceipt pointers on run.admitted). Additive, never required.",
+			"type": "array",
+			"items": { "type": "string", "minLength": 1, "maxLength": 256 },
+			"maxItems": 16
+		}
 	}
 }

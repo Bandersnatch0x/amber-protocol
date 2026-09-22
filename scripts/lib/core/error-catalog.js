@@ -2767,6 +2767,33 @@ const CATALOG = {
 		layer: "Tooling",
 		related: ["AMBER_E_KNOWLEDGE_INDEX_SOURCE"],
 	},
+	AMBER_E_HARNESS_ADMISSION_INCOMPLETE: {
+		title: "Harness admission receipt is incomplete",
+		cause:
+			"Advancing a run to the admitted state without a complete six-check AdmissionReceipt. A receipt is only ever stored complete: every check (identity, contract, policy, context, execution, approval) must name the existing governed artifact it witnessed.",
+		remedy:
+			"Re-run with --check <name:pointer> for all six checks, each pointer citing the existing governed artifact (e.g. the loop approval token or the worktree execution contract).",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG", "AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION"],
+	},
+	AMBER_E_HARNESS_LOOP_APPROVAL_MISSING: {
+		title: "Loop has no unconsumed approval to witness",
+		cause:
+			"Starting a run with --from-loop found no unconsumed approval record in the loop's ledger (.amber/loops/<id>/ledger.jsonl). Harness admission witnesses real governed approvals; a claim is never sufficient.",
+		remedy:
+			"Run the loop's own approval gate first (amber loop approve --file <pack> --contract <id>), then retry the harness start.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_ADMISSION_INCOMPLETE", "AMBER_E_HARNESS_LOOP_OUTCOME_MISSING"],
+	},
+	AMBER_E_HARNESS_LOOP_OUTCOME_MISSING: {
+		title: "Loop has no executed outcome to bind",
+		cause:
+			"Binding a run found no executed record in the loop's ledger. Outcomes come from the real governed execution (amber loop run --execute behind its four gates), never from claims.",
+		remedy:
+			"Execute the governed loop first (amber loop run --file <pack> --contract <id> --execute), then retry the harness bind.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_LOOP_APPROVAL_MISSING"],
+	},
 	AMBER_E_HARNESS_CONTRACT_IMMUTABLE: {
 		title: "Harness Contract is immutable after admission",
 		cause:

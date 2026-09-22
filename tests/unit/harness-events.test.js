@@ -114,11 +114,21 @@ test("the run lifecycle emits its trail; inspect --run shows run + verified even
 	const target = tmpTarget();
 	try {
 		const run = admitAndStart(target);
+		// F066: advancing to admitted requires the complete six-check receipt.
+		const admissionChecks = [
+			"identity:subjects/worker",
+			"contract:harness/contracts/coding-task.json",
+			"policy:governance/rules.json#default-safe",
+			"context:loops/trail/context-authority",
+			"execution:worktrees/trail-1",
+			"approval:loops/ledger#approval-1",
+		];
 		dispatch("harness", {
 			target,
 			json: true,
 			run: run.id,
 			to: "admitted",
+			checks: admissionChecks,
 			_: ["advance"],
 		});
 		const shown = dispatch("harness", {

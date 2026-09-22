@@ -2399,6 +2399,41 @@
 				"H1+ layers, replay, and H7 scheduling stay out of scope (wayfinder map issues/0066 fog). F066 vertical slice next; commit pending user decision (all paths staged)."
 			],
 			"updated": "2026-09-22"
+		},
+		{
+			"id": "F066",
+			"priority": 66,
+			"area": "governance",
+			"paths": [
+				"schemas/run.schema.json",
+				"schemas/event.schema.json",
+				"scripts/lib/harness/loop-adapter.js",
+				"scripts/lib/harness/run-core.js",
+				"scripts/lib/harness/harness-commands.js",
+				"docs/specs/F066-harness-vertical-slice.md",
+				"docs/plans/F066-harness-vertical-slice.md"
+			],
+			"title": "Harness Vertical Slice (loop execution through Contract/Admission/Run/Event)",
+			"user_visible_behavior": "One governed loop execution maps to Task + Run + AdmissionReceipt + Events: amber harness start --from-loop admits a run whose six receipt checks (identity/contract/policy/context/execution/approval) each cite the real loop gate artifact it witnessed; amber harness bind maps the loop ledger's real executed outcome to execution.* and policy.evaluated events and moves the run to completed/failed. The adapter only reads the loop's tamper-evident ledger and grants no new authority.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-admission.test.js tests/unit/harness-loop-adapter.test.js tests/unit/harness-run.test.js tests/unit/harness-events.test.js tests/unit/harness-commands.test.js tests/unit/harness-integration.test.js",
+				"amber harness start --from-loop <loopId> then amber harness bind --run <id> --from-loop <loopId> presents the full chain via amber harness inspect --run <id>"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/harness-*.test.js (F066 set)",
+					"result": "pass: 32/32 focused tests green (admission 5, loop adapter 5, commands 9, run 6, events 6, §38 walk 1)",
+					"date": "2026-09-22",
+					"notes": "stage 6 exit pending full-suite gate"
+				}
+			],
+			"notes": [
+				"AdmissionReceipt rides the Run record additively (ADR-0012 conventions); pre-F066 records stay schema-valid.",
+				"The adapter is read-only over the loop surfaces: the loop's four gates (policy, approval, worktree, ledger) remain the sole authority.",
+				"Replay/validation-receipt engine (H5), scheduler (H7), and MCP projection stay out of scope."
+			],
+			"updated": "2026-09-22"
 		}
 	]
 }

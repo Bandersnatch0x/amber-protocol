@@ -130,6 +130,8 @@ const FLAG_SPECS = {
 	"--window": { key: "window" },
 	"--knowledge-kind": { key: "knowledgeKind" },
 	"--supersedes": { key: "supersedesValue", accumulate: "supersedes" },
+	"--check": { key: "check", accumulate: "checks" },
+	"--from-loop": { key: "fromLoop" },
 	"--supersedes-revision": { key: "supersedesRevision" },
 	"--expected-head": { key: "expectedHead" },
 	"--idempotency-key": { key: "idempotencyKey" },

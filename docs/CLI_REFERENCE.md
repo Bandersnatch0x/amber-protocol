@@ -2839,11 +2839,23 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   (the stored record is re-hashed on every read; a mismatch refuses closed).
 - `harness start --contract <id> [--run <id>] [--agent <id>] [--session <id>] [--task <id>]` —
   create a Run bound to the contract's Snapshot Hash. Fails closed when the contract is not
-  admitted or corrupt.
-- `harness advance --run <id> --to <state> [--reason <text>]` — move a Run along its closed
-  nine-state machine (`created→admitted→running→{paused|blocked|…}`); illegal transitions and
-  final-state rewrites refuse with stable `AMBER_E_HARNESS_*` codes. Each transition appends a
-  `run.*` event to the ledger.
+  admitted or corrupt. With `--from-loop <loopContractId>` (F066), the run is admitted from the
+  loop's **unconsumed approval** in its tamper-evident ledger
+  (`.amber/loops/<id>/ledger.jsonl`): the six-check AdmissionReceipt
+  (identity/contract/policy/context/execution/approval) each cites the real gate artifact it
+  witnessed, and a loop without an unconsumed approval refuses closed
+  (`AMBER_E_HARNESS_LOOP_APPROVAL_MISSING`).
+- `harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...]` —
+  move a Run along its closed nine-state machine (`created→admitted→running→{paused|blocked|…}`);
+  illegal transitions and final-state rewrites refuse with stable `AMBER_E_HARNESS_*` codes.
+  Advancing to `admitted` requires the complete six-check AdmissionReceipt
+  (`AMBER_E_HARNESS_ADMISSION_INCOMPLETE` otherwise). Each transition appends a `run.*` event
+  to the ledger.
+- `harness bind --run <id> --from-loop <loopContractId>` — bind one real loop outcome (the
+  loop ledger's latest `executed` record) to an admitted/running run: emits
+  `execution.started`, `policy.evaluated`, and `execution.completed`/`execution.failed` events,
+  then moves the run to `completed`/`failed`. A failed execution leaves a failed run; binding
+  without a real executed record refuses (`AMBER_E_HARNESS_LOOP_OUTCOME_MISSING`).
 - `harness status [--run <id>]` — show one Run or list runs.
 - `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
   (Agent → Contract → Run → Events) from one read-only command.

@@ -114,20 +114,33 @@ test("advance walks the legal path created→admitted→running→completed", ()
 			_: ["start"],
 		});
 		const runId = started.result.run.id;
-		for (const to of ["admitted", "running", "completed"]) {
-			const step = dispatch("harness", {
+		// F066: advancing to admitted requires the complete six-check receipt.
+		const admissionChecks = [
+			"identity:subjects/worker",
+			"contract:harness/contracts/coding-task.json",
+			"policy:governance/rules.json#default-safe",
+			"context:loops/walk/context-authority",
+			"execution:worktrees/walk-1",
+			"approval:loops/ledger#approval-1",
+		];
+		for (const step of [
+			{ to: "admitted", checks: admissionChecks },
+			{ to: "running" },
+			{ to: "completed" },
+		]) {
+			const advanced = dispatch("harness", {
 				target,
 				json: true,
 				run: runId,
-				to,
+				to: step.to,
+				...(step.checks ? { checks: step.checks } : {}),
 				reason: "tracer walk",
 				_: ["advance"],
 			});
-			assert.equal(step.exitCode, 0, `advance to ${to} should succeed`);
-			assert.equal(step.result.run.state, to);
+			assert.equal(advanced.exitCode, 0, `advance to ${step.to} should succeed`);
+			assert.equal(advanced.result.run.state, step.to);
 		}
-		const last = started.result.run.id;
-		const shown = dispatch("harness", { target, json: true, run: last, _: ["status"] });
+		const shown = dispatch("harness", { target, json: true, run: runId, _: ["status"] });
 		assert.equal(shown.result.run.state, "completed");
 		assert.ok(shown.result.run.outcome.startedAt, "entering running records startedAt");
 		assert.ok(shown.result.run.outcome.finishedAt, "entering a final state records finishedAt");

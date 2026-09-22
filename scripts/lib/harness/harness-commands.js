@@ -36,7 +36,7 @@ function requiredFlag(args, key, label, example) {
 
 const dispatch = defineCommand({
 	command: "harness",
-	actions: ["admit", "inspect", "start", "advance", "status"],
+	actions: ["admit", "inspect", "start", "advance", "status", "bind"],
 	handlers: {
 		admit: (args) => {
 			const { admitHarnessContract } = require("./contract-core");
@@ -99,7 +99,6 @@ const dispatch = defineCommand({
 			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
 		},
 		start: (args) => {
-			const { createRun } = require("./run-core");
 			const target = resolveTarget(args);
 			const contract = requiredFlag(
 				args,
@@ -110,24 +109,67 @@ const dispatch = defineCommand({
 			if (contract.error) return invalidArg(contract.error);
 			let result;
 			try {
-				result = createRun(target, {
-					contractId: contract.value,
-					runId: args.run,
-					subject: {
-						agent: args.agent || "unspecified-agent",
-						...(args.session ? { session: args.session } : {}),
-						...(args.task ? { task: args.task } : {}),
-					},
-					executionRef: args.execution,
-				});
+				if (args.fromLoop) {
+					// F066: one governed loop execution maps to Task + Run + Receipt.
+					const { startRunFromLoop } = require("./loop-adapter");
+					result = startRunFromLoop(target, {
+						contractId: contract.value,
+						loopContractId: args.fromLoop,
+						packFile: args.file,
+						runId: args.run,
+						agent: args.agent,
+					});
+				} else {
+					const { createRun } = require("./run-core");
+					result = createRun(target, {
+						contractId: contract.value,
+						runId: args.run,
+						subject: {
+							agent: args.agent || "unspecified-agent",
+							...(args.session ? { session: args.session } : {}),
+							...(args.task ? { task: args.task } : {}),
+						},
+						executionRef: args.execution,
+					});
+				}
 			} catch (err) {
 				return writeFailure(err);
 			}
 			const body = { run: result.run, runFile: result.runFile };
 			return { ...body, text: JSON.stringify(body, null, 2), ok: true };
 		},
+		bind: (args) => {
+			const { bindLoopOutcome } = require("./loop-adapter");
+			const target = resolveTarget(args);
+			const run = requiredFlag(
+				args,
+				"run",
+				"--run",
+				"amber harness bind --run run-xyz --from-loop daily-amber-triage --target <repo>",
+			);
+			if (run.error) return invalidArg(run.error);
+			const loop = requiredFlag(
+				args,
+				"fromLoop",
+				"--from-loop",
+				"amber harness bind --run run-xyz --from-loop daily-amber-triage --target <repo>",
+			);
+			if (loop.error) return invalidArg(loop.error);
+			let result;
+			try {
+				result = bindLoopOutcome(target, { runId: run.value, loopContractId: loop.value });
+			} catch (err) {
+				return writeFailure(err);
+			}
+			const body = {
+				run: result.run,
+				outcomeExitCode: result.exitCode,
+				executedPointer: result.executedPointer,
+			};
+			return { ...body, text: JSON.stringify(body, null, 2), ok: true };
+		},
 		advance: (args) => {
-			const { transitionRun } = require("./run-core");
+			const { transitionRun, ADMISSION_CHECK_NAMES } = require("./run-core");
 			const target = resolveTarget(args);
 			const run = requiredFlag(
 				args,
@@ -143,9 +185,34 @@ const dispatch = defineCommand({
 				"amber harness advance --run run-xyz --to running --target <repo>",
 			);
 			if (to.error) return invalidArg(to.error);
+			let admission;
+			if (Array.isArray(args.checks) && args.checks.length > 0) {
+				admission = {};
+				for (const entry of args.checks) {
+					const sep = String(entry).indexOf(":");
+					if (sep <= 0) {
+						return invalidArg(
+							`--check must be <name:pointer> (got ${JSON.stringify(entry)}); names: ${ADMISSION_CHECK_NAMES.join(", ")}`,
+						);
+					}
+					const name = String(entry).slice(0, sep);
+					const pointer = String(entry).slice(sep + 1);
+					if (!ADMISSION_CHECK_NAMES.includes(name)) {
+						return invalidArg(
+							`unknown admission check "${name}"; names: ${ADMISSION_CHECK_NAMES.join(", ")}`,
+						);
+					}
+					admission[name] = { result: "pass", pointer };
+				}
+			}
 			let result;
 			try {
-				result = transitionRun(target, { runId: run.value, to: to.value, reason: args.reason });
+				result = transitionRun(target, {
+					runId: run.value,
+					to: to.value,
+					reason: args.reason,
+					admission,
+				});
 			} catch (err) {
 				return writeFailure(err);
 			}

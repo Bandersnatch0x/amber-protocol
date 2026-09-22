@@ -84,19 +84,32 @@ test("the §38 gate: one inspect presents Contract → Run → Events end to end
 		]);
 		assert.equal(start.exitCode, 0);
 
-		for (const to of ["admitted", "running"]) {
-			const advance = await runCapture([
+		const admissionChecks = [
+			"identity:subjects/worker",
+			"contract:harness/contracts/gate-walk.json",
+			"policy:governance/rules.json#default-safe",
+			"context:loops/gate/context-authority",
+			"execution:worktrees/gate-1",
+			"approval:loops/ledger#approval-1",
+		];
+		const steps = [{ to: "admitted", checks: admissionChecks }, { to: "running" }];
+		for (const step of steps) {
+			const advanceArgs = [
 				"harness",
 				"advance",
 				"--run",
 				"run-gate-1",
 				"--to",
-				to,
+				step.to,
 				"--target",
 				target,
 				"--json",
-			]);
-			assert.equal(advance.exitCode, 0, `advance to ${to}`);
+			];
+			for (const check of step.checks || []) {
+				advanceArgs.push("--check", check);
+			}
+			const advance = await runCapture(advanceArgs);
+			assert.equal(advance.exitCode, 0, `advance to ${step.to}`);
 		}
 
 		const inspect = await runCapture([

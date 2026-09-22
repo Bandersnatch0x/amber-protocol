@@ -22,7 +22,21 @@ const CODE_ILLEGAL = "AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION";
 const CODE_FINAL = "AMBER_E_HARNESS_RUN_FINAL";
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_RUN_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_RUN_CORRUPT";
+const CODE_ADMISSION_INCOMPLETE = "AMBER_E_HARNESS_ADMISSION_INCOMPLETE";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
+
+// The six AdmissionReceipt checks (ADR-0100 decision 3, F066): each names the
+// EXISTING governed artifact it witnessed. A receipt is only ever written
+// complete — a missing or malformed check refuses the whole admission, so a
+// stored receipt is always all-pass.
+const ADMISSION_CHECK_NAMES = Object.freeze([
+	"identity",
+	"contract",
+	"policy",
+	"context",
+	"execution",
+	"approval",
+]);
 
 function typedError(code, message) {
 	const err = new Error(message);
@@ -86,7 +100,7 @@ function eventKindForTransition(from, to) {
 	throw typedError(CODE_ILLEGAL, `no event kind for run transition to ${JSON.stringify(to)}`);
 }
 
-function emitRunEvent(targetRoot, kind, run, at, reason) {
+function emitRunEvent(targetRoot, kind, run, at, reason, pointers) {
 	emitHarnessEvent(targetRoot, {
 		kind,
 		schemaVersion: 1,
@@ -94,7 +108,27 @@ function emitRunEvent(targetRoot, kind, run, at, reason) {
 		runId: run.id,
 		actor: run.subject ? run.subject.agent : undefined,
 		...(reason ? { reason } : {}),
+		...(pointers && pointers.length > 0 ? { pointers } : {}),
 	});
+}
+
+// The AdmissionReceipt is only ever stored complete: every one of the six
+// checks must name the existing governed artifact it witnessed. Anything
+// less refuses the whole admission — a receipt is evidence, not intent.
+function admissionProblem(admission) {
+	if (!admission || typeof admission !== "object" || Array.isArray(admission)) {
+		return "admission to the admitted state requires the six receipt checks (--check <name:pointer> per check)";
+	}
+	for (const name of ADMISSION_CHECK_NAMES) {
+		const check = admission[name];
+		if (!check || typeof check !== "object" || check.result !== "pass") {
+			return `admission check "${name}" is missing or not a pass — a receipt records witnessed gates only`;
+		}
+		if (typeof check.pointer !== "string" || check.pointer.trim().length === 0) {
+			return `admission check "${name}" carries no pointer to a governed artifact`;
+		}
+	}
+	return null;
 }
 
 function generateRunId(now) {
@@ -171,7 +205,7 @@ function createRun(targetRoot, { contractId, subject, runId, executionRef, now }
  * @param {string} [opts.reason]
  * @param {string} [opts.now]
  */
-function transitionRun(targetRoot, { runId, to, reason, now } = {}) {
+function transitionRun(targetRoot, { runId, to, reason, now, admission } = {}) {
 	if (!runId || typeof runId !== "string") {
 		throw typedError(CODE_INVALID_ARG, "--run <id> is required to advance a run");
 	}
@@ -196,6 +230,23 @@ function transitionRun(targetRoot, { runId, to, reason, now } = {}) {
 		);
 	}
 	const at = now || new Date().toISOString();
+	let receiptPointers = null;
+	if (to === "admitted") {
+		const problem = admissionProblem(admission);
+		if (problem !== null) throw typedError(CODE_ADMISSION_INCOMPLETE, problem);
+		record.admission = {
+			receiptedAt: at,
+			checks: Object.fromEntries(
+				ADMISSION_CHECK_NAMES.map((name) => [
+					name,
+					{ result: "pass", pointer: admission[name].pointer },
+				]),
+			),
+		};
+		receiptPointers = ADMISSION_CHECK_NAMES.map(
+			(name) => `${name}:${record.admission.checks[name].pointer}`,
+		);
+	}
 	record.stateHistory.push({ from: record.state, to, at, ...(reason ? { reason } : {}) });
 	record.state = to;
 	record.outcome = record.outcome || {};
@@ -208,6 +259,7 @@ function transitionRun(targetRoot, { runId, to, reason, now } = {}) {
 		record,
 		at,
 		reason,
+		receiptPointers,
 	);
 	return { ok: true, run: record, runFile: file };
 }
@@ -258,9 +310,11 @@ module.exports = {
 	transitionRun,
 	getRun,
 	listRuns,
+	ADMISSION_CHECK_NAMES,
 	CODE_ILLEGAL,
 	CODE_FINAL,
 	CODE_NOT_FOUND,
 	CODE_CORRUPT,
+	CODE_ADMISSION_INCOMPLETE,
 	CODE_INVALID_ARG,
 };

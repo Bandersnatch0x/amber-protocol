@@ -94,6 +94,44 @@
 				"startedAt": { "type": "string", "format": "date-time" },
 				"finishedAt": { "type": "string", "format": "date-time" }
 			}
+		},
+		"admission": {
+			"description": "F066 (ADR-0100 decision 3): the AdmissionReceipt. Additive section — records created before F066 stay schema-valid without it. The receipt is only ever written complete: each of the six checks names the existing governed artifact it witnessed; a missing or refused check refuses the whole admission, so a stored receipt is always all-pass.",
+			"type": "object",
+			"required": ["receiptedAt", "checks"],
+			"additionalProperties": false,
+			"properties": {
+				"receiptedAt": { "type": "string", "format": "date-time" },
+				"checks": {
+					"type": "object",
+					"required": ["identity", "contract", "policy", "context", "execution", "approval"],
+					"additionalProperties": false,
+					"properties": {
+						"identity": { "$ref": "#/$defs/admissionCheck" },
+						"contract": { "$ref": "#/$defs/admissionCheck" },
+						"policy": { "$ref": "#/$defs/admissionCheck" },
+						"context": { "$ref": "#/$defs/admissionCheck" },
+						"execution": { "$ref": "#/$defs/admissionCheck" },
+						"approval": { "$ref": "#/$defs/admissionCheck" }
+					}
+				}
+			}
+		}
+	},
+	"$defs": {
+		"admissionCheck": {
+			"type": "object",
+			"required": ["result", "pointer"],
+			"additionalProperties": false,
+			"properties": {
+				"result": { "const": "pass" },
+				"pointer": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 256,
+					"description": "Pointer to the EXISTING governed artifact this check witnessed (path, id, or ledger entry). Harness re-derives nothing and owns no new gate."
+				}
+			}
 		}
 	}
 }
