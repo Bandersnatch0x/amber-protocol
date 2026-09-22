@@ -25,8 +25,9 @@ Admit and inspect Harness Contracts and Runs (F065 H0, ADR-0100/0101). A
 ```bash
 amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness inspect (--contract <id> | --all) --target <repo> [--json]
-       amber harness start --contract <id> [--run <id>] [--agent <id>] [--session <id>] [--task <id>] --target <repo> [--json]
-       amber harness advance --run <id> --to <state> [--reason <text>] --target <repo> [--json]
+       amber harness start --contract <id> [--from-loop <loopId> [--file <pack.json>]] [--run <id>] [--agent <id>] --target <repo> [--json]
+       amber harness bind --run <id> --from-loop <loopId> --target <repo> [--json]
+       amber harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...] --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
 
@@ -45,6 +46,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | --- | --- |
 | <code>admit</code> | Subcommand action for <code>harness</code> |
 | <code>advance</code> | Subcommand action for <code>harness</code> |
+| <code>bind</code> | Subcommand action for <code>harness</code> |
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
@@ -69,7 +71,20 @@ Subcommands:
   start               Create a Run bound to an admitted contract. Optional:
                       --run <id>, --agent <id>, --session <id>, --task <id>.
                       Required: --contract <id>.
-  advance             Move a Run along its closed nine-state machine.
+                      With --from-loop <loopContractId> (F066): admit the run
+                      from the loop's unconsumed approval in its ledger — the
+                      six receipt checks point at the real gate artifacts.
+                      Optional then: --file <workflow-pack.json>.
+  bind                Bind one real loop outcome (the loop ledger's latest
+                      executed record) to an admitted/running run: emits
+                      execution.* and policy.evaluated events and moves the
+                      run to completed/failed. Required: --run <id>
+                      --from-loop <loopContractId>.
+  advance             Move a Run along its closed nine-state machine. Advancing to
+                      admitted requires the complete six-check AdmissionReceipt:
+                      --check <name:pointer> for identity, contract, policy,
+                      context, execution, approval — each pointer citing the
+                      existing governed artifact it witnessed.
                       Required: --run <id> --to <state>. Optional: --reason.
   status              Show one Run with --run <id>, or list runs.
 
