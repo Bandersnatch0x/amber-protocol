@@ -44,6 +44,16 @@
 - 后继者为 AI 盲读代理而非人类；此为披露的限制，不冒充用户测试。
 - 修复提交：J7 批（lifecycle 短路 / git-state.recentCommits / handoff Repo State / feature_list 确认证据 ×3）。
 
+| T3（dogfood，计入本月 4 次分母） | 2026-09-22 | 本仓（dogfood） | contracts list 坟碑对齐（T3 修复，提交 5b62594） | 2026-09-22 | `session-handoff.md`（`amber handoff` 生成） | 新 agent 会话（盲读 handoff 单文件） | 是 | ①改了什么=**对**（最近工作正确归因到 5b62594「contracts list T3 修复」——Recent commits 首条即为此；会话摘要虽仍锚定 G-1…G-11，但已不是唯一叙事） ②谁批准=**对**（F065–F069 五批确认全部可读：0069/0076/0082/0088/0094「按推荐」） ③证据在哪=**对**（context 6/6、全量数字、`.scratch/` 日志路径） ④下一步=**对**（"start the next feature"，无误触发） | **通过（4/4，置信度 high）** | 交付会话对照地面真值判定；判定人未读本会话聊天 | 否 | 下一个 feature 的具体 ID（handoff 不做路线图）；F042 证据行标 (none)（历史遗留） |
+
+### T3 判定依据
+
+- ① Recent commits 首条即 T3 修复（5b62594），后继者据此正确回答「最近完成了什么」——修复 2 的写侧叙事首次成为判定主依据。
+- ② 五批确认证据（修复 3）全部被读到，逐条点名 0069/0076/0082/0088/0094。
+- ③④ 无新缺口；后继者标注的「下一 feature 未指定、F042 证据 (none)」为 handoff 固有形态与历史遗留，如实披露。
+- 后继者为 AI 盲读代理而非人类；此为披露的限制，不冒充用户测试。
+- 修复提交：5b62594（contract-core list 重推导 + 坟碑 + 用例）。
+
 ## 护栏快照
 
 | 护栏 | 值 | 核对日 |
