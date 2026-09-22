@@ -35,6 +35,15 @@
 2. （T1 新面）handoff 摘要锚定最后一次 amber session——不走 session 生命周期的交付在 handoff 里没有叙事；git 事实（最近提交、feature 状态）与 session 摘要脱节。
 3. （T1 新面）确认/审批证据的落位不一致：F065 把用户确认写进了 feature 证据行，F066–F069 没有——同类治理事实应统一落位。
 
+| T2（dogfood，计入本月 4 次分母） | 2026-09-22 | 本仓（dogfood） | J7 修复批（next 短路 / handoff Recent commits / 确认证据落位，当时未提交） | 2026-09-22 | `session-handoff.md`（修复后 `amber handoff` 生成） | 新 agent 会话（盲读 handoff 单文件） | 是 | ①改了什么=**对**（会话摘要虽仍锚定 G-1…G-11，但 Recent commits 五条 F069/H3a 叙事就在其下，且正确点出四个未提交 J7 文件与「not booked, actor unknown」归属） ②谁批准=**对**（读到 F069 的 0094「按推荐」确认证据行——修复 3 生效） ③证据在哪=**对**（聚焦测试 + 全量数字 + 日志路径） ④下一步=**对**（"start the next feature"，无误触发；并正确处理 Dirty worktree 节） | **通过（4/4，首次）** | 交付会话对照地面真值判定；判定人未读本会话聊天 | 否 | G-1…G-11 会话本身的批准人（早于本表，历史遗留）；dirty 文件归属仍是"actor unknown"（handoff 不记录交付者身份） |
+
+### T2 判定依据
+
+- ①②③④ 逐条与地面真值一致：修复 1（next 短路）使 ④ 从 T0/T1 的误触发变为正确的"start the next feature"；修复 2（Recent commits）使 ① 不再被滞后摘要单独带偏——git 叙事与会话叙事并存；修复 3（确认证据落位）使 ② 读到 F069 的 0094 确认。
+- 判定为通过不代表 handoff 完美：G-1…G-11 的批准人缺失是表前历史；dirty 文件的"actor unknown"是 handoff 不记录交付者身份的固有形态。两者如实披露，不扣本格（后继者据此正确处理了工作区）。
+- 后继者为 AI 盲读代理而非人类；此为披露的限制，不冒充用户测试。
+- 修复提交：J7 批（lifecycle 短路 / git-state.recentCommits / handoff Repo State / feature_list 确认证据 ×3）。
+
 ## 护栏快照
 
 | 护栏 | 值 | 核对日 |
