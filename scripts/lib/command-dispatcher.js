@@ -90,6 +90,7 @@ const { evalDispatch } = require("./eval-commands");
 const { evidenceDispatch } = require("./evidence-commands");
 const { approvalDispatch } = require("./approval-commands");
 const { contractsDispatch } = require("./contracts-commands");
+const { harnessDispatch } = require("./harness/harness-commands");
 const { gateDispatch } = require("./gate-commands");
 const { policyDispatch } = require("./policy-commands");
 const { adapterDispatch } = require("./adapter-commands");
@@ -1136,6 +1137,10 @@ function handleContracts(args) {
 	return contractsDispatch(args);
 }
 
+function handleHarness(args) {
+	return harnessDispatch(args);
+}
+
 function handlePolicy(args) {
 	return policyDispatch(args);
 }
@@ -1314,6 +1319,7 @@ const COMMAND_HANDLERS = {
 	evidence: handleEvidence,
 	approval: handleApproval,
 	contracts: handleContracts,
+	harness: handleHarness,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

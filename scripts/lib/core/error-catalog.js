@@ -2767,6 +2767,102 @@ const CATALOG = {
 		layer: "Tooling",
 		related: ["AMBER_E_KNOWLEDGE_INDEX_SOURCE"],
 	},
+	AMBER_E_HARNESS_CONTRACT_IMMUTABLE: {
+		title: "Harness Contract is immutable after admission",
+		cause:
+			"An admitted Harness Contract id was re-admitted with different bytes. Contracts are frozen at admission (ADR-0100); a started run records the snapshot hash, so a silent rewrite would break run provenance.",
+		remedy:
+			"Admit the changed document under a new id or version; the admitted record is left untouched.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_CONTRACT_NOT_FOUND: {
+		title: "Admitted Harness Contract not found",
+		cause:
+			"A harness command referenced a contract id that has not been admitted under the harness state area.",
+		remedy:
+			"Run `amber harness admit --file <contract.json>` first, then retry; `amber harness inspect --all` lists admitted ids.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_CONTRACT_CORRUPT: {
+		title: "Admitted Harness Contract failed its snapshot re-hash",
+		cause:
+			"The stored admission record's contract no longer hashes to its Snapshot Hash (edited in place or corrupt storage). Reads fail closed rather than presenting unproven bytes.",
+		remedy:
+			"Do not repair in place: re-admit the intended document under a new id/version and investigate how the admitted bytes changed.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_CONTRACT_IMMUTABLE"],
+	},
+	AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION: {
+		title: "Illegal Run state transition",
+		cause:
+			"The requested run transition is not an edge of the closed nine-state machine (ADR-0101), e.g. created→running or blocked→completed.",
+		remedy:
+			"Advance through a legal path (see `scripts/lib/harness/run-state-machine.js` TRANSITIONS); retry of a failed run is a new run on the same task.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUN_FINAL"],
+	},
+	AMBER_E_HARNESS_RUN_FINAL: {
+		title: "Run is final and cannot be rewritten",
+		cause:
+			"The run reached a terminal state (completed/failed/cancelled/expired); terminal records are preserved evidence and never re-enter the machine.",
+		remedy: "Start a new run on the same task instead of mutating the final record.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION"],
+	},
+	AMBER_E_HARNESS_RUN_NOT_FOUND: {
+		title: "Run not found",
+		cause:
+			"A harness command referenced a run id that does not exist under the harness state area.",
+		remedy: "Run `amber harness status` (no --run) to list runs, then retry with a listed id.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_RUN_CORRUPT: {
+		title: "Run record failed validation",
+		cause:
+			"The stored run record is not valid JSON or no longer satisfies schemas/run.schema.json.",
+		remedy:
+			"Investigate the corrupt record under the harness state area; reads fail closed rather than presenting a broken lifecycle.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_LEDGER_CORRUPT"],
+	},
+	AMBER_E_HARNESS_LEDGER_LOCKED: {
+		title: "Harness event ledger is locked by another writer",
+		cause:
+			"The governed append could not acquire the exclusive ledger lock (a concurrent append holds it).",
+		remedy:
+			"Retry after the concurrent writer finishes; the lock is owned by the governed append path, never held manually.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_LEDGER_CORRUPT"],
+	},
+	AMBER_E_HARNESS_LEDGER_CORRUPT: {
+		title: "Harness event ledger failed its chain walk",
+		cause:
+			"A fail-closed read walked the hash chain and found a broken link, an unsupported schemaVersion, an unknown event kind, or an event without run scope. The ledger is tamper-evident: this is a recorded integrity refusal.",
+		remedy:
+			"Investigate the ledger under the harness state area; never edit events in place. Every read refuses until the integrity question is resolved.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_EVENT_INVALID"],
+	},
+	AMBER_E_HARNESS_LEDGER_SIZE_CEILING: {
+		title: "Harness event append exceeds the ledger size ceiling",
+		cause: "The next chained event would push events.jsonl past the configured byte ceiling.",
+		remedy:
+			"Raise the ceiling deliberately via AMBER_HARNESS_MAX_EVENTS_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG) or rotate governance of the ledger explicitly.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_EVENT_INVALID: {
+		title: "Harness event body is invalid",
+		cause:
+			"The event body does not satisfy schemas/event.schema.json (closed kind enum, run scope, ISO timestamp) and is refused before the append.",
+		remedy:
+			"Fix the event body against schemas/event.schema.json; the closed type enum grows only by additive schema change (ADR-0102).",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_LEDGER_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

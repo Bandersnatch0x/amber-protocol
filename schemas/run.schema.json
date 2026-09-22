@@ -1,0 +1,99 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Harness Run (v1)",
+	"description": "ADR-0101 (F065 H0): one auditable, bounded execution unit bound to an admitted Harness Contract snapshot. Task != Run: one task may produce many runs. Terminal states are preserved records; runs are never edited after completion. Distinct from the Session, which spans framing/approval/review.",
+	"type": "object",
+	"required": ["apiVersion", "kind", "id", "subject", "harness", "state", "stateHistory"],
+	"additionalProperties": false,
+	"properties": {
+		"apiVersion": { "const": "amber.dev/v1" },
+		"kind": { "const": "HarnessRun" },
+		"id": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+		},
+		"subject": {
+			"type": "object",
+			"required": ["agent"],
+			"additionalProperties": false,
+			"properties": {
+				"agent": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"session": { "type": "string", "maxLength": 128 },
+				"task": { "type": "string", "maxLength": 128 }
+			}
+		},
+		"harness": {
+			"type": "object",
+			"required": ["contract", "contractSnapshotHash"],
+			"additionalProperties": false,
+			"properties": {
+				"contract": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"contractSnapshotHash": {
+					"type": "string",
+					"pattern": "^sha256:[0-9a-f]{64}$",
+					"description": "Snapshot Hash of the admitted contract this run is bound to (ADR-0100)."
+				},
+				"policy": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"execution": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"ref": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"events": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"stream": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"evidence": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"ref": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"state": {
+			"enum": [
+				"created",
+				"admitted",
+				"running",
+				"paused",
+				"blocked",
+				"failed",
+				"completed",
+				"cancelled",
+				"expired"
+			]
+		},
+		"stateHistory": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["from", "to", "at"],
+				"additionalProperties": false,
+				"properties": {
+					"from": { "type": ["string", "null"] },
+					"to": { "type": "string" },
+					"at": { "type": "string", "format": "date-time" },
+					"reason": { "type": "string", "maxLength": 2000 }
+				}
+			}
+		},
+		"outcome": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"startedAt": { "type": "string", "format": "date-time" },
+				"finishedAt": { "type": "string", "format": "date-time" }
+			}
+		}
+	}
+}

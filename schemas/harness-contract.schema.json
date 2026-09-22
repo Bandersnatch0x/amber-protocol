@@ -1,0 +1,113 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Harness Contract (v1)",
+	"description": "ADR-0100 (F065 H0): the versioned, immutable total contract of one agent run. Admission validates this schema, freezes a canonical-JSON SHA-256 Snapshot Hash, and stores the admitted bytes under the harness state area. Absence of an optional section means 'governed by the referenced policy', never unbounded. The contract grants no execution authority; existing governed gates remain authoritative.",
+	"type": "object",
+	"required": ["apiVersion", "kind", "metadata", "agent", "governance"],
+	"additionalProperties": false,
+	"properties": {
+		"apiVersion": { "const": "amber.dev/v1" },
+		"kind": { "const": "HarnessContract" },
+		"metadata": {
+			"type": "object",
+			"required": ["id", "version"],
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128,
+					"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+				},
+				"version": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"createdAt": { "type": "string", "format": "date-time" },
+				"description": { "type": "string", "maxLength": 2000 }
+			}
+		},
+		"agent": {
+			"type": "object",
+			"required": ["id", "role"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"role": { "type": "string", "minLength": 1, "maxLength": 64 },
+				"host": { "type": "string", "maxLength": 128 }
+			}
+		},
+		"governance": {
+			"type": "object",
+			"required": ["policy"],
+			"additionalProperties": false,
+			"properties": {
+				"policy": {
+					"description": "Reference to the governing policy (name or id). The policy itself stays the non-relaxable ceiling; it is never embedded here.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 256
+				},
+				"approvalRefs": {
+					"description": "Pointers to existing governed approvals/gates that remain authoritative. Admission witnesses them; it never creates authority.",
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"maxItems": 64
+				}
+			}
+		},
+		"context": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"profile": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"tools": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"allow": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"maxItems": 256
+				},
+				"approval": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"maxItems": 256
+				}
+			}
+		},
+		"execution": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"workspace": { "type": "string", "maxLength": 64 }
+			}
+		},
+		"lifecycle": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"maxIterations": { "type": "integer", "minimum": 1 },
+				"timeout": { "type": "string", "maxLength": 32 }
+			}
+		},
+		"observability": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"events": { "type": "string", "maxLength": 32 }
+			}
+		},
+		"validation": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"required": {
+					"type": "array",
+					"items": { "type": "string", "minLength": 1 },
+					"maxItems": 64
+				}
+			}
+		}
+	}
+}

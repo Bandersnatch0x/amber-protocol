@@ -1,0 +1,55 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Harness Event (v1)",
+	"description": "ADR-0102 (F065 H0): one append-only, run-scoped, typed fact of the harness event ledger. This schema validates the event BODY as submitted; the governed-ledger core adds the chain fields (prevHash/hash) at append time. Events are never edited or deleted; the type enum is closed and grows only by additive schema change.",
+	"type": "object",
+	"required": ["kind", "schemaVersion", "at", "runId"],
+	"additionalProperties": false,
+	"properties": {
+		"kind": {
+			"enum": [
+				"run.created",
+				"run.admitted",
+				"run.started",
+				"run.resumed",
+				"run.paused",
+				"run.blocked",
+				"run.failed",
+				"run.completed",
+				"run.cancelled",
+				"run.expired",
+				"policy.evaluated",
+				"approval.requested",
+				"approval.granted",
+				"execution.started",
+				"execution.completed",
+				"execution.failed",
+				"validation.completed"
+			]
+		},
+		"schemaVersion": { "const": 1 },
+		"at": { "type": "string", "format": "date-time" },
+		"runId": { "type": "string", "minLength": 1, "maxLength": 128 },
+		"actor": { "type": "string", "maxLength": 128 },
+		"action": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"tool": { "type": "string", "maxLength": 128 },
+				"resource": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"decision": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"result": { "enum": ["allow", "deny", "ask"] },
+				"policy": { "type": "string", "maxLength": 256 },
+				"policyVersion": { "type": "string", "maxLength": 32 }
+			}
+		},
+		"inputHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+		"outputHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+		"reason": { "type": "string", "maxLength": 2000 }
+	}
+}

@@ -1,0 +1,177 @@
+"use strict";
+
+// Harness command adapter (F065 H0): `amber harness <admit|inspect|start|advance|status>`.
+// Envelope, routing, and exit codes are owned by defineCommand (F039); this
+// adapter parses flags and forwards to the harness cores, which own every
+// semantic verdict (schema validation, Snapshot Hash identity, immutability,
+// run transitions, fail-closed reads) as stable AMBER_E_* codes. Expert tier
+// by registration; the default seven-verb help surface is unchanged.
+
+const { defineCommand } = require("../subcommand-dispatcher");
+const { resolveTarget } = require("../command-helpers");
+
+function invalidArg(message) {
+	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
+}
+
+function writeFailure(err) {
+	return {
+		text: "",
+		errors: [err.message || String(err)],
+		warnings: [],
+		exitCode: 1,
+		...(err.amberCode ? { code: err.amberCode } : {}),
+	};
+}
+
+// A value flag as the LAST argv token parses to `undefined` (parseArgs only
+// sets the key when the flag appears), so present-but-undefined names the
+// truncated invocation and fails closed here.
+function requiredFlag(args, key, label, example) {
+	if (args[key] === undefined) {
+		return { error: `${label} is required. Example: ${example}` };
+	}
+	return { value: args[key] };
+}
+
+const dispatch = defineCommand({
+	command: "harness",
+	actions: ["admit", "inspect", "start", "advance", "status"],
+	handlers: {
+		admit: (args) => {
+			const { admitHarnessContract } = require("./contract-core");
+			const target = resolveTarget(args);
+			const file = requiredFlag(
+				args,
+				"file",
+				"--file",
+				"amber harness admit --file path/to/contract.json --target <repo>",
+			);
+			if (file.error) return invalidArg(file.error);
+			let result;
+			try {
+				result = admitHarnessContract(target, { contractPath: file.value });
+			} catch (err) {
+				return writeFailure(err);
+			}
+			const body = {
+				id: result.id,
+				snapshotHash: result.snapshotHash,
+				admittedAt: result.admittedAt,
+				contractFile: result.contractFile,
+				idempotent: result.idempotent,
+			};
+			return {
+				...body,
+				text: JSON.stringify(body, null, 2),
+				warnings: result.idempotent
+					? [
+							`contract "${result.id}" was already admitted; byte-identical re-admission left the record unchanged`,
+						]
+					: [],
+				ok: true,
+			};
+		},
+		inspect: (args) => {
+			const { inspectHarnessContract, listHarnessContracts } = require("./contract-core");
+			const target = resolveTarget(args);
+			let result;
+			try {
+				if (args.run) {
+					// §38 gate shape: one view over the run and its verified event
+					// chain (Agent→Contract→Run→Events) — read-only, fail-closed.
+					const { getRun } = require("./run-core");
+					const { readRunEvents } = require("./event-ledger");
+					const run = getRun(target, { runId: args.run }).run;
+					result = { ok: true, run, events: readRunEvents(target, args.run) };
+				} else if (args.contract) {
+					result = inspectHarnessContract(target, { contractId: args.contract });
+				} else if (args.all) {
+					result = { ok: true, contracts: listHarnessContracts(target) };
+				} else {
+					return invalidArg(
+						"--contract <id>, --run <id>, or --all is required for harness inspect",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		start: (args) => {
+			const { createRun } = require("./run-core");
+			const target = resolveTarget(args);
+			const contract = requiredFlag(
+				args,
+				"contract",
+				"--contract",
+				"amber harness start --contract coding-task --agent worker --target <repo>",
+			);
+			if (contract.error) return invalidArg(contract.error);
+			let result;
+			try {
+				result = createRun(target, {
+					contractId: contract.value,
+					runId: args.run,
+					subject: {
+						agent: args.agent || "unspecified-agent",
+						...(args.session ? { session: args.session } : {}),
+						...(args.task ? { task: args.task } : {}),
+					},
+					executionRef: args.execution,
+				});
+			} catch (err) {
+				return writeFailure(err);
+			}
+			const body = { run: result.run, runFile: result.runFile };
+			return { ...body, text: JSON.stringify(body, null, 2), ok: true };
+		},
+		advance: (args) => {
+			const { transitionRun } = require("./run-core");
+			const target = resolveTarget(args);
+			const run = requiredFlag(
+				args,
+				"run",
+				"--run",
+				"amber harness advance --run run-xyz --to running --target <repo>",
+			);
+			if (run.error) return invalidArg(run.error);
+			const to = requiredFlag(
+				args,
+				"to",
+				"--to",
+				"amber harness advance --run run-xyz --to running --target <repo>",
+			);
+			if (to.error) return invalidArg(to.error);
+			let result;
+			try {
+				result = transitionRun(target, { runId: run.value, to: to.value, reason: args.reason });
+			} catch (err) {
+				return writeFailure(err);
+			}
+			const body = { run: result.run };
+			return { ...body, text: JSON.stringify(body, null, 2), ok: true };
+		},
+		status: (args) => {
+			const { getRun, listRuns } = require("./run-core");
+			const target = resolveTarget(args);
+			let result;
+			try {
+				if (args.run) {
+					result = getRun(target, { runId: args.run });
+				} else {
+					result = { ok: true, runs: listRuns(target) };
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+	},
+});
+
+function harnessDispatch(args) {
+	return dispatch(args._?.[0], args);
+}
+
+module.exports = { harnessDispatch };

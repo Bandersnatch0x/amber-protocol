@@ -1608,6 +1608,35 @@ const COMMAND_HELP = {
 		"  amber contracts validate --json",
 		"  amber contracts validate --target path/to/amber-checkout",
 	],
+	harness: [
+		"Admit and inspect Harness Contracts and Runs (F065 H0, ADR-0100/0101). A",
+		"Harness Contract is the versioned, immutable total contract of one agent",
+		"run; a Run is one auditable bounded execution bound to its Snapshot Hash.",
+		"Admission validates schemas and freezes canonical-JSON SHA-256 snapshots",
+		"under the harness state area. Nothing here executes anything or grants",
+		"authority: the governed gates the contract references stay authoritative.",
+		"",
+		"Subcommands:",
+		"  admit               Validate and admit a contract document. Immutable after",
+		"                      admission; only byte-identical re-admission is idempotent.",
+		"                      Required: --file <contract.json>.",
+		"  inspect             Show one admitted contract with its Snapshot Hash, or",
+		"                      list every admitted contract with --all.",
+		"                      Required: --contract <id>, or --all.",
+		"  start               Create a Run bound to an admitted contract. Optional:",
+		"                      --run <id>, --agent <id>, --session <id>, --task <id>.",
+		"                      Required: --contract <id>.",
+		"  advance             Move a Run along its closed nine-state machine.",
+		"                      Required: --run <id> --to <state>. Optional: --reason.",
+		"  status              Show one Run with --run <id>, or list runs.",
+		"",
+		"Examples:",
+		"  amber harness admit --file path/to/contract.json --target path/to/repo",
+		"  amber harness inspect --contract coding-task --target path/to/repo --json",
+		"  amber harness start --contract coding-task --agent worker --target path/to/repo --json",
+		"  amber harness advance --run run-abc --to running --target path/to/repo --json",
+		"  amber harness status --run run-abc --target path/to/repo --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1966,6 +1995,15 @@ const COMMAND_OUTPUT = {
 	contracts: {
 		usage: "Usage: amber contracts validate [--target <amber-checkout>] [--json]",
 	},
+	harness: {
+		usage: [
+			"Usage: amber harness admit --file <contract.json> --target <repo> [--json]",
+			"       amber harness inspect (--contract <id> | --all) --target <repo> [--json]",
+			"       amber harness start --contract <id> [--run <id>] [--agent <id>] [--session <id>] [--task <id>] --target <repo> [--json]",
+			"       amber harness advance --run <id> --to <state> [--reason <text>] --target <repo> [--json]",
+			"       amber harness status [--run <id>] --target <repo> [--json]",
+		].join("\n"),
+	},
 	policy: {
 		usage: [
 			"Usage: amber policy <evaluate|show|list> --target <repo> [--json]",
@@ -2143,6 +2181,7 @@ const COMMANDS = Object.freeze([
 	"evidence",
 	"approval",
 	"contracts",
+	"harness",
 ]);
 // F063: the default help surface is the seven primary verbs (audit, init,
 // doctor, next, plan, handoff, session); every other governance command is
@@ -2187,6 +2226,7 @@ const TIER_BY_COMMAND = {
 	evidence: "expert",
 	approval: "expert",
 	contracts: "expert",
+	harness: "expert",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",
@@ -2394,6 +2434,13 @@ const KNOWN_UNTYPED_SUBCOMMANDS = Object.freeze(
 		"runner/list",
 		"runner/rolled-back",
 		"runner/show",
+		// F065 H0 (ADR-0100/0101): the harness command is CLI-only, untyped — no
+		// MCP projection, no COMMAND_CAPABILITIES entries, no new authority.
+		"harness/admit",
+		"harness/inspect",
+		"harness/start",
+		"harness/advance",
+		"harness/status",
 	]),
 );
 

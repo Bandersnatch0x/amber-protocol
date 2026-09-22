@@ -124,6 +124,8 @@ const FLAG_SPECS = {
 	"--entry": { key: "entry" },
 	"--ratify": { key: "ratify", kind: "boolean" },
 	"--reason": { key: "reason" },
+	"--run": { key: "run" },
+	"--to": { key: "to" },
 	"--max-words": { key: "maxWords" },
 	"--window": { key: "window" },
 	"--knowledge-kind": { key: "knowledgeKind" },
