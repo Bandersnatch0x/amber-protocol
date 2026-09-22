@@ -151,6 +151,30 @@ test("inspect --all lists admitted contracts; an unknown id refuses with a stabl
 	}
 });
 
+test("a tampered contract shows as a tombstone in the list and refuses its single read (T3)", () => {
+	const target = tmpTarget();
+	try {
+		const file = writeContract(target, minimalContract());
+		const admitted = dispatch("harness", admitArgs(target, file));
+		const stored = JSON.parse(fs.readFileSync(admitted.result.contractFile, "utf8"));
+		stored.contract.agent.role = "tampered";
+		fs.writeFileSync(admitted.result.contractFile, JSON.stringify(stored, null, "\t"), "utf8");
+
+		// Single read refuses closed; the list flags the tombstone and never
+		// presents the stale snapshot as admitted.
+		const corruptRead = dispatch("harness", inspectArgs(target, { contract: "coding-task" }));
+		assert.equal(corruptRead.exitCode, 1);
+		assert.equal(corruptRead.result.code, "AMBER_E_HARNESS_CONTRACT_CORRUPT");
+
+		const listed = dispatch("harness", inspectArgs(target, { all: true }));
+		assert.equal(listed.result.contracts.length, 1);
+		assert.equal(listed.result.contracts[0].corrupt, true);
+		assert.equal(listed.result.contracts[0].snapshotHash, null);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
 test("the snapshot hash is canonical: key order does not change the identity", () => {
 	const a = { kind: "HarnessContract", metadata: { id: "x", version: "1" } };
 	const b = { metadata: { version: "1", id: "x" }, kind: "HarnessContract" };

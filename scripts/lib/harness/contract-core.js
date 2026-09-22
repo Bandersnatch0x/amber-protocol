@@ -177,6 +177,14 @@ function inspectHarnessContract(targetRoot, { contractId } = {}) {
  * List admitted contracts (id, snapshot, admitted time) in id order.
  * A directory that does not exist yet is an empty list, not an error.
  */
+/**
+ * List admitted contracts in id order, re-deriving each snapshot hash. A
+ * record that no longer hashes to its snapshot is a flagged tombstone
+ * (corrupt: true, no snapshot presented) — the list never presents unproven
+ * bytes as admitted, and never hides them; single reads refuse closed.
+ * (T3: aligned with the F067 tool-list semantics — the dual-axis review's
+ * standing consistency candidate.)
+ */
 function listHarnessContracts(targetRoot) {
 	const dir = statePath(targetRoot, "harness", "contracts");
 	if (!fs.existsSync(dir)) return [];
@@ -187,8 +195,13 @@ function listHarnessContracts(targetRoot) {
 		.map((name) => {
 			try {
 				const record = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+				const id = record.contract && record.contract.metadata ? record.contract.metadata.id : name;
+				const derived = record.contract ? canonicalHashOf(record.contract) : null;
+				if (derived !== record.snapshotHash) {
+					return { id, snapshotHash: null, admittedAt: null, corrupt: true };
+				}
 				return {
-					id: record.contract && record.contract.metadata ? record.contract.metadata.id : name,
+					id,
 					snapshotHash: record.snapshotHash,
 					admittedAt: record.admittedAt,
 				};
