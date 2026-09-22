@@ -1,9 +1,9 @@
 # F069: Harness H3a — Context Firewall (Grants, TTL, Purpose, Denials)
 
 **spec_id:** F069
-**Status:** draft
+**Status:** accepted
 **Updated:** 2026-09-22
-**Provenance:** Harness v2 proposal §4.3/§11/§32 (Context Firewall) and §23 (threat table); the existing governed context surfaces — F017 lifecycle, F027 role-scoped manifests, `schemas/context-loadout.schema.json` (classification is fixed, not caller-settable; redactions ledger with `classification-ceiling` / `purpose-mismatch` reasons), `docs/architecture/context-threat-model.md` — as the composed authority; ADR-0102 (additive event types); wayfinder map `issues/0066`
+**Provenance:** Harness v2 proposal §4.3/§11/§32 (Context Firewall) and §23 (threat table); the existing governed context surfaces — F017 lifecycle, F027 role-scoped manifests, `schemas/context-loadout.schema.json` (classification is fixed, not caller-settable; redactions ledger with `classification-ceiling` / `purpose-mismatch` reasons), `docs/architecture/context-threat-model.md` — as the composed authority; ADR-0102 (additive event types; amended 2026-09-22: runId is required only for run-scoped kinds — context.* events carry actor/action instead); wayfinder map `issues/0066`; user confirmation 2026-09-22 (`issues/0094`, 「按推荐」)
 **Feature:** F069
 
 ## Problem Statement
