@@ -61,6 +61,12 @@ function getRepoSnapshot(targetRoot) {
 		lines.length > 0 && lines.every((line) => line.startsWith("??") || line.startsWith("!!"));
 	const dirty = lines.length > 0;
 	const lastCommit = gitOutput(targetRoot, ["log", "-1", "--format=%h %s"]) || null;
+	// J7 (continuation ledger T1): the handoff summary anchors to the last
+	// amber session, so deliveries that skip the session lifecycle have no
+	// narrative there. The snapshot carries the recent commit subjects so the
+	// handoff can show git facts beside the session summary.
+	const recentCommitsRaw = gitOutput(targetRoot, ["log", "--oneline", "-5"]) || null;
+	const recentCommits = recentCommitsRaw ? recentCommitsRaw.split(/\r?\n/).filter(Boolean) : null;
 	return {
 		isGit: true,
 		branch,
@@ -69,6 +75,7 @@ function getRepoSnapshot(targetRoot) {
 		// Callers can still treat dirty=true as "not clean"; this flag softens the label.
 		dirtyUntrackedOnly: dirty && untrackedOnly,
 		lastCommit,
+		recentCommits,
 		// Final path of every porcelain entry (rename destination, unquoted,
 		// forward slashes, deduped); null when git itself failed.
 		dirtyPaths: dirtyOutput === null ? null : parsePorcelainPaths(dirtyOutput),

@@ -2422,6 +2422,12 @@
 			],
 			"evidence": [
 				{
+					"command": "user confirmation (issues/0076)",
+					"result": "pass: 「按推荐」 — spec draft -> accepted (F066 vertical slice)",
+					"date": "2026-09-22",
+					"notes": "HITL gate closed 2026-09-22"
+				},
+				{
 					"command": "node --test tests/unit/harness-*.test.js (F066 set)",
 					"result": "pass: 32/32 focused tests green (admission 5, loop adapter 5, commands 9, run 6, events 6, §38 walk 1)",
 					"date": "2026-09-22",
@@ -2455,6 +2461,12 @@
 				"amber harness tool admit --file <tool.json> with an F052-pinned capability; amber harness tool check --tool <id> reports the existing policy verdict"
 			],
 			"evidence": [
+				{
+					"command": "user confirmation (issues/0082)",
+					"result": "pass: 「按推荐」 — spec draft -> accepted (F067 tool/capability boundary)",
+					"date": "2026-09-22",
+					"notes": "HITL gate closed 2026-09-22"
+				},
 				{
 					"command": "node --test tests/unit/harness-tool.test.js",
 					"result": "pass: 6/6 focused tests green (real F052 fixture via the runner-registry test convention: registerPrincipal + decision artifacts + registerRunner/Capability)",
@@ -2490,6 +2502,12 @@
 			],
 			"evidence": [
 				{
+					"command": "user confirmation (issues/0088)",
+					"result": "pass: 「按推荐」 — spec draft -> accepted (F068 execution boundary)",
+					"date": "2026-09-22",
+					"notes": "HITL gate closed 2026-09-22"
+				},
+				{
 					"command": "node --test tests/unit/harness-execution.test.js",
 					"result": "pass: 6/6 focused tests green (real temp git repos for the worktree adapter; deterministic fold cases ok/violation/unevaluated)",
 					"date": "2026-09-22",
@@ -2522,6 +2540,12 @@
 				"amber harness context check --subject <s> --resource <prefix> --purpose <p> with an admitted grant; denials carry closed reasons and land on the trail"
 			],
 			"evidence": [
+				{
+					"command": "user confirmation (issues/0094)",
+					"result": "pass: 「按推荐」 — spec draft -> accepted (F069 context firewall)",
+					"date": "2026-09-22",
+					"notes": "HITL gate closed 2026-09-22"
+				},
 				{
 					"command": "node --test tests/unit/harness-context.test.js",
 					"result": "pass: 6/6 focused tests green (TTL boundaries, five deny reasons, ceiling ordering incl. fail-closed unknown, revocation terminality, event assertions, tamper fail-closed)",

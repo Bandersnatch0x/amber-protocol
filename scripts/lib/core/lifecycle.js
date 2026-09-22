@@ -169,6 +169,15 @@ function featureHasEvidence(ctx) {
 	return Boolean(feature && Array.isArray(feature.evidence) && feature.evidence.length > 0);
 }
 
+// J7 short-circuit (continuation ledger T1): an ACCEPTED feature needs no
+// retroactive plan — `amber next` kept advising "Create a plan" for features
+// that were accepted long before the plan system existed, so the successor
+// inherited a misfire. Passing (tests green, acceptance pending) still plans.
+function focusFeatureStatus(ctx) {
+	const feature = ctx.state.features.find((f) => f.id === ctx.focus.id);
+	return feature ? feature.status : undefined;
+}
+
 function acceptLogged(ctx) {
 	const plan = planFor(ctx);
 	if (!plan) return false;
@@ -229,7 +238,7 @@ const STEPS = [
 	{
 		id: "plan",
 		label: "Create a plan",
-		appliesTo: (ctx) => ctx.focus.type === "feature",
+		appliesTo: (ctx) => ctx.focus.type === "feature" && focusFeatureStatus(ctx) !== "accepted",
 		isDone: (ctx) => Boolean(planFor(ctx)),
 		why: (ctx) => `feature ${ctx.focus.id} has no plan yet.`,
 		remedy: (ctx) =>

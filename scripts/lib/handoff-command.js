@@ -16,7 +16,12 @@ const { classifyDirtyPaths, renderDirtyPathsSection } = require("./core/dirty-pa
 function gitInfo(targetRoot) {
 	const snap = getRepoSnapshot(targetRoot);
 	if (!snap.isGit) {
-		return { branch: "unknown", dirty: "not a git repository", lastCommit: "none" };
+		return {
+			branch: "unknown",
+			dirty: "not a git repository",
+			lastCommit: "none",
+			recentCommits: null,
+		};
 	}
 	let dirty = "clean";
 	if (snap.dirty) {
@@ -28,6 +33,7 @@ function gitInfo(targetRoot) {
 		branch: snap.branch || "unknown",
 		dirty,
 		lastCommit: snap.lastCommit || "none",
+		recentCommits: snap.recentCommits || null,
 	};
 }
 
@@ -217,6 +223,12 @@ function renderHandoff(targetRoot) {
 		`- Branch: ${git.branch}`,
 		`- Uncommitted changes: ${git.dirty}`,
 		`- Last commit: ${git.lastCommit}`,
+		// J7 (continuation ledger T1): the session summary above anchors to the
+		// last amber session; recent git commits give the successor the real
+		// work narrative even when deliveries skipped the session lifecycle.
+		...(git.recentCommits && git.recentCommits.length > 0
+			? [`- Recent commits:`, ...git.recentCommits.map((c) => `  - ${c}`)]
+			: []),
 		"",
 		"## Runtime / Verification State",
 		"",
