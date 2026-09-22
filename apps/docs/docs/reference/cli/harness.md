@@ -29,6 +29,10 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness bind --run <id> --from-loop <loopId> --target <repo> [--json]
        amber harness tool admit --file <tool.json> --target <repo> [--json]
        amber harness tool (list | inspect --tool <id> | check --tool <id>) --target <repo> [--json]
+       amber harness execution admit --file <contract.json> --target <repo> [--json]
+       amber harness execution prepare --contract <id> --run <id> --target <repo> [--json]
+       amber harness execution evaluate --run <id> [--file observed.json] --target <repo> [--json]
+       amber harness execution inspect (--contract <id> | --run <id>) --target <repo> [--json]
        amber harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...] --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
@@ -49,6 +53,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | <code>admit</code> | Subcommand action for <code>harness</code> |
 | <code>advance</code> | Subcommand action for <code>harness</code> |
 | <code>bind</code> | Subcommand action for <code>harness</code> |
+| <code>execution</code> | Subcommand action for <code>harness</code> |
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
@@ -92,6 +97,16 @@ Subcommands:
                       surface would give a tool. Subcommands: admit
                       (--file <tool.json>), list, inspect (--tool <id>),
                       check (--tool <id>).
+  execution           Execution boundaries (F068, declared/effective/
+                      observed comparable): admit an ExecutionContract,
+                      prepare the workspace per its declared type (the
+                      git-worktree adapter composes the existing worktree
+                      seam), and evaluate — folding observed entries into
+                      an ok/violation/unevaluated verdict; observed
+                      outside declared BLOCKs, never silently continues.
+                      Subcommands: admit (--file), list, inspect
+                      (--contract | --run), prepare (--contract --run),
+                      evaluate (--run [--file observed.json]).
   advance             Move a Run along its closed nine-state machine. Advancing to
                       admitted requires the complete six-check AdmissionReceipt:
                       --check <name:pointer> for identity, contract, policy,
