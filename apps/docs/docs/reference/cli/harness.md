@@ -27,6 +27,8 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness inspect (--contract <id> | --all) --target <repo> [--json]
        amber harness start --contract <id> [--from-loop <loopId> [--file <pack.json>]] [--run <id>] [--agent <id>] --target <repo> [--json]
        amber harness bind --run <id> --from-loop <loopId> --target <repo> [--json]
+       amber harness tool admit --file <tool.json> --target <repo> [--json]
+       amber harness tool (list | inspect --tool <id> | check --tool <id>) --target <repo> [--json]
        amber harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...] --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
@@ -50,6 +52,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
+| <code>tool</code> | Subcommand action for <code>harness</code> |
 
 ## Command Details
 
@@ -80,6 +83,15 @@ Subcommands:
                       execution.* and policy.evaluated events and moves the
                       run to completed/failed. Required: --run <id>
                       --from-loop <loopContractId>.
+  tool                Tool declarations (F067, connector ≠ permission): admit
+                      a tool whose capability pin resolves through the
+                      existing F052/F056 registries (admission grants zero
+                      authority), list/inspect admitted tools (Snapshot
+                      Hash, tombstones for corrupt records), or check —
+                      report-only — which verdict the existing policy
+                      surface would give a tool. Subcommands: admit
+                      (--file <tool.json>), list, inspect (--tool <id>),
+                      check (--tool <id>).
   advance             Move a Run along its closed nine-state machine. Advancing to
                       admitted requires the complete six-check AdmissionReceipt:
                       --check <name:pointer> for identity, contract, policy,
