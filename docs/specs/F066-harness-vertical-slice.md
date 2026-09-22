@@ -1,9 +1,9 @@
 # F066: Harness Vertical Slice — One Governed Execution Through the Chain
 
 **spec_id:** F066
-**Status:** draft
+**Status:** accepted
 **Updated:** 2026-09-22
-**Provenance:** Harness v2 proposal §58 (vertical slice); ADR-0100 (decision 3: AdmissionReceipt), ADR-0101 (decision 4 + §52 mappings), ADR-0102 (execution/policy events); F065 accepted spec (`docs/specs/F065-harness-h0-foundation.md`, user stories 5–6 re-pointed here); wayfinder map `issues/0066`
+**Provenance:** Harness v2 proposal §58 (vertical slice); ADR-0100 (decision 3: AdmissionReceipt), ADR-0101 (decision 4 + §52 mappings), ADR-0102 (execution/policy events); F065 accepted spec (`docs/specs/F065-harness-h0-foundation.md`, user stories 5–6 re-pointed here); wayfinder map `issues/0066`; user confirmation 2026-09-22 (`issues/0076`, 「按推荐」)
 **Feature:** F066
 
 ## Problem Statement
@@ -89,6 +89,6 @@ authority; Harness admission witnesses them.
 
 ## Further Notes
 
-- Design decisions above are **recommendations adopted per the standing "按推荐" directive**;
-  the HITL confirmation ticket for this spec is `issues/0076` (created with the ticket batch).
+- Design decisions above were **confirmed by the user 2026-09-22 (`issues/0076`, 「按推荐」)**;
+  the confirmation ticket is closed and this spec is accepted.
 - Driven by user stories 5–6 re-pointed from F065 at the 0069 confirmation.
