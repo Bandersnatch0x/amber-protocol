@@ -20,6 +20,21 @@
 1. Handoff 包不含 Approval/Review 维度 → 后继者无法回答「谁批准」。
 2. `amber next` 对已 accepted 且无 plan 的 feature 仍建议「补 plan」→ 建议器缺验收态短路。
 
+| T1（dogfood，计入本月 4 次分母） | 2026-09-22 | 本仓（dogfood） | F065–F069 五批 Harness 交付（今日真实任务） | 2026-09-22（本批 J0 自此表起算） | `session-handoff.md`（`amber handoff` 生成） | 新 agent 会话（盲读 handoff 单文件） | 是 | ①改了什么=**半对**（仓库状态 master/clean/f9451ce、63+4 特征对；但「最近完成的工作」归因到旧 G-1…G-11 会话——handoff 摘要锚定最后一次 amber session，F065–F069 未走 session 生命周期） ②谁批准=**部分改善**（F065 的 0069 用户确认证据行首次可从 handoff 读到；F066–F069 的确认未入证据行） ③证据在哪=**对**（聚焦测试 + 全量数字 + `.scratch/` 日志路径全部可核验） ④下一步=**错**（同一误触发：建议给已 accepted 的 F001 补 plan；后继者自己都标出「自相矛盾，值得先核实」） | **失败（2/4）** | 交付会话对照地面真值判定；判定人未读「被交接会话」的聊天 | 否 | handoff 会话摘要滞后于真实工作（未走 session 生命周期）；F001 plan 误触发未修 |
+
+### T1 判定依据
+
+- ①③ 与 git log（f9451ce、70d09e7 等五批）、feature_list（63 accepted + 4 passing = F066–F069 passing）一致；但「最近工作」被 handoff 摘要带偏到 G-1…G-11——摘要是 session 级的，而本仓近五批交付没有走 `amber session start` 生命周期，导致 handoff 叙事与 git 事实脱节。
+- ② 相比 T0 是真实改善：F065 的 feature_list 证据行包含用户确认记录，盲答者读到了它。F066–F069 的确认（0076/0082/0088/0094）未写进各自证据行——同类信息不同批不同命。
+- ④ 与 T0 同一误触发（next 对已 accepted 且无 plan 的 feature 仍建议补 plan），且盲答者主动标记了矛盾。
+- 后继者为 AI 盲读代理而非人类；此为披露的限制，不冒充用户测试。
+
+### T1 暴露的缺口（转 J7 候选；第一条为 T0 缺口的再现，后两条为新面）
+
+1. （T0 再现）`amber next` 对已 accepted 且无 plan 的 feature 仍建议「补 plan」→ 验收态短路缺失。
+2. （T1 新面）handoff 摘要锚定最后一次 amber session——不走 session 生命周期的交付在 handoff 里没有叙事；git 事实（最近提交、feature 状态）与 session 摘要脱节。
+3. （T1 新面）确认/审批证据的落位不一致：F065 把用户确认写进了 feature 证据行，F066–F069 没有——同类治理事实应统一落位。
+
 ## 护栏快照
 
 | 护栏 | 值 | 核对日 |
