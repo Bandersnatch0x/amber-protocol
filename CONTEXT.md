@@ -945,3 +945,31 @@ _Avoid_: symbol node, AST node, file vertex
 **Anchors Edge**:
 The deterministic `feature -[anchors]-> code` edge linking a feature to an existing Code Node it declares as an implementation anchor. It exists only when the target Code Node exists — a dead anchor never becomes a dangling edge and keeps surfacing as a drift finding. Supersedes the F059 "anchors are a node property, never a ghost edge" rule for targets that are now nodes (ADR-0025).
 _Avoid_: ghost edge, anchor property, path link
+
+**Harness Contract**:
+The versioned, immutable total contract of one agent run: which agent, under which policy reference, with which tools/context/execution boundary, validated by what. Admitted once, frozen as a Snapshot Hash, never edited; a run records the hash, not a mutable reference. It binds existing governed gates as authoritative and grants no authority of its own (ADR-0100).
+_Avoid_: agent config, session manifest, policy document, run permission
+
+**Snapshot Hash**:
+The canonical-JSON SHA-256 identity of an admitted Harness Contract (or any frozen H0 snapshot object). Identifies the exact admitted bytes; two contracts with equal hashes are interchangeable, and a changed hash means a new admission.
+_Avoid_: content hash of a plan, file checksum, commit SHA
+
+**Harness Admission**:
+The explicit, fail-closed check record produced when a Harness Contract is admitted: identity, contract, policy, context, execution, approval — each pass or refuse; a missing check refuses. In H0 it witnesses the existing governed gates (e.g. ADR-0003 loop execution) and never executes or self-approves anything.
+_Avoid_: auto-approval, execution grant, login
+
+**Run**:
+One auditable, bounded execution unit of the Harness: subject (agent/session/task refs), harness refs (contract snapshot, policy), execution ref, event stream ref, evidence ref, and outcome. One task may produce many runs; every terminal state is a preserved record; runs are never edited after completion. Distinct from the Session, which spans framing/approval/review (ADR-0101).
+_Avoid_: session, chat session, loop record, execution attempt
+
+**Run State**:
+The closed nine-state lifecycle of a Run — `created`, `admitted`, `running`, `paused`, `blocked`, `failed`, `completed`, `cancelled`, `expired` — validated by `src/lifecycle/run/state-machine.js`; illegal transitions refuse. Separate from the session state machine; the only sanctioned bridge is the vertical-slice mapping adapter.
+_Avoid_: session stage, route stage, free-form status
+
+**Harness Event**:
+One append-only, run-scoped, typed fact emitted during a Run: actor, action (tool/resource), decision (result/policy/version), and input/output hashes. Events are never edited or deleted; a closed type enum grows only by additive schema change (ADR-0102).
+_Avoid_: log line, metric, timeline entry, chat event
+
+**Harness Event Ledger**:
+The tamper-evident, fail-closed ledger of Harness Events under `.amber/harness/`, composed through `defineLedgerFamily` (ADR-0028) — one hash chain, one append lock, ceiling-bounded appends, and reads that fail closed on corruption. Metrics are aggregates folded from it, never a parallel truth.
+_Avoid_: audit log file, second hash chain, metrics store
