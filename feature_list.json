@@ -2349,6 +2349,56 @@
 				"docs/plans/F064-Improvement-suggestions.md"
 			],
 			"updated": "2026-09-21"
+		},
+		{
+			"id": "F065",
+			"priority": 65,
+			"area": "governance",
+			"paths": [
+				"schemas/harness-contract.schema.json",
+				"schemas/run.schema.json",
+				"schemas/event.schema.json",
+				"scripts/lib/harness/",
+				"docs/adr/0100-harness-contract.md",
+				"docs/adr/0101-run-unit-of-auditable-execution.md",
+				"docs/adr/0102-harness-event-ledger-via-ledger-family.md",
+				"docs/specs/F065-harness-h0-foundation.md",
+				"docs/plans/F065-harness-h0-foundation.md"
+			],
+			"title": "Harness H0 Foundation (Contract, Run, Event)",
+			"user_visible_behavior": "amber harness (expert tier, untyped CLI-only) admits immutable Harness Contracts with a canonical-JSON SHA-256 Snapshot Hash, creates Runs bound to that snapshot through a closed nine-state machine, and records a tamper-evident run-scoped event ledger composed through the governed-ledger factory; one inspect view presents Contract → Run → Events. No new execution authority, no default-surface change.",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/harness-commands.test.js tests/unit/harness-run.test.js tests/unit/harness-events.test.js tests/unit/harness-integration.test.js",
+				"node --test tests/unit/command-registry-parity.test.js tests/unit/distributed-governance-schemas.test.js",
+				"amber harness inspect --run <id> presents Contract → Run → Events (§38 gate walk)"
+			],
+			"evidence": [
+				{
+					"command": "npm test (full suite)",
+					"result": "pass: 3839/3840 (single failure = F063 N4 foreign untracked paths from a parallel session, not this batch)",
+					"date": "2026-09-22",
+					"notes": "log .scratch/harness-h0/full-test-f065-final.log"
+				},
+				{
+					"command": "spec-to-code compliance + standards review (stage 7)",
+					"result": "pass: 13 implemented / 1 partial adjudicated to spec wording (stories 5-6 -> F066), 0 contradicts",
+					"date": "2026-09-22",
+					"notes": "verdict .scratch/orchestration/f065-harness-h0-dual-axis-review.md (method note: local dual-axis, disclosed)"
+				},
+				{
+					"command": "user confirmation (issues/0069)",
+					"result": "pass: 「按推荐」 — spec draft -> accepted; two wording fixes applied",
+					"date": "2026-09-22",
+					"notes": "HITL gate closed 2026-09-22"
+				}
+			],
+			"notes": [
+				"ADR-0100/0101/0102 are the decision authority; the harness ledger family composes defineLedgerFamily (ADR-0028) with zero parallel hash implementation.",
+				"Untyped CLI-only by registration: no MCP projection, no COMMAND_CAPABILITIES entries, expert tier.",
+				"H1+ layers, replay, and H7 scheduling stay out of scope (wayfinder map issues/0066 fog). F066 vertical slice next; commit pending user decision (all paths staged)."
+			],
+			"updated": "2026-09-22"
 		}
 	]
 }

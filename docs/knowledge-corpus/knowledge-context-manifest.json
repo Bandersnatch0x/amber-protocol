@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 30,
+    "adr": 33,
     "wiki": 10,
     "architecture": 9,
-    "total": 49
+    "total": 52
   },
   "rows": [
     {
@@ -369,6 +369,42 @@
       }
     },
     {
+      "id": "knowledge:adr:0100",
+      "category": "adr",
+      "sourceNodeId": "adr:0100",
+      "pageId": "knowledge-adr-0100",
+      "sourcePath": "docs/adr/0100-harness-contract.md",
+      "title": "HarnessContract Is the Versioned, Immutable Total Contract of a Run",
+      "source": {
+        "rawHash": "sha256:d1cd3f55d8b08d6184dc37228e5bd6bf450f1d7b6ce85d8fc32de3d019f55f39",
+        "normHash": "sha256:aa2b085983b335f958b1c5570b60eb6c6239a43483fc9319543e15e288ec5b63"
+      }
+    },
+    {
+      "id": "knowledge:adr:0101",
+      "category": "adr",
+      "sourceNodeId": "adr:0101",
+      "pageId": "knowledge-adr-0101",
+      "sourcePath": "docs/adr/0101-run-unit-of-auditable-execution.md",
+      "title": "Run Is the Unit of Auditable Execution, With Its Own State Machine",
+      "source": {
+        "rawHash": "sha256:c27d1b3f09d861ebf9d3af31f6179add28aedd841d10ffb7583ee39f6d1adbac",
+        "normHash": "sha256:5fd378d0ff7c714d3fc8929bdbb438c9b1d9657c09ff5bc5908e6351133f552c"
+      }
+    },
+    {
+      "id": "knowledge:adr:0102",
+      "category": "adr",
+      "sourceNodeId": "adr:0102",
+      "pageId": "knowledge-adr-0102",
+      "sourcePath": "docs/adr/0102-harness-event-ledger-via-ledger-family.md",
+      "title": "The Harness Event Ledger Composes the Governed-Ledger Factory",
+      "source": {
+        "rawHash": "sha256:e4e74988aa112a849bbd3beac7a726c7a12cd586dac47dddaafcf9e6c870f433",
+        "normHash": "sha256:9b2fd524666a977509ecf0da2279381f37bde5474e1c6291e20987760a0a60cb"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -597,5 +633,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:0690655e9115df4eb20f52a7e6b986450e092d7969600bc7797a0d2ea2466e7a"
+  "manifestHash": "sha256:5d546a467e0cbf6c0e39df08ad3c4172de94df311529adfcc1a543995888dc74"
 }

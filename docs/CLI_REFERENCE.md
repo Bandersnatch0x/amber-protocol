@@ -2821,6 +2821,40 @@ the runtime carries one `versionNegotiation.minCompatibleVersion` scalar per env
 `scripts/lib/core/sync-remote.js`. A domain-level combination matrix has no runtime counterpart
 and this command does not add one.
 
+## Harness Commands
+
+`amber harness` (expert tier, not on the default seven-verb surface) admits and inspects the
+F065 H0 governance objects: the **Harness Contract** (the versioned, immutable total contract
+of one agent run), the **Run** (one auditable bounded execution bound to the contract's
+Snapshot Hash), and the **Harness Event Ledger** (the tamper-evident, fail-closed, run-scoped
+event chain under `.amber/harness/`). Nothing here executes anything or grants authority: the
+governed gates a contract references stay authoritative. Design contracts: ADR-0100, ADR-0101,
+ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
+
+- `harness admit --file <contract.json>` — validate against
+  `schemas/harness-contract.schema.json`, freeze the canonical-JSON SHA-256 Snapshot Hash, and
+  store the admitted bytes under `.amber/harness/contracts/`. Immutable after admission; only
+  byte-identical re-admission is idempotent.
+- `harness inspect --contract <id>` / `harness inspect --all` — read admitted contracts
+  (the stored record is re-hashed on every read; a mismatch refuses closed).
+- `harness start --contract <id> [--run <id>] [--agent <id>] [--session <id>] [--task <id>]` —
+  create a Run bound to the contract's Snapshot Hash. Fails closed when the contract is not
+  admitted or corrupt.
+- `harness advance --run <id> --to <state> [--reason <text>]` — move a Run along its closed
+  nine-state machine (`created→admitted→running→{paused|blocked|…}`); illegal transitions and
+  final-state rewrites refuse with stable `AMBER_E_HARNESS_*` codes. Each transition appends a
+  `run.*` event to the ledger.
+- `harness status [--run <id>]` — show one Run or list runs.
+- `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
+  (Agent → Contract → Run → Events) from one read-only command.
+
+```bash
+node scripts/amber.js harness admit --file path/to/contract.json --target . --json
+node scripts/amber.js harness start --contract coding-task --agent worker --target . --json
+node scripts/amber.js harness advance --run run-abc --to running --target . --json
+node scripts/amber.js harness inspect --run run-abc --target . --json
+```
+
 ## Error Codes
 
 ### explain

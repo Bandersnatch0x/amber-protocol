@@ -89,6 +89,7 @@ amber <command> --target <repo> [options]
 | <code>evidence</code> | Record and independently verify Evidence receipts, each binding the | No | [Docs](/reference/cli/evidence) |
 | <code>approval</code> | Grant, revoke, consume, and inspect Approvals — the human | No | [Docs](/reference/cli/approval) |
 | <code>contracts</code> | Validate the distributed-governance contract registry against its schema and | Yes | [Docs](/reference/cli/contracts) |
+| <code>harness</code> | Admit and inspect Harness Contracts and Runs (F065 H0, ADR-0100/0101). A | No | [Docs](/reference/cli/harness) |
 
 ### ⚠️ Deprecated Commands (v1 Compatibility)
 
