@@ -95,6 +95,16 @@
 				"finishedAt": { "type": "string", "format": "date-time" }
 			}
 		},
+		"tools": {
+			"description": "F067: additive optional — the tool-registry snapshot this run operated under (Harness v2 §30 acceptance 5). Absent when no tool was admitted at run creation, so pre-H1 records stay schema-valid. A changed tool set changes the snapshot hash, making tool drift per-run detectable.",
+			"type": "object",
+			"required": ["snapshotHash", "ids"],
+			"additionalProperties": false,
+			"properties": {
+				"snapshotHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+				"ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "maxItems": 64 }
+			}
+		},
 		"admission": {
 			"description": "F066 (ADR-0100 decision 3): the AdmissionReceipt. Additive section — records created before F066 stay schema-valid without it. The receipt is only ever written complete: each of the six checks names the existing governed artifact it witnessed; a missing or refused check refuses the whole admission, so a stored receipt is always all-pass.",
 			"type": "object",

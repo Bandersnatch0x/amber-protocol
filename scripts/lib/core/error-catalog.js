@@ -2794,6 +2794,42 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_HARNESS_LOOP_APPROVAL_MISSING"],
 	},
+	AMBER_E_HARNESS_TOOL_PIN_UNRESOLVED: {
+		title: "Tool capability pin does not resolve",
+		cause:
+			"The tool declaration's capability pin could not be resolved through the existing governed registries (F052 runner registry or F056 external-effect registry). A tool names governed authority; it never invents it.",
+		remedy:
+			"Register the capability in its own registry first (amber runner register / the external-effect admission), or pin the exact registered id@version the tool intends.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_TOOL_IMMUTABLE", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_TOOL_IMMUTABLE: {
+		title: "Tool declaration is immutable after admission",
+		cause:
+			"An admitted tool id was re-admitted with different bytes. Tool declarations are frozen at admission; a run records the tool-set snapshot, so a silent rewrite would break run provenance.",
+		remedy:
+			"Admit the changed document under a new id or version; the admitted record is left untouched.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_TOOL_PIN_UNRESOLVED"],
+	},
+	AMBER_E_HARNESS_TOOL_NOT_FOUND: {
+		title: "Admitted tool not found",
+		cause:
+			"A harness tool command referenced a tool id that has not been admitted under the harness state area.",
+		remedy:
+			"Run `amber harness tool admit --file <tool.json>` first, then retry; `amber harness tool list` lists admitted ids.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_TOOL_CORRUPT: {
+		title: "Admitted tool failed its snapshot re-hash",
+		cause:
+			"The stored tool admission record no longer hashes to its Snapshot Hash (edited in place or corrupt storage). Reads fail closed rather than presenting unproven bytes.",
+		remedy:
+			"Do not repair in place: re-admit the intended document under a new id/version and investigate how the admitted bytes changed.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_TOOL_IMMUTABLE"],
+	},
 	AMBER_E_HARNESS_CONTRACT_IMMUTABLE: {
 		title: "Harness Contract is immutable after admission",
 		cause:

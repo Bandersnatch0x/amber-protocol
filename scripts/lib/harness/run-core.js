@@ -17,6 +17,7 @@ const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { inspectHarnessContract } = require("./contract-core");
 const { isLegalTransition, isFinal } = require("./run-state-machine");
 const { emitHarnessEvent } = require("./event-ledger");
+const { toolsSnapshot } = require("./tool-core");
 
 const CODE_ILLEGAL = "AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION";
 const CODE_FINAL = "AMBER_E_HARNESS_RUN_FINAL";
@@ -182,6 +183,11 @@ function createRun(targetRoot, { contractId, subject, runId, executionRef, now }
 		state: "created",
 		stateHistory: [{ from: null, to: "created", at }],
 	};
+	// F067 (Harness v2 §30 acceptance 5): the run records the tool-registry
+	// snapshot it operated under, so tool drift between runs is detectable.
+	// Empty registry → no section (pre-H1 records stay byte-compatible).
+	const tools = toolsSnapshot(targetRoot);
+	if (tools) record.tools = tools;
 	const file = runFileForCreate(targetRoot, id);
 	if (fs.existsSync(file)) {
 		throw typedError(
@@ -191,7 +197,14 @@ function createRun(targetRoot, { contractId, subject, runId, executionRef, now }
 	}
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
-	emitRunEvent(targetRoot, "run.created", record, at);
+	emitRunEvent(
+		targetRoot,
+		"run.created",
+		record,
+		at,
+		undefined,
+		tools ? [`tools:${tools.snapshotHash}`] : null,
+	);
 	return { ok: true, run: record, runFile: file };
 }
 

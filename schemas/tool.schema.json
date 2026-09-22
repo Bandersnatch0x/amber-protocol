@@ -1,0 +1,116 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Harness Tool (v1)",
+	"description": "F067 (Harness v2 §12/§25/§30): one Tool declaration — Tool ≠ Capability ≠ Credential ≠ Permission. The capability is a REFERENCE resolved through the existing governed registries (F052 runner pin or F056 external-effect pin); the credential is a reference name and never material; the effect class comes from the closed §9 taxonomy with the default postures read_only=allow, local_write=scoped allow, command_execution=policy, external_read=policy, external_write=ask, credential_use=explicit grant, destructive=deny, irreversible=deny/human approval. Admitting a tool grants zero authority (connector ≠ permission); the runner/external gates stay the only enforcement.",
+	"type": "object",
+	"required": ["apiVersion", "kind", "metadata", "capability", "effect"],
+	"additionalProperties": false,
+	"properties": {
+		"apiVersion": { "const": "amber.dev/v1" },
+		"kind": { "const": "HarnessTool" },
+		"metadata": {
+			"type": "object",
+			"required": ["id", "version"],
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128,
+					"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+				},
+				"version": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"description": { "type": "string", "maxLength": 2000 }
+			}
+		},
+		"capability": {
+			"description": "A reference into an EXISTING governed registry — never an executable definition. Runner pins resolve through the F052 runner registry (resolveRequestCapability); external pins through the F056 external-effect registry (showExternalEffect). An unresolvable pin refuses admission (drift-bound).",
+			"type": "object",
+			"required": ["kind"],
+			"additionalProperties": false,
+			"properties": {
+				"kind": { "enum": ["runner", "external"] },
+				"runnerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"runnerVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"name": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"capabilityVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+				"id": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"version": { "type": "string", "minLength": 1, "maxLength": 32 }
+			},
+			"allOf": [
+				{
+					"if": { "properties": { "kind": { "const": "runner" } }, "required": ["kind"] },
+					"then": { "required": ["runnerId", "runnerVersion", "name", "capabilityVersion"] }
+				},
+				{
+					"if": { "properties": { "kind": { "const": "external" } }, "required": ["kind"] },
+					"then": { "required": ["id", "version"] }
+				}
+			]
+		},
+		"effect": {
+			"description": "Closed §9 taxonomy. Default postures (recorded, not enforced here): read_only=allow, local_write=scoped allow, command_execution=policy, external_read=policy, external_write=ask, credential_use=explicit grant, destructive=deny, irreversible=deny/human approval.",
+			"enum": [
+				"read_only",
+				"local_write",
+				"command_execution",
+				"external_read",
+				"external_write",
+				"credential_use",
+				"destructive",
+				"irreversible"
+			]
+		},
+		"credential": {
+			"type": "object",
+			"required": ["ref"],
+			"additionalProperties": false,
+			"properties": {
+				"ref": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128,
+					"description": "Reference NAME only — no secret material ever enters the harness state area."
+				}
+			}
+		},
+		"input": {
+			"type": "object",
+			"required": ["schema"],
+			"additionalProperties": false,
+			"properties": {
+				"schema": { "type": "string", "minLength": 1, "maxLength": 256 }
+			}
+		},
+		"output": {
+			"type": "object",
+			"required": ["schema"],
+			"additionalProperties": false,
+			"properties": {
+				"schema": { "type": "string", "minLength": 1, "maxLength": 256 }
+			}
+		},
+		"limits": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"timeout": { "type": "string", "maxLength": 32 },
+				"rate": { "type": "string", "maxLength": 32 }
+			}
+		},
+		"governance": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"approval": { "type": "string", "maxLength": 256 }
+			}
+		},
+		"observability": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"record": { "type": "array", "items": { "type": "string", "minLength": 1 }, "maxItems": 16 }
+			}
+		}
+	}
+}

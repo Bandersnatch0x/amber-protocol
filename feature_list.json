@@ -2434,6 +2434,40 @@
 				"Replay/validation-receipt engine (H5), scheduler (H7), and MCP projection stay out of scope."
 			],
 			"updated": "2026-09-22"
+		},
+		{
+			"id": "F067",
+			"priority": 67,
+			"area": "governance",
+			"paths": [
+				"schemas/tool.schema.json",
+				"schemas/run.schema.json",
+				"scripts/lib/harness/tool-core.js",
+				"scripts/lib/harness/run-core.js",
+				"docs/specs/F067-harness-tool-capability-boundary.md",
+				"docs/plans/F067-harness-tool-capability-boundary.md"
+			],
+			"title": "Harness H1 Tool/Capability/Effect/Credential Boundary",
+			"user_visible_behavior": "amber harness tool admit|list|inspect|check (expert tier, untyped): Tool declarations whose capability pins resolve ONLY through the existing F052/F056 registries (unresolvable pins refuse admission; admission grants zero authority — connector != permission, test-enforced), immutable Snapshot-Hash records with tombstone lists, a report-only policy check mirroring the existing policy surface (deny-wins, default fallback), and per-run tool-registry snapshots making tool drift detectable.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-tool.test.js",
+				"amber harness tool admit --file <tool.json> with an F052-pinned capability; amber harness tool check --tool <id> reports the existing policy verdict"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/harness-tool.test.js",
+					"result": "pass: 6/6 focused tests green (real F052 fixture via the runner-registry test convention: registerPrincipal + decision artifacts + registerRunner/Capability)",
+					"date": "2026-09-22",
+					"notes": "stage 6 exit pending full-suite gate"
+				}
+			],
+			"notes": [
+				"Harness v2 §30's four schema deliverables consolidated into one closed Tool schema (capability/effect/credential as embedded closed shapes) — concepts stay separate, files stay one.",
+				"Compose-not-duplicate: capability pins resolve through resolveRequestCapability (F052) / showExternalEffect (F056); no parallel registry.",
+				"The check is report-only and writes nothing; enforcement stays with the existing gates. Replay (H5) and scheduler (H7) stay out of scope."
+			],
+			"updated": "2026-09-22"
 		}
 	]
 }

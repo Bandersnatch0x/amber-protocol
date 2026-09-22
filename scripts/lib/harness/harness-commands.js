@@ -36,7 +36,7 @@ function requiredFlag(args, key, label, example) {
 
 const dispatch = defineCommand({
 	command: "harness",
-	actions: ["admit", "inspect", "start", "advance", "status", "bind"],
+	actions: ["admit", "inspect", "start", "advance", "status", "bind", "tool"],
 	handlers: {
 		admit: (args) => {
 			const { admitHarnessContract } = require("./contract-core");
@@ -218,6 +218,66 @@ const dispatch = defineCommand({
 			}
 			const body = { run: result.run };
 			return { ...body, text: JSON.stringify(body, null, 2), ok: true };
+		},
+		tool: (args) => {
+			const sub = args._?.[1];
+			const target = resolveTarget(args);
+			const {
+				admitHarnessTool,
+				inspectHarnessTool,
+				listHarnessTools,
+				checkHarnessTool,
+			} = require("./tool-core");
+			let result;
+			try {
+				if (sub === "admit") {
+					const file = requiredFlag(
+						args,
+						"file",
+						"--file",
+						"amber harness tool admit --file path/to/tool.json --target <repo>",
+					);
+					if (file.error) return invalidArg(file.error);
+					result = admitHarnessTool(target, { toolPath: file.value });
+					const body = {
+						id: result.id,
+						snapshotHash: result.snapshotHash,
+						admittedAt: result.admittedAt,
+						toolFile: result.toolFile,
+						idempotent: result.idempotent,
+					};
+					return {
+						...body,
+						text: JSON.stringify(body, null, 2),
+						warnings: result.idempotent
+							? [
+									`tool "${result.id}" was already admitted; byte-identical re-admission left the record unchanged`,
+								]
+							: [],
+						ok: true,
+					};
+				}
+				if (sub === "list") {
+					result = { ok: true, tools: listHarnessTools(target) };
+				} else if (sub === "inspect") {
+					if (!args.tool) {
+						return invalidArg("--tool <id> is required for harness tool inspect");
+					}
+					result = inspectHarnessTool(target, { toolId: args.tool });
+				} else if (sub === "check") {
+					if (!args.tool) {
+						return invalidArg("--tool <id> is required for harness tool check");
+					}
+					result = checkHarnessTool(target, { toolId: args.tool });
+				} else {
+					return invalidArg(
+						"harness tool requires admit, list, inspect, or check. Example: amber harness tool admit --file path/to/tool.json",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
 		},
 		status: (args) => {
 			const { getRun, listRuns } = require("./run-core");

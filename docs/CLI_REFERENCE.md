@@ -2856,6 +2856,15 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   `execution.started`, `policy.evaluated`, and `execution.completed`/`execution.failed` events,
   then moves the run to `completed`/`failed`. A failed execution leaves a failed run; binding
   without a real executed record refuses (`AMBER_E_HARNESS_LOOP_OUTCOME_MISSING`).
+- `harness tool admit --file <tool.json>` / `harness tool list` / `harness tool inspect
+  --tool <id>` / `harness tool check --tool <id>` (F067, connector ≠ permission) — Tool
+  declarations composing the existing governed registries: the capability pin resolves through
+  the F052 runner registry or F056 external-effect registry (an unresolvable pin refuses
+  admission and grants zero authority), the credential is a reference name only, and the
+  effect class comes from the closed §9 taxonomy. `check` is report-only: it reports the
+  verdict the existing policy surface would give the tool (deny-wins, default-action
+  fallback), never enforcing anything. Runs record the tool-registry snapshot hash they
+  operated under (`AMBER_E_HARNESS_TOOL_*` stable codes).
 - `harness status [--run <id>]` — show one Run or list runs.
 - `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
   (Agent → Contract → Run → Events) from one read-only command.
