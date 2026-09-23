@@ -2876,8 +2876,20 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   entries — never an invented ok), or `violation`, which lands the BLOCK posture (`execution.failed`
   event with pointers to the violating sources; a running run blocks, a created/admitted run
   cancels). The three boundaries ride the run's additive `execution` section
-  (`AMBER_E_HARNESS_EXEC_*` stable codes). H2b (the governed runner consuming adapter-prepared
-  workspaces; per-mutation observation) is a separate ticket behind this evidence.
+  (`AMBER_E_HARNESS_EXEC_*` stable codes).
+- `harness execution run --run <id> --command-id <id> [--ledger <name>] [--budget-minutes <n>]
+  [--producer <principal>] [--request-id <id>]` / `release --run <id>` (F070 H2b, governed-runner
+  wiring) — `run` executes ONE governed named command for the run inside the adapter-prepared
+  workspace through the row-11 seam: the four gates (policy, approval, ledger, frozen-admission
+  verification) stay in Core and precede any effect; a gate refusal fails closed with the
+  governing gate's errors and the denied record already on the governed ledger. On success the
+  attempt's dirty-path observation (`git-status` for worktrees, bounded-root listing for local)
+  appends one immutable mutation entry to the run's observed trail and the comparison recomputes
+  over the full trail — so a violating attempt BLOCKs the run from its own observation
+  (running→blocked; a blocked run never executes until human recovery). Local contracts prepare
+  a bounded scratch root under the harness state area: the main checkout is never the default
+  cwd (§31). `release` removes the prepared workspace as a recorded step (`releasedAt`; the one
+  worktree seam for git-worktree, directory deletion for bounded roots) and is terminal.
 - `harness context admit --file <grant.json>` / `list` / `inspect --grant <id>` / `check
   --subject <s> --resource <prefix> --purpose <p> [--classification <c>] [--now <iso>]
   [--run <id>]` / `revoke --grant <id> --revoker <who>` (F069, report-first firewall) —

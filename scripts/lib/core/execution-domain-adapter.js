@@ -131,12 +131,31 @@ function executeInWorktree(
 	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 	const worktree = createWorktree(targetRoot, runId);
 	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
+	try {
+		return executeInPreparedWorkspace(worktree.path, command, budgetMinutes, { captureDigest });
+	} finally {
+		removeWorktree(targetRoot, runId);
+	}
+}
+
+/**
+ * F070 H2b: execute inside an ALREADY-PREPARED workspace (the ExecutionRecord's
+ * effective workspace) instead of a throwaway worktree. Same spawn/capture
+ * semantics as executeInWorktree; no worktree is created and none is removed —
+ * the workspace must outlive the command so its mutations stay observable.
+ */
+function executeInPreparedWorkspace(
+	workspacePath,
+	command,
+	budgetMinutes,
+	{ captureDigest = false } = {},
+) {
 	let result;
 	const startedAt = new Date().toISOString();
 	try {
 		const spawned = spawnSync(command, {
 			shell: true,
-			cwd: worktree.path,
+			cwd: workspacePath,
 			// The legacy command seam intentionally keeps its historical UTF-8
 			// envelope.  Only the named-command/F062 seam needs raw bytes for the
 			// complete output digest.
@@ -190,8 +209,6 @@ function executeInWorktree(
 					}
 				: { stdout: "", stderr: String(error.message || error).slice(-2000) }),
 		};
-	} finally {
-		removeWorktree(targetRoot, runId);
 	}
 	return { result };
 }
@@ -268,6 +285,7 @@ module.exports = {
 	verifiers,
 	validate,
 	executeInWorktree,
+	executeInPreparedWorkspace,
 	prepare,
 	execute,
 	observe,

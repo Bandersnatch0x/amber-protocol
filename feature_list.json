@@ -2559,6 +2559,52 @@
 				"ADR-0102 amendment: runId is required only for run-scoped event kinds, enforced at the write seam."
 			],
 			"updated": "2026-09-22"
+		},
+		{
+			"id": "F070",
+			"priority": 70,
+			"area": "governance",
+			"paths": [
+				"schemas/run.schema.json",
+				"scripts/lib/harness/execution-adapter.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/core/execution-domain-adapter.js",
+				"scripts/lib/core/governed-runner.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/core/error-catalog.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/harness-execution.test.js",
+				"tests/unit/governed-runner.test.js",
+				"docs/specs/F070-harness-h2b-execution-wiring.md",
+				"docs/plans/F070-harness-h2b-execution-wiring.md"
+			],
+			"title": "Harness H2b Governed-Runner Wiring (prepared workspaces, per-mutation observation)",
+			"user_visible_behavior": "amber harness execution run|release (expert tier, untyped): a run's governed named command executes inside the adapter-prepared workspace through the row-11 seam (four gates in Core unchanged, the main checkout never the default cwd — local contracts prepare a bounded scratch root); each attempt appends a deterministic dirty-path mutation entry to the run's observed trail and the comparison recomputes over the full trail, so a violating attempt BLOCKs the run from the run's own observation; release removes the prepared workspace as a recorded step (releasedAt).",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-execution.test.js",
+				"amber harness execution run --run <id> --command-id <id> against a prepared worktree; inspect --run presents declared/effective/observed/comparison from the run's own trail"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0100)",
+					"result": "pass: 「继续推进v2.2」 — standing directive per map 0066 执行带入; spec draft -> accepted (F070 H2b governed-runner wiring)",
+					"date": "2026-09-23",
+					"notes": "HITL gate closed 2026-09-23"
+				},
+				{
+					"command": "node --test tests/unit/harness-execution.test.js",
+					"result": "pass: 14/14 focused tests green (prepared-worktree seam, local bounded root + run/release, §13 fold, idempotent + multi-attempt growth, run observation, own-trail BLOCK, gate-refusal fail-closed, failing-command still observed, raw-CLI flag mapping)",
+					"date": "2026-09-23",
+					"notes": "plus governed-runner prepared-workspace case; §40 demo .scratch/orchestration/f070-h2b/section40-gate-demo.md"
+				}
+			],
+			"notes": [
+				"H2b graduates from the F068 fog: the wiring rides the G-9 row 11 seam (execution-domain-adapter + setExecutionAdapter); the four gates stay Core and precede any effect.",
+				"Per-mutation observation is the per-attempt dirty-path delta via the adapter's existing observe() — no new observation mechanism, no OS watchers (§24: per-write interception is a sandbox feature Amber does not own).",
+				"Observed growth replaces the H2a one-shot evaluate refusal; the verdict enum and BLOCK posture are unchanged."
+			],
+			"updated": "2026-09-23"
 		}
 	]
 }

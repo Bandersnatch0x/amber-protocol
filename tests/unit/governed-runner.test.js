@@ -202,3 +202,45 @@ test("a named-command run produces an Evidence receipt carrying an output digest
 	assert.equal(executed.evidenceId, "evidence/named/att-1");
 	fs.rmSync(target, { recursive: true, force: true });
 });
+
+// F070 H2b: a run with a prepared ExecutionRecord executes inside the
+// adapter-prepared workspace — the main checkout is never the default cwd
+// (Harness v2 §31) and the workspace outlives the command for observation.
+test("runGovernedCommand executes a prepared workspace without touching the main checkout", () => {
+	const rule = {
+		id: "allow-prepared-mutation",
+		action: "allow",
+		match: "exact",
+		pattern: `node -e "require('fs').writeFileSync('h2b-mut.txt','x')"`,
+	};
+	const target = gitTarget("prepared-workspace", highConfidenceRules(rule));
+	const {
+		createWorktree,
+		listWorktrees,
+		removeWorktree,
+	} = require("../../scripts/lib/worktree-manager");
+	const prepared = createWorktree(target, "h2b-run-1");
+	assert.equal(prepared.success, true);
+	const before = listWorktrees(target);
+
+	const ledgerPath = path.join(target, ".amber", "loops", "prepared-workspace", "ledger.jsonl");
+	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "prepared-workspace:approval" });
+	const result = runGovernedCommand({
+		target,
+		commandId: rule.id,
+		ledgerPath,
+		label: "prepared-workspace",
+		preparedWorkspacePath: prepared.path,
+	});
+
+	assert.deepEqual(result.errors, [], JSON.stringify(result));
+	assert.equal(result.executed, true);
+	assert.ok(
+		fs.existsSync(path.join(prepared.path, "h2b-mut.txt")),
+		"the mutation lands in the prepared workspace",
+	);
+	assert.equal(fs.existsSync(path.join(target, "h2b-mut.txt")), false, "main checkout stays clean");
+	assert.deepEqual(listWorktrees(target), before, "the prepared workspace is not auto-removed");
+	removeWorktree(target, "h2b-run-1");
+	fs.rmSync(target, { recursive: true, force: true });
+});

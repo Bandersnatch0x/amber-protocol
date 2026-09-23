@@ -2881,14 +2881,23 @@ const CATALOG = {
 		layer: "Execution",
 		related: ["AMBER_E_HARNESS_EXEC_IMMUTABLE"],
 	},
-	AMBER_E_HARNESS_EXEC_ALREADY_EVALUATED: {
-		title: "Execution boundary already evaluated",
+	AMBER_E_HARNESS_EXEC_ALREADY_RELEASED: {
+		title: "Prepared workspace already released",
 		cause:
-			"The execution record already carries a declared/effective/observed comparison. Observed growth is an H2b concern; re-evaluation would rewrite a recorded verdict.",
+			"The run's prepared workspace was released as a recorded step; a release is terminal (preparation stays one-per-run) and can never be repeated or un-released.",
 		remedy:
-			"Read the recorded comparison (amber harness execution inspect --run <id>); boundary violations are resolved by contract revision, never by widening.",
+			"Execute under a new run: prepare a fresh workspace (amber harness execution prepare) for the new run id.",
+		layer: "Execution",
+		related: ["AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND"],
+	},
+	AMBER_E_HARNESS_EXEC_RUN_TERMINAL: {
+		title: "Run is terminal or blocked; execution refused",
+		cause:
+			"A governed attempt was requested for a run in a terminal state (failed/completed/cancelled/expired) or in blocked. A terminal run never executes — its evidence is settled — and a blocked run must first be human-recovered (blocked→running), never executed through.",
+		remedy:
+			"Start a new run for further governed work, human-recover a blocked run, or (for a boundary violation) resolve by contract revision under a fresh run, never by widening the declared boundary.",
 		layer: "Governance",
-		related: ["AMBER_E_HARNESS_EXEC_RECORD_CORRUPT"],
+		related: ["AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND"],
 	},
 	AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND: {
 		title: "Prepared execution record not found",

@@ -442,8 +442,20 @@ function executeInWorktree(
 	command,
 	label,
 	budgetMinutes,
-	{ captureDigest = false } = {},
+	{ captureDigest = false, preparedWorkspacePath } = {},
 ) {
+	// F070 H2b: a run with a prepared ExecutionRecord executes inside the
+	// adapter-prepared workspace (no throwaway worktree, no auto-remove — the
+	// workspace must outlive the command for mutation observation). Absent the
+	// handle, behavior is byte-for-byte the historical throwaway worktree.
+	if (preparedWorkspacePath !== undefined) {
+		return defaultExecutionAdapter().executeInPreparedWorkspace(
+			preparedWorkspacePath,
+			command,
+			budgetMinutes,
+			{ captureDigest },
+		);
+	}
 	return defaultExecutionAdapter().executeInWorktree(targetRoot, command, label, budgetMinutes, {
 		captureDigest,
 	});
@@ -593,6 +605,7 @@ function runGovernedCommand({
 	label = "command",
 	contextRules,
 	frozen,
+	preparedWorkspacePath,
 }) {
 	const targetRoot = resolveTarget(target);
 	const executionSubject = {
@@ -805,6 +818,7 @@ function runGovernedCommand({
 	}
 	const execution = executeInWorktree(targetRoot, resolvedCommand, label, budgetMinutes, {
 		captureDigest: namedCommand,
+		preparedWorkspacePath,
 	});
 	if (execution.error)
 		return {

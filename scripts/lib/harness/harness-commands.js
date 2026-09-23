@@ -380,9 +380,74 @@ const dispatch = defineCommand({
 						observedEntries = Array.isArray(parsed) ? parsed : parsed.entries || [];
 					}
 					result = evaluateExecution(target, { runId: run.value, observedEntries });
+				} else if (sub === "run") {
+					const { runPreparedExecution } = require("./execution-adapter");
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness execution run --run <id> --command-id <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					const commandId = requiredFlag(
+						args,
+						"commandId",
+						"--command-id",
+						"amber harness execution run --run <id> --command-id <id> --target <repo>",
+					);
+					if (commandId.error) return invalidArg(commandId.error);
+					result = runPreparedExecution(target, {
+						runId: run.value,
+						commandId: commandId.value,
+						...(args.ledger === undefined ? {} : { ledger: args.ledger }),
+						...(args.budgetMinutes === undefined
+							? {}
+							: Number.isInteger(Number(args.budgetMinutes))
+								? { budgetMinutes: Number(args.budgetMinutes) }
+								: (() => {
+										throw new Error(
+											`--budget-minutes must be an integer; got ${JSON.stringify(args.budgetMinutes)}`,
+										);
+									})()),
+						...(args.producer === undefined ? {} : { producer: args.producer }),
+						...(args.requestId === undefined ? {} : { requestId: args.requestId }),
+					});
+					if (result.refused) {
+						// A gate refusal IS the governed outcome: fail closed with the
+						// governing gate's errors; the denied record is already on the
+						// governed ledger.
+						const body = {
+							refused: true,
+							attemptId: result.attemptId,
+							governed: result.governed,
+						};
+						return {
+							...body,
+							text: JSON.stringify(body, null, 2),
+							errors: result.governed.errors.map((entry) => String(entry)),
+							warnings: [],
+							exitCode: 1,
+						};
+					}
+					if (result.commandErrors) {
+						// The attempt executed and its mutations are folded, but the
+						// command itself failed: report it while keeping the verdict.
+						result.errors = result.commandErrors.map((entry) => String(entry));
+						result.exitCode = 1;
+					}
+				} else if (sub === "release") {
+					const { releaseExecution } = require("./execution-adapter");
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness execution release --run <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					result = releaseExecution(target, { runId: run.value });
 				} else {
 					return invalidArg(
-						"harness execution requires admit, list, inspect, prepare, or evaluate. Example: amber harness execution admit --file path/to/contract.json",
+						"harness execution requires admit, list, inspect, prepare, evaluate, run, or release. Example: amber harness execution admit --file path/to/contract.json",
 					);
 				}
 			} catch (err) {

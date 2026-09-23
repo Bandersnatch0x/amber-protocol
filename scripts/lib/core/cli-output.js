@@ -126,6 +126,9 @@ const FLAG_SPECS = {
 	"--reason": { key: "reason" },
 	"--run": { key: "run" },
 	"--to": { key: "to" },
+	// F070 H2b: governed prepared-execution run flags (--ledger/--producer/
+	// --request-id/--budget-minutes already exist on shared surfaces).
+	"--command-id": { key: "commandId" },
 	"--max-words": { key: "maxWords" },
 	"--window": { key: "window" },
 	"--knowledge-kind": { key: "knowledgeKind" },
