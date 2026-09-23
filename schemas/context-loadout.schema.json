@@ -19,7 +19,9 @@
 		"deltaSince"
 	],
 	"properties": {
-		"schemaVersion": { "const": "1.0.0" },
+		"schemaVersion": {
+			"const": "1.0.0"
+		},
 		"route": {
 			"type": "string",
 			"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
@@ -32,19 +34,35 @@
 				"additionalProperties": false,
 				"required": ["field", "reason"],
 				"properties": {
-					"field": { "type": "string", "minLength": 1 },
-					"reason": { "enum": ["classification-ceiling", "purpose-mismatch"] }
+					"field": {
+						"type": "string",
+						"minLength": 1
+					},
+					"reason": {
+						"enum": ["classification-ceiling", "purpose-mismatch"]
+					}
 				}
 			}
 		},
 		"feature": {
 			"anyOf": [
-				{ "type": "null" },
-				{ "type": "string", "pattern": "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$" }
+				{
+					"type": "null"
+				},
+				{
+					"type": "string",
+					"pattern": "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$"
+				}
 			]
 		},
-		"generatedAt": { "type": "string", "format": "date-time" },
-		"budgetWords": { "type": "integer", "minimum": 1 },
+		"generatedAt": {
+			"type": "string",
+			"format": "date-time"
+		},
+		"budgetWords": {
+			"type": "integer",
+			"minimum": 1
+		},
 		"knowledgeKinds": {
 			"type": "array",
 			"uniqueItems": true,
@@ -77,12 +95,18 @@
 							"kind": {
 								"enum": ["operating-manual", "route-manifest", "loadout-definition"]
 							},
-							"path": { "type": "string", "minLength": 1 },
+							"path": {
+								"type": "string",
+								"minLength": 1
+							},
 							"rawHash": {
 								"type": "string",
 								"pattern": "^sha256:[0-9a-f]{64}$"
 							},
-							"words": { "type": "integer", "minimum": 0 },
+							"words": {
+								"type": "integer",
+								"minimum": 0
+							},
 							"classification": {
 								"description": "Required Artifacts carry the fixed internal classification; not caller-settable (context/runtime contract §3.1).",
 								"const": "internal"
@@ -97,9 +121,15 @@
 			"additionalProperties": false,
 			"required": ["required", "priority", "optional"],
 			"properties": {
-				"required": { "$ref": "#/definitions/pageIds" },
-				"priority": { "$ref": "#/definitions/pageIds" },
-				"optional": { "$ref": "#/definitions/pageIds" }
+				"required": {
+					"$ref": "#/definitions/pageIds"
+				},
+				"priority": {
+					"$ref": "#/definitions/pageIds"
+				},
+				"optional": {
+					"$ref": "#/definitions/pageIds"
+				}
 			}
 		},
 		"pages": {
@@ -112,17 +142,26 @@
 				"additionalProperties": false,
 				"required": ["title", "words", "rawHash", "status", "scope"],
 				"properties": {
-					"title": { "type": "string" },
-					"words": { "type": "integer", "minimum": 0 },
+					"title": {
+						"type": "string"
+					},
+					"words": {
+						"type": "integer",
+						"minimum": 0
+					},
 					"rawHash": {
 						"type": "string",
 						"pattern": "^sha256:[0-9a-f]{64}$"
 					},
-					"status": { "enum": ["ok", "stale"] },
+					"status": {
+						"enum": ["ok", "stale"]
+					},
 					"scope": {
 						"type": "array",
 						"uniqueItems": true,
-						"items": { "type": "string" }
+						"items": {
+							"type": "string"
+						}
 					},
 					"classification": {
 						"description": "The effective classification projection (stored value wins; governed pages without a stored label project internal).",
@@ -132,11 +171,27 @@
 						"enum": ["stored", "effective-default", "unlabeled"]
 					},
 					"purpose": {
-						"anyOf": [{ "type": "null" }, { "type": "string", "minLength": 1 }]
+						"anyOf": [
+							{
+								"type": "null"
+							},
+							{
+								"type": "string",
+								"minLength": 1
+							}
+						]
 					},
 					"expiresAt": {
 						"description": "Effective hard expiry derived from the page ttl and its ingest/refresh instant; null when the page carries no ttl.",
-						"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+						"anyOf": [
+							{
+								"type": "null"
+							},
+							{
+								"type": "string",
+								"format": "date-time"
+							}
+						]
 					}
 				}
 			}
@@ -166,7 +221,9 @@
 				"additionalProperties": false,
 				"required": ["pageId", "reason", "detail"],
 				"properties": {
-					"pageId": { "type": "string" },
+					"pageId": {
+						"type": "string"
+					},
 					"reason": {
 						"enum": [
 							"over-budget",
@@ -176,15 +233,85 @@
 							"superseded",
 							"knowledge-kind",
 							"classification",
-							"expired"
+							"expired",
+							"firewall"
 						]
 					},
-					"detail": { "type": "string", "minLength": 1 }
+					"detail": {
+						"type": "string",
+						"minLength": 1
+					}
 				}
 			}
 		},
 		"deltaSince": {
-			"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+			"anyOf": [
+				{
+					"type": "null"
+				},
+				{
+					"type": "string",
+					"format": "date-time"
+				}
+			]
+		},
+		"firewall": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["mode", "subject", "purpose", "checkedAt", "grants", "deniedCount"],
+			"properties": {
+				"mode": {
+					"const": "on"
+				},
+				"subject": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128
+				},
+				"purpose": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128
+				},
+				"checkedAt": {
+					"type": "string",
+					"format": "date-time"
+				},
+				"runId": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 128
+				},
+				"grants": {
+					"type": "array",
+					"maxItems": 64,
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["id", "validUntil"],
+						"properties": {
+							"id": {
+								"type": "string",
+								"minLength": 1,
+								"maxLength": 128
+							},
+							"snapshotHash": {
+								"type": "string",
+								"pattern": "^sha256:[0-9a-f]{64}$"
+							},
+							"validUntil": {
+								"type": "string",
+								"format": "date-time"
+							}
+						}
+					}
+				},
+				"deniedCount": {
+					"type": "integer",
+					"minimum": 0
+				}
+			},
+			"description": "F071 H3b (optional): present only when a governing subject was declared — the covering grants cited (id + snapshot + validUntil) and the denied count; absence means the load was not grant-governed."
 		}
 	},
 	"definitions": {

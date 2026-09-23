@@ -2605,6 +2605,45 @@
 				"Observed growth replaces the H2a one-shot evaluate refusal; the verdict enum and BLOCK posture are unchanged."
 			],
 			"updated": "2026-09-23"
+		},
+		{
+			"id": "F071",
+			"priority": 71,
+			"area": "governance",
+			"paths": [
+				"schemas/context-loadout.schema.json",
+				"scripts/lib/core/context-loadout.js",
+				"scripts/lib/context/adapters/command.js",
+				"docs/specs/F071-harness-h3b-firewall-wiring.md",
+				"docs/plans/F071-harness-h3b-firewall-wiring.md"
+			],
+			"title": "Harness H3b Firewall Verdict Wiring (the loadout consumes the grants)",
+			"user_visible_behavior": "amber context load --subject <s> --purpose <p> [--run <id>] gates the Context Loadout through the F069 verdict: each candidate page passes checkContextAccess verbatim after the §3.3 authority exclusions (a required pin cannot pull a page past the firewall); denied pages are excluded with reason firewall plus the closed deny reason, each denial on the trail as context.denied; the loadout cites its covering grants (id + snapshot + validUntil) in an additive firewall section, so the Phase-H3 gate questions are answered from the artifact; without --subject the build is byte-identical to today (absence of the section = not grant-governed, never silent).",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/context-loadout.test.js",
+				"amber context load --subject <s> --purpose <p> against an admitted grant; the same load under a mismatched purpose excludes every page with reason firewall"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0105)",
+					"result": "pass: 「继续推进v2.2」 — standing directive per map 0066 执行带入; spec draft -> accepted (F071 H3b firewall verdict wiring)",
+					"date": "2026-09-23",
+					"notes": "HITL gate closed 2026-09-23"
+				},
+				{
+					"command": "node --test tests/unit/context-loadout.test.js",
+					"result": "pass: 42/42 focused tests green (allow citation, all five closed deny reasons through the real build path, required-pin discipline, no-grant fail-closed, byte-identical no-subject build, denial events on the trail, verify round-trip)",
+					"date": "2026-09-23",
+					"notes": "real-CLI smoke: gated load cites the grant; subject-without-purpose refuses AMBER_E_CONTEXT_LOADOUT_FIREWALL"
+				}
+			],
+			"notes": [
+				"H3b graduates from the F069 fog: one verdict function (checkContextAccess) now has two consumers — the point-check command and the loadout build.",
+				"Activation is explicit (subject+purpose); a plain load stays byte-identical — mandatory subject declaration would be a charter-level default-deny flip, out of scope.",
+				"Schema growth is optional-field-only (firewall section + excluded.reason enum += firewall); pre-H3b loadouts stay valid."
+			],
+			"updated": "2026-09-23"
 		}
 	]
 }

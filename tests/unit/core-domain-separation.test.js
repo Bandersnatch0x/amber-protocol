@@ -39,6 +39,13 @@ const FORBIDDEN_CORE_TARGETS = new Set([
 	"worktree-manager.js",
 ]);
 
+// F071 H3b note: core/context-loadout requires harness/context-core (the ONE
+// firewall verdict, composed verbatim — never re-implemented). This is a
+// deliberate core→harness edge with no module cycle (context-core requires
+// only schema/ledger/state/event cores, nothing from core/context-loadout).
+// The guard does not forbid it; a FUTURE harness require of context-loadout
+// would close a real cycle and must be flagged deliberately.
+
 // Known-deviation allowlist (spec §5.5 disposition rows 4-11): the Core-marked
 // files that still contain adapter-module requires today. The guard is red
 // only on NEW violations — this list shrinks monotonically and each entry

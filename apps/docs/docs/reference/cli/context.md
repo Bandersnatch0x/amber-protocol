@@ -88,8 +88,16 @@ Subcommands:
         Assemble a task-scoped Loadout: three target-local Required Artifacts plus
         a freshness-gated, budgeted selection of Context Pages, written to
         .amber/context/loadouts/<route>[-<feature>].json.
+        With --subject <s> --purpose <p> ([--run <id>]) the F069 firewall
+        verdict gates every candidate page: allowed pages cite the covering
+        grant (id + snapshot + validUntil), denied pages are excluded with
+        reason firewall and the closed deny reason (each denial on the
+        trail); without --subject the build is byte-identical and the
+        artifact carries no firewall section (visibly not grant-governed).
   preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
         Assemble and print the same Loadout without writing files or events.
+        Firewall mode (--subject/--purpose) requires `load` — preview never
+        carries the firewall section; it prints the ungoverned shape.
   verify --loadout <file>
         Re-check Required Artifacts and required-tier Pages (path and hash) right
         before the agent loads them; missing, escaped, or changed inputs fail closed.
@@ -109,6 +117,7 @@ Examples:
   amber context verify --target . --json
   amber context refresh --target .
   amber context load --target . --route feature-standard --feature F015
+  amber context load --target . --route feature-standard --subject worker --purpose review
   amber context verify --target . --loadout .amber/context/loadouts/feature-standard-F015.json
   amber context projection status --target .
   amber context benchmark --target . --fixture fixtures/context-benchmark.json
@@ -137,6 +146,10 @@ amber context refresh --target .
 
 ```bash
 amber context load --target . --route feature-standard --feature F015
+```
+
+```bash
+amber context load --target . --route feature-standard --subject worker --purpose review
 ```
 
 ```bash

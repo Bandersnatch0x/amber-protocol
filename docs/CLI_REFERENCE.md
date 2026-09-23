@@ -2670,6 +2670,10 @@ node scripts/amber.js context delete --target . --page <id>
 # Task-scoped Loadout
 node scripts/amber.js context load --target . --route feature-standard
 node scripts/amber.js context load --target . --route feature-standard --feature F016 --budget 4000 --page governed-execution
+# Firewall-gated load (F071 H3b): the F069 verdict gates every candidate page; allowed pages
+# cite the covering grant, denied pages are excluded (reason firewall, closed deny reason,
+# context.denied on the trail); without --subject the build is byte-identical.
+node scripts/amber.js context load --target . --route feature-standard --subject worker --purpose review
 node scripts/amber.js context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
 
 # Rebuildable projections and deterministic quality checks
@@ -2901,7 +2905,8 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   (revoked grants stay listable forever) and expiry is a read-time projection.
   `context.granted`/`context.denied`/`context.revoked` events land on the tamper-evident trail;
   denials optionally scope to a run via `--run` (`AMBER_E_HARNESS_CTX_*` stable codes). H3b
-  (wiring the verdict into the actual context-loading path) is a separate ticket.
+  shipped as F071: `context load --subject/--purpose` gates the real loadout through this same
+  verdict (see the Task-scoped Loadout section).
 - `harness status [--run <id>]` — show one Run or list runs.
 - `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
   (Agent → Contract → Run → Events) from one read-only command.

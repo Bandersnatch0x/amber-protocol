@@ -548,6 +548,15 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_ROUTE"],
 	},
+	AMBER_E_CONTEXT_LOADOUT_FIREWALL: {
+		title: "Context firewall configuration is incomplete",
+		cause:
+			"F071 H3b: a governing subject was declared for the loadout build without a purpose (or the firewall configuration is otherwise incomplete). The grant verdict is Subject × Resource × Purpose × Time — it is not meaningful without both.",
+		remedy:
+			"Pass --purpose together with --subject, or drop --subject to build without the firewall (the artifact then carries no firewall section — visibly not grant-governed).",
+		layer: "Context",
+		related: ["AMBER_E_CONTEXT_LOADOUT_ROUTE", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_CONTEXT_LOADOUT_REQUIRED: {
 		title: "Context loadout required artifact is invalid",
 		cause:

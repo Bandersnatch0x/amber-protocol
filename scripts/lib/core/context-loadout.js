@@ -11,12 +11,21 @@
 // byte-identical loadout file. Cacheability (D2): when the freshly computed
 // loadout serializes to the exact bytes already on disk, the file is NOT
 // rewritten and no `loadout-written` event is appended — an unchanged signal
-// skips regeneration. The only clock-derived field, `generatedAt`, is sourced
-// from the latest NON-`loadout-written` event `at` (or the Unix epoch when
-// none exists), so appending a `loadout-written` event after the write does
-// not change the next build's `generatedAt`. Recency ordering for the
-// priority tier comes from `events.jsonl` `at` per pageId (NOT file mtime —
-// `refresh`/`no-change` rewrite page files and would churn mtime).
+// skips regeneration. `generatedAt` is sourced from the latest
+// NON-`loadout-written` event `at` (or the Unix epoch when none exists), so
+// appending a `loadout-written` event after the write does not change the
+// next build's `generatedAt`. Recency ordering for the priority tier comes
+// from `events.jsonl` `at` per pageId (NOT file mtime — `refresh`/`no-change`
+// rewrite page files and would churn mtime).
+//
+// F071 H3b determinism note: with the firewall ON (a declared subject), the
+// TTL verdict is evaluated against the REAL wall clock — that is the §11
+// formula's Time input — and the artifact embeds `firewall.checkedAt`. Two
+// firewall builds of the same state therefore produce different bytes even
+// when every verdict is unchanged: the byte-dedupe is defeated by design
+// (the file rewrites and one `loadout-written` event re-appends per build),
+// while the per-page denial events only appear when a page is actually
+// denied. Firewall-off builds keep full byte-identity.
 //
 // `rawHash` per page: the write path has no page-level hash, so the loadout
 // embeds `sha256(canonicalJson(JSON.stringify(page)))` — a stable, deterministic identity hash
@@ -50,6 +59,8 @@ const {
 	readKnowledgeGraph,
 } = require("./context-knowledge");
 const { compileSchema } = require("./schema-contract");
+// F071 H3b: the ONE firewall verdict — the build never re-implements it.
+const { checkContextAccess } = require("../harness/context-core");
 
 const SCHEMA_VERSION = "1.0.0";
 const ROUTE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/; // kebab-case, matching pageId
@@ -276,6 +287,37 @@ function loadBuildConfig(targetRoot, opts) {
 			],
 		};
 	}
+	// F071 H3b: the firewall is on only when a governing subject is declared —
+	// and the verdict is not meaningful without a purpose (the check requires
+	// both), so subject-without-purpose refuses here, before any selection. A
+	// DECLARED-but-malformed subject (garbage type, whitespace) also refuses:
+	// silently degrading to firewall-off would hand back an ungoverned load.
+	const subjectDeclared = opts.subject !== undefined && opts.subject !== null;
+	const subject =
+		subjectDeclared && typeof opts.subject === "string" && opts.subject.trim().length > 0
+			? opts.subject
+			: null;
+	if (subjectDeclared && !subject) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_LOADOUT_FIREWALL",
+					detail: `subject must be a non-empty string (got ${JSON.stringify(opts.subject)})`,
+				},
+			],
+		};
+	}
+	if (subject && (typeof opts.purpose !== "string" || opts.purpose.trim().length === 0)) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_LOADOUT_FIREWALL",
+					detail:
+						"subject requires purpose: the firewall verdict (context-grant check) is not meaningful without both",
+				},
+			],
+		};
+	}
 	return {
 		errors: [],
 		route,
@@ -286,6 +328,14 @@ function loadBuildConfig(targetRoot, opts) {
 		knowledgeKinds: [...new Set(knowledgeKinds)].sort(),
 		requiredArtifacts,
 		maxClassification,
+		firewall: subject
+			? {
+					subject,
+					purpose: opts.purpose,
+					runId: typeof opts.runId === "string" && opts.runId.trim().length > 0 ? opts.runId : null,
+				}
+			: null,
+		targetRoot,
 	};
 }
 
@@ -504,11 +554,84 @@ function appendStatusExclusions(pageEntries, state) {
 	}
 }
 
+// F071 H3b: the firewall verdict, wired. Runs after the §3.3 authority
+// exclusions and before any tier selection (a required pin cannot pull a page
+// past the firewall either — selectRequiredPages skips seen pages). The build
+// adds ZERO verdict logic: every candidate page goes through
+// checkContextAccess verbatim (the same function the point-check command
+// uses), so each denial lands on the trail as context.denied from the check
+// itself. Allowed pages cite their covering grant; denied pages are excluded
+// with reason "firewall" and the closed deny reason in the detail.
+function applyFirewallExclusions(pageEntries, state, config, now) {
+	if (!config.firewall) return { grants: [], deniedCount: 0 };
+	const { subject, purpose, runId } = config.firewall;
+	const at = now instanceof Date ? now.toISOString() : String(now);
+	const covering = new Map();
+	let deniedCount = 0;
+	for (const entry of pageEntries) {
+		if (state.seen.has(entry.pageId)) continue;
+		// The check fails closed (corrupt/locked harness ledger throws a typed
+		// error); the build converts that into its structured {errors} shape
+		// instead of letting it escape mid-preview — still fail-closed, but
+		// with the caller's contract intact.
+		let verdict;
+		try {
+			verdict = checkContextAccess(config.targetRoot, {
+				subject,
+				resource: entry.pageId,
+				purpose,
+				classification: entry.classification,
+				now: at,
+				...(runId ? { runId } : {}),
+			});
+		} catch (error) {
+			state.firewall = null;
+			return {
+				firewallError: {
+					code: error.amberCode || "AMBER_E_CONTEXT_LOADOUT_FIREWALL",
+					detail: `firewall verdict unavailable for ${entry.pageId}: ${error.message}`,
+				},
+			};
+		}
+		if (verdict.verdict === "allow") {
+			if (!covering.has(verdict.grant)) {
+				// The check's pointer carries the snapshot hash:
+				// context-grant:<id>#<snapshotHash>.
+				const hash =
+					typeof verdict.grantPointer === "string" ? verdict.grantPointer.split("#")[1] : null;
+				covering.set(verdict.grant, {
+					id: verdict.grant,
+					...(hash ? { snapshotHash: hash } : {}),
+					validUntil: verdict.validUntil,
+				});
+			}
+		} else {
+			state.seen.add(entry.pageId);
+			deniedCount += 1;
+			state.excluded.push({
+				pageId: entry.pageId,
+				reason: "firewall",
+				detail: `firewall deny (${verdict.reason}): no qualifying grant for subject ${subject} at purpose ${purpose}`,
+			});
+		}
+	}
+	return { grants: [...covering.values()], deniedCount, checkedAt: at };
+}
+
 function selectPageTiers(pageEntries, config) {
 	const state = { excluded: [], pagesMap: {}, seen: new Set(), requiredPageIds: [] };
+	// One build, one instant: expiry, ceiling, and the firewall verdict all
+	// read the same clock (TTL is a half-open window with no skew tolerance).
+	const now = new Date();
 	// §3.3 authority exclusions run FIRST: classification-denied and expired
 	// pages never enter any tier, required pins included.
-	applyAuthorityExclusions(pageEntries, state, config);
+	applyAuthorityExclusions(pageEntries, state, config, now);
+	// F071 H3b: the firewall verdict second — pages already excluded for
+	// expiry/ceiling never query the grants, and the recorded reason is the
+	// first authority fact that applied.
+	const firewall = applyFirewallExclusions(pageEntries, state, config, now);
+	if (firewall.firewallError) return { error: firewall.firewallError };
+	state.firewall = firewall;
 	const required = selectRequiredPages(pageEntries, config.requiredPins, state);
 	state.requiredPageIds = required.requiredPageIds;
 	const supersededPin = state.excluded.find((entry) => entry.reason === "superseded");
@@ -578,6 +701,7 @@ function applyDeltaSelection(selection, latestAtByPage, since) {
 }
 
 function assembleLoadout(config, pageState, selection, delta) {
+	const firewall = selection.firewall;
 	return {
 		schemaVersion: SCHEMA_VERSION,
 		route: config.route,
@@ -594,6 +718,22 @@ function assembleLoadout(config, pageState, selection, delta) {
 		// admitted pages and why. The build omits nothing today — the bounded,
 		// deterministic empty ledger keeps the snapshot shape closed.
 		redactions: [],
+		// F071 H3b: present only when a governing subject was declared. Its
+		// absence is the visible statement that this load was not
+		// grant-governed — the build never stays silent about the mode.
+		...(config.firewall
+			? {
+					firewall: {
+						mode: "on",
+						subject: config.firewall.subject,
+						purpose: config.firewall.purpose,
+						checkedAt: firewall.checkedAt,
+						...(config.firewall.runId ? { runId: config.firewall.runId } : {}),
+						grants: firewall.grants,
+						deniedCount: firewall.deniedCount,
+					},
+				}
+			: {}),
 		deltaSince: delta.deltaSince,
 	};
 }

@@ -271,6 +271,13 @@ function renderLoadout(loadout, loadoutPath) {
 			lines.push(`    ... and ${loadout.excluded.length - 10} more`);
 	}
 	if (loadout.deltaSince) lines.push(`  delta since ${loadout.deltaSince}`);
+	if (loadout.firewall) {
+		lines.push(
+			`  firewall: on — subject ${loadout.firewall.subject}, purpose ${loadout.firewall.purpose}, grants ${loadout.firewall.grants.length}, denied ${loadout.firewall.deniedCount}`,
+		);
+	} else {
+		lines.push("  firewall: off (no subject declared — not grant-governed)");
+	}
 	lines.push("");
 	lines.push(
 		"  Load it: point your agent at the file above; run `amber context verify --loadout <file>` right before loading (Required Artifacts and required-tier Pages).",
@@ -288,6 +295,12 @@ function loadBody(args, targetRoot) {
 		// and D7 verify --loadout become reachable from the CLI).
 		required: args.page ? (Array.isArray(args.page) ? args.page : [args.page]) : undefined,
 		knowledgeKinds: args.knowledgeKind,
+		// F071 H3b: declaring a governing subject turns the firewall on (the
+		// F069 verdict gates every candidate page); absent --subject the build
+		// is byte-identical to the pre-H3b behavior.
+		subject: args.subject,
+		purpose: args.purpose,
+		runId: args.run,
 	});
 	if (result.errors.length > 0) {
 		return {

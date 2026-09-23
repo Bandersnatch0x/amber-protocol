@@ -1111,3 +1111,250 @@ describe("buildLoadout required artifacts", () => {
 		}
 	});
 });
+
+// F071 H3b — the firewall verdict, wired into the real load: each candidate
+// page goes through checkContextAccess verbatim; allowed pages cite their
+// covering grant, denied pages are excluded with reason "firewall" and the
+// closed deny reason, and every denial lands on the trail as context.denied.
+const { dispatch } = require("../../scripts/lib/command-dispatcher");
+const { readHarnessEvents } = require("../../scripts/lib/harness/event-ledger");
+
+function admitGrant(root, overrides = {}, name = "grant.json") {
+	const grant = {
+		apiVersion: "amber.dev/v1",
+		kind: "ContextGrant",
+		metadata: { id: "grant-review", version: "1" },
+		subject: "worker",
+		resources: ["page-a"],
+		purpose: "review",
+		classificationCeiling: "internal",
+		validFrom: "2026-01-01T00:00:00.000Z",
+		validUntil: "2099-01-01T00:00:00.000Z",
+		policy: "context-safe",
+		...overrides,
+	};
+	const file = path.join(root, name);
+	fs.writeFileSync(file, JSON.stringify(grant, null, 2), "utf8");
+	const r = dispatch("harness", { target: root, file: name, json: true, _: ["context", "admit"] });
+	assert.equal(r.exitCode, 0, JSON.stringify(r.errors || r));
+}
+
+describe("buildLoadout — firewall verdict wiring (F071 H3b)", () => {
+	it("refuses a subject without a purpose before any selection", () => {
+		const root = makeTarget();
+		try {
+			const result = buildLoadout(root, { route: "bugfix-quick", subject: "worker" });
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_FIREWALL");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("a corrupt admitted grant never yields a false allow", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, freshPage(root, { pageId: "page-a", ref: "src/a.js" }));
+			admitGrant(root);
+			// Corrupt the admitted grant record: the registry tombstones it, the
+			// check sees no live grant, and the page must be DENIED (no-grant) —
+			// never silently loaded on a broken authorization record.
+			const grantFile = path.join(root, ".amber", "harness", "context-grants", "grant-review.json");
+			fs.writeFileSync(grantFile, "{ broken", "utf8");
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			const denied = result.loadout.excluded.filter((e) => e.pageId === "page-a");
+			assert.equal(denied.length, 1);
+			assert.equal(denied[0].reason, "firewall");
+			assert.ok(denied[0].detail.includes("no-grant"), denied[0].detail);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses a declared-but-malformed subject instead of silently disabling the firewall", () => {
+		for (const garbage of [123, true, "   "]) {
+			const root = makeTarget();
+			try {
+				const result = buildLoadout(root, { route: "bugfix-quick", subject: garbage });
+				assert.equal(result.loadout, null, JSON.stringify(garbage));
+				assert.match(result.errors[0].detail, /subject must be a non-empty string/);
+			} finally {
+				cleanup(root);
+			}
+		}
+	});
+
+	it("allows covered pages and cites the covering grant", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, freshPage(root, { pageId: "page-a", ref: "src/a.js" }));
+			admitGrant(root);
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			const fw = result.loadout.firewall;
+			assert.equal(fw.mode, "on");
+			assert.equal(fw.subject, "worker");
+			assert.equal(fw.purpose, "review");
+			assert.equal(fw.deniedCount, 0);
+			assert.equal(fw.grants.length, 1);
+			assert.match(fw.grants[0].snapshotHash, /^sha256:[0-9a-f]{64}$/);
+			assert.equal(fw.grants[0].validUntil, "2099-01-01T00:00:00.000Z");
+			assert.ok(
+				[
+					...result.loadout.tiers.required,
+					...result.loadout.tiers.priority,
+					...result.loadout.tiers.optional,
+				].includes("page-a"),
+				"the covered page is in the loadout",
+			);
+			assert.equal(result.loadout.excluded.filter((e) => e.reason === "firewall").length, 0);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("denies with each closed reason through the real build path", () => {
+		const cases = [
+			{ label: "purpose-mismatch", grant: {}, opts: { purpose: "deploy" } },
+			{
+				label: "expired",
+				grant: { validFrom: "2019-01-01T00:00:00.000Z", validUntil: "2020-01-01T00:00:00.000Z" },
+				opts: {},
+			},
+			{
+				label: "classification-above-ceiling",
+				grant: { classificationCeiling: "public" },
+				opts: {},
+			},
+		];
+		for (const c of cases) {
+			const root = makeTarget();
+			try {
+				const page = freshPage(root, { pageId: "page-a", ref: "src/a.js" });
+				if (c.label === "classification-above-ceiling") page.classification = "confidential";
+				writePage(root, page);
+				admitGrant(root, c.grant);
+				const result = buildLoadout(root, {
+					route: "bugfix-quick",
+					subject: "worker",
+					purpose: c.opts.purpose || "review",
+				});
+				assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+				const denied = result.loadout.excluded.filter((e) => e.reason === "firewall");
+				assert.equal(denied.length, 1, c.label);
+				assert.ok(denied[0].detail.includes(c.label), `${c.label}: ${denied[0].detail}`);
+				assert.equal(result.loadout.firewall.deniedCount, 1, c.label);
+				assert.equal(result.loadout.firewall.grants.length, 0, c.label);
+				const denials = readHarnessEvents(root).filter((e) => e.kind === "context.denied");
+				assert.ok(denials.length >= 1, `${c.label}: the denial is on the trail`);
+			} finally {
+				cleanup(root);
+			}
+		}
+
+		// revoked: a terminal revocation record denies the covered resource.
+		const root = makeTarget();
+		try {
+			writePage(root, freshPage(root, { pageId: "page-a", ref: "src/a.js" }));
+			admitGrant(root);
+			const revoked = dispatch("harness", {
+				target: root,
+				json: true,
+				grant: "grant-review",
+				revoker: "human",
+				_: ["context", "revoke"],
+			});
+			assert.equal(revoked.exitCode, 0, JSON.stringify(revoked.errors || revoked));
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+			});
+			const denied = result.loadout.excluded.filter((e) => e.reason === "firewall");
+			assert.equal(denied.length, 1);
+			assert.ok(denied[0].detail.includes("revoked"), denied[0].detail);
+		} finally {
+			cleanup(root);
+		}
+
+		// no-grant: a declared subject with no admitted grant denies everything.
+		const root2 = makeTarget();
+		try {
+			writePage(root2, freshPage(root2, { pageId: "page-a", ref: "src/a.js" }));
+			const result = buildLoadout(root2, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+			});
+			const denied = result.loadout.excluded.filter((e) => e.reason === "firewall");
+			assert.equal(denied.length, 1);
+			assert.ok(denied[0].detail.includes("no-grant"), denied[0].detail);
+			assert.equal(result.loadout.firewall.grants.length, 0);
+		} finally {
+			cleanup(root2);
+		}
+	});
+
+	it("a required pin cannot pull a denied page past the firewall", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, freshPage(root, { pageId: "page-b", ref: "src/b.js" }));
+			admitGrant(root, { resources: ["page-a"] });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+				required: ["page-b"],
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.equal(result.loadout.tiers.required.length, 0, "the pin stayed out");
+			const denied = result.loadout.excluded.filter((e) => e.pageId === "page-b");
+			assert.equal(denied.length, 1);
+			assert.equal(denied[0].reason, "firewall");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("a plain load stays byte-identical: no firewall section at all", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, freshPage(root, { pageId: "page-a", ref: "src/a.js" }));
+			const result = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(result.errors.length, 0);
+			assert.equal(result.loadout.firewall, undefined);
+			const keys = Object.keys(result.loadout);
+			assert.equal(keys.includes("firewall"), false, "the pre-H3b shape carries no firewall key");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("a firewall-bearing loadout round-trips verify", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, freshPage(root, { pageId: "page-a", ref: "src/a.js" }));
+			admitGrant(root);
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+			});
+			assert.equal(result.errors.length, 0);
+			const check = verifyLoadoutFile(root, path.relative(root, result.loadoutPath));
+			assert.equal(check.ok, true, JSON.stringify(check.findings));
+			assert.equal(check.findings.length, 0);
+		} finally {
+			cleanup(root);
+		}
+	});
+});
