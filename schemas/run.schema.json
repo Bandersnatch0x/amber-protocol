@@ -150,6 +150,28 @@
 				"ids": { "type": "array", "items": { "type": "string", "minLength": 1 }, "maxItems": 64 }
 			}
 		},
+		"attempts": {
+			"description": "F072 H4: additive optional — a summary of this run's first-class attempt records (the full-fidelity records live under .amber/harness/attempts/<runId>/). Absent when no attempt has been recorded, so pre-H4 records stay schema-valid.",
+			"type": "object",
+			"required": ["count", "lastAttemptId", "lastAttemptState"],
+			"additionalProperties": false,
+			"properties": {
+				"count": { "type": "integer", "minimum": 1, "maximum": 1024 },
+				"lastAttemptId": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"lastAttemptState": { "enum": ["running", "completed", "failed", "refused"] }
+			}
+		},
+		"checkpoints": {
+			"description": "F072 H4: additive optional — a summary of this run's checkpoint records (the full-fidelity records live under .amber/harness/checkpoints/<runId>/). Absent when no checkpoint has been captured, so pre-H4 records stay schema-valid.",
+			"type": "object",
+			"required": ["count", "lastCheckpointId", "lastCheckpointAt"],
+			"additionalProperties": false,
+			"properties": {
+				"count": { "type": "integer", "minimum": 1, "maximum": 1024 },
+				"lastCheckpointId": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"lastCheckpointAt": { "type": "string", "format": "date-time" }
+			}
+		},
 		"admission": {
 			"description": "F066 (ADR-0100 decision 3): the AdmissionReceipt. Additive section — records created before F066 stay schema-valid without it. The receipt is only ever written complete: each of the six checks names the existing governed artifact it witnessed; a missing or refused check refuses the whole admission, so a stored receipt is always all-pass.",
 			"type": "object",

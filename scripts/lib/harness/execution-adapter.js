@@ -29,6 +29,7 @@ const { inspectExecutionContract } = require("./execution-core");
 const { getRun, transitionRun } = require("./run-core");
 const { emitHarnessEvent } = require("./event-ledger");
 const { runGovernedCommand } = require("../core/governed-runner");
+const { recordAttempt } = require("./attempt-core");
 
 const CODE_PREPARE_FAILED = "AMBER_E_HARNESS_EXEC_PREPARE_FAILED";
 const CODE_ALREADY_PREPARED = "AMBER_E_HARNESS_EXEC_ALREADY_PREPARED";
@@ -504,6 +505,26 @@ function runPreparedExecution(
 	const ledgerName = ledger || runId;
 	const ledgerPath = statePath(targetRoot, "loops", safeId(ledgerName), "ledger.jsonl");
 	const attemptId = `att-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+	const at0 = now || new Date().toISOString();
+	// F072 H4: the attempt is a first-class run-scoped record and its launch
+	// is a fact on the trail (the three execution.* kinds are already in the
+	// closed event enum — additive wiring, zero enum growth).
+	recordAttempt(targetRoot, {
+		runId,
+		attemptId,
+		commandId,
+		governedRef: `governed-ledger:${safeId(ledgerName)}#${attemptId}`,
+		now: at0,
+	});
+	emitHarnessEvent(targetRoot, {
+		kind: "execution.started",
+		schemaVersion: 1,
+		at: at0,
+		runId,
+		actor: run.subject ? run.subject.agent : undefined,
+		reason: `governed attempt ${attemptId} for command ${commandId}`,
+		pointers: [`governed-ledger:${safeId(ledgerName)}#${attemptId}`],
+	});
 	// The declared resource budget is the attempt budget unless the caller
 	// narrows it — the declared timeout dimension of the §13 fold must be able
 	// to fire from the run's own trail, not only from caller-supplied entries.
@@ -530,6 +551,28 @@ function runPreparedExecution(
 	// still observed and folded; the failure rides the normal result.
 	const executed = governed.executed === true || Boolean(governed.ledgerRecord);
 	if (!executed && Array.isArray(governed.errors) && governed.errors.length > 0) {
+		const refusalAt = new Date().toISOString();
+		const refusalReason = governed.errors
+			.map((entry) => String(entry))
+			.join("; ")
+			.slice(0, 2000);
+		recordAttempt(targetRoot, {
+			runId,
+			attemptId,
+			commandId,
+			state: "refused",
+			reason: refusalReason,
+			now: refusalAt,
+		});
+		emitHarnessEvent(targetRoot, {
+			kind: "execution.failed",
+			schemaVersion: 1,
+			at: refusalAt,
+			runId,
+			actor: run.subject ? run.subject.agent : undefined,
+			reason: `governed attempt ${attemptId} refused before any effect: ${refusalReason}`,
+			pointers: [`governed-ledger:${safeId(ledgerName)}#${attemptId}`],
+		});
 		return { ok: false, refused: true, attemptId, governed };
 	}
 	const observation = observePreparedWorkspace(record.effective.workspace);
@@ -543,15 +586,49 @@ function runPreparedExecution(
 		observedVia: observation.observedVia,
 	};
 	const evaluation = evaluateExecution(targetRoot, { runId, observedEntries: [entry], now: at });
+	// F072 H4: the attempt's outcome is a terminal record + one trail event.
+	// An executed-but-failed command is state `failed` (its mutations were
+	// still observed above); exitCode 0 completes it. The ledger record
+	// carries the exit code inside its public action envelope
+	// (`ledgerRecord.action.exitCode`); the governed result itself carries it
+	// top-level — prefer the governed value, fall back to the envelope.
+	const governedExitCode = Number.isInteger(governed.exitCode)
+		? governed.exitCode
+		: governed.ledgerRecord && governed.ledgerRecord.action
+			? governed.ledgerRecord.action.exitCode
+			: undefined;
+	const attemptState = governedExitCode === 0 ? "completed" : "failed";
+	recordAttempt(targetRoot, {
+		runId,
+		attemptId,
+		commandId,
+		state: attemptState,
+		...(governedExitCode === undefined ? {} : { exitCode: governedExitCode }),
+		observedRef: `observed-entry:${safeId(runId)}#${attemptId}`,
+		now: at,
+	});
+	emitHarnessEvent(targetRoot, {
+		kind: attemptState === "completed" ? "execution.completed" : "execution.failed",
+		schemaVersion: 1,
+		at,
+		runId,
+		actor: run.subject ? run.subject.agent : undefined,
+		reason:
+			attemptState === "completed"
+				? `governed attempt ${attemptId} completed`
+				: `governed attempt ${attemptId} exited non-zero (${governedExitCode})`,
+		pointers: [`governed-ledger:${safeId(ledgerName)}#${attemptId}`],
+	});
 	return {
 		ok: true,
 		attemptId,
+		attemptState,
 		observedEntry: entry,
 		comparison: evaluation.comparison,
 		...(Array.isArray(governed.errors) && governed.errors.length > 0
 			? { commandErrors: governed.errors }
 			: {}),
-		governedExitCode: governed.ledgerRecord ? governed.ledgerRecord.exitCode : undefined,
+		governedExitCode,
 		recordFile: evaluation.recordFile,
 	};
 }

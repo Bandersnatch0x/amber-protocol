@@ -27,6 +27,9 @@ const FLAG_SPECS = {
 	"--session": { key: "session" },
 	"--request-id": { key: "requestId" },
 	"--attempt-id": { key: "attemptId" },
+	// F072 H4: harness attempt inspect (--attempt <id>); --attempt-id keeps
+	// its prior owner's key untouched.
+	"--attempt": { key: "attempt" },
 	"--request-hash": { key: "requestHash" },
 	"--owner-id": { key: "ownerId" },
 	"--token-hash": { key: "tokenHash" },

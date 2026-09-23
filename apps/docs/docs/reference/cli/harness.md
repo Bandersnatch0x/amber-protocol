@@ -39,6 +39,9 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness context check --subject <s> --resource <prefix> --purpose <p> [--classification <c>] [--now <iso>] [--run <id>] --target <repo> [--json]
        amber harness context revoke --grant <id> --revoker <who> --target <repo> [--json]
        amber harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...] --target <repo> [--json]
+       amber harness checkpoint (capture | list | verify --run <id> [--checkpoint <id>] | inspect --run <id> --checkpoint <id>) --target <repo> [--json]
+       amber harness attempt (list --run <id> | inspect --run <id> --attempt <id>) --target <repo> [--json]
+       amber harness lifecycle [--run <id>] --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
 
@@ -57,10 +60,13 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | --- | --- |
 | <code>admit</code> | Subcommand action for <code>harness</code> |
 | <code>advance</code> | Subcommand action for <code>harness</code> |
+| <code>attempt</code> | Subcommand action for <code>harness</code> |
 | <code>bind</code> | Subcommand action for <code>harness</code> |
+| <code>checkpoint</code> | Subcommand action for <code>harness</code> |
 | <code>context</code> | Subcommand action for <code>harness</code> |
 | <code>execution</code> | Subcommand action for <code>harness</code> |
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
+| <code>lifecycle</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
 | <code>tool</code> | Subcommand action for <code>harness</code> |
@@ -137,6 +143,28 @@ Subcommands:
                       context, execution, approval — each pointer citing the
                       existing governed artifact it witnessed.
                       Required: --run <id> --to <state>. Optional: --reason.
+  checkpoint          Run-scoped checkpoints (F072 H4): capture a snapshot
+                      citing the run/execution record digests and the attempt
+                      count (non-final runs only; idempotent per content),
+                      list a run's checkpoints, or verify — recovery reads +
+                      verifies the run still stands where the checkpoint
+                      captured it; a drifted run refuses (fail closed).
+                      Checkpoints are snapshots, never ledger events.
+                      Subcommands: capture (--run), list (--run), verify
+                      (--run [--checkpoint]), inspect (--run --checkpoint).
+  attempt             Run-scoped attempt records (F072 H4): every governed
+                      attempt is a first-class record (running →
+                      completed/failed/refused; terminal records immutable);
+                      list reports the no-progress derivation (reported,
+                      never enforced). Subcommands: list (--run), inspect
+                      (--run --attempt).
+  lifecycle           The unified lifecycle view (F072 H4): one read-only
+                      mapping of run state/history, loop/session/task
+                      provenance (cited from the run's admission pointers),
+                      the execution verdict, attempts, and checkpoints.
+                      Writes nothing; corrupt records fail closed.
+                      Optional: --run <id> (one run) or omit for every run
+                      plus the surface mapping.
   status              Show one Run with --run <id>, or list runs.
 
 Examples:

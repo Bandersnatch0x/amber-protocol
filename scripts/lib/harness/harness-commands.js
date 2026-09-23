@@ -47,6 +47,9 @@ const dispatch = defineCommand({
 		"tool",
 		"execution",
 		"context",
+		"checkpoint",
+		"attempt",
+		"lifecycle",
 	],
 	handlers: {
 		admit: (args) => {
@@ -526,6 +529,125 @@ const dispatch = defineCommand({
 						"harness context requires admit, list, inspect, check, or revoke. Example: amber harness context check --subject worker --resource docs/ --purpose review --target <repo>",
 					);
 				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		checkpoint: (args) => {
+			const sub = args._?.[1];
+			const target = resolveTarget(args);
+			const {
+				captureCheckpoint,
+				listCheckpoints,
+				verifyCheckpoint,
+				getCheckpoint,
+			} = require("./checkpoint-core");
+			let result;
+			try {
+				if (sub === "capture") {
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness checkpoint capture --run <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					result = captureCheckpoint(target, { runId: run.value, reason: args.reason });
+				} else if (sub === "list") {
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness checkpoint list --run <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					result = { ok: true, checkpoints: listCheckpoints(target, { runId: run.value }) };
+				} else if (sub === "verify") {
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness checkpoint verify --run <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					result = verifyCheckpoint(target, {
+						runId: run.value,
+						...(args.checkpoint === undefined ? {} : { checkpointId: args.checkpoint }),
+					});
+				} else if (sub === "inspect") {
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness checkpoint inspect --run <id> --checkpoint <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					const checkpoint = requiredFlag(
+						args,
+						"checkpoint",
+						"--checkpoint",
+						"amber harness checkpoint inspect --run <id> --checkpoint <id> --target <repo>",
+					);
+					if (checkpoint.error) return invalidArg(checkpoint.error);
+					result = getCheckpoint(target, { runId: run.value, checkpointId: checkpoint.value });
+				} else {
+					return invalidArg(
+						"harness checkpoint requires capture, list, verify, or inspect. Example: amber harness checkpoint capture --run <id>",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		attempt: (args) => {
+			const sub = args._?.[1];
+			const target = resolveTarget(args);
+			const { listAttempts, getAttempt, detectNoProgress } = require("./attempt-core");
+			let result;
+			try {
+				if (sub === "list") {
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness attempt list --run <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					const attempts = listAttempts(target, { runId: run.value });
+					result = { ok: true, attempts, noProgress: detectNoProgress(attempts) };
+				} else if (sub === "inspect") {
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness attempt inspect --run <id> --attempt <id> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					if (args.attemptId === undefined && args.attempt === undefined) {
+						return invalidArg("--attempt <id> is required for harness attempt inspect");
+					}
+					result = getAttempt(target, {
+						runId: run.value,
+						attemptId: args.attemptId || args.attempt,
+					});
+				} else {
+					return invalidArg(
+						"harness attempt requires list or inspect. Example: amber harness attempt list --run <id>",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		lifecycle: (args) => {
+			const { lifecycleView } = require("./lifecycle-view");
+			const target = resolveTarget(args);
+			let result;
+			try {
+				result = lifecycleView(target, { ...(args.run === undefined ? {} : { runId: args.run }) });
 			} catch (err) {
 				return writeFailure(err);
 			}

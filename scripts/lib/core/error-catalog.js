@@ -3046,6 +3046,68 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_HARNESS_LEDGER_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_HARNESS_ATTEMPT_NOT_FOUND: {
+		title: "Attempt record not found",
+		cause:
+			"An attempt command referenced an attemptId with no record under the run's attempts area.",
+		remedy:
+			"List the run's attempts (records live under .amber/harness/attempts/<runId>/); attempts are created by governed executions, never by hand.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_ATTEMPT_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_ATTEMPT_CORRUPT: {
+		title: "Attempt record failed its closed shape",
+		cause:
+			"The stored attempt record is not valid JSON, fails its closed inline shape, or carries an unknown state.",
+		remedy:
+			"Investigate the record under the harness state area; reads fail closed rather than presenting a broken attempt history.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUN_CORRUPT"],
+	},
+	AMBER_E_HARNESS_ATTEMPT_FINAL: {
+		title: "Attempt record is terminal and immutable",
+		cause:
+			"A terminal attempt (completed/failed/refused) was offered an outcome again. Attempt records are immutable once terminal — a retry is a new attempt with its own record.",
+		remedy: "Execute a new governed attempt; never rewrite a finished one.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUN_FINAL"],
+	},
+	AMBER_E_HARNESS_CHECKPOINT_NOT_FOUND: {
+		title: "Checkpoint record not found",
+		cause:
+			"A checkpoint command referenced a run (or id) with no checkpoint record under the run's checkpoints area.",
+		remedy:
+			"Capture a checkpoint first (amber harness checkpoint --run <id> capture); a capture is the only way a checkpoint comes to exist.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_CHECKPOINT_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_CHECKPOINT_CORRUPT: {
+		title: "Checkpoint record failed its closed shape",
+		cause:
+			"The stored checkpoint record is not valid JSON or fails its closed inline shape (checkpointId, runId, state, refs).",
+		remedy:
+			"Investigate the record under the harness state area; recovery fails closed rather than resuming from a broken citation.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_CHECKPOINT_NOT_FOUND"],
+	},
+	AMBER_E_HARNESS_CHECKPOINT_FINAL: {
+		title: "Checkpoint refused for a terminal run",
+		cause:
+			"A checkpoint was requested for a run in a terminal state. A final run's record is settled and immutable — there is nothing left to checkpoint.",
+		remedy:
+			"Checkpoint non-final runs only; terminal records are cited through the run record itself.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUN_FINAL"],
+	},
+	AMBER_E_HARNESS_CHECKPOINT_DRIFT: {
+		title: "Run has drifted from its checkpoint",
+		cause:
+			"Recovery verification found the run in a different state than the checkpoint captured. Resuming on stale citations would present drifted facts as fresh.",
+		remedy:
+			"Read the run's current state and history (amber harness status --run <id>); recovery requires the run to stand exactly where the checkpoint captured it.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_CHECKPOINT_NOT_FOUND"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

@@ -2644,6 +2644,59 @@
 				"Schema growth is optional-field-only (firewall section + excluded.reason enum += firewall); pre-H3b loadouts stay valid."
 			],
 			"updated": "2026-09-23"
+		},
+		{
+			"id": "F072",
+			"priority": 72,
+			"area": "governance",
+			"paths": [
+				"schemas/run.schema.json",
+				"scripts/lib/harness/attempt-core.js",
+				"scripts/lib/harness/checkpoint-core.js",
+				"scripts/lib/harness/lifecycle-view.js",
+				"scripts/lib/harness/execution-adapter.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/core/error-catalog.js",
+				"tests/unit/harness-attempt.test.js",
+				"tests/unit/harness-checkpoint.test.js",
+				"docs/specs/F072-harness-h4-runtime-lifecycle.md",
+				"docs/plans/F072-harness-h4-runtime-lifecycle.md"
+			],
+			"title": "Harness H4 Runtime Lifecycle (attempts, checkpoints, the unified mapping)",
+			"user_visible_behavior": "amber harness checkpoint|attempt|lifecycle (expert tier, untyped): every governed attempt is a first-class run-scoped record (running -> completed/failed/refused, terminal immutable) with execution.started/completed/failed emitted per attempt (closed enum, zero growth); run-scoped checkpoints capture citing digests (non-final only, idempotent per content) and recovery verifies the run still stands where the checkpoint captured it (drift refuses); the lifecycle view maps run state/history, loop/session/task provenance, execution verdict, attempts, and checkpoints in one read-only view (F072 H4, §33/§42).",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-attempt.test.js",
+				"node --test tests/unit/harness-checkpoint.test.js",
+				"npm test (3904/3905 exit=0, 1 npm-pack ETIMEDOUT flake re-verified empty-load 2x)",
+				"amber harness lifecycle --run <id>; checkpoint capture/verify with a drifted run refusing; raw-CLI --attempt smoke"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0110)",
+					"result": "pass: 「继续推进v2.2」 — standing directive per map 0066 执行带入; spec draft -> accepted (F072 H4 runtime lifecycle)",
+					"date": "2026-09-23",
+					"notes": "HITL gate closed 2026-09-23"
+				},
+				{
+					"command": "dual-axis review (issues/0109)",
+					"result": "pass: Spec axis 11 met / 1 partial / 0 contradicts; Standards axis fail -> all 14 findings adjudicated (13 fixed / 1 wording-aligned / 0 deferred); report .scratch/orchestration/f072-h4-dual-axis-review.md",
+					"date": "2026-09-23",
+					"notes": "P0 canonicalRunDigest nested-collapse fail-open fixed via canonicalJson; --attempt FLAG_SPECS + wiring tests added; governedExitCode read-path defect found during adjudication and fixed"
+				},
+				{
+					"command": "node --test tests/unit/harness-attempt.test.js tests/unit/harness-checkpoint.test.js",
+					"result": "pass: 19/19 focused (attempt records incl. 3 real governed-path wiring cases + raw-CLI smoke; checkpoints incl. dispatch-level subverb smoke)",
+					"date": "2026-09-23",
+					"notes": "section42 gate demo .scratch/orchestration/f072-h4/section42-gate-demo.md"
+				}
+			],
+			"notes": [
+				"H4 graduates from the F071 fog: attempts and checkpoints compose the existing governed surfaces (records cite ledger pointers and digests; no second trail, no new event types — the three execution.* kinds were already in the closed enum).",
+				"The §49 no-progress signal is derived deterministically from attempt records and REPORTED only; enforcement stays a future Loop/Runtime concern (§49 names it there).",
+				"Checkpoints are snapshots, not events: they live outside the event ledger and cite run-record digests (canonicalized to exclude the self-maintained summary section); recovery is read + verify, never a state rewrite."
+			]
 		}
 	]
 }
