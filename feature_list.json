@@ -2780,6 +2780,72 @@
 				"The eval alias is locked to the F058 surface by same-dispatch-path identity; eval admit stays on its own explicitly gated surface (§26: eval does not mean authority).",
 				"execution terminate and harness diff are deferred with disclosure: terminate crosses the settled F070 BLOCK posture (violations resolve by contract revision, never an operator kill — a new spec decision needed); diff belongs with the H5 replay lineage as its own ticket."
 			]
+		},
+		{
+			"id": "F075",
+			"priority": 75,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/harness/legacy-core.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/core/error-catalog.js",
+				"tests/unit/harness-legacy.test.js",
+				"docs/specs/F075-legacy-surface-dispositions.md",
+				"docs/plans/F075-legacy-surface-dispositions.md"
+			],
+			"title": "Harness §52 legacy surface dispositions (task / result / profile inspect)",
+			"user_visible_behavior": "amber harness legacy [task --task <id> | profile] (expert tier, untyped): one read-only disposition row per deprecated surface naming its mapping onto the harness spine — task prepare/result inspect map to Task + a legacy run projection (legacy: true, a view never a record) + Evidence + the ValidationReceipt vocabulary (replayable/chatHistoryRequired disclosed); profile inspect declares NO correspondence (deletion candidate pending an explicit user decision). Frozen-fixture conformance (the legacy writer is deprecated and frozen); per-artifact fail-closed reads; the closed nearest-neighbor status table refuses unknown statuses; the view writes nothing.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-legacy.test.js",
+				"amber harness legacy (the three-row table); harness legacy task --task <id> against legacy artifacts"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0122)",
+					"result": "pass: 「先做2,3,4」 — standing directive; spec draft -> accepted (F075 §52 legacy surface dispositions)",
+					"date": "2026-09-24",
+					"notes": "HITL gate closed 2026-09-24"
+				}
+			],
+			"notes": [
+				"The §52 discipline is declared-not-improvised: the dispositions are citable, deletions remain explicit user decisions, and the legacy run projection never enters the Run state machine.",
+				"Frozen-fixture conformance is disclosed in the spec: the legacy writer is deprecated and frozen; driving the real task prepare (plan gate + active session) is heavier than the reader contract warrants."
+			]
+		},
+		{
+			"id": "F076",
+			"priority": 76,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/harness/replay-core.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/harness-diff.test.js",
+				"docs/specs/F076-harness-cross-run-diff.md",
+				"docs/plans/F076-harness-cross-run-diff.md"
+			],
+			"title": "Harness cross-run diff (the H5 replay lineage comparison across two runs)",
+			"user_visible_behavior": "amber harness diff --from <runId> --to <runId> (expert tier, untyped): compares two runs over the SAME six replay axes (deriveAxes composed verbatim — a per-axis fact equals what harness replay reports), per-axis same | differs | only-a | only-b, verdict equivalent-world | world-drift | incomparable; the outcome states are reported, never compared into the verdict; response-only (a diff of two immutable records is reproducible by re-running); unrelated declared tasks refuse; both flags required.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-diff.test.js",
+				"amber harness diff --from <a> --to <b>; tool change between runs flips tools axis to world-drift (real F052 fixture)"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0124)",
+					"result": "pass: 「先做2,3,4」 — standing directive; spec draft -> accepted (F076 cross-run diff)",
+					"date": "2026-09-24",
+					"notes": "HITL gate closed 2026-09-24"
+				}
+			],
+			"notes": [
+				"The axis comparison composes the replay derivation verbatim — the verdict folds two derivations; one-sided facts are disclosed, never guessed into the verdict.",
+				"Response-only by design: both sides are immutable records; no receipt/proposal artifact is warranted (keeping H5 artifact discipline intact)."
+			]
 		}
 	]
 }

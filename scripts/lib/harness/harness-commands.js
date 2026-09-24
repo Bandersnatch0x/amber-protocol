@@ -58,6 +58,8 @@ const dispatch = defineCommand({
 		"policy",
 		"capabilities",
 		"eval",
+		"legacy",
+		"diff",
 	],
 	handlers: {
 		admit: (args) => {
@@ -907,6 +909,61 @@ const dispatch = defineCommand({
 			} catch (err) {
 				return writeFailure(err);
 			}
+		},
+		legacy: (args) => {
+			const { legacyTaskView, legacyDispositions, legacyProfileView } = require("./legacy-core");
+			const target = resolveTarget(args);
+			const sub = args._?.[1];
+			let result;
+			try {
+				if (sub === "task") {
+					// F075: the declared §52 mapping for ONE legacy task — a
+					// read-only projection over the frozen on-disk legacy
+					// shape; nothing is migrated or adopted. The task id
+					// comes only from --task (the spec's sole affordance —
+					// no positional run/task ids on the harness surface).
+					result = legacyTaskView(target, { taskId: args.task });
+				} else if (sub === "profile") {
+					result = legacyProfileView();
+				} else if (sub === undefined) {
+					result = legacyDispositions();
+				} else {
+					return invalidArg(
+						"harness legacy requires task (--task <id>), profile, or no subaction (the disposition table)",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		diff: (args) => {
+			const { diffRuns } = require("./replay-core");
+			const target = resolveTarget(args);
+			const from = requiredFlag(
+				args,
+				"from",
+				"--from",
+				"amber harness diff --from <runId> --to <runId> --target <repo>",
+			);
+			if (from.error) return invalidArg(from.error);
+			const to = requiredFlag(
+				args,
+				"to",
+				"--to",
+				"amber harness diff --from <runId> --to <runId> --target <repo>",
+			);
+			if (to.error) return invalidArg(to.error);
+			let result;
+			try {
+				// F076: the cross-run comparison over the replay axes —
+				// response-only (a diff of two immutable records is reproducible
+				// by re-running), read-only, outcome never in the verdict.
+				result = diffRuns(target, { fromRunId: from.value, toRunId: to.value });
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
 		},
 		status: (args) => {
 			const { getRun, listRuns } = require("./run-core");

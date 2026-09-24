@@ -138,6 +138,9 @@ const FLAG_SPECS = {
 	"--supersedes": { key: "supersedesValue", accumulate: "supersedes" },
 	"--check": { key: "check", accumulate: "checks" },
 	"--from-loop": { key: "fromLoop" },
+	// F076: harness diff (--from <runId> --to <runId>); --to keeps its prior
+	// owner's key untouched.
+	"--from": { key: "from" },
 	"--resource": { key: "resource" },
 	"--classification": { key: "classification" },
 	"--grant": { key: "grant" },

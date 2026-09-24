@@ -158,3 +158,46 @@ test("a re-admission attempt is an illegal transition, not a receipt rewrite", (
 		fs.rmSync(target, { recursive: true, force: true });
 	}
 });
+
+// F067-era consistency note (map 0066): the contracts list carries the same
+// tombstone discipline the tools list has — a record that no longer hashes
+// to its snapshot degrades to a corrupt marker in the list (listable, never
+// silently dropped) while the point-inspect refuses fail-closed. Conformance
+// at the real dispatcher path.
+test("the contracts list degrades a drifted record to a tombstone; inspect refuses it (same discipline as tools)", () => {
+	const target = tmpTarget();
+	try {
+		const contractFile = path.join(target, "contract.json");
+		fs.writeFileSync(
+			contractFile,
+			JSON.stringify({
+				apiVersion: "amber.dev/v1",
+				kind: "HarnessContract",
+				metadata: { id: "tombstone-contract", version: "1" },
+				agent: { id: "worker", role: "implementation" },
+				governance: { policy: "default-safe" },
+			}),
+			"utf8",
+		);
+		const admitted = dispatch("harness", { target, file: contractFile, json: true, _: ["admit"] });
+		const stored = JSON.parse(fs.readFileSync(admitted.result.contractFile, "utf8"));
+		stored.contract.agent.role = "tampered";
+		fs.writeFileSync(admitted.result.contractFile, JSON.stringify(stored, null, "\t"), "utf8");
+		// Point-inspect refuses fail-closed.
+		const inspect = dispatch("harness", {
+			target,
+			json: true,
+			contract: "tombstone-contract",
+			_: ["inspect"],
+		});
+		assert.equal(inspect.exitCode, 1);
+		assert.match(inspect.result.errors.join("\n"), /no longer hashes to its snapshot/);
+		// The list degrades to a tombstone — listable, never silent.
+		const listed = dispatch("harness", { target, json: true, all: true, _: ["inspect"] });
+		const entry = listed.result.contracts.find((c) => c.id === "tombstone-contract");
+		assert.equal(entry.corrupt, true);
+		assert.equal(entry.snapshotHash, null);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});

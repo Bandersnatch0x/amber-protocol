@@ -3143,6 +3143,24 @@ const CATALOG = {
 		layer: "Validation",
 		related: ["AMBER_E_HARNESS_REPLAY_CORRUPT"],
 	},
+	AMBER_E_HARNESS_LEGACY_NOT_FOUND: {
+		title: "Legacy surface artifacts not found",
+		cause:
+			"A legacy disposition view referenced artifacts that do not exist under the deprecated legacy area (e.g. .amber/executions/<taskId>/).",
+		remedy:
+			"Check the legacy task id (the artifacts the deprecated `amber task prepare` wrote); the disposition view reads, it never creates legacy artifacts.",
+		layer: "Migration",
+		related: ["AMBER_E_HARNESS_LEGACY_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_LEGACY_CORRUPT: {
+		title: "Legacy artifacts failed their declared shape",
+		cause:
+			"The frozen legacy artifact is not valid JSON, or its status is outside the closed nearest-neighbor table — the projection refuses rather than guessing a run state.",
+		remedy:
+			"Inspect the legacy artifact at the named path; the disposition view declares correspondences, it never repairs legacy bytes.",
+		layer: "Migration",
+		related: ["AMBER_E_HARNESS_LEGACY_NOT_FOUND"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

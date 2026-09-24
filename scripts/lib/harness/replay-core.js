@@ -486,10 +486,122 @@ function listReplays(targetRoot, { runId } = {}) {
 		.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.replayId < b.replayId ? -1 : 1));
 }
 
+// F076: the cross-run comparison — the SAME six-axis derivation the replay
+// engine uses (composed, never re-implemented), folded over two runs' frozen
+// facts. The outcome states are reported side by side but NEVER compared
+// into the verdict: outcome is the runs' own business (a FAILED run under an
+// equivalent world is exactly the no-progress signal the attempts axis
+// already reports). Response-only: a diff of two immutable records is
+// reproducible by re-running the command — no receipt/proposal artifact.
+const DIFF_AXIS_VERDICTS = Object.freeze(["same", "differs", "only-a", "only-b"]);
+const DIFF_VERDICTS = Object.freeze(["equivalent-world", "world-drift", "incomparable"]);
+
+/**
+ * Diff two runs over the replay axes. Both flags are required; the runs must
+ * share the same declared subject.task (two declared tasks that differ are
+ * `unrelated` and refused — comparing unrelated worlds is not a diff).
+ * @param {string} targetRoot
+ * @param {object} opts
+ * @param {string} opts.fromRunId @param {string} opts.toRunId
+ */
+function diffRuns(targetRoot, { fromRunId, toRunId } = {}) {
+	if (!fromRunId || typeof fromRunId !== "string" || !toRunId || typeof toRunId !== "string") {
+		throw typedError(
+			CODE_INVALID_ARG,
+			"--from <runId> and --to <runId> are both required for harness diff (a one-sided diff is not a diff)",
+		);
+	}
+	const { run: runA } = getRun(targetRoot, { runId: fromRunId });
+	const { run: runB } = getRun(targetRoot, { runId: toRunId });
+	const taskA = runA.subject ? (runA.subject.task ?? null) : null;
+	const taskB = runB.subject ? (runB.subject.task ?? null) : null;
+	// Fail closed on an undisclosed relationship: different declared tasks
+	// refuse outright, and a mixed declaration (one run names a task, the
+	// other does not) cannot confirm a shared world — refused too, with the
+	// reason named. Only equal declared tasks, or no task on either side,
+	// proceed (the latter disclosed as such, never read as "same").
+	if (taskA !== null && taskB !== null && taskA !== taskB) {
+		throw typedError(
+			CODE_INVALID_ARG,
+			`the runs declare different tasks (${JSON.stringify(taskA)} vs ${JSON.stringify(taskB)}) — comparing unrelated worlds is refused; diff runs of one task`,
+		);
+	}
+	if ((taskA === null) !== (taskB === null)) {
+		throw typedError(
+			CODE_INVALID_ARG,
+			`only one run declares a task (${JSON.stringify(taskA)} vs ${JSON.stringify(taskB)}) — the relationship is undisclosed; diff runs that both declare the same task (or neither)`,
+		);
+	}
+	const axesA = deriveAxes(targetRoot, runA);
+	const axesB = deriveAxes(targetRoot, runB);
+	// The folded identity: for axes whose frozen fact is a WORLD-scoped
+	// artifact (contract, tools), the derivation's pointer IS the frozen fact
+	// identity — two runs under different tool snapshots both derive `drift`
+	// against the current registry, and folding on the verdict alone would
+	// read that pair as the same world. For run-scoped axes (execution,
+	// attempts — their records are per-run by design), the verdict + drift
+	// kind is the sensible identity.
+	const RUN_SCOPED_DIFF_AXES = new Set(["execution", "attempts"]);
+	const axes = axesA.map((axisA) => {
+		const axisB = axesB.find((axis) => axis.name === axisA.name);
+		let comparison;
+		if (!axisB || axisB.verdict === "unevaluated") {
+			comparison = axisA.verdict === "unevaluated" ? "same" : "only-a";
+		} else if (axisA.verdict === "unevaluated") {
+			comparison = "only-b";
+		} else if (
+			!RUN_SCOPED_DIFF_AXES.has(axisA.name) &&
+			axisA.pointer !== undefined &&
+			axisB.pointer !== undefined
+		) {
+			comparison =
+				axisA.pointer === axisB.pointer && axisA.verdict === axisB.verdict ? "same" : "differs";
+		} else {
+			// Run-scoped records or pointerless axes: same verdict + same
+			// drift kind means the two runs froze the same fact.
+			comparison =
+				axisA.verdict === axisB.verdict && (axisA.driftKind ?? null) === (axisB.driftKind ?? null)
+					? "same"
+					: "differs";
+		}
+		return {
+			name: axisA.name,
+			from: axisA.verdict,
+			to: axisB ? axisB.verdict : "unevaluated",
+			comparison,
+		};
+	});
+	// The spec's verdict, exactly: world-drift when any shared axis differs;
+	// equivalent-world when every shared axis is same (one-sided facts are
+	// disclosed in the axes, never guessed into the verdict); incomparable
+	// when the runs share no evaluated axis fact at all.
+	const differs = axes.some((axis) => axis.comparison === "differs");
+	const sharedEvaluated = axes.some(
+		(axis) => axis.from !== "unevaluated" && axis.to !== "unevaluated",
+	);
+	const verdict = differs ? "world-drift" : sharedEvaluated ? "equivalent-world" : "incomparable";
+	return {
+		ok: true,
+		from: { runId: fromRunId, state: runA.state, task: taskA },
+		to: { runId: toRunId, state: runB.state, task: taskB },
+		// Unreachable as "same task" for mixed declarations — they refuse
+		// above; this field only ever reads "same task" or the disclosed
+		// no-task case.
+		related:
+			taskA === null && taskB === null ? "undisclosed (neither run declares a task)" : "same task",
+		verdict,
+		axes,
+	};
+}
+
 module.exports = {
 	replayRun,
 	proposeRegression,
 	listReplays,
+	deriveAxes,
+	diffRuns,
+	DIFF_AXIS_VERDICTS,
+	DIFF_VERDICTS,
 	DRIFT_KINDS,
 	AXIS_VERDICTS,
 	CODE_CORRUPT,
