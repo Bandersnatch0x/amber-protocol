@@ -3108,6 +3108,41 @@ const CATALOG = {
 		layer: "Lifecycle",
 		related: ["AMBER_E_HARNESS_CHECKPOINT_NOT_FOUND"],
 	},
+	AMBER_E_HARNESS_VALIDATION_CORRUPT: {
+		title: "Validation receipt failed its closed shape",
+		cause:
+			"The stored validation receipt is not valid JSON, fails its closed inline shape, or carries an unknown check/status.",
+		remedy:
+			"Investigate the receipt under .amber/harness/validations/; reads fail closed rather than presenting a broken validation fact.",
+		layer: "Validation",
+		related: ["AMBER_E_HARNESS_RUN_CORRUPT"],
+	},
+	AMBER_E_HARNESS_REPLAY_CORRUPT: {
+		title: "Replay result failed its closed shape",
+		cause:
+			"The stored replay result is not valid JSON, fails its closed inline shape, or carries an unknown verdict/drift kind.",
+		remedy:
+			"Investigate the result under .amber/harness/replays/; reads fail closed rather than presenting a broken comparison.",
+		layer: "Validation",
+		related: ["AMBER_E_HARNESS_RUN_CORRUPT"],
+	},
+	AMBER_E_HARNESS_REPLAY_NOT_FOUND: {
+		title: "Replay result not found",
+		cause: "A replay command referenced a run with no replay result on record.",
+		remedy:
+			"Replay the run first (amber harness replay --run <id>); a replay result exists only after a replay ran.",
+		layer: "Validation",
+		related: ["AMBER_E_HARNESS_REPLAY_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_HARNESS_REGRESSION_NOTHING_TO_PROPOSE: {
+		title: "A clean passing run proposes nothing",
+		cause:
+			"A regression proposal was requested for a run whose terminal outcome is passing and whose replay found no drift. Proposals derive from recorded facts only (the F054 discipline), never from caller input.",
+		remedy:
+			"Propose after a real failure or a drift replay; a clean run needs no human review queue entry.",
+		layer: "Validation",
+		related: ["AMBER_E_HARNESS_REPLAY_CORRUPT"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

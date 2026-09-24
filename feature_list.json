@@ -2697,6 +2697,50 @@
 				"The §49 no-progress signal is derived deterministically from attempt records and REPORTED only; enforcement stays a future Loop/Runtime concern (§49 names it there).",
 				"Checkpoints are snapshots, not events: they live outside the event ledger and cite run-record digests (canonicalized to exclude the self-maintained summary section); recovery is read + verify, never a state rewrite."
 			]
+		},
+		{
+			"id": "F073",
+			"priority": 73,
+			"area": "governance",
+			"paths": [
+				"schemas/run.schema.json",
+				"scripts/lib/harness/validation-core.js",
+				"scripts/lib/harness/replay-core.js",
+				"scripts/lib/harness/execution-adapter.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/core/error-catalog.js",
+				"tests/unit/harness-replay.test.js",
+				"docs/specs/F073-harness-h5-eval-replay.md",
+				"docs/plans/F073-harness-h5-eval-replay.md"
+			],
+			"title": "Harness H5 Eval & Replay (ValidationReceipt, drift detection, regression proposals)",
+			"user_visible_behavior": "amber harness validate|replay|propose-regression --run <id> (expert tier, untyped): validate produces a ValidationReceipt over the closed deterministic check set (policy/execution/tools/context/evidence/attempts; pass|fail|not-run with every not-run disclosing its reason) and emits the first real validation.completed event; replay re-derives the six frozen axes from the run's own records — no chat history, no re-execution — and reports per-axis equivalent|drift|unevaluated with the closed §7 drift kinds; propose-regression derives a proposal from recorded facts only (terminal failure or drift; a clean run refuses) as data for human review — eval can never change governance (§17/§26).",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-replay.test.js",
+				"npm test (3919/3919 expected after review fixes)",
+				"amber harness replay --run <id> answers from records alone (§43 gate); tool/context/execution drift detected via real fixture changes"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0115)",
+					"result": "pass: 「继续推进v2.2」 — standing directive per map 0066 执行带入; spec draft -> accepted (F073 H5 eval & replay)",
+					"date": "2026-09-23",
+					"notes": "HITL gate closed 2026-09-23"
+				},
+				{
+					"command": "dual-axis review (issues/0114)",
+					"result": "pass: Spec axis 9 met / 3 partial / 0 contradicts; Standards axis pass-with-findings (5xP2 + 6xP3) - all findings adjudicated fixed",
+					"date": "2026-09-24",
+					"notes": "attempts axis now compares the re-derived fold against the run FROZEN attempts summary (real non-determinism detection); listReplays/listReceipts sorted by at; governance fingerprint is sha256 bytes over rules+contract+every grant, bracketed from the start; spec path/model-drift/pointer wording aligned"
+				}
+			],
+			"notes": [
+				"H5 graduates from the F072 fog (the last H-fog): replay is verification, not re-execution — retry is a new run (ADR-0101); the §43 gate (amber harness replay run-123 without chat history) is answered by reading frozen records only.",
+				"The §46.5 matrix is covered at the real path: same environment -> equivalent; tool drift (F052-fixture tools admitted after the freeze), context drift (trail-vs-record admission tampering), execution drift (corrupt record), non-determinism (fold mismatch) all detected.",
+				"The §17/§26 guarantee is a conformance assertion: validate + replay + propose leave policy/rules/contract bytes byte-identical."
+			]
 		}
 	]
 }

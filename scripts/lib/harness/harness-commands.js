@@ -50,6 +50,9 @@ const dispatch = defineCommand({
 		"checkpoint",
 		"attempt",
 		"lifecycle",
+		"validate",
+		"replay",
+		"propose-regression",
 	],
 	handlers: {
 		admit: (args) => {
@@ -648,6 +651,62 @@ const dispatch = defineCommand({
 			let result;
 			try {
 				result = lifecycleView(target, { ...(args.run === undefined ? {} : { runId: args.run }) });
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		validate: (args) => {
+			const { validateRun, listReceipts } = require("./validation-core");
+			const target = resolveTarget(args);
+			const sub = args._?.[1];
+			let result;
+			try {
+				if (sub === "list") {
+					if (!args.run) return invalidArg("--run <id> is required for harness validate list");
+					result = { ok: true, receipts: listReceipts(target, { runId: args.run }) };
+				} else if (args.run || sub) {
+					result = validateRun(target, { runId: args.run || sub });
+				} else {
+					return invalidArg("--run <id> is required for harness validate");
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		replay: (args) => {
+			const { replayRun, listReplays } = require("./replay-core");
+			const target = resolveTarget(args);
+			const sub = args._?.[1];
+			let result;
+			try {
+				if (sub === "list") {
+					if (!args.run) return invalidArg("--run <id> is required for harness replay list");
+					result = { ok: true, replays: listReplays(target, { runId: args.run }) };
+				} else if (args.run || sub) {
+					result = replayRun(target, { runId: args.run || sub });
+				} else {
+					return invalidArg("--run <id> is required for harness replay");
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		"propose-regression": (args) => {
+			const { proposeRegression } = require("./replay-core");
+			const target = resolveTarget(args);
+			const run = requiredFlag(
+				args,
+				"run",
+				"--run",
+				"amber harness propose-regression --run <id> --target <repo>",
+			);
+			if (run.error) return invalidArg(run.error);
+			let result;
+			try {
+				result = proposeRegression(target, { runId: run.value });
 			} catch (err) {
 				return writeFailure(err);
 			}

@@ -698,6 +698,7 @@ module.exports = {
 	runPreparedExecution,
 	releaseExecution,
 	observePreparedWorkspace,
+	readExecutionRecord,
 	RUN_EXECUTABLE_STATES,
 	EXECUTION_VERDICTS,
 	CODE_PREPARE_FAILED,

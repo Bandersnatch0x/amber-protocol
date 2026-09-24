@@ -42,6 +42,9 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness checkpoint (capture | list | verify --run <id> [--checkpoint <id>] | inspect --run <id> --checkpoint <id>) --target <repo> [--json]
        amber harness attempt (list --run <id> | inspect --run <id> --attempt <id>) --target <repo> [--json]
        amber harness lifecycle [--run <id>] --target <repo> [--json]
+       amber harness validate --run <id> --target <repo> [--json]
+       amber harness replay --run <id> --target <repo> [--json]
+       amber harness propose-regression --run <id> --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
 
@@ -67,9 +70,12 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | <code>execution</code> | Subcommand action for <code>harness</code> |
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
 | <code>lifecycle</code> | Subcommand action for <code>harness</code> |
+| <code>propose-regression</code> | Subcommand action for <code>harness</code> |
+| <code>replay</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
 | <code>tool</code> | Subcommand action for <code>harness</code> |
+| <code>validate</code> | Subcommand action for <code>harness</code> |
 
 ## Command Details
 
@@ -165,6 +171,26 @@ Subcommands:
                       Writes nothing; corrupt records fail closed.
                       Optional: --run <id> (one run) or omit for every run
                       plus the surface mapping.
+  validate            The ValidationReceipt (F073 H5, §16/§51C): a closed
+                      deterministic check set (policy/execution/tools/
+                      context/evidence/attempts) over the run's own frozen
+                      records — pass | fail | not-run, with every not-run
+                      disclosing its reason. Emits validation.completed on
+                      the trail; never touches the run's state machine.
+                      Subcommands: (--run <id>), list (--run <id>).
+  replay              Replay as verification, not re-execution (F073 H5,
+                      §7/§43): re-derives the six frozen axes (contract/
+                      tools/execution/context/policy/attempts) from the
+                      run's own records — no chat history, no conversation
+                      state — and compares. Per-axis equivalent | drift |
+                      unevaluated with the closed §7 drift kinds; a
+                      released workspace is the recorded fact, not drift.
+                      Subcommands: (--run <id>), list (--run <id>).
+  propose-regression  Derive a regression proposal from RECORDED FACTS only
+                      (F073 H5, §17): a terminal failed/cancelled run or a
+                      drift replay; a clean passing run refuses (proposals
+                      are data for human review — eval can never change
+                      governance). Required: --run <id>.
   status              Show one Run with --run <id>, or list runs.
 
 Examples:

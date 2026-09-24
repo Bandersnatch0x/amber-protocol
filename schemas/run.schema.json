@@ -172,6 +172,28 @@
 				"lastCheckpointAt": { "type": "string", "format": "date-time" }
 			}
 		},
+		"validation": {
+			"description": "F073 H5: additive optional — the latest ValidationReceipt's status for this run (full-fidelity receipts live under .amber/harness/validations/<runId>/). Absent when the run was never validated, so pre-H5 records stay schema-valid. Validation is a separate fact from the run's own state machine (the receipt never transitions a run).",
+			"type": "object",
+			"required": ["status", "receiptId", "receiptedAt"],
+			"additionalProperties": false,
+			"properties": {
+				"status": { "enum": ["accepted", "rejected"] },
+				"receiptId": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"receiptedAt": { "type": "string", "format": "date-time" }
+			}
+		},
+		"replay": {
+			"description": "F073 H5: additive optional — the latest replay verdict for this run (full-fidelity results live under .amber/harness/replays/<runId>/). Absent when the run was never replayed, so pre-H5 records stay schema-valid.",
+			"type": "object",
+			"required": ["verdict", "replayId", "replayedAt"],
+			"additionalProperties": false,
+			"properties": {
+				"verdict": { "enum": ["equivalent", "drift"] },
+				"replayId": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"replayedAt": { "type": "string", "format": "date-time" }
+			}
+		},
 		"admission": {
 			"description": "F066 (ADR-0100 decision 3): the AdmissionReceipt. Additive section — records created before F066 stay schema-valid without it. The receipt is only ever written complete: each of the six checks names the existing governed artifact it witnessed; a missing or refused check refuses the whole admission, so a stored receipt is always all-pass.",
 			"type": "object",
