@@ -250,6 +250,51 @@ test("harness eval aliases the F058 surface through the SAME dispatch path; eval
 	assert.equal(withRun.exitCode, 0);
 	assert.deepEqual(withRun.result.evaluationPointers, []);
 	assert.equal(withRun.result.reportOnly, true);
+	// F077 closes F074's disclosed producer gap: bind one committed eval-result
+	// through validation, then this UNCHANGED view reads the two closed
+	// eval-prefixed pointers from the run's own trail.
+	const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
+	assert.equal(
+		admitArtifact(target, {
+			type: "eval",
+			identity: "eval/harness-control-plane",
+			body: "# Eval\n",
+		}).ok,
+		true,
+	);
+	assert.equal(
+		admitArtifact(target, {
+			type: "eval-result",
+			identity: "eval-result/harness-control-plane-pass",
+			body: "# Eval Result\n",
+			extensions: {
+				evalResult: {
+					definition: { identity: "eval/harness-control-plane", revision: 1 },
+					result: { overall: "pass" },
+				},
+			},
+		}).ok,
+		true,
+	);
+	const { validateRun } = require("../../scripts/lib/harness/validation-core");
+	validateRun(target, {
+		runId: "run-eval-1",
+		evalResult: { identity: "eval-result/harness-control-plane-pass", revision: 1 },
+	});
+	const runFile = path.join(target, ".amber", "harness", "runs", "run-eval-1.json");
+	const beforeBoundView = fs.readFileSync(runFile);
+	const withBoundRun = dispatch("harness", {
+		target,
+		json: true,
+		run: "run-eval-1",
+		_: ["eval"],
+	});
+	assert.deepEqual(withBoundRun.result.evaluationPointers, [
+		"eval-result/eval-result/harness-control-plane-pass@1",
+		"eval/eval/harness-control-plane@1",
+	]);
+	assert.equal(withBoundRun.result.validationStatus, "accepted");
+	assert.deepEqual(fs.readFileSync(runFile), beforeBoundView);
 	// The alias boundary: the handler the eval surface registers is the one
 	// the harness alias invokes (no forked logic can drift in).
 	const { evalDispatch } = require("../../scripts/lib/eval-commands");

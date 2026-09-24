@@ -28,6 +28,7 @@ const {
 	DRIFT_KINDS,
 	CODE_NOTHING_TO_PROPOSE,
 } = require("../../scripts/lib/harness/replay-core");
+const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 
 function tmpTarget() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-h5-"));
@@ -64,6 +65,63 @@ function runRecord(target, runId) {
 	);
 }
 
+function treeBytes(root) {
+	if (!fs.existsSync(root)) return [];
+	const rows = [];
+	const walk = (dir) => {
+		for (const entry of fs
+			.readdirSync(dir, { withFileTypes: true })
+			.sort((a, b) => a.name.localeCompare(b.name))) {
+			const full = path.join(dir, entry.name);
+			const relative = path.relative(root, full).replaceAll("\\", "/");
+			if (entry.isDirectory()) {
+				rows.push(`${relative}/`);
+				walk(full);
+			} else {
+				rows.push(`${relative}=${fs.readFileSync(full).toString("base64")}`);
+			}
+		}
+	};
+	walk(root);
+	return rows;
+}
+
+function admitEvalResult(
+	target,
+	{ identity, overall = "pass", includeOverall = true, includeDefinition = true } = {},
+) {
+	const definitionIdentity = "eval/harness-validation";
+	const resultIdentity = identity || `eval-result/harness-validation-${overall}`;
+	if (includeDefinition) {
+		assert.equal(
+			admitArtifact(target, {
+				type: "eval",
+				identity: definitionIdentity,
+				body: "# Harness validation eval\n",
+			}).ok,
+			true,
+		);
+	}
+	const admitted = admitArtifact(target, {
+		type: "eval-result",
+		identity: resultIdentity,
+		body: `# Harness validation result: ${overall}\n`,
+		extensions: {
+			evalResult: {
+				...(includeDefinition ? { definition: { identity: definitionIdentity, revision: 1 } } : {}),
+				result: includeOverall ? { overall } : {},
+			},
+		},
+	});
+	assert.equal(admitted.ok, true);
+	return {
+		pin: { identity: resultIdentity, revision: 1 },
+		contentHash: admitted.receipt.contentHash,
+		resultPointer: `eval-result/${resultIdentity}@1`,
+		definitionPointer: includeDefinition ? `eval/${definitionIdentity}@1` : null,
+	};
+}
+
 // The §17/§26 guard surface: the governance files validate/replay/propose
 // must never touch — content digests (not lengths), taken BEFORE any
 // validate/replay/propose runs, over the full named surface (rules, contract
@@ -96,8 +154,59 @@ function governanceFingerprint(target) {
 test("validateRun produces an accepted receipt with honest not-run disclosure and the first validation.completed", () => {
 	const target = tmpTarget();
 	admitAndStart(target, "run-val-1");
-	const { receipt } = validateRun(target, { runId: "run-val-1" });
+	const { receipt, receiptFile } = validateRun(target, {
+		runId: "run-val-1",
+		now: "2026-09-24T12:00:00.000Z",
+	});
 	assert.equal(receipt.result.status, "accepted");
+	// F077 compatibility pin: an UNBOUND validation remains byte-identical to
+	// F073 — same check array, receiptId, and bytes. A pass recorded before the
+	// optional eval-result binding existed is never silently revised.
+	assert.equal(
+		fs.readFileSync(receiptFile, "utf8"),
+		`{
+\t"receiptId": "vr-2ef5000861fd307f",
+\t"runId": "run-val-1",
+\t"at": "2026-09-24T12:00:00.000Z",
+\t"state": "created",
+\t"checks": [
+\t\t{
+\t\t\t"name": "policy",
+\t\t\t"status": "not-run",
+\t\t\t"detail": "no policy.evaluated event is on this run's trail yet"
+\t\t},
+\t\t{
+\t\t\t"name": "execution",
+\t\t\t"status": "not-run",
+\t\t\t"detail": "no prepared execution record — the run never executed"
+\t\t},
+\t\t{
+\t\t\t"name": "tools",
+\t\t\t"status": "not-run",
+\t\t\t"detail": "no tool snapshot on the run (pre-H1 record or empty registry)"
+\t\t},
+\t\t{
+\t\t\t"name": "context",
+\t\t\t"status": "not-run",
+\t\t\t"detail": "no admission receipt on the run"
+\t\t},
+\t\t{
+\t\t\t"name": "evidence",
+\t\t\t"status": "pass",
+\t\t\t"detail": "the event chain verified (the fold re-walked every run-scoped event)"
+\t\t},
+\t\t{
+\t\t\t"name": "attempts",
+\t\t\t"status": "not-run",
+\t\t\t"detail": "the run has no attempt records"
+\t\t}
+\t],
+\t"result": {
+\t\t"status": "accepted"
+\t}
+}
+`,
+	);
 	assert.deepEqual(
 		receipt.checks.map((c) => c.name),
 		[...CHECK_NAMES],
@@ -126,6 +235,253 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 	const again = validateRun(target, { runId: "run-val-1" });
 	assert.equal(again.idempotent, true);
 	assert.equal(listReceipts(target, { runId: "run-val-1" }).length, 1);
+});
+
+test("a committed eval-result binds one projected eval leg and canonical pointers onto validation", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-eval-bind-1");
+	const admitted = admitEvalResult(target, {
+		identity: "eval-result/harness-validation-pass",
+		// The verdict is copied, never re-derived.
+		overall: "pass",
+	});
+	const artifactRoot = path.join(target, ".amber", "artifacts");
+	const artifactsBefore = treeBytes(artifactRoot);
+	const governanceBefore = governanceFingerprint(target);
+	const first = validateRun(target, {
+		runId: "run-eval-bind-1",
+		evalResult: admitted.pin,
+		now: "2026-09-24T12:30:00.000Z",
+	});
+	assert.equal(first.receipt.result.status, "accepted");
+	assert.deepEqual(
+		first.receipt.checks.map((check) => check.name),
+		[...CHECK_NAMES, "eval"],
+	);
+	const evalCheck = first.receipt.checks.find((check) => check.name === "eval");
+	assert.equal(evalCheck.status, "pass");
+	assert.equal(evalCheck.pointer, admitted.resultPointer);
+	assert.deepEqual(first.receipt.evalResult, {
+		identity: admitted.pin.identity,
+		revision: 1,
+		contentHash: admitted.contentHash,
+		overall: "pass",
+		definition: { identity: "eval/harness-validation", revision: 1 },
+	});
+	assert.match(first.receipt.evalResult.contentHash, /^sha256:[0-9a-f]{64}$/);
+
+	const { readRunEvents } = require("../../scripts/lib/harness/event-ledger");
+	const completed = readRunEvents(target, "run-eval-bind-1").filter(
+		(event) => event.kind === "validation.completed",
+	);
+	assert.equal(completed.length, 1);
+	assert.deepEqual(completed[0].pointers, [
+		`validation-receipt:run-eval-bind-1#${first.receipt.receiptId}`,
+		admitted.resultPointer,
+		admitted.definitionPointer,
+	]);
+	// Eval binding never mutates the canonical artifacts it cites or any
+	// policy/rules/contract/grant byte (§17/§26).
+	assert.deepEqual(treeBytes(artifactRoot), artifactsBefore);
+	assert.equal(governanceFingerprint(target), governanceBefore);
+	// Same pin + same run facts → same content-addressed receipt.
+	const again = validateRun(target, {
+		runId: "run-eval-bind-1",
+		evalResult: admitted.pin,
+	});
+	assert.equal(again.idempotent, true);
+	assert.equal(again.receipt.receiptId, first.receipt.receiptId);
+	assert.equal(listReceipts(target, { runId: "run-eval-bind-1" }).length, 1);
+});
+
+test("eval-result fail rejects; missing verdict or revision refuses before any validation write", () => {
+	const failedTarget = tmpTarget();
+	admitAndStart(failedTarget, "run-eval-bind-fail");
+	const failed = admitEvalResult(failedTarget, {
+		identity: "eval-result/harness-validation-fail",
+		overall: "fail",
+	});
+	const rejected = validateRun(failedTarget, {
+		runId: "run-eval-bind-fail",
+		evalResult: failed.pin,
+	});
+	assert.equal(rejected.receipt.result.status, "rejected");
+	assert.equal(rejected.receipt.checks.find((check) => check.name === "eval").status, "fail");
+
+	const refusedTarget = tmpTarget();
+	admitAndStart(refusedTarget, "run-eval-bind-refused");
+	const noVerdict = admitEvalResult(refusedTarget, {
+		identity: "eval-result/harness-validation-no-verdict",
+		includeOverall: false,
+	});
+	const runFile = path.join(
+		refusedTarget,
+		".amber",
+		"harness",
+		"runs",
+		"run-eval-bind-refused.json",
+	);
+	const eventFile = path.join(refusedTarget, ".amber", "harness", "events.jsonl");
+	const runBefore = fs.readFileSync(runFile);
+	const eventsBefore = fs.readFileSync(eventFile);
+	assert.throws(
+		() =>
+			validateRun(refusedTarget, {
+				runId: "run-eval-bind-refused",
+				evalResult: noVerdict.pin,
+			}),
+		(error) =>
+			error.amberCode === "AMBER_E_INVALID_ARG" &&
+			/extensions\.evalResult\.result\.overall/.test(error.message),
+	);
+	assert.equal(fs.existsSync(path.join(refusedTarget, ".amber", "harness", "validations")), false);
+	assert.deepEqual(fs.readFileSync(runFile), runBefore);
+	assert.deepEqual(fs.readFileSync(eventFile), eventsBefore);
+	assert.throws(
+		() =>
+			validateRun(refusedTarget, {
+				runId: "run-eval-bind-refused",
+				evalResult: { identity: noVerdict.pin.identity, revision: 2 },
+			}),
+		(error) => error.amberCode === "AMBER_E_ARTIFACT_NOT_FOUND",
+	);
+	assert.deepEqual(fs.readFileSync(runFile), runBefore);
+	assert.deepEqual(fs.readFileSync(eventFile), eventsBefore);
+	const dangling = admitArtifact(refusedTarget, {
+		type: "eval-result",
+		identity: "eval-result/harness-validation-dangling",
+		body: "# Dangling result\n",
+		extensions: {
+			evalResult: {
+				definition: { identity: "eval/ghost", revision: 1 },
+				result: { overall: "pass" },
+			},
+		},
+	});
+	assert.equal(dangling.ok, true);
+	assert.throws(
+		() =>
+			validateRun(refusedTarget, {
+				runId: "run-eval-bind-refused",
+				evalResult: {
+					identity: "eval-result/harness-validation-dangling",
+					revision: 1,
+				},
+			}),
+		(error) =>
+			error.amberCode === "AMBER_E_ARTIFACT_NOT_FOUND" && /dangling provenance/.test(error.message),
+	);
+	assert.deepEqual(fs.readFileSync(runFile), runBefore);
+	assert.deepEqual(fs.readFileSync(eventFile), eventsBefore);
+
+	// A committed fixture result may honestly omit its definition provenance:
+	// the receipt discloses null and the event cites only the result revision.
+	const noDefinitionTarget = tmpTarget();
+	admitAndStart(noDefinitionTarget, "run-eval-bind-no-definition");
+	const noDefinition = admitEvalResult(noDefinitionTarget, {
+		identity: "eval-result/harness-validation-no-definition",
+		includeDefinition: false,
+	});
+	const withoutDefinition = validateRun(noDefinitionTarget, {
+		runId: "run-eval-bind-no-definition",
+		evalResult: noDefinition.pin,
+	});
+	assert.equal(withoutDefinition.receipt.evalResult.definition, null);
+	const { readRunEvents } = require("../../scripts/lib/harness/event-ledger");
+	const event = readRunEvents(noDefinitionTarget, "run-eval-bind-no-definition").find(
+		(entry) => entry.kind === "validation.completed",
+	);
+	assert.deepEqual(event.pointers, [
+		`validation-receipt:run-eval-bind-no-definition#${withoutDefinition.receipt.receiptId}`,
+		noDefinition.resultPointer,
+	]);
+});
+
+test("harness validate parses --eval-result pins and refuses malformed or truncated values", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-eval-cli-1");
+	const admitted = admitEvalResult(target, {
+		identity: "eval-result/harness-validation-cli",
+		overall: "pass",
+	});
+	const { dispatch } = require("../../scripts/lib/command-dispatcher");
+	const malformed = dispatch("harness", {
+		target,
+		json: true,
+		run: "run-eval-cli-1",
+		evalResult: "not-a-pin",
+		_: ["validate"],
+	});
+	assert.equal(malformed.exitCode, 1);
+	assert.match(malformed.result.errors.join("\n"), /must be <identity>@<revision>/);
+	const truncated = dispatch("harness", {
+		target,
+		json: true,
+		run: "run-eval-cli-1",
+		evalResult: undefined,
+		_: ["validate"],
+	});
+	assert.equal(truncated.exitCode, 1);
+	assert.match(truncated.result.errors.join("\n"), /requires a value/);
+	const bound = dispatch("harness", {
+		target,
+		json: true,
+		run: "run-eval-cli-1",
+		evalResult: `${admitted.pin.identity}@${admitted.pin.revision}`,
+		_: ["validate"],
+	});
+	assert.equal(bound.exitCode, 0);
+	assert.equal(bound.result.receipt.evalResult.identity, admitted.pin.identity);
+});
+
+test("raw CLI maps --eval-result through FLAG_SPECS and catches a trailing flag", () => {
+	const { spawnSync } = require("node:child_process");
+	const target = tmpTarget();
+	try {
+		admitAndStart(target, "run-eval-rawcli-1");
+		const admitted = admitEvalResult(target, {
+			identity: "eval-result/harness-validation-rawcli",
+			overall: "pass",
+		});
+		const cli = path.join(__dirname, "..", "..", "scripts", "amber.js");
+		const bound = spawnSync(
+			process.execPath,
+			[
+				cli,
+				"harness",
+				"validate",
+				"--run",
+				"run-eval-rawcli-1",
+				"--eval-result",
+				`${admitted.pin.identity}@1`,
+				"--target",
+				target,
+				"--json",
+			],
+			{ encoding: "utf8" },
+		);
+		assert.equal(bound.status, 0, bound.stderr || bound.stdout);
+		assert.match(bound.stdout, /harness-validation-rawcli/);
+		const trailing = spawnSync(
+			process.execPath,
+			[
+				cli,
+				"harness",
+				"validate",
+				"--run",
+				"run-eval-rawcli-1",
+				"--target",
+				target,
+				"--json",
+				"--eval-result",
+			],
+			{ encoding: "utf8" },
+		);
+		assert.equal(trailing.status, 1);
+		assert.match(trailing.stdout, /--eval-result requires a value/);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
 });
 
 test("a boundary-violating run validates rejected; a deny policy verdict fails the policy check", () => {

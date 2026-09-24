@@ -42,7 +42,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness checkpoint (capture | list | verify --run <id> [--checkpoint <id>] | inspect --run <id> --checkpoint <id>) --target <repo> [--json]
        amber harness attempt (list --run <id> | inspect --run <id> --attempt <id>) --target <repo> [--json]
        amber harness lifecycle [--run <id>] --target <repo> [--json]
-       amber harness validate --run <id> --target <repo> [--json]
+       amber harness validate --run <id> [--eval-result <identity>@<revision>] --target <repo> [--json]
        amber harness replay --run <id> --target <repo> [--json]
        amber harness propose-regression --run <id> --target <repo> [--json]
        amber harness trace --run <id> --target <repo> [--json]
@@ -189,9 +189,14 @@ Subcommands:
                       deterministic check set (policy/execution/tools/
                       context/evidence/attempts) over the run's own frozen
                       records — pass | fail | not-run, with every not-run
-                      disclosing its reason. Emits validation.completed on
-                      the trail; never touches the run's state machine.
-                      Subcommands: (--run <id>), list (--run <id>).
+                      disclosing its reason. Optional F077 binding:
+                      --eval-result <identity>@<revision> resolves one
+                      committed eval-result and adds the eval pass|fail leg
+                      plus eval-prefixed pointers to validation.completed.
+                      Without the flag the F073 receipt stays byte-identical;
+                      validation never touches the run's state machine.
+                      Subcommands: (--run <id> [--eval-result <id>@<rev>]),
+                      list (--run <id>).
   replay              Replay as verification, not re-execution (F073 H5,
                       §7/§43): re-derives the six frozen axes (contract/
                       tools/execution/context/policy/attempts) from the

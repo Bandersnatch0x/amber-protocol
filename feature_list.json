@@ -2846,6 +2846,45 @@
 				"The axis comparison composes the replay derivation verbatim — the verdict folds two derivations; one-sided facts are disclosed, never guessed into the verdict.",
 				"Response-only by design: both sides are immutable records; no receipt/proposal artifact is warranted (keeping H5 artifact discipline intact)."
 			]
+		},
+		{
+			"id": "F077",
+			"priority": 77,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/harness/validation-core.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/harness-replay.test.js",
+				"tests/unit/harness-control-plane.test.js",
+				"docs/specs/F077-harness-eval-result-binding.md",
+				"docs/plans/F077-harness-eval-result-binding.md"
+			],
+			"title": "Harness eval-result binding (the first eval-prefixed pointer producer)",
+			"user_visible_behavior": "amber harness validate --run <id> [--eval-result <identity>@<revision>] (expert tier, untyped): optionally resolves one committed eval-result through the canonical artifact reader, projects its own overall pass|fail into an eval ValidationReceipt leg, records the immutable pin, and emits the ADR-0021 eval-result/ and eval/ revision pointers on validation.completed. Without the flag the F073 receipt bytes and receiptId are unchanged; harness eval --run and trace consume the new pointers without new authority or writes.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-replay.test.js tests/unit/harness-control-plane.test.js",
+				"amber harness validate --run <id> --eval-result <identity>@<revision>; amber harness eval --run <id> cites the bound eval-result and definition pointers"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0126)",
+					"result": "pass: 「全部按推荐」 — bind on validate; conditional eval leg; ADR-0021 revision pointers; spec draft -> accepted",
+					"date": "2026-09-24",
+					"notes": "HITL gate closed 2026-09-24"
+				},
+				{
+					"command": "dual-axis review (issues/0125)",
+					"result": "pass: Spec axis 13 met / 0 partial / 0 contradicts; Standards axis pass-with-findings (2xP2 + 2xP3) — all findings fixed before final gate",
+					"date": "2026-09-24",
+					"notes": "closed binding shape; exact status/pointer agreement; dangling definition refusal; bound governance/artifact byte pins; omitted-definition and admitted contentHash coverage"
+				}
+			],
+			"notes": [
+				"The eval check is a projection of the committed result's own overall verdict, never a new threshold, weight, or model judgment.",
+				"The unbound path is pinned byte-for-byte to F073; binding is a new content-addressed receipt and re-binding the same revision is idempotent."
+			]
 		}
 	]
 }

@@ -8,7 +8,7 @@
 // by registration; the default seven-verb help surface is unchanged.
 
 const { defineCommand } = require("../subcommand-dispatcher");
-const { resolveTarget } = require("../command-helpers");
+const { resolveTarget, parseRevisionPin } = require("../command-helpers");
 const path = require("node:path");
 
 function invalidArg(message) {
@@ -671,9 +671,30 @@ const dispatch = defineCommand({
 			try {
 				if (sub === "list") {
 					if (!args.run) return invalidArg("--run <id> is required for harness validate list");
+					// Listing existing receipts is read-only and does not bind a
+					// caller-supplied eval result; --eval-result is intentionally
+					// ignored on this subcommand.
 					result = { ok: true, receipts: listReceipts(target, { runId: args.run }) };
 				} else if (args.run || sub) {
-					result = validateRun(target, { runId: args.run || sub });
+					let evalResult;
+					if (Object.prototype.hasOwnProperty.call(args, "evalResult")) {
+						if (args.evalResult === undefined) {
+							return invalidArg(
+								"--eval-result requires a value; it was the last token on the command line",
+							);
+						}
+						const parsed = parseRevisionPin(
+							args.evalResult,
+							"--eval-result",
+							"eval-result/instruction-surface/0123456789abcdef@1",
+						);
+						if (parsed.error) return invalidArg(parsed.error);
+						evalResult = parsed.value;
+					}
+					result = validateRun(target, {
+						runId: args.run || sub,
+						...(evalResult !== undefined ? { evalResult } : {}),
+					});
 				} else {
 					return invalidArg("--run <id> is required for harness validate");
 				}
