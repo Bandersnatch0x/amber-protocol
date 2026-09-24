@@ -53,6 +53,11 @@ const dispatch = defineCommand({
 		"validate",
 		"replay",
 		"propose-regression",
+		"trace",
+		"events",
+		"policy",
+		"capabilities",
+		"eval",
 	],
 	handlers: {
 		admit: (args) => {
@@ -711,6 +716,197 @@ const dispatch = defineCommand({
 				return writeFailure(err);
 			}
 			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		trace: (args) => {
+			const { getRun } = require("./run-core");
+			const { readRunEvents } = require("./event-ledger");
+			const target = resolveTarget(args);
+			const run = requiredFlag(
+				args,
+				"run",
+				"--run",
+				"amber harness trace --run <id> --target <repo>",
+			);
+			if (run.error) return invalidArg(run.error);
+			let result;
+			try {
+				// F074 H6: the run's causal line in one view — the record, its
+				// state history, the admission pointers, and the ordered trail.
+				// Composes getRun + readRunEvents verbatim (the same citations
+				// inspect --run uses); zero new verdicts; corrupt records fail
+				// closed through the readers.
+				const record = getRun(target, { runId: run.value }).run;
+				const events = readRunEvents(target, run.value);
+				result = {
+					ok: true,
+					run: record,
+					stateHistory: record.stateHistory,
+					...(record.admission ? { admission: record.admission } : {}),
+					events,
+				};
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		events: (args) => {
+			const { readRunEvents, readHarnessEvents } = require("./event-ledger");
+			const { getRun } = require("./run-core");
+			const target = resolveTarget(args);
+			let result;
+			try {
+				// F074 H6: the verified event stream — one run's (with --run) or
+				// the whole harness ledger's (without). The fold re-walks the
+				// chain either way; a corrupt event refuses the read. A --run
+				// that is present-but-empty or names no existing run fails
+				// closed (a silent empty success would present absence as
+				// evidence).
+				if (args.run !== undefined) {
+					if (!args.run) {
+						return invalidArg("--run <id> requires a value");
+					}
+					getRun(target, { runId: args.run });
+					result = { ok: true, runId: args.run, events: readRunEvents(target, args.run) };
+				} else {
+					result = { ok: true, events: readHarnessEvents(target) };
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		policy: (args) => {
+			const sub = args._?.[1];
+			const target = resolveTarget(args);
+			let result;
+			try {
+				if (sub === "check") {
+					// F074 H6: the run's policy POSTURE from the trail —
+					// report-only visibility; enforcement stays inside the
+					// governed runner, unchanged (this view can never deny or
+					// allow an operation).
+					const toolId = args.toolVal || args.tool;
+					if (toolId !== undefined && !args.run) {
+						// The --tool leg: the connector ≠ permission verdict for
+						// ONE tool — the same `checkHarnessTool` composition
+						// `tool check` uses (verbatim, never re-implemented).
+						const { checkHarnessTool } = require("./tool-core");
+						result = { ok: true, tool: checkHarnessTool(target, { toolId }), reportOnly: true };
+					} else if (!args.run) {
+						return invalidArg(
+							"--run <id> (run posture) or --tool <id> (tool verdict) is required for harness policy check",
+						);
+					} else if (toolId !== undefined) {
+						return invalidArg("--run and --tool are separate legs; use one per invocation");
+					} else {
+						const { getRun } = require("./run-core");
+						const { readRunEvents } = require("./event-ledger");
+						const record = getRun(target, { runId: args.run }).run;
+						const events = readRunEvents(target, args.run).filter(
+							(event) => event.kind === "policy.evaluated",
+						);
+						result = {
+							ok: true,
+							runId: args.run,
+							frozenPolicyRef: record.harness ? (record.harness.policy ?? null) : null,
+							trailVerdicts: events.map((event) => ({
+								at: event.at,
+								result: event.decision ? event.decision.result : null,
+								policy: event.decision ? (event.decision.policy ?? null) : null,
+								...(event.reason ? { reason: event.reason } : {}),
+							})),
+							...(record.replay ? { replayVerdict: record.replay.verdict } : {}),
+							...(record.validation ? { validationStatus: record.validation.status } : {}),
+							reportOnly: true,
+						};
+					}
+				} else {
+					return invalidArg(
+						"harness policy requires check. Example: amber harness policy check --run <id>",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		capabilities: (args) => {
+			const { listHarnessTools, toolsSnapshot } = require("./tool-core");
+			const target = resolveTarget(args);
+			let result;
+			try {
+				// F074 H6: the capability snapshot — admitted tools with their
+				// resolved pins (tombstones for corrupt records) plus the
+				// registry's snapshot hash. Read-only; admission stays
+				// `harness tool admit` (explicitly gated as today).
+				result = {
+					ok: true,
+					tools: listHarnessTools(target),
+					registrySnapshot: toolsSnapshot(target),
+				};
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		eval: (args) => {
+			const target = resolveTarget(args);
+			let result;
+			try {
+				if (args.run !== undefined) {
+					// With --run: the run's eval artifacts on record — read from
+					// the run's own event pointers (the closed eval/eval-result
+					// artifact-identity prefixes; never a substring over-match
+					// of caller-controlled fields). Report-only.
+					if (args.run === undefined) {
+						return invalidArg("--run <id> requires a value");
+					}
+					const { getRun } = require("./run-core");
+					const { readRunEvents } = require("./event-ledger");
+					const record = getRun(target, { runId: args.run }).run;
+					const pointers = readRunEvents(target, args.run)
+						.flatMap((event) => event.pointers || [])
+						.filter((pointer) => pointer.startsWith("eval/") || pointer.startsWith("eval-result/"));
+					result = {
+						ok: true,
+						runId: args.run,
+						evaluationPointers: pointers,
+						...(record.validation ? { validationStatus: record.validation.status } : {}),
+						reportOnly: true,
+					};
+					return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+				}
+				// A stray positional (e.g. `harness eval admit`) is refused
+				// loudly: the alias aggregates only the report-only `run` subverb
+				// — `eval admit` stays on its own explicitly gated surface.
+				if (args._?.[1]) {
+					return invalidArg(
+						`harness eval aggregates only the report-only suite (no subverbs); for ${JSON.stringify(args._[1])} use the eval surface directly (e.g. amber eval ${args._[1]})`,
+					);
+				}
+				// F074 H6: a governed ALIAS over the F058 surface — the same
+				// dispatch path (and therefore the same handler) `amber eval
+				// run` resolves to; report-only, never an Approval, never a
+				// model call. The alias is the §35 aggregation, not a second
+				// authority: `eval admit` is NOT aliased and stays on its own
+				// explicitly gated surface.
+				const { evalDispatch } = require("../eval-commands");
+				const aliasArgs = {
+					...args,
+					_: ["run"],
+					target: args.target,
+				};
+				const evalResult = evalDispatch(aliasArgs);
+				return {
+					...evalResult.result,
+					text: evalResult.result.text,
+					errors: evalResult.result.errors || [],
+					warnings: evalResult.result.warnings || [],
+					exitCode: evalResult.exitCode,
+				};
+			} catch (err) {
+				return writeFailure(err);
+			}
 		},
 		status: (args) => {
 			const { getRun, listRuns } = require("./run-core");

@@ -45,6 +45,11 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness validate --run <id> --target <repo> [--json]
        amber harness replay --run <id> --target <repo> [--json]
        amber harness propose-regression --run <id> --target <repo> [--json]
+       amber harness trace --run <id> --target <repo> [--json]
+       amber harness events [--run <id>] --target <repo> [--json]
+       amber harness policy check --run <id> --target <repo> [--json]
+       amber harness capabilities --target <repo> [--json]
+       amber harness eval [--run <id>] --target <repo> [--json]
        amber harness status [--run <id>] --target <repo> [--json]
 ```
 
@@ -65,16 +70,21 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | <code>advance</code> | Subcommand action for <code>harness</code> |
 | <code>attempt</code> | Subcommand action for <code>harness</code> |
 | <code>bind</code> | Subcommand action for <code>harness</code> |
+| <code>capabilities</code> | Subcommand action for <code>harness</code> |
 | <code>checkpoint</code> | Subcommand action for <code>harness</code> |
 | <code>context</code> | Subcommand action for <code>harness</code> |
+| <code>eval</code> | Subcommand action for <code>harness</code> |
+| <code>events</code> | Subcommand action for <code>harness</code> |
 | <code>execution</code> | Subcommand action for <code>harness</code> |
 | <code>inspect</code> | Subcommand action for <code>harness</code> |
 | <code>lifecycle</code> | Subcommand action for <code>harness</code> |
+| <code>policy</code> | Subcommand action for <code>harness</code> |
 | <code>propose-regression</code> | Subcommand action for <code>harness</code> |
 | <code>replay</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
 | <code>tool</code> | Subcommand action for <code>harness</code> |
+| <code>trace</code> | Subcommand action for <code>harness</code> |
 | <code>validate</code> | Subcommand action for <code>harness</code> |
 
 ## Command Details
@@ -191,6 +201,31 @@ Subcommands:
                       drift replay; a clean passing run refuses (proposals
                       are data for human review — eval can never change
                       governance). Required: --run <id>.
+  trace               The run's causal line in one view (F074 H6, §35): the
+                      run record, its state history, the admission pointers,
+                      and the ordered event trail — the same citations
+                      inspect --run composes, factored for reading.
+                      Required: --run <id>.
+  events              The verified harness event stream (F074 H6): one
+                      run's trail with --run <id>, or the whole ledger
+                      (re-walked chain, fail-closed) without.
+  policy              The control-plane policy POSTURE (F074 H6):
+                      `harness policy check --run <id>` surfaces the trail's
+                      policy verdicts and the run's frozen policy ref —
+                      report-only visibility; enforcement stays inside the
+                      governed runner, unchanged.
+  capabilities        The capability snapshot (F074 H6): the admitted tools
+                      with their resolved pins (tombstones for corrupt
+                      records) and the registry's snapshot hash. Read-only;
+                      admission stays `harness tool admit`.
+  eval                A governed ALIAS over the F058 eval surface (F074 H6,
+                      §26: eval does not mean authority): without --run,
+                      the same instruction-surface suite `amber eval run`
+                      produces through the same dispatch path (report-only,
+                      never a model call); with --run <id>, the run's eval
+                      artifact pointers on record. `eval admit` is NOT
+                      aliased — it stays on its own explicitly gated
+                      surface.
   status              Show one Run with --run <id>, or list runs.
 
 Examples:

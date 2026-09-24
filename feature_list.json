@@ -2741,6 +2741,45 @@
 				"The §46.5 matrix is covered at the real path: same environment -> equivalent; tool drift (F052-fixture tools admitted after the freeze), context drift (trail-vs-record admission tampering), execution drift (corrupt record), non-determinism (fold mismatch) all detected.",
 				"The §17/§26 guarantee is a conformance assertion: validate + replay + propose leave policy/rules/contract bytes byte-identical."
 			]
+		},
+		{
+			"id": "F074",
+			"priority": 74,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/harness-control-plane.test.js",
+				"docs/specs/F074-harness-h6-control-plane.md",
+				"docs/plans/F074-harness-h6-control-plane.md"
+			],
+			"title": "Harness H6 Control Plane (the aggregated surface over the shared core)",
+			"user_visible_behavior": "amber harness trace|events|policy|capabilities|eval (expert tier, untyped): trace shows one run's causal line (record + state history + admission pointers + ordered trail, the same citations inspect --run composes); events reads one run's trail or the whole verified ledger (fail-closed); policy check surfaces a run's policy posture from the trail, report-only; capabilities shows the admitted tools with resolved pins and the registry snapshot hash; eval is a governed ALIAS over the F058 surface through the same dispatch path (report-only; eval admit is NOT aliased). Every pre-existing subverb keeps its exact shape — the §44 gate (new and old CLI over the same core) is structural.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-control-plane.test.js",
+				"npm test (3923/3923 exit=0)",
+				"amber harness trace|events|policy check|capabilities|eval through the real CLI; the eval alias byte-identical to amber eval run"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0120)",
+					"result": "pass: 「继续」 — standing directive per map 0066 执行带入; spec draft -> accepted (F074 H6 control plane)",
+					"date": "2026-09-24",
+					"notes": "HITL gate closed 2026-09-24"
+				},
+				{
+					"command": "dual-axis review (issues/0119)",
+					"result": "pass: Spec axis 7 met / 2 partial / 0 contradicts; Standards axis pass-with-findings (2xP2 + 4xP3) - all 9 findings adjudicated fixed",
+					"date": "2026-09-24",
+					"notes": "policy check --tool leg implemented (checkHarnessTool verbatim); eval refuses stray positionals loudly; same-dispatch-path identity pinned by byte-equality; pointer filter narrowed to the closed eval/eval-result prefixes; report-only ceiling pinned by bytes"
+				}
+			],
+			"notes": [
+				"H6 graduates from the F073 fog (the last H-phase): five read-only subverbs composing the existing cores verbatim — zero new semantic verdicts, zero writes (distinct from validate/replay, whose artifacts are their governed records).",
+				"The eval alias is locked to the F058 surface by same-dispatch-path identity; eval admit stays on its own explicitly gated surface (§26: eval does not mean authority).",
+				"execution terminate and harness diff are deferred with disclosure: terminate crosses the settled F070 BLOCK posture (violations resolve by contract revision, never an operator kill — a new spec decision needed); diff belongs with the H5 replay lineage as its own ticket."
+			]
 		}
 	]
 }
