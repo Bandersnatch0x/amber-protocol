@@ -2922,6 +2922,48 @@
 				"Capability absence is target-independent: existing, missing, and omitted run ids return the same refusal without reading the run.",
 				"A real live-cancel feature would require a separate protocol for owned handles, coordination, termination receipts/evidence, settlement races, and controller recovery."
 			]
+		},
+		{
+			"id": "F079",
+			"priority": 79,
+			"area": "governance",
+			"paths": [
+				"AGENTS.md",
+				"docs/TEAM_REPLICATION_CHARTER.md",
+				"docs/adr/0003-governance-gated-execution.md",
+				"docs/adr/0005-experimental-execution-removal.md",
+				"docs/adr/0103-bounded-live-runtime-and-cancellation-authority.md",
+				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md",
+				"docs/product/LOOP.md",
+				"tests/unit/h7-charter-boundary.test.js",
+				"docs/specs/F079-bounded-live-runtime-charter-amendment.md",
+				"docs/plans/F079-bounded-live-runtime-charter-amendment.md"
+			],
+			"title": "Bounded H7 maintenance-runtime and cancellation authority amendment",
+			"user_visible_behavior": "The effective Charter now permits one repository-local H7 maintenance scheduler for a closed registry of deterministic Amber-internal proposal jobs with executesAnything=false, schedulesJobs=true, dispatchesAgents=false, and writesExternalSystems=false. Existing Loop/Workflow contracts stay unscheduled. Cancellation authority is reserved for already-approved executions with owned handles, separate approval, race-safe settlement, and terminal Evidence; F078 refusal remains until F081. Target-command scheduling, agents, dynamic workflows, external writes, document rewrites, and restored experimental runtime code remain forbidden. README positioning is unchanged pending F080+F081 evidence and a separate §55 gate.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/h7-charter-boundary.test.js tests/unit/security-governance-packs.test.js",
+				"README sha256 remains cbd25c1cf0757b88ee557db0f88b9698127ac294ed24c1043f5da6e53f482bbf; every existing workflow-pack execution tuple remains all-false"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0130)",
+					"result": "pass: 「全部按推荐」 — bounded internal maintenance scheduling, owned cancellation prerequisites, existing loops unscheduled, positioning held",
+					"date": "2026-09-24",
+					"notes": "exact authority HITL closed"
+				},
+				{
+					"command": "dual-axis review (issues/0129)",
+					"result": "pass: Spec axis 14 met / 0 partial / 0 contradicts; Standards pass-with-findings (2xP3) — both fixed before final full gate",
+					"date": "2026-09-24",
+					"notes": "recursive workflow-pack census; complete four-bit authority tuple pinned across Charter/Manual/LOOP/AGENTS; README exact hash unchanged"
+				}
+			],
+			"notes": [
+				"ADR-0103 amends the blanket scheduling prohibition without authorizing unattended target execution or agent dispatch.",
+				"ADR-0005 remains binding: H7 must be new code over current governance primitives, never restoration of the deleted daemon/autonomous executor."
+			]
 		}
 	]
 }

@@ -70,7 +70,8 @@ Default `amber` help projects the seven primary verbs — `audit`, `init`, `doct
 ## Safety boundaries
 
 - Read-only / dry-run first; `init` and `wiki` never overwrite existing files.
-- Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
+- Amber does not auto-execute or schedule target-project/governed commands, dispatch live agents, or run dynamic workflows.
+- ADR-0103/F079 permits one bounded H7 exception: a repository-local scheduler may invoke only closed-registry deterministic Amber maintenance jobs with `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`, `writesExternalSystems=false`; writes are confined to append-only `.amber/harness/runtime/` proposal/evidence/ledger records. Existing Loop/Workflow contracts remain unscheduled.
 - Never overwrite user-authored files without explicit approval.
 - Amber never runs `git push`. The one gated exception to "no live git": ADR-0020 Stage A
   (`amber sync session push --execute --yes`) performs the local `git add` + `git commit` of sync
@@ -97,7 +98,7 @@ governance state and non-zero command results fail closed (`isError`); and
 every Action/Function is confined to repositories configured at startup
 (`scripts/lib/mcp-targets.js`, `scripts/lib/mcp-action-contracts.js`).
 
-See also `docs/product/LOOP.md` (loop engineering self-description) and the explicit `execution: { executesAnything: false }` rule in all Amber loop contracts.
+See also `docs/product/LOOP.md` (loop engineering self-description), ADR-0103 (bounded maintenance runtime/cancellation authority), and the explicit `execution: { executesAnything: false }` rule in all Amber loop contracts.
 
 ## Skills & commands
 

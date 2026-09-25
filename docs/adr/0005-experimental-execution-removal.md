@@ -55,6 +55,23 @@ Six weeks later, a 2026-07-04 review verified the preservation had failed in pra
 
 ADR-0002's V2 criteria — that any reintroduced execution must be **governed, inspectable, explicit, constrained, documented** — are retained and now *exemplified*. [ADR-0003](0003-governance-gated-execution.md) is the realized form: governance-gated, human-triggered execution of declared commands behind policy + approval + worktree + ledger. The deleted autonomous executor was not that, and pretending otherwise (by keeping it cold-stored) muddied the boundary.
 
+## Addendum (2026-09-24) — H7 is new bounded code, never restoration
+
+ADR-0103/F079 authorizes a bounded maintenance scheduler after Harness H0–H6 acceptance. This does
+**not** reverse this ADR's deletion decision:
+
+- do not recover, copy, repair, or adapt `src/experimental/execution/*`, the deleted daemon, or the
+  deleted autonomous executor;
+- H7 must be new code over current Approval, ledger-family, budget, no-progress, replay, and
+  lease/fence primitives;
+- H7 jobs cannot execute commands or dispatch agents; their ceiling is deterministic repository
+  inspection plus append-only proposal/evidence/runtime records;
+- any future live cancellation uses the separate owned-handle protocol authorized by ADR-0103 and
+  does not restore the old PID/SIGTERM daemon design.
+
+The empirical lesson of the deleted tree remains binding: no speculative runtime code without an
+active caller, closed contract, conformance tests, and current ownership.
+
 ## Related
 
 - [ADR-0001](0001-governance-first-artifact-first.md) — governance-first, artifact-first

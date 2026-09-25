@@ -8,23 +8,34 @@ Operating rules for agents working on Amber Protocol (this repo). Command syntax
 ## 1. Identity And Boundary
 
 Amber Protocol is a repository-local, governance-first protocol layer. It is NOT a general agent
-framework, live orchestration runtime, CI replacement, or automatic execution platform.
+framework, agent orchestration runtime, CI replacement, or automatic target-execution platform.
+ADR-0103/F079 permits one bounded exception: a repository-local maintenance scheduler for a closed
+registry of deterministic internal proposal jobs.
 
 Never implement or imply support for:
 
-- Dynamic workflow execution or live subagent dispatch.
-- Automatic execution of target-project commands.
+- Dynamic workflow execution or live subagent/agent dispatch.
+- Automatic or scheduled execution of target-project commands or governed commands.
 - Automatic rewrite of existing target-project docs or user-authored files.
-- Scheduled/daemonized loop execution, cron, auto-PRs, or external-system writes.
+- Auto-PRs, issues, notifications, connector effects, or external-system writes.
+- Caller-supplied scheduled code, model calls, or target-command cron.
 - External marketplace publishing.
+
+The bounded H7 runtime, when implemented, stays fixed at `executesAnything: false`,
+`schedulesJobs: true`, `dispatchesAgents: false`, `writesExternalSystems: false`; it may invoke only
+registered Amber-internal maintenance jobs and may write only append-only proposal/evidence/runtime
+records under `.amber/harness/runtime/`. Existing loop/workflow contracts remain unscheduled.
 
 Hard consequences already enforced:
 
 - `session start/continue --mode autonomous` is refused (exit 1) citing ADR-0001/0005.
 - Experimental executors were deleted, not archived (ADR-0005). Do not reintroduce or "repair"
-  them; recover reference code only via `git show v1.2.0:<path>`.
+  them; H7 is new code over current governance primitives, never restored code.
 - Loop contracts carry `execution: { executesAnything: false }`; `loop run` is dry-run unless
-  `--execute` plus an approval exists.
+  `--execute` plus an approval exists, and loop contracts remain `schedulesJobs: false`.
+- F078's terminate refusal remains until an already-approved execution has an ownership-bound
+  persisted handle, separate cancellation approval, race-safe settlement, and terminal
+  Evidence-backed receipt (ADR-0103).
 
 ## 2. Control Priorities
 

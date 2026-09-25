@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 33,
+    "adr": 34,
     "wiki": 10,
     "architecture": 9,
-    "total": 52
+    "total": 53
   },
   "rows": [
     {
@@ -40,8 +40,8 @@
       "sourcePath": "docs/adr/0003-governance-gated-execution.md",
       "title": "Governance-Gated Execution (L2)",
       "source": {
-        "rawHash": "sha256:61a63e1db774469c6c708a315ca59ff0f8d79032f22d3c3b90732469d4b05585",
-        "normHash": "sha256:ee085ac3de5f95bdd80d0465476ded07b5fc6c83806fa28a5556be6b9614e7b2"
+        "rawHash": "sha256:d4db9792f9a3938e5d5795df225239d5a8b8077c9c6c663a1df79ad23bae64b9",
+        "normHash": "sha256:4db27de732aa049eccb7cfe34700973e1689abdcce75da91c916ecd89ebb6135"
       }
     },
     {
@@ -64,8 +64,8 @@
       "sourcePath": "docs/adr/0005-experimental-execution-removal.md",
       "title": "Experimental Execution Removal — Supersedes ADR-0002 Preservation",
       "source": {
-        "rawHash": "sha256:f1323d55822eeaa2c100a23d9381b5306f23eeb269bfebf4eb9ae3523c12d375",
-        "normHash": "sha256:821f8099e5c482f61f5d09aeb199412408be1bc5b239472e220b157a88edd2e5"
+        "rawHash": "sha256:ac451bb96d51fe096900d13ffba5d14cfb8fb767751a93f6b8c30fd176cecd33",
+        "normHash": "sha256:3181fd3a3f56f0935da0c499083e6a757133b730902fdbd1b0834b3b91aa4372"
       }
     },
     {
@@ -405,6 +405,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0103",
+      "category": "adr",
+      "sourceNodeId": "adr:0103",
+      "pageId": "knowledge-adr-0103",
+      "sourcePath": "docs/adr/0103-bounded-live-runtime-and-cancellation-authority.md",
+      "title": "Bounded Live Runtime and Cancellation Authority",
+      "source": {
+        "rawHash": "sha256:a08cc9563295a73d627a12f9b5df3a9aa223774d24a5749561cdd514d7ef6646",
+        "normHash": "sha256:3e6205e655b8c27e7f7de13df3d79ba284653ff5ee6d3aca3e2de495531bd470"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -633,5 +645,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:5d546a467e0cbf6c0e39df08ad3c4172de94df311529adfcc1a543995888dc74"
+  "manifestHash": "sha256:c01324dcba0aa73dd2bc9fb1a86fe37922e560999615df39bfa5018de4185cb3"
 }

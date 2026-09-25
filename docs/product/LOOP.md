@@ -2,7 +2,7 @@
 
 This file describes how **Amber Protocol** is maintained using its built-in governance and loop contract system.
 
-Amber is a **governance-first repository-local harness**. It defines strict Loop Contracts (see `schemas/loop-contract.schema.json` and `workflow-packs/`) with explicit `execution: { executesAnything: false }`. Live scheduling and autonomous agent dispatch remain **outside the current product boundary**.
+Amber is a **governance-first repository-local harness**. It defines strict Loop Contracts (see `schemas/loop-contract.schema.json` and `workflow-packs/`) with explicit `execution: { executesAnything: false }`. Loop scheduling and autonomous agent dispatch remain outside the product boundary. ADR-0103/F079 separately permits a bounded H7 maintenance scheduler for closed, deterministic Amber-internal proposal jobs; it cannot execute Loop commands, target commands, agents, workflows, or external effects.
 
 ## Active Loops
 
@@ -96,10 +96,16 @@ Follow Amber's loop contracts and evidence rules:
 - **L2**: Assisted. **Now partly available** via governed execution (ADR-0003): `amber loop approve`
   then `amber loop run --execute` runs a contract's `governed.command` in an isolated worktree with a
   tamper-evident ledger. Human approval is required; scheduling/unattended runs stay disallowed.
-- **L3**: Unattended — still disallowed by the Amber product boundary (no scheduling/daemon; loop
-  `execution.executesAnything` stays `false`).
+- **L3**: Unattended target execution — still disallowed by the Amber product boundary; loop
+  `execution.executesAnything` stays `false` and loop contracts remain `schedulesJobs: false`.
 
-Amber's explicit boundaries make it a **safe place to practice L1/L2 loops**.
+H7 maintenance scheduling is orthogonal to L3: its contract is not a Loop Contract, its closed jobs
+only inspect and append proposals/evidence/runtime records, and its authority tuple is
+`executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`,
+`writesExternalSystems=false`.
+
+Amber's explicit boundaries make it a **safe place to practice L1/L2 loops** while allowing bounded,
+proposal-only maintenance automation.
 
 ## Evolution & Dogfooding
 

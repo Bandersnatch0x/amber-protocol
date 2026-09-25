@@ -88,6 +88,25 @@ infrastructure rather than loop-specific. Non-`command` stages (pack/skill/gate)
 The session `verify`/`approve` human-record flow is untouched; whole-route or whole-session
 auto-execution remains disallowed.
 
+## Addendum (2026-09-24) — ADR-0103 bounded maintenance scheduling exception
+
+ADR-0103/F079 narrows the scheduling prohibition without weakening governed command execution:
+
+- Amber MAY run a repository-local scheduler/daemon only for a closed registry of deterministic
+  internal Maintenance Jobs.
+- Those jobs are fixed at `executesAnything: false`, `schedulesJobs: true`,
+  `dispatchesAgents: false`, `writesExternalSystems: false`; they may inspect the repository and
+  append proposal/evidence/runtime ledger records under `.amber/harness/runtime/` only.
+- Existing loop/workflow contracts stay `schedulesJobs: false`. A schedule cannot invoke
+  `loop run --execute`, route command stages, `harness execution run`, runner execution, external
+  effects, agents, models, dynamic workflows, or caller-supplied commands.
+- Schedule registration is human-approved, scoped, expiring, revocable, budgeted, fenced, and
+  ledgered. Outputs remain proposals; they grant no authority.
+
+Therefore “Scheduling / cron / daemon / hook-triggered execution” above now means scheduling
+**target commands, agents, workflows, or effects**. The bounded internal maintenance runtime is the
+one accepted exception. All human-triggered governed execution preconditions remain unchanged.
+
 ## Related
 
 - ADR-0001 (governance-first, artifact-first)
