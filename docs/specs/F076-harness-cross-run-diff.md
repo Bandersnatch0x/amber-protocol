@@ -84,8 +84,9 @@ frozen records (no chat history, no re-execution, no new authority):
   cross-TASK diffs (same-task pairs are the discipline; a cross-task diff would
   compare unrelated worlds and is refused — both runs must share the same
   `subject.task` when both declare one, else disclosed as `unrelated` and refused);
-  execution `terminate` (still deferred with disclosure, needs its own spec
-  decision); MCP projection.
+  execution `terminate` (settled by F078 as an explicit zero-write refusal: Amber
+  owns no cancellable live-process handle and never fakes kill with cancel+release);
+  MCP projection.
 
 ## Further Notes
 

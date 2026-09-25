@@ -2885,6 +2885,43 @@
 				"The eval check is a projection of the committed result's own overall verdict, never a new threshold, weight, or model judgment.",
 				"The unbound path is pinned byte-for-byte to F073; binding is a new content-addressed receipt and re-binding the same revision is idempotent."
 			]
+		},
+		{
+			"id": "F078",
+			"priority": 78,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/harness-execution.test.js",
+				"docs/specs/F078-harness-execution-terminate-refusal.md",
+				"docs/plans/F078-harness-execution-terminate-refusal.md"
+			],
+			"title": "Harness execution terminate explicit refusal (not a fake kill)",
+			"user_visible_behavior": "amber harness execution terminate [--run <id>] is a recognized, stable AMBER_E_INVALID_ARG refusal: Amber persists no cancellable live-process handle and will not pretend cancel+release killed a process. The message points to the separate audited surfaces for Run cancellation (harness advance --to cancelled), missing-receipt runner-request settlement (runner execution abort), and prepared-workspace deletion (execution release). The refusal reads no run and writes no target byte; F070 BLOCK posture is unchanged.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-execution.test.js",
+				"amber harness execution terminate [--run <id>] returns the explicit no-live-handle refusal; whole target tree remains byte-identical"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0128)",
+					"result": "pass: selected 显式拒绝面 — no fake cancel+release, preserve lifecycle/request/workspace facts",
+					"date": "2026-09-24",
+					"notes": "HITL gate closed 2026-09-24"
+				},
+				{
+					"command": "dual-axis review (issues/0127)",
+					"result": "pass: Spec axis 11 met / 0 partial / 0 contradicts; Standards axis pass with no findings",
+					"date": "2026-09-24",
+					"notes": "truthful capability boundary; zero mutation by construction and whole-tree byte pin; existing/missing/omitted run ids refuse identically; BLOCK posture unchanged"
+				}
+			],
+			"notes": [
+				"Capability absence is target-independent: existing, missing, and omitted run ids return the same refusal without reading the run.",
+				"A real live-cancel feature would require a separate protocol for owned handles, coordination, termination receipts/evidence, settlement races, and controller recovery."
+			]
 		}
 	]
 }

@@ -46,5 +46,5 @@ run validated without the flag produces bytes identical to F073.
 ## Non-goals
 
 Producing eval-results from a run; replay/diff consuming the eval leg; multiple
-bindings per receipt; `harness execution terminate` (own spec decision); MCP
-projection.
+bindings per receipt; `harness execution terminate` (settled by F078 as an explicit
+zero-write refusal); MCP projection.

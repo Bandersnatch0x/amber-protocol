@@ -137,8 +137,9 @@ Five read-only subverbs over the shared cores — the last of which is a governe
 
 - `harness execution terminate` (a mutating verb the proposal lists in §20 but that
   crosses the execution lifecycle's settled BLOCK posture — F070 resolves violations
-  by contract revision, never by an operator kill; deferred with disclosure, a new
-  spec decision needed before it lands); `harness diff <run-a> <run-b>` (cross-run
+  by contract revision, never by an operator kill; disposition now settled by F078 as
+  an explicit zero-write refusal because Amber owns no cancellable live-process
+  handle); `harness diff <run-a> <run-b>` (cross-run
   comparison belongs with H5's replay lineage, a separate ticket); §20's `policy
   inspect` and `context grants` variants (§35 — the spec's chosen target list —
   names `policy check` and `context inspect`; the existing `harness context list`

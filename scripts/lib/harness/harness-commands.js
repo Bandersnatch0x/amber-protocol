@@ -448,6 +448,17 @@ const dispatch = defineCommand({
 						result.errors = result.commandErrors.map((entry) => String(entry));
 						result.exitCode = 1;
 					}
+				} else if (sub === "terminate") {
+					// F078: explicit refusal, not a fake kill. The synchronous
+					// governed-command path stores no cancellable process handle;
+					// composing Run cancellation with workspace release could delete
+					// a workspace while a child still runs and would collapse three
+					// independently-audited facts. Do not read the named run and do
+					// not call any mutating core — capability absence is target-
+					// independent and the refusal must be byte-zero.
+					return invalidArg(
+						"harness execution terminate is an explicit refusal: Amber has no cancellable live-execution handle and cannot truthfully kill a process. Cancel the Run record with `amber harness advance --run <id> --to cancelled --reason <text>`; settle a prepared runner request that will never produce a receipt with `amber runner execution abort --request-hash <hash> --reason <text>`; remove a prepared workspace with `amber harness execution release --run <id>`. These are separate auditable facts; terminate never bypasses the F070 BLOCK posture and writes nothing.",
+					);
 				} else if (sub === "release") {
 					const { releaseExecution } = require("./execution-adapter");
 					const run = requiredFlag(
@@ -460,7 +471,7 @@ const dispatch = defineCommand({
 					result = releaseExecution(target, { runId: run.value });
 				} else {
 					return invalidArg(
-						"harness execution requires admit, list, inspect, prepare, evaluate, run, or release. Example: amber harness execution admit --file path/to/contract.json",
+						"harness execution requires admit, list, inspect, prepare, evaluate, run, release, or the explicit terminate refusal. Example: amber harness execution admit --file path/to/contract.json",
 					);
 				}
 			} catch (err) {

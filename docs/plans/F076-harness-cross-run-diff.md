@@ -40,4 +40,5 @@ disclosed as `only-a`/`only-b`, never guessed into the verdict.
 ## Non-goals
 
 Storing diffs as records; cross-task diffs (unrelated declared tasks refuse);
-execution `terminate` (still deferred with disclosure); MCP projection.
+execution `terminate` (settled by F078 as an explicit zero-write refusal); MCP
+projection.

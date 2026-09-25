@@ -72,6 +72,81 @@ function executionContractAdmitted(target) {
 	admitViaCli(target, writeContract(target, contractBody()));
 }
 
+// Byte-level whole-target snapshot: file bytes plus directory entries (empty
+// directories included). F078 uses this to prove the explicit terminate
+// refusal performs zero target reads-with-repair and zero writes/deletions.
+function targetTreeBytes(target) {
+	const rows = [];
+	const walk = (dir) => {
+		for (const entry of fs
+			.readdirSync(dir, { withFileTypes: true })
+			.sort((a, b) => a.name.localeCompare(b.name))) {
+			const full = path.join(dir, entry.name);
+			const relative = path.relative(target, full).replaceAll("\\", "/");
+			if (entry.isDirectory()) {
+				rows.push(`${relative}/`);
+				walk(full);
+			} else {
+				rows.push(`${relative}=${fs.readFileSync(full).toString("base64")}`);
+			}
+		}
+	};
+	walk(target);
+	return rows;
+}
+
+function prepareLocalRun(target, runId) {
+	const admitted = admitViaCli(
+		target,
+		writeContract(
+			target,
+			contractBody({
+				metadata: { id: "exec-local", version: "1" },
+				workspace: { type: "local", base: "HEAD" },
+			}),
+			"local.json",
+		),
+	);
+	assert.equal(admitted.exitCode, 0);
+	const harnessFile = path.join(target, "harness-contract.json");
+	fs.writeFileSync(
+		harnessFile,
+		JSON.stringify({
+			apiVersion: "amber.dev/v1",
+			kind: "HarnessContract",
+			metadata: { id: "harness-exec", version: "1" },
+			agent: { id: "worker", role: "implementation" },
+			governance: { policy: "default-safe" },
+		}),
+		"utf8",
+	);
+	assert.equal(
+		dispatch("harness", { target, file: harnessFile, json: true, _: ["admit"] }).exitCode,
+		0,
+	);
+	assert.equal(
+		dispatch("harness", {
+			target,
+			json: true,
+			contract: "harness-exec",
+			agent: "worker",
+			run: runId,
+			_: ["start"],
+		}).exitCode,
+		0,
+	);
+	const prepared = dispatch("harness", {
+		target,
+		json: true,
+		contract: "exec-local",
+		run: runId,
+		_: ["execution", "prepare"],
+	});
+	assert.equal(prepared.exitCode, 0);
+	assert.ok(fs.existsSync(prepared.result.record.effective.workspace.path));
+	return prepared.result.record;
+}
+
 test("execution contracts admit immutably; bad prefixes refuse in core", () => {
 	const target = tmpTarget("contract");
 	try {
@@ -197,6 +272,77 @@ test("the local adapter prepares the bounded root without touching git", () => {
 			wsPath.replace(/\\/g, "/").includes(".amber/harness/workspaces/run-local-1"),
 			"the bounded root lives under the harness state area",
 		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
+test("execution terminate is an explicit zero-write refusal, not cancel+release disguised as kill", () => {
+	const target = tmpTarget("terminate-refusal");
+	try {
+		const runId = "run-terminate-1";
+		const prepared = prepareLocalRun(target, runId);
+		const workspace = prepared.effective.workspace.path;
+		const before = targetTreeBytes(target);
+		const refused = dispatch("harness", {
+			target,
+			json: true,
+			run: runId,
+			_: ["execution", "terminate"],
+		});
+		assert.equal(refused.exitCode, 1);
+		assert.equal(refused.result.code, "AMBER_E_INVALID_ARG");
+		const message = refused.result.errors.join("\n");
+		assert.match(message, /explicit refusal/);
+		assert.match(message, /no cancellable live-execution handle/);
+		assert.match(message, /harness advance --run <id> --to cancelled/);
+		assert.match(message, /runner execution abort --request-hash/);
+		assert.match(message, /harness execution release --run <id>/);
+		assert.match(message, /BLOCK posture/);
+		assert.deepEqual(
+			targetTreeBytes(target),
+			before,
+			"refusal changes no target byte or directory",
+		);
+		assert.ok(fs.existsSync(workspace), "refusal never releases the prepared workspace");
+
+		// Capability absence is target-independent: a missing id and no id at all
+		// return the same semantic refusal, not RUN_NOT_FOUND / required-flag.
+		for (const args of [
+			{ run: "run-missing", _: ["execution", "terminate"] },
+			{ _: ["execution", "terminate"] },
+		]) {
+			const snapshot = targetTreeBytes(target);
+			const result = dispatch("harness", { target, json: true, ...args });
+			assert.equal(result.exitCode, 1);
+			assert.equal(result.result.code, "AMBER_E_INVALID_ARG");
+			assert.match(result.result.errors.join("\n"), /explicit refusal/);
+			assert.doesNotMatch(result.result.errors.join("\n"), /not found|required/);
+			assert.deepEqual(targetTreeBytes(target), snapshot);
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
+test("raw CLI routes execution terminate to the explicit refusal, not unknown action", () => {
+	const target = tmpTarget("terminate-rawcli");
+	try {
+		const cli = path.join(__dirname, "..", "..", "scripts", "amber.js");
+		for (const argv of [["--run", "run-any"], []]) {
+			const before = targetTreeBytes(target);
+			const result = spawnSync(
+				process.execPath,
+				[cli, "harness", "execution", "terminate", ...argv, "--target", target, "--json"],
+				{ encoding: "utf8" },
+			);
+			assert.equal(result.status, 1);
+			assert.match(result.stdout, /AMBER_E_INVALID_ARG/);
+			assert.match(result.stdout, /explicit refusal/);
+			assert.match(result.stdout, /no cancellable live-execution handle/);
+			assert.doesNotMatch(result.stdout, /requires admit, list, inspect/);
+			assert.deepEqual(targetTreeBytes(target), before);
+		}
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 	}

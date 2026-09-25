@@ -133,8 +133,8 @@ artifact type, no new event kind:
   replay axes are the frozen-world vocabulary — a bound eval is a judgment about the
   run, not a fact of its world); binding more than one result per receipt (bind again
   → a new receipt; the run summary points at the latest); `harness execution
-  terminate` (still deferred with disclosure, needs its own spec decision); MCP
-  projection.
+  terminate` (settled by F078 as an explicit zero-write refusal because no
+  cancellable live handle exists); MCP projection.
 
 ## Further Notes
 

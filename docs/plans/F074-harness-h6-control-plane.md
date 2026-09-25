@@ -46,6 +46,7 @@ existing tests unmodified.
 
 ## Non-goals
 
-`harness execution terminate` (crosses the settled F070 BLOCK posture — needs its own
-spec decision); `harness diff <run-a> <run-b>` (H5 replay lineage, own ticket); MCP
+`harness execution terminate` (settled by F078 as an explicit zero-write refusal: no
+cancellable live handle, no fake cancel+release); `harness diff <run-a> <run-b>` (H5
+replay lineage, own ticket); MCP
 projection; reshaping any existing command; charter/homepage change.
