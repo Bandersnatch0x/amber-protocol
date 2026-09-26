@@ -2911,11 +2911,115 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
 - `harness inspect --run <id>` — the §38 gate view: the Run plus its verified event chain
   (Agent → Contract → Run → Events) from one read-only command.
 
+**Execution run and cancellation (F070/F078/F081).** A prepared execution is consumed by one
+named governed command; while it runs, an owned handle makes the attempt observable, and a
+cancellation can address exactly that handle.
+
+- `harness execution run --run <id> --command-id <id> [--ledger <name>] [--budget-minutes <n>]
+  [--producer <principal>] [--request-id <id>]` — run ONE governed named command inside the
+  prepared workspace. The four gates (policy, approval, isolation, ledger) stay Core and always
+  precede any effect. Each attempt appends a deterministic mutation observation and the fold
+  recomputes over the full trail.
+- `harness execution release --run <id>` — remove the prepared workspace as a RECORDED step
+  (a finished command never silently deletes its workspace).
+- `harness execution handles [--run <id>]` — read-only view of the owned execution handles: the
+  recorded pid, lease, fence, workspace, and deadline with OBSERVED liveness (`live` / `stale`).
+  A stale handle is reconciled on read, never read as "probably stopped".
+- `harness execution cancel --run <id> --decision <identity>@<revision> --reason <text>` —
+  cancel a live governed execution. Cancellation consumes its OWN single-use human Decision
+  (never the execution's own approval), observes the pid before and after signalling, and
+  records what it OBSERVED: `terminated` (alive, signal delivered, gone within the bound),
+  `already-exited` (already gone), or `unknown` (still alive after the bound — never read as
+  success). It deletes no workspace, rewrites no terminal result, and grants no launch
+  authority. One cancellation per attempt; a settled attempt has no handle and refuses
+  (`AMBER_E_HARNESS_EXEC_NO_HANDLE`).
+- `harness execution terminate [--run <id>]` — an explicit REFUSAL (F078). `terminate` conflates
+  Run cancellation, request settlement, and workspace deletion, so it stays refused and writes
+  nothing; the refusal names `execution cancel`, `harness advance --to cancelled`,
+  `runner execution abort`, and `execution release` as the separate audited surfaces.
+
+**Runtime lifecycle (F072).**
+
+- `harness checkpoint capture|list|verify|inspect --run <id> [--checkpoint <id>]` — run-scoped
+  checkpoints citing the run/execution digests and the attempt count (non-final runs only,
+  idempotent per content). `verify` re-reads and re-verifies: a drifted run refuses closed.
+  Checkpoints are snapshots, never ledger events.
+- `harness attempt list|inspect --run <id> [--attempt <id>]` — first-class attempt records
+  (running → completed/failed/refused, terminal-immutable). `list` reports the no-progress
+  derivation (reported, never enforced).
+- `harness lifecycle [--run <id>]` — the unified mapping view (run state and history, loop/
+  session/task provenance from the admission pointers, execution verdict, attempts,
+  checkpoints). Writes nothing; corrupt records fail closed.
+
+**Validation and replay (F073/F076/F077).**
+
+- `harness validate --run <id> [--eval-result <identity>@<revision>]` — the ValidationReceipt:
+  a closed deterministic check set (policy/execution/tools/context/evidence/attempts) over the
+  run's own frozen records, each landing `pass` | `fail` | `not-run` with every `not-run`
+  disclosing its reason. With `--eval-result` (F077) one committed eval-result is bound through
+  the canonical artifact reader: the receipt grows the `eval` leg (the result's own `overall`
+  copied, never re-derived) and the `validation.completed` event carries the
+  `eval-result/<id>@<rev>` and `eval/<id>@<rev>` pointers. Without the flag the receipt is
+  unchanged. Validation never moves the run's state machine.
+- `harness replay --run <id>` — verification, not re-execution: re-derives the six §7 axes
+  (contract/tools/execution/context/policy/attempts) from the run's own records and compares —
+  per-axis `equivalent` | `drift` | `unevaluated` with the closed §7 drift kinds. No chat
+  history, no re-run.
+- `harness propose-regression --run <id>` — derive a regression proposal from RECORDED FACTS
+  only (a terminal failed/cancelled run, or a drifting replay); a clean passing run refuses.
+  Proposals are data for human review; eval never changes governance.
+- `harness diff --from <runId> --to <runId>` — compare two runs over the SAME six replay axes
+  (the axis facts are derived verbatim from the replay engine), per-axis `same` | `differs` |
+  `only-a` | `only-b`, verdict `equivalent-world` | `world-drift` | `incomparable`. Both flags
+  are required (a one-sided diff is not a diff) and unrelated declared tasks refuse.
+
+**Control plane (F074), legacy dispositions (F075), bounded runtime (F080).**
+
+- `harness trace --run <id>` — the run's causal line in one view (run record, state history,
+  admission pointers, ordered trail): the same citations `inspect --run` composes, factored for
+  reading.
+- `harness events [--run <id>]` — the verified harness event stream: one run's trail, or the
+  whole ledger (fail-closed).
+- `harness policy check --run <id> [--tool <id>]` — the trail's policy posture, report-only;
+  the `--tool` leg reports the verdict the existing policy surface would give a tool, never
+  enforcing it.
+- `harness capabilities` — the admitted tools with their resolved pins plus the registry
+  snapshot hash (same citations as `tool list`).
+- `harness eval [--run <id>]` — a governed ALIAS over the F058 surface (same dispatch path, so
+  byte-identical to `amber eval run`); with `--run` it reports the run's eval-prefixed artifact
+  pointers from the trail. Report-only; `eval admit` is NOT aliased.
+- `harness legacy [task --task <id> | profile]` — one read-only disposition row per deprecated
+  surface, naming its mapping onto the harness spine; `profile inspect` declares NO
+  correspondence. The view reads frozen legacy artifacts and writes nothing.
+- `harness runtime jobs` / `schedule admit --file <schedule.json>` / `schedule list|show|revoke`
+  / `tick [--schedule <id>] [--now <iso>]` / `daemon start [--poll-ms <n>]|stop|status` — the
+  bounded H7 maintenance runtime: a repository-local scheduler for a CLOSED registry of
+  deterministic Amber-internal proposal jobs. The authority tuple is fixed at
+  `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`,
+  `writesExternalSystems=false`; a job may read the repository and append
+  proposal/evidence/runtime records under `.amber/harness/runtime/` only, never run a target
+  command, dispatch an agent, execute a workflow, or write an external system. Each schedule
+  binds one committed human Decision, expires, and stays revocable; every wake, skip, result,
+  stop, and crash recovery is a typed event on the existing Harness ledger.
+
 ```bash
 node scripts/amber.js harness admit --file path/to/contract.json --target . --json
 node scripts/amber.js harness start --contract coding-task --agent worker --target . --json
 node scripts/amber.js harness advance --run run-abc --to running --target . --json
 node scripts/amber.js harness inspect --run run-abc --target . --json
+node scripts/amber.js harness execution prepare --contract exec-coding --run run-abc --target . --json
+node scripts/amber.js harness execution run --run run-abc --command-id lint.repo --target . --json
+node scripts/amber.js harness execution handles --target . --json
+node scripts/amber.js harness execution cancel --run run-abc --decision decision/cancel-1@1 --reason "hung verification" --target . --json
+node scripts/amber.js harness validate --run run-abc --target . --json
+node scripts/amber.js harness validate --run run-abc --eval-result eval-result/instruction-surface/0123456789abcdef@1 --target . --json
+node scripts/amber.js harness replay --run run-abc --target . --json
+node scripts/amber.js harness diff --from run-abc --to run-def --target . --json
+node scripts/amber.js harness lifecycle --run run-abc --target . --json
+node scripts/amber.js harness runtime jobs --target . --json
+node scripts/amber.js harness runtime schedule admit --file schedule.json --target . --json
+node scripts/amber.js harness runtime tick --schedule draft-review --target . --json
+node scripts/amber.js harness runtime daemon status --target . --json
 ```
 
 ## Error Codes
