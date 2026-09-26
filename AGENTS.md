@@ -71,7 +71,7 @@ Default `amber` help projects the seven primary verbs — `audit`, `init`, `doct
 
 - Read-only / dry-run first; `init` and `wiki` never overwrite existing files.
 - Amber does not auto-execute or schedule target-project/governed commands, dispatch live agents, or run dynamic workflows.
-- ADR-0103/F079 permits one bounded H7 exception: a repository-local scheduler may invoke only closed-registry deterministic Amber maintenance jobs with `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`, `writesExternalSystems=false`; writes are confined to append-only `.amber/harness/runtime/` proposal/evidence/ledger records. Existing Loop/Workflow contracts remain unscheduled.
+- ADR-0103/F079 permits one bounded H7 exception, delivered as `amber harness runtime` (F080): a repository-local scheduler may invoke only closed-registry deterministic Amber maintenance jobs with `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`, `writesExternalSystems=false`; writes are confined to append-only `.amber/harness/runtime/` proposal/evidence/ledger records, and the lease/fenced daemon can only wake that closed registry. Existing Loop/Workflow contracts remain unscheduled.
 - Never overwrite user-authored files without explicit approval.
 - Amber never runs `git push`. The one gated exception to "no live git": ADR-0020 Stage A
   (`amber sync session push --execute --yes`) performs the local `git add` + `git commit` of sync

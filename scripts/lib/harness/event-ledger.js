@@ -45,6 +45,20 @@ const HARNESS_EVENT_TYPES = Object.freeze([
 	"context.granted",
 	"context.denied",
 	"context.revoked",
+	// F080 H7: repository-local bounded maintenance runtime. These events
+	// are NOT run-scoped; their schedule/proposal/daemon citations ride the
+	// existing pointer/hash fields and the same Harness ledger chain.
+	"runtime.schedule.registered",
+	"runtime.schedule.revoked",
+	"runtime.daemon.started",
+	"runtime.daemon.stopped",
+	"runtime.daemon.recovered",
+	"runtime.wake.started",
+	"runtime.wake.skipped",
+	"runtime.job.completed",
+	"runtime.job.failed",
+	"runtime.budget.stopped",
+	"runtime.no-progress.stopped",
 ]);
 
 // Run-scoped kinds name their run (ADR-0102); context.* events (F069) carry
@@ -141,7 +155,7 @@ function eventProblem(candidate) {
  * @param {string} targetRoot
  * @param {object} body - The event body (kind, schemaVersion, at, runId, ...).
  */
-function emitHarnessEvent(targetRoot, body) {
+function emitHarnessEvent(targetRoot, body, guard) {
 	const problem = eventProblem(body);
 	if (problem !== null) {
 		const err = new Error(
@@ -150,10 +164,14 @@ function emitHarnessEvent(targetRoot, body) {
 		err.amberCode = HARNESS_EVENT_INVALID_CODE;
 		throw err;
 	}
+	// `guard(fold)` runs inside the governed append while the ledger lock is
+	// held: a non-null result refuses the append verbatim (ADR-0028). Families
+	// whose invariant spans the folded chain (F080's single-use Decision
+	// spends) pass one so the check cannot race a concurrent writer.
 	return EVENTS_LEDGER.append(
 		targetRoot,
 		() => body,
-		() => null,
+		typeof guard === "function" ? guard : () => null,
 		(fold) => fold[fold.length - 1] ?? null,
 	);
 }

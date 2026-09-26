@@ -128,6 +128,9 @@ const FLAG_SPECS = {
 	"--ratify": { key: "ratify", kind: "boolean" },
 	"--reason": { key: "reason" },
 	"--run": { key: "run" },
+	// F080 H7 bounded maintenance runtime.
+	"--schedule": { key: "schedule" },
+	"--poll-ms": { key: "pollMs" },
 	"--to": { key: "to" },
 	// F070 H2b: governed prepared-execution run flags (--ledger/--producer/
 	// --request-id/--budget-minutes already exist on shared surfaces).

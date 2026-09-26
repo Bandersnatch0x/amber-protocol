@@ -46,6 +46,7 @@ const dispatch = defineCommand({
 		"bind",
 		"tool",
 		"execution",
+		"runtime",
 		"context",
 		"checkpoint",
 		"attempt",
@@ -472,6 +473,100 @@ const dispatch = defineCommand({
 				} else {
 					return invalidArg(
 						"harness execution requires admit, list, inspect, prepare, evaluate, run, release, or the explicit terminate refusal. Example: amber harness execution admit --file path/to/contract.json",
+					);
+				}
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
+		},
+		runtime: (args) => {
+			const sub = args._?.[1];
+			const op = args._?.[2];
+			const target = resolveTarget(args);
+			const {
+				admitSchedule,
+				revokeSchedule,
+				listSchedules,
+				showSchedule,
+				listJobs,
+				tickRuntime,
+				startDaemon,
+				stopDaemon,
+				daemonStatus,
+			} = require("./runtime-core");
+			let result;
+			try {
+				if (sub === "jobs") {
+					result = { ok: true, jobs: listJobs() };
+				} else if (sub === "schedule" && op === "admit") {
+					const file = requiredFlag(
+						args,
+						"file",
+						"--file",
+						"amber harness runtime schedule admit --file schedule.json --target <repo>",
+					);
+					if (file.error) return invalidArg(file.error);
+					const fs = require("node:fs");
+					const input = JSON.parse(fs.readFileSync(path.resolve(target, file.value), "utf8"));
+					result = admitSchedule(target, input);
+				} else if (sub === "schedule" && op === "list") {
+					result = { ok: true, schedules: listSchedules(target, { now: args.now }) };
+				} else if (sub === "schedule" && op === "show") {
+					const schedule = requiredFlag(
+						args,
+						"schedule",
+						"--schedule",
+						"amber harness runtime schedule show --schedule <id> --target <repo>",
+					);
+					if (schedule.error) return invalidArg(schedule.error);
+					result = {
+						ok: true,
+						...showSchedule(target, { scheduleId: schedule.value, now: args.now }),
+					};
+				} else if (sub === "schedule" && op === "revoke") {
+					const schedule = requiredFlag(
+						args,
+						"schedule",
+						"--schedule",
+						"amber harness runtime schedule revoke --schedule <id> --decision <identity>@<revision> --reason <text> --target <repo>",
+					);
+					if (schedule.error) return invalidArg(schedule.error);
+					const decision = requiredFlag(
+						args,
+						"decision",
+						"--decision",
+						"amber harness runtime schedule revoke --schedule <id> --decision decision/runtime-revoke@1 --reason <text> --target <repo>",
+					);
+					if (decision.error) return invalidArg(decision.error);
+					const parsed = parseRevisionPin(
+						decision.value,
+						"--decision",
+						"decision/runtime-revoke@1",
+					);
+					if (parsed.error) return invalidArg(parsed.error);
+					if (!args.reason) return invalidArg("--reason <text> is required for schedule revoke");
+					result = revokeSchedule(target, {
+						scheduleId: schedule.value,
+						decision: parsed.value,
+						reason: args.reason,
+					});
+				} else if (sub === "tick") {
+					result = tickRuntime(target, {
+						...(args.schedule === undefined ? {} : { scheduleId: args.schedule }),
+						...(args.now === undefined ? {} : { now: args.now }),
+					});
+				} else if (sub === "daemon" && op === "start") {
+					result = startDaemon(target, {
+						...(args.pollMs === undefined ? {} : { pollMs: Number(args.pollMs) }),
+					});
+				} else if (sub === "daemon" && op === "stop") {
+					result = stopDaemon(target);
+				} else if (sub === "daemon" && op === "status") {
+					result = daemonStatus(target);
+				} else {
+					return invalidArg(
+						"harness runtime requires jobs; schedule admit|list|show|revoke; tick; or daemon start|stop|status",
 					);
 				}
 			} catch (err) {

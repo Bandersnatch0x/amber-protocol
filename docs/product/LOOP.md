@@ -102,7 +102,9 @@ Follow Amber's loop contracts and evidence rules:
 H7 maintenance scheduling is orthogonal to L3: its contract is not a Loop Contract, its closed jobs
 only inspect and append proposals/evidence/runtime records, and its authority tuple is
 `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`,
-`writesExternalSystems=false`.
+`writesExternalSystems=false`. It is delivered as `amber harness runtime`
+(`jobs` / `schedule admit|list|show|revoke` / `tick` / `daemon start|stop|status`), and a schedule
+can only wake a registered internal job — never a Loop command, target command, agent, or workflow.
 
 Amber's explicit boundaries make it a **safe place to practice L1/L2 loops** while allowing bounded,
 proposal-only maintenance automation.

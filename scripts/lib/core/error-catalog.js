@@ -3161,6 +3161,60 @@ const CATALOG = {
 		layer: "Migration",
 		related: ["AMBER_E_HARNESS_LEGACY_NOT_FOUND"],
 	},
+	AMBER_E_HARNESS_RUNTIME_INVALID: {
+		title: "Maintenance runtime request is invalid",
+		cause:
+			"An H7 schedule, pin, or job request violates the closed contract: an unknown/extra field, an unregistered job, an out-of-bound cadence, window, budget, or poll interval, a malformed Decision pin, or a non-human, scoped, review-kind, or unresolved Decision.",
+		remedy:
+			"Fix the reported field or bind a fresh committed human acceptance/approval Decision (amber artifact show --type decision), then re-run the command.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_RUNTIME_CONFLICT"],
+	},
+	AMBER_E_HARNESS_RUNTIME_NOT_FOUND: {
+		title: "Maintenance runtime record not found",
+		cause:
+			"A runtime command referenced a schedule id with no record under .amber/harness/runtime/schedules/.",
+		remedy:
+			"List the admitted schedules (amber harness runtime schedule list) and retry with an existing id.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUNTIME_INVALID"],
+	},
+	AMBER_E_HARNESS_RUNTIME_CORRUPT: {
+		title: "Maintenance runtime record failed its closed shape",
+		cause:
+			"The stored schedule, proposal, revocation, or daemon record is not valid JSON, fails its closed inline shape, no longer matches its Snapshot Hash, or has no matching registration witness on the Harness ledger.",
+		remedy:
+			"Investigate the named record under .amber/harness/runtime/; runtime reads fail closed rather than serving partial authority.",
+		layer: "Verification",
+		related: ["AMBER_E_HARNESS_LEDGER_CORRUPT"],
+	},
+	AMBER_E_HARNESS_RUNTIME_CONFLICT: {
+		title: "Maintenance runtime request conflicts with recorded state",
+		cause:
+			"A schedule id already exists with different content, one Decision was already spent by another schedule or revocation, or a terminal schedule was revoked twice.",
+		remedy:
+			"Use the recorded schedule as-is, admit a new id with a fresh Decision, or read the terminal revocation that already exists.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_RUNTIME_INVALID"],
+	},
+	AMBER_E_HARNESS_RUNTIME_DAEMON_RUNNING: {
+		title: "Maintenance daemon is already running",
+		cause:
+			"A daemon start was requested while the recorded owner pid is still alive; the runtime keeps exactly one fenced owner per repository.",
+		remedy:
+			"Inspect the owner (amber harness runtime daemon status) and stop it (amber harness runtime daemon stop) before starting a new one.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUNTIME_DAEMON_OWNERSHIP"],
+	},
+	AMBER_E_HARNESS_RUNTIME_DAEMON_OWNERSHIP: {
+		title: "Maintenance daemon ownership could not be established or released",
+		cause:
+			"The recorded pid/lease/fence no longer matches the caller, or the daemon did not exit within the stop window.",
+		remedy:
+			"Re-read the ownership record (amber harness runtime daemon status); a stale owner is recovered on the next start rather than signalled blindly.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_RUNTIME_DAEMON_RUNNING"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

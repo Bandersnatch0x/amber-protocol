@@ -2964,6 +2964,49 @@
 				"ADR-0103 amends the blanket scheduling prohibition without authorizing unattended target execution or agent dispatch.",
 				"ADR-0005 remains binding: H7 must be new code over current governance primitives, never restoration of the deleted daemon/autonomous executor."
 			]
+		},
+		{
+			"id": "F080",
+			"priority": 80,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/harness/runtime-core.js",
+				"scripts/amber-runtime.js",
+				"scripts/lib/harness/event-ledger.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/command-registry.js",
+				"schemas/event.schema.json",
+				"tests/unit/harness-runtime.test.js",
+				"docs/specs/F080-h7-bounded-maintenance-runtime.md",
+				"docs/plans/F080-h7-bounded-maintenance-runtime.md"
+			],
+			"title": "H7 bounded maintenance runtime (closed job registry, Decision schedules, fenced daemon)",
+			"user_visible_behavior": "amber harness runtime (expert tier, untyped): jobs lists the closed deterministic maintenance registry (initially draft-spec-review); schedule admit--file|list|show|revoke binds one committed human Decision per bounded window with maxRuns/maxProposals; tick runs due schedules deterministically and writes content-addressed proposals under .amber/harness/runtime/proposals/; daemon start|stop|status runs a lease/fence-guarded local worker that wakes only the closed registry. Every wake/skip/result/stop/crash-recovery is a typed event on the existing Harness ledger. Authority stays executesAnything=false, schedulesJobs=true, dispatchesAgents=false, writesExternalSystems=false; no target command, agent, workflow, external effect, or document edit is reachable.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-runtime.test.js",
+				"amber harness runtime jobs|schedule admit|list|show|revoke|tick|daemon start|stop|status against a real target; docs/specs bytes unchanged by a tick"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0132)",
+					"result": "pass: 「全部按推荐」 — closed draft-spec-review job, Decision schedules, existing Harness ledger, deterministic tick, budget/no-progress stops, real fenced daemon",
+					"date": "2026-09-24",
+					"notes": "exact H7 design HITL closed"
+				},
+				{
+					"command": "dual-axis review (issues/0131)",
+					"result": "pass: Spec axis 18 met / 0 partial / 0 contradicts; Standards pass-with-findings (1xP2 + 3xP3) — all fixed before the final full gate",
+					"date": "2026-09-24",
+					"notes": "in-lock single-use Decision guard via runtime-decision pointers; governed EEXIST refusals; explicit targetRoot plumbing; terminal stop reporting"
+				}
+			],
+			"notes": [
+				"Time never becomes authority: a schedule can only wake one registered internal function whose ceiling is repository inspection plus append-only proposal records.",
+				"The daemon self-signals only; it can never signal a governed target execution.",
+				"README positioning stays unchanged; the F082 §55 gate decides any first-screen flip after F080+F081 evidence."
+			]
 		}
 	]
 }

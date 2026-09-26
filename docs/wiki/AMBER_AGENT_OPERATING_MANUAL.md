@@ -21,10 +21,12 @@ Never implement or imply support for:
 - Caller-supplied scheduled code, model calls, or target-command cron.
 - External marketplace publishing.
 
-The bounded H7 runtime, when implemented, stays fixed at `executesAnything: false`,
-`schedulesJobs: true`, `dispatchesAgents: false`, `writesExternalSystems: false`; it may invoke only
-registered Amber-internal maintenance jobs and may write only append-only proposal/evidence/runtime
-records under `.amber/harness/runtime/`. Existing loop/workflow contracts remain unscheduled.
+The bounded H7 runtime (F080) is delivered as `amber harness runtime` and stays fixed at
+`executesAnything: false`, `schedulesJobs: true`, `dispatchesAgents: false`,
+`writesExternalSystems: false`; it may invoke only registered Amber-internal maintenance jobs and may
+write only append-only proposal/evidence/runtime records under `.amber/harness/runtime/`. Existing
+loop/workflow contracts remain unscheduled, and it can never execute a target command, dispatch an
+agent, run a dynamic workflow, or write an external system.
 
 Hard consequences already enforced:
 

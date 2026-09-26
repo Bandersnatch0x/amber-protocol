@@ -36,6 +36,12 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness execution release --run <id> --target <repo> [--json]
        amber harness execution terminate [--run <id>] --target <repo> [--json]  # explicit refusal; no live handle
        amber harness execution inspect (--contract <id> | --run <id>) --target <repo> [--json]
+       amber harness runtime jobs --target <repo> [--json]
+       amber harness runtime schedule admit --file <schedule.json> --target <repo> [--json]
+       amber harness runtime schedule (list | show --schedule <id>) --target <repo> [--json]
+       amber harness runtime schedule revoke --schedule <id> --decision <identity>@<revision> --reason <text> --target <repo> [--json]
+       amber harness runtime tick [--schedule <id>] [--now <iso>] --target <repo> [--json]
+       amber harness runtime daemon (start [--poll-ms <n>] | stop | status) --target <repo> [--json]
        amber harness context admit --file <grant.json> --target <repo> [--json]
        amber harness context check --subject <s> --resource <prefix> --purpose <p> [--classification <c>] [--now <iso>] [--run <id>] --target <repo> [--json]
        amber harness context revoke --grant <id> --revoker <who> --target <repo> [--json]
@@ -86,6 +92,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 | <code>policy</code> | Subcommand action for <code>harness</code> |
 | <code>propose-regression</code> | Subcommand action for <code>harness</code> |
 | <code>replay</code> | Subcommand action for <code>harness</code> |
+| <code>runtime</code> | Subcommand action for <code>harness</code> |
 | <code>start</code> | Subcommand action for <code>harness</code> |
 | <code>status</code> | Subcommand action for <code>harness</code> |
 | <code>tool</code> | Subcommand action for <code>harness</code> |
@@ -153,6 +160,23 @@ Subcommands:
                       kill by composing Run cancellation with workspace
                       deletion. Use advance --to cancelled, runner execution
                       abort, and execution release as separate audited facts.
+  runtime             Bounded H7 maintenance runtime (F080, ADR-0103): a
+                      repository-local scheduler for a CLOSED registry of
+                      deterministic Amber-internal proposal jobs. Jobs may
+                      read the repository and append proposal/evidence/runtime
+                      records under .amber/harness/runtime/ only; they never
+                      run a target command, dispatch an agent, execute a
+                      workflow, or write an external system. The authority
+                      tuple is executesAnything=false, schedulesJobs=true,
+                      dispatchesAgents=false, writesExternalSystems=false.
+                      Schedules bind one committed human Decision, expire,
+                      and stay revocable; every wake/skip/result/stop is a
+                      typed event on the existing Harness ledger. The local
+                      daemon is lease/fence-guarded and self-signals only.
+                      Subcommands: jobs; schedule admit (--file) | list |
+                      show (--schedule) | revoke (--schedule --decision
+                      --reason); tick (--schedule, --now); daemon start
+                      (--poll-ms) | stop | status.
   context             Context grants (F069, report-first firewall): admit a
                       grant binding one subject to resource prefixes for one
                       purpose inside a half-open TTL under a classification

@@ -27,7 +27,18 @@
 				"validation.completed",
 				"context.granted",
 				"context.denied",
-				"context.revoked"
+				"context.revoked",
+				"runtime.schedule.registered",
+				"runtime.schedule.revoked",
+				"runtime.daemon.started",
+				"runtime.daemon.stopped",
+				"runtime.daemon.recovered",
+				"runtime.wake.started",
+				"runtime.wake.skipped",
+				"runtime.job.completed",
+				"runtime.job.failed",
+				"runtime.budget.stopped",
+				"runtime.no-progress.stopped"
 			]
 		},
 		"schemaVersion": { "const": 1 },
