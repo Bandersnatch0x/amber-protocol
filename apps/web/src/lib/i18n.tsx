@@ -189,7 +189,9 @@ const en = {
   'code.copyFailed': 'Copy failed',
   'code.hiddenLines': '{count} hidden lines - expand full block',
   'code.hiddenLinesOne': '1 hidden line - expand full block',
-  'home.title': 'Trusted Continuation Console',
+  // F082: the console title follows the §55 positioning lift (ADR-0030 F082
+  // amendment) so the viewer and the first screen name the same boundary.
+  'home.title': 'Governed Agent Harness Console',
   'home.description':
     'See where this coding-agent-enabled repository stands, why it is there, and what a maintainer or reviewer should do next.',
   'home.viewerBoundary':
@@ -1289,7 +1291,7 @@ const zh: Record<TranslationKey, string> = {
   'code.hiddenLines':
     '{count} \u884c\u5df2\u9690\u85cf - \u5c55\u5f00\u5b8c\u6574\u4ee3\u7801\u5757',
   'code.hiddenLinesOne': '1 \u884c\u5df2\u9690\u85cf - \u5c55\u5f00\u5b8c\u6574\u4ee3\u7801\u5757',
-  'home.title': '可信续接控制台',
+  'home.title': '受治理 Agent Harness 控制台',
   'home.description':
     '查看这个已接入 Coding Agent 的项目处于哪一步、为何停在这里，以及维护者或 reviewer 接下来该做什么。',
   'home.viewerBoundary':

@@ -95,7 +95,7 @@ decision, not an implementation side effect, and it is reversible by a later rul
 
 ### What does NOT change
 
-The Web Viewer's console title (`apps/web` `home.title`: “Trusted Continuation Console” / “可信续接控制台”) is deliberately left as-is by this ruling: it labels an operational console, not the public first screen, and changing it is a web-surface change with its own gates. A follow-up may align it; this amendment does not claim it changed.
+The Web Viewer's console title was deliberately left unchanged by the initial ruling (it labels an operational console, not the public first screen). A follow-up within the same positioning decision aligned it: `apps/web` `home.title` is now “Governed Agent Harness Console” / “受治理 Agent Harness 控制台”, so the viewer and the README name the same boundary.
 
 - The safety contract: read-only-first, never overwrite user files, `executesAnything: false` in
   Loop Contracts, no target/agent/workflow scheduling, no external writes, no self-approval.

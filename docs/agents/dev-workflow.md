@@ -14,9 +14,22 @@
 | 4   | 成谱 | `/to-spec`                             | 会话 → spec，发布到本地票仓                   | spec 票建立（`issues/NNNN-<slug>.md`）                                                                         |
 | 5   | 成票 | `/to-tickets`                          | spec → tracer-bullet 票 + blocking 边         | 票全建立且 `blocked-by` 边已声明                                                                               |
 | 6   | 落码 | `/implement`                           | 按票实现                                      | 门禁全绿：`npm test`、`npm run manifests`、`npm run doctor`、`npm run gen:agents:check`（wiki 改动加 `node scripts/validate-wiki.js --target .`） |
-| 7   | 验收 | `code-review` + `spec-to-code-compliance` | 全量测试通过后的双重核查                      | 两轴评审（Standards + Spec）findings 全部裁决；spec-to-code 合规核查无 contradicts；报告落 `.scratch/`，结论登记到票的 Log |
+| 7   | 验收 | `code-review` + `spec-to-code-compliance` | 全量测试通过后的双重核查                      | 两轴评审（Standards + Spec）findings 全部裁决；spec-to-code 合规核查无 contradicts；报告落 `.scratch/`，结论登记到票的 Log；**交付证据**成立：改动已合入默认分支（见下） |
 
 进入规则：小任务直接从 3（方向未定）或 4（方向已定）进入；bug 修复对着 GitHub bug 票从 6 进入；只有超出单会话体量的工作才走 2。阶段 7 对每次交付生效，不可跳过。
+
+## 交付证据（阶段 7 的第二个出口）
+
+评审只说「代码是对的」；它不说「东西到了」。两者会分离：本地全绿而默认分支上没有产物，等于没有交付。
+
+因此把票记为 complete 之前，需同时成立：
+
+1. 存在承载该项的提交，且**已合入默认分支**（`git merge-base --is-ancestor <commit> origin/<default>`）；
+2. 仅存在于分支、worktree、或审查者本地检出不算交付证据；审查者本地重跑门禁验证的是一个工作树，不是仓库状态；
+3. 未合入时，票的状态必须写明 `delivery: pending-publish`，而不是 closed-complete；
+4. 确实不是代码变更的决议（范围裁定、定位裁决、拒绝面）可以例外，但必须在票里显式说出来。
+
+本仓票据惯例的权威文本在 `docs/agents/issue-tracker.md`；上游已新增同义规则（“Closing an issue as complete”，remote `c2fade6`），本地尚未合入——合入后以该文件为准，本节不另立一套措辞。
 
 ## 全量测试纪律
 
