@@ -3056,6 +3056,37 @@
 				"Cancellation is asynchronous by necessity (a blocking wait would starve the settling continuation in the same process), and the seam settles on the child's exit with a bounded stdio drain because a cancelled tree can hold a pipe open.",
 				"The four gates (policy, approval, isolation, ledger) are untouched and still precede any effect."
 			]
+		},
+		{
+			"id": "F082",
+			"priority": 82,
+			"area": "governance",
+			"paths": [
+				"README.md",
+				"README.zh-CN.md",
+				"docs/TEAM_REPLICATION_CHARTER.md",
+				"docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
+				"tests/unit/h7-charter-boundary.test.js"
+			],
+			"title": "§55 first-screen positioning flip (Governed Agent Harness) with recorded scope override",
+			"user_visible_behavior": "README (EN and zh) leads with 'Governed Agent Harness for real engineering systems' and 'Amber Protocol is the governed execution boundary between AI agents and real systems'. ADR-0030 gains an F082 amendment that amends (not supersedes) the 2026-09-04 decision and the 0046 amendment, records the user's explicit scope override (internal H7 + cancellation acceptance evidence substitutes for the external-pilot signal), and restates what does not change: the safety contract, the expert-surface clause, Trusted Continuation as the coding-domain outcome, and the Charter's Own/Integrate/Exclude split. The Web Viewer console title is deliberately left unchanged and disclosed.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/h7-charter-boundary.test.js",
+				"README first screen and ADR-0030 amendment asserted; the F079 positioning hold is replaced by the F082 flip"
+			],
+			"evidence": [
+				{
+					"command": "user direction (F082 §55 gate)",
+					"result": "pass: 「翻首屏（记录 scope override）」 — H7 + cancel acceptance evidence replaces the external-pilot prerequisite",
+					"date": "2026-09-24",
+					"notes": "positioning scope decision recorded in ADR-0030"
+				}
+			],
+			"notes": [
+				"The flip records a scope override rather than a new external signal; it is reversible by a later ruling.",
+				"Trusted Continuation remains the coding-domain core outcome; the lift changes the first screen, not the safety contract."
+			]
 		}
 	]
 }

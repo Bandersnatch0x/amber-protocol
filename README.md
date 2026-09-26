@@ -2,7 +2,13 @@
 
 # Amber Protocol
 
-> **Turn AI coding work into trusted continuation.**
+> **Governed Agent Harness for real engineering systems.**
+
+> **Amber Protocol is the governed execution boundary between AI agents and real
+> systems.** It governs what an agent may see, use, execute, and emit, with whose
+> approval, and what evidence proves it — in files beside the code, not in chat history.
+>
+> **Amber Protocol 是 AI Agent 与真实系统之间的治理执行边界。**
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
@@ -278,4 +284,4 @@ MIT License — see [LICENSE](./LICENSE) for details.
 
 ---
 
-<p align="center"><b>Amber Protocol</b> — Repository-local AI coding governance for engineering teams.</p>
+<p align="center"><b>Amber Protocol</b> — the governed execution boundary between AI agents and real systems.</p>

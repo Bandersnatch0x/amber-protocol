@@ -15,7 +15,6 @@ const path = require("node:path");
 const ROOT = path.join(__dirname, "..", "..");
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), "utf8");
 
-const README_HASH = "sha256:cbd25c1cf0757b88ee557db0f88b9698127ac294ed24c1043f5da6e53f482bbf";
 const AUTHORITY_TUPLE = [
 	"executesAnything=false",
 	"schedulesJobs=true",
@@ -26,7 +25,6 @@ const AUTHORITY_TUPLE = [
 function sha256(text) {
 	return `sha256:${crypto.createHash("sha256").update(text).digest("hex")}`;
 }
-
 test("F079 accepts ADR-0103 and keeps the bounded H7 authority consistent across boundary docs", () => {
 	const adr = read("docs/adr/0103-bounded-live-runtime-and-cancellation-authority.md");
 	assert.match(adr, /\*\*Status:\*\* Accepted/);
@@ -112,11 +110,29 @@ test("F079 keeps every existing Loop Contract unscheduled and non-dispatching", 
 	assert.ok(contracts > 0, "workflow-pack census found no Loop Contracts");
 });
 
-test("F079 changes authority without flipping README positioning", () => {
+test("F082 flips the first-screen positioning and records the scope override", () => {
+	// F079 held the positioning behind runtime evidence; F082 is that gate,
+	// resolved by an explicit user scope override recorded in ADR-0030.
 	const readme = read("README.md");
-	assert.equal(sha256(readme), README_HASH);
-	assert.doesNotMatch(readme, /Governed Agent Harness for real engineering systems/);
-	assert.match(readme, /trusted control boundary|Trusted Continuation/i);
+	assert.match(readme, /Governed Agent Harness for real engineering systems/);
+	assert.match(readme, /governed execution boundary between AI agents and real/);
+	assert.doesNotMatch(readme, /Turn AI coding work into trusted continuation/);
+	const zh = read("README.zh-CN.md");
+	assert.match(zh, /面向真实工程系统的受治理 Agent Harness/);
+	assert.match(zh, /治理执行边界/);
+
+	const amendment = read(
+		"docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
+	);
+	assert.match(amendment, /## Amendment \(F082, 2026-09-24\)/);
+	assert.match(amendment, /scope\s+override/i);
+	assert.match(amendment, /does not supersede/);
+	// The safety contract and the expert-surface clause survive the flip.
+	assert.match(amendment, /What does NOT change/);
+	assert.match(amendment, /seven-verb surface is unchanged/);
+
+	const charter = read("docs/TEAM_REPLICATION_CHARTER.md");
+	assert.match(charter, /F082 已翻/);
 });
 
 test("ADR-0003 and ADR-0005 keep target scheduling and deleted-runtime resurrection forbidden", () => {

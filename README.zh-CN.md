@@ -2,7 +2,9 @@
 
 # Amber Protocol
 
-> **把 AI 编码工作变成可信续接。**
+> **面向真实工程系统的受治理 Agent Harness。**
+
+> **Amber Protocol 是 AI Agent 与真实系统之间的治理执行边界。**它治理 Agent 能看什么、能用什么、在哪执行、能产生什么副作用、谁批准、发生了什么、结果是否可信——证据在代码旁的仓内文件，而非聊天记录。
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 

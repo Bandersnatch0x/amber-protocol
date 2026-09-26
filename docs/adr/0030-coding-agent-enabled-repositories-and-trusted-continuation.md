@@ -59,6 +59,51 @@ inspection surfaces until the core outcome is validated.
 - Existing advanced capabilities are preserved and maintained; this decision does not delete them
   or weaken their safety contracts.
 
+## Amendment (F082, 2026-09-24): §55 first-screen positioning — Governed Agent Harness
+
+**Status:** Accepted (positioning ruling by the user, 2026-09-24, recorded as an explicit scope
+override: the earlier prerequisite of an external-pilot signal is replaced by the repository's own
+H7 + cancellation acceptance evidence)
+**Cites:** Harness v2 proposal §55 (product positioning after v2); ADR-0103/F079 (bounded runtime
+and cancellation authority); F080 (bounded maintenance runtime) and F081 (owned execution handles
+and truthful cancellation) acceptance evidence
+
+This amendment **amends, and does not supersede**, the 2026-09-04 decision and the 0046 amendment.
+Trusted Continuation remains the coding-domain core product outcome; the positioning lifts to the
+level the boundary has now actually reached.
+
+### Positioning
+
+> **Governed Agent Harness for real engineering systems.**
+>
+> **Amber Protocol is the governed execution boundary between AI agents and real systems.**
+>
+> **面向真实工程系统的受治理 Agent Harness。**
+> **Amber Protocol 是 AI Agent 与真实系统之间的治理执行边界。**
+
+The first screen (README, both languages) now leads with this wording. The 0046 sentence is
+preserved verbatim above it in spirit: what an agent may see, use, execute, and emit, with whose
+approval, and what evidence proves it.
+
+### Scope override recorded
+
+The 0046 amendment and the product boundary required an external signal before a first-screen lift.
+This amendment records a user ruling that the **internal acceptance evidence now substitutes for that
+signal**: Harness H0–H6 (F065–F074), the bounded maintenance runtime (F080), and owned execution
+handles with truthful cancellation (F081) are delivered, reviewed, and green. This is a scope
+decision, not an implementation side effect, and it is reversible by a later ruling.
+
+### What does NOT change
+
+The Web Viewer's console title (`apps/web` `home.title`: “Trusted Continuation Console” / “可信续接控制台”) is deliberately left as-is by this ruling: it labels an operational console, not the public first screen, and changing it is a web-surface change with its own gates. A follow-up may align it; this amendment does not claim it changed.
+
+- The safety contract: read-only-first, never overwrite user files, `executesAnything: false` in
+  Loop Contracts, no target/agent/workflow scheduling, no external writes, no self-approval.
+- The expert-surface clause: the advanced capability remains opt-in and untyped; the default
+  seven-verb surface is unchanged.
+- Trusted Continuation as the coding-domain outcome and Repository Maintainers as primary users.
+- The Charter's Own/Integrate/Exclude split, including every entry F079 kept forbidden.
+
 ## Amendment (0046, 2026-09-15): 定位上抬与词汇修订
 
 **Status:** Accepted (positioning ruling by the user, 2026-09-15; appended 2026-09-16 by the D0

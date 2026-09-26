@@ -364,8 +364,8 @@
       "sourcePath": "docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
       "title": "Coding-Agent-Enabled Repositories and Trusted Continuation",
       "source": {
-        "rawHash": "sha256:fac8eeb9f42f619223613e0daae76425775452e58a364ad6e90bbaa4dd04a980",
-        "normHash": "sha256:a94a808cd62ea6e8be67ea1c4706a2435ed5c191d6135ffa6a60a12e0ba7dc10"
+        "rawHash": "sha256:8cab32f728de5152d6421eac9e65f5b22a3abd12ad3e26c34c0809bd1492ad4e",
+        "normHash": "sha256:9108cd2cfd9c766801aa9abeee4dc089cd2d3d694b7e6a7ecf9a8028314c1ca1"
       }
     },
     {
@@ -645,5 +645,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:c01324dcba0aa73dd2bc9fb1a86fe37922e560999615df39bfa5018de4185cb3"
+  "manifestHash": "sha256:3219b21e7bd992622186d1e1154d3f80ea105e7bee0eedaa49555a29c4692337"
 }
