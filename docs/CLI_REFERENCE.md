@@ -2825,6 +2825,31 @@ the runtime carries one `versionNegotiation.minCompatibleVersion` scalar per env
 `scripts/lib/core/sync-remote.js`. A domain-level combination matrix has no runtime counterpart
 and this command does not add one.
 
+## Phase Commands
+
+`amber phase` manages the Phase 0–4 gate evidence, promotion, and rollback (#168), expert tier.
+The rule is: each phase gate requires **complete deterministic evidence**, promotion requires
+**explicit authorization**, and rollback requires a checkpoint. Rollback is never destructive and
+records append-only lineage — the phase surface can prove what was promoted and when, but it does
+not itself decide whether the underlying work was good.
+
+- `phase evidence --phase <phase-0..phase-4>` — show the gate evidence.
+- `phase validate --phase <phase>` — check evidence completeness.
+- `phase promote --phase <phase> --auth <authorization>` — promote with complete evidence plus
+explicit authorization.
+- `phase rollback --phase <phase> --checkpoint <id> [--reason <text>]` — roll back to a checkpoint
+(never destructive).
+- `phase transitions` — list the append-only lineage.
+- `phase invariants` — check invariant non-regression.
+
+```bash
+node scripts/amber.js phase evidence --phase phase-0 --target . --json
+node scripts/amber.js phase validate --phase phase-0 --target . --json
+node scripts/amber.js phase promote --phase phase-0 --auth human-approve --target . --json
+node scripts/amber.js phase rollback --phase phase-0 --checkpoint <id> --reason "regression" --target . --json
+node scripts/amber.js phase transitions --target . --json
+```
+
 ## Harness Commands
 
 `amber harness` (expert tier, not on the default seven-verb surface) admits and inspects the
