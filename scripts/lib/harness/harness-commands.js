@@ -308,7 +308,7 @@ const dispatch = defineCommand({
 			}
 			return { ...result, text: JSON.stringify(result, null, 2), ok: true };
 		},
-		execution: (args) => {
+		execution: async (args) => {
 			const sub = args._?.[1];
 			const target = resolveTarget(args);
 			let result;
@@ -410,7 +410,7 @@ const dispatch = defineCommand({
 						"amber harness execution run --run <id> --command-id <id> --target <repo>",
 					);
 					if (commandId.error) return invalidArg(commandId.error);
-					result = runPreparedExecution(target, {
+					result = await runPreparedExecution(target, {
 						runId: run.value,
 						commandId: commandId.value,
 						...(args.ledger === undefined ? {} : { ledger: args.ledger }),
@@ -450,16 +450,47 @@ const dispatch = defineCommand({
 						result.exitCode = 1;
 					}
 				} else if (sub === "terminate") {
-					// F078: explicit refusal, not a fake kill. The synchronous
-					// governed-command path stores no cancellable process handle;
-					// composing Run cancellation with workspace release could delete
-					// a workspace while a child still runs and would collapse three
-					// independently-audited facts. Do not read the named run and do
-					// not call any mutating core — capability absence is target-
-					// independent and the refusal must be byte-zero.
+					// F078/F081: the ambiguous verb stays refused — but F081 delivered the
+					// authorized surface, so the refusal now points at it. Composing Run
+					// cancellation with workspace deletion is still never done: those
+					// remain separate audited facts.
 					return invalidArg(
-						"harness execution terminate is an explicit refusal: Amber has no cancellable live-execution handle and cannot truthfully kill a process. Cancel the Run record with `amber harness advance --run <id> --to cancelled --reason <text>`; settle a prepared runner request that will never produce a receipt with `amber runner execution abort --request-hash <hash> --reason <text>`; remove a prepared workspace with `amber harness execution release --run <id>`. These are separate auditable facts; terminate never bypasses the F070 BLOCK posture and writes nothing.",
+						"harness execution terminate is an explicit refusal: 'terminate' conflates Run cancellation, request settlement, and workspace deletion, and F081 cancellation is addressed per governed execution instead. Cancel a live governed execution with `amber harness execution cancel --run <id> --decision <identity>@<revision> --reason <text>` (or inspect the owned handles with `amber harness execution handles`); cancel the Run record with `amber harness advance --run <id> --to cancelled --reason <text>`; settle a prepared runner request that will never produce a receipt with `amber runner execution abort --request-hash <hash> --reason <text>`; remove a prepared workspace with `amber harness execution release --run <id>`. These are separate auditable facts; terminate never bypasses the F070 BLOCK posture and writes nothing.",
 					);
+				} else if (sub === "cancel") {
+					const { cancelExecution } = require("./execution-cancel");
+					const run = requiredFlag(
+						args,
+						"run",
+						"--run",
+						"amber harness execution cancel --run <id> --decision <identity>@<revision> --reason <text> --target <repo>",
+					);
+					if (run.error) return invalidArg(run.error);
+					const decision = requiredFlag(
+						args,
+						"decision",
+						"--decision",
+						"amber harness execution cancel --run <id> --decision decision/cancel-1@1 --reason <text> --target <repo>",
+					);
+					if (decision.error) return invalidArg(decision.error);
+					const parsedDecision = parseRevisionPin(
+						decision.value,
+						"--decision",
+						"decision/cancel-1@1",
+					);
+					if (parsedDecision.error) return invalidArg(parsedDecision.error);
+					if (!args.reason) return invalidArg("--reason <text> is required for execution cancel");
+					result = await cancelExecution(target, {
+						runId: run.value,
+						decision: parsedDecision.value,
+						reason: String(args.reason),
+						...(args.now === undefined ? {} : { now: args.now }),
+					});
+				} else if (sub === "handles") {
+					const { handleView } = require("./execution-cancel");
+					result = handleView(target, {
+						...(args.run === undefined ? {} : { runId: args.run }),
+					});
 				} else if (sub === "release") {
 					const { releaseExecution } = require("./execution-adapter");
 					const run = requiredFlag(
@@ -472,7 +503,7 @@ const dispatch = defineCommand({
 					result = releaseExecution(target, { runId: run.value });
 				} else {
 					return invalidArg(
-						"harness execution requires admit, list, inspect, prepare, evaluate, run, release, or the explicit terminate refusal. Example: amber harness execution admit --file path/to/contract.json",
+						"harness execution requires admit, list, inspect, prepare, evaluate, run, cancel, handles, release, or the explicit terminate refusal. Example: amber harness execution admit --file path/to/contract.json",
 					);
 				}
 			} catch (err) {

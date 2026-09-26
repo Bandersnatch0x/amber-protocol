@@ -468,7 +468,7 @@ function observePreparedWorkspace(workspace) {
  * @param {number} [opts.budgetMinutes] @param {string} [opts.producer]
  * @param {string} [opts.requestId] @param {string} [opts.now]
  */
-function runPreparedExecution(
+async function runPreparedExecution(
 	targetRoot,
 	{ runId, commandId, ledger, budgetMinutes, producer, requestId, now } = {},
 ) {
@@ -533,7 +533,7 @@ function runPreparedExecution(
 			? record.declared.resources.timeoutMinutes
 			: undefined;
 	const budget = Number.isInteger(budgetMinutes) ? budgetMinutes : declaredTimeout;
-	const governed = runGovernedCommand({
+	const governed = await runGovernedCommand({
 		target: targetRoot,
 		commandId,
 		ledgerPath,

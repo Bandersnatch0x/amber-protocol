@@ -650,7 +650,14 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 				`route ${session.manifest.route.id} is not defined in the target`,
 			);
 		}
-		return executeAttempt(projectRoot, sessionId, sessionDir, session.manifest, route, options);
+		return await executeAttempt(
+			projectRoot,
+			sessionId,
+			sessionDir,
+			session.manifest,
+			route,
+			options,
+		);
 	} finally {
 		releaseLock(projectRoot, sessionId);
 	}
@@ -712,7 +719,7 @@ function buildRequest(
 // The execute path, already inside the session lock. The cursor is read here —
 // never before the lock — so a concurrent run cannot double-write the same
 // idempotency key (spec §"Durable records and crash recovery" write order).
-function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, options) {
+async function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, options) {
 	const cursorRead = readCursorLedger(sessionDir);
 	if (!cursorRead.ok) return fail("AMBER_E_LEDGER_TAMPERED", cursorRead.reason);
 	const records = cursorRead.records;
@@ -745,7 +752,7 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 				providerClass: adapter.providerClass,
 			};
 		}
-		return runCapturedAttempt(
+		return await runCapturedAttempt(
 			projectRoot,
 			sessionId,
 			sessionDir,
@@ -834,7 +841,7 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 	}
 
 	if (adapter.providerClass === "bounded-command") {
-		return runCapturedAttempt(
+		return await runCapturedAttempt(
 			projectRoot,
 			sessionId,
 			sessionDir,
@@ -864,7 +871,7 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
  * `request` may be the fresh capture or the resumed open capture — the gates
  * and records bind the attempt identity the request already carries.
  */
-function runCapturedAttempt(
+async function runCapturedAttempt(
 	projectRoot,
 	sessionId,
 	sessionDir,
@@ -902,7 +909,7 @@ function runCapturedAttempt(
 		}
 	}
 
-	const outcome = runGovernedCommand({
+	const outcome = await runGovernedCommand({
 		target: projectRoot,
 		commandId: resolution.capability.name,
 		producer: request.leaseOwnerId,

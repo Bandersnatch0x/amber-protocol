@@ -28,7 +28,7 @@ function tmpTarget() {
 }
 
 // One admitted contract + one run, through the real dispatcher.
-function admitAndStart(target, runId) {
+async function admitAndStart(target, runId) {
 	const { dispatch } = require("../../scripts/lib/command-dispatcher");
 	const contractFile = path.join(target, "contract.json");
 	fs.writeFileSync(
@@ -42,8 +42,8 @@ function admitAndStart(target, runId) {
 		}),
 		"utf8",
 	);
-	dispatch("harness", { target, file: contractFile, json: true, _: ["admit"] });
-	dispatch("harness", {
+	await dispatch("harness", { target, file: contractFile, json: true, _: ["admit"] });
+	await dispatch("harness", {
 		target,
 		json: true,
 		contract: "coding-task",
@@ -53,9 +53,9 @@ function admitAndStart(target, runId) {
 	});
 }
 
-test("recordAttempt writes a running record then freezes the outcome; the run summary grows", () => {
+test("recordAttempt writes a running record then freezes the outcome; the run summary grows", async () => {
 	const target = tmpTarget();
-	admitAndStart(target, "run-att-1");
+	await admitAndStart(target, "run-att-1");
 	const started = recordAttempt(target, {
 		runId: "run-att-1",
 		attemptId: "att-1",
@@ -85,9 +85,9 @@ test("recordAttempt writes a running record then freezes the outcome; the run su
 	});
 });
 
-test("a terminal attempt refuses any rewrite (records are immutable)", () => {
+test("a terminal attempt refuses any rewrite (records are immutable)", async () => {
 	const target = tmpTarget();
-	admitAndStart(target, "run-att-2");
+	await admitAndStart(target, "run-att-2");
 	recordAttempt(target, { runId: "run-att-2", attemptId: "att-1", commandId: "cmd-tests" });
 	recordAttempt(target, {
 		runId: "run-att-2",
@@ -108,9 +108,9 @@ test("a terminal attempt refuses any rewrite (records are immutable)", () => {
 	);
 });
 
-test("an unknown outcome state and a malformed record both fail closed", () => {
+test("an unknown outcome state and a malformed record both fail closed", async () => {
 	const target = tmpTarget();
-	admitAndStart(target, "run-att-3");
+	await admitAndStart(target, "run-att-3");
 	assert.throws(
 		() =>
 			recordAttempt(target, { runId: "run-att-3", attemptId: "a", commandId: "c", state: "weird" }),
@@ -125,9 +125,9 @@ test("an unknown outcome state and a malformed record both fail closed", () => {
 	);
 });
 
-test("listAttempts folds deterministically; getAttempt fails closed on a missing id", () => {
+test("listAttempts folds deterministically; getAttempt fails closed on a missing id", async () => {
 	const target = tmpTarget();
-	admitAndStart(target, "run-att-4");
+	await admitAndStart(target, "run-att-4");
 	assert.deepEqual(listAttempts(target, { runId: "run-att-4" }), []);
 	recordAttempt(target, { runId: "run-att-4", attemptId: "att-b", commandId: "cmd-2" });
 	recordAttempt(target, { runId: "run-att-4", attemptId: "att-a", commandId: "cmd-1" });
@@ -143,7 +143,7 @@ test("listAttempts folds deterministically; getAttempt fails closed on a missing
 	);
 });
 
-test("detectNoProgress reports two consecutive identical failures and stays silent otherwise", () => {
+test("detectNoProgress reports two consecutive identical failures and stays silent otherwise", async () => {
 	const failed = (commandId, exitCode, attemptId) => ({
 		attemptId,
 		state: "failed",
@@ -192,7 +192,7 @@ function git(dir, args) {
 	require("node:child_process").execFileSync("git", args, { cwd: dir, stdio: "ignore" });
 }
 
-function governedFixture(target, runId, commandPattern) {
+async function governedFixture(target, runId, commandPattern) {
 	const { dispatch } = require("../../scripts/lib/command-dispatcher");
 	git(target, ["init", "-b", "main"]);
 	git(target, ["config", "user.email", "test@example.com"]);
@@ -212,7 +212,7 @@ function governedFixture(target, runId, commandPattern) {
 		}),
 		"utf8",
 	);
-	dispatch("harness", { target, file: contractFile, json: true, _: ["admit"] });
+	await dispatch("harness", { target, file: contractFile, json: true, _: ["admit"] });
 	const execFile = path.join(target, "exec.json");
 	fs.writeFileSync(
 		execFile,
@@ -228,8 +228,8 @@ function governedFixture(target, runId, commandPattern) {
 		}),
 		"utf8",
 	);
-	dispatch("harness", { target, file: execFile, json: true, _: ["execution", "admit"] });
-	dispatch("harness", {
+	await dispatch("harness", { target, file: execFile, json: true, _: ["execution", "admit"] });
+	await dispatch("harness", {
 		target,
 		json: true,
 		contract: "coding-task",
@@ -237,7 +237,7 @@ function governedFixture(target, runId, commandPattern) {
 		run: runId,
 		_: ["start"],
 	});
-	dispatch("harness", {
+	await dispatch("harness", {
 		target,
 		json: true,
 		contract: "exec-coding",
@@ -263,17 +263,17 @@ function governedFixture(target, runId, commandPattern) {
 	return dispatch;
 }
 
-test("a successful governed attempt emits started + completed, records the attempt, and grows the run summary", () => {
+test("a successful governed attempt emits started + completed, records the attempt, and grows the run summary", async () => {
 	const target = tmpTarget();
 	try {
 		const command = `node -e "require('fs').mkdirSync('src',{recursive:true});require('fs').writeFileSync('src/ok.txt','x')"`;
-		const dispatch = governedFixture(target, "run-att-gov-1", command);
+		const dispatch = await governedFixture(target, "run-att-gov-1", command);
 		const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 		appendLedgerRecord(path.join(target, ".amber", "loops", "run-att-gov-1", "ledger.jsonl"), {
 			kind: "approved",
 			approvalKey: "run-att-gov-1:approval",
 		});
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-att-gov-1",
@@ -303,21 +303,21 @@ test("a successful governed attempt emits started + completed, records the attem
 			"completed",
 		);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("a failing governed attempt emits started + failed with the non-zero exit code recorded", () => {
+test("a failing governed attempt emits started + failed with the non-zero exit code recorded", async () => {
 	const target = tmpTarget();
 	try {
 		const command = `node -e "process.exit(3)"`;
-		const dispatch = governedFixture(target, "run-att-gov-2", command);
+		const dispatch = await governedFixture(target, "run-att-gov-2", command);
 		const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 		appendLedgerRecord(path.join(target, ".amber", "loops", "run-att-gov-2", "ledger.jsonl"), {
 			kind: "approved",
 			approvalKey: "run-att-gov-2:approval",
 		});
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-att-gov-2",
@@ -341,7 +341,7 @@ test("a failing governed attempt emits started + failed with the non-zero exit c
 			kind: "approved",
 			approvalKey: "run-att-gov-2:approval-2",
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-att-gov-2",
@@ -356,18 +356,18 @@ test("a failing governed attempt emits started + failed with the non-zero exit c
 			consecutiveFailures: 2,
 		});
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("a gate refusal emits execution.failed with the refusal reason and records state refused", () => {
+test("a gate refusal emits execution.failed with the refusal reason and records state refused", async () => {
 	const target = tmpTarget();
 	try {
 		const command = `node -e "require('fs').writeFileSync('src/never.txt','x')"`;
-		const dispatch = governedFixture(target, "run-att-gov-3", command);
+		const dispatch = await governedFixture(target, "run-att-gov-3", command);
 		// The closed rule exists, but the run's ledger has NO unconsumed
 		// approval — the approval gate refuses before any effect.
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-att-gov-3",
@@ -397,11 +397,11 @@ test("a gate refusal emits execution.failed with the refusal reason and records 
 		);
 		assert.equal(record.observed, undefined);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("the attempt surface exports stay minimal and the governed runner is composable", () => {
+test("the attempt surface exports stay minimal and the governed runner is composable", async () => {
 	// The attempt core never re-judges a gate: it only records what the
 	// governed runner already decided. Compose-only is a structural fact of
 	// the wiring (runPreparedExecution calls recordAttempt; the four gates
@@ -414,7 +414,7 @@ test("the attempt surface exports stay minimal and the governed runner is compos
 	assert.deepEqual([...surface.ATTEMPT_STATES], ["running", "completed", "failed", "refused"]);
 });
 
-test("the run schema accepts the additive attempts summary and rejects unknown fields", () => {
+test("the run schema accepts the additive attempts summary and rejects unknown fields", async () => {
 	const { compileSchema } = require("../../scripts/lib/core/schema-contract");
 	const validate = compileSchema("run");
 	const base = {
@@ -451,11 +451,11 @@ test("the run schema accepts the additive attempts summary and rejects unknown f
 // Spec Testing Decision: flag mapping must be smoke-tested through the real
 // CLI (the parseArgs FLAG_SPECS whitelist silently turns unregistered flags
 // into positionals). Raw argv against the real scripts/amber.js process.
-test("raw-CLI --attempt maps through FLAG_SPECS (the earlier gap: a missing whitelist entry made inspect unusable)", () => {
+test("raw-CLI --attempt maps through FLAG_SPECS (the earlier gap: a missing whitelist entry made inspect unusable)", async () => {
 	const { spawnSync } = require("node:child_process");
 	const target = tmpTarget();
 	try {
-		admitAndStart(target, "run-rawcli-1");
+		await admitAndStart(target, "run-rawcli-1");
 		const result = spawnSync(
 			process.execPath,
 			[
@@ -479,6 +479,6 @@ test("raw-CLI --attempt maps through FLAG_SPECS (the earlier gap: a missing whit
 		assert.match(result.stdout, /AMBER_E_HARNESS_ATTEMPT_NOT_FOUND/);
 		assert.doesNotMatch(result.stdout, /--attempt <id> is required/);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });

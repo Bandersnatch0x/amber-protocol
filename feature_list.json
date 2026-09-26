@@ -3007,6 +3007,55 @@
 				"The daemon self-signals only; it can never signal a governed target execution.",
 				"README positioning stays unchanged; the F082 §55 gate decides any first-screen flip after F080+F081 evidence."
 			]
+		},
+		{
+			"id": "F081",
+			"priority": 81,
+			"area": "governance",
+			"paths": [
+				"scripts/lib/core/execution-handles.js",
+				"scripts/lib/core/execution-domain-adapter.js",
+				"scripts/lib/core/governed-runner.js",
+				"scripts/lib/core/loop-execution.js",
+				"scripts/lib/core/evidence-runner.js",
+				"scripts/lib/harness/execution-cancel.js",
+				"scripts/lib/harness/execution-adapter.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/session-stage-runner.js",
+				"scripts/lib/route-commands.js",
+				"scripts/lib/subcommand-dispatcher.js",
+				"scripts/lib/command-dispatcher.js",
+				"schemas/event.schema.json",
+				"tests/unit/harness-execution-cancel.test.js",
+				"docs/specs/F081-governed-execution-cancellation.md",
+				"docs/plans/F081-governed-execution-cancellation.md"
+			],
+			"title": "Owned governed-execution handles and truthful cancellation",
+			"user_visible_behavior": "The shared governed-execution seam spawns asynchronously into its own process group and persists one owned handle per running command (pid, lease, fence, workspace, deadline, Snapshot Hash); all four consumers (loop run --execute, route command stages, session stages, harness execution run) await it with unchanged ledger records. amber harness execution handles shows observed live/stale ownership; amber harness execution cancel --run <id> --decision <identity>@<revision> --reason <text> consumes its OWN single-use human Decision, observes the pid, signals the tree, and reports what it observed (terminated | already-exited | unknown) with a Content-addressed cancellation record and one execution.cancelled event. Cancellation deletes no workspace, rewrites no terminal result, and grants no launch authority; harness execution terminate stays an explicit refusal that now points at cancel.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/harness-execution-cancel.test.js",
+				"amber harness execution handles; amber harness execution cancel --run <id> --decision <identity>@<revision> --reason <text> against a real running governed command"
+			],
+			"evidence": [
+				{
+					"command": "user direction (issues/0134)",
+					"result": "pass: scope B selected — unify the shared execution seam (all four consumers asynchronous), then deliver owned handles + truthful cancellation",
+					"date": "2026-09-24",
+					"notes": "F081 scope HITL closed"
+				},
+				{
+					"command": "dual-axis review (issues/0133)",
+					"result": "pass: Spec axis 16 met / 0 partial / 0 contradicts; Standards pass-with-findings (3xP2 + 2xP3) — all fixed before the final full gate",
+					"date": "2026-09-24",
+					"notes": "async cancellation (blocking wait starved the settler); settle on exit with bounded stdio drain; fence directory creation; ledger-derived single-use spend; async boundary execute()"
+				}
+			],
+			"notes": [
+				"Parity for the async conversion is mechanically verified: the consumer suites' diff is await/async only, with zero assertion changes.",
+				"Cancellation is asynchronous by necessity (a blocking wait would starve the settling continuation in the same process), and the seam settles on the child's exit with a bounded stdio drain because a cancelled tree can hold a pipe open.",
+				"The four gates (policy, approval, isolation, ledger) are untouched and still precede any effect."
+			]
 		}
 	]
 }

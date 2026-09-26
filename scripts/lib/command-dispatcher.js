@@ -700,7 +700,7 @@ function handleAgent(args) {
 	return { result: unknownAction("agent", ["dispatch", "stop", "resume", "review"]) };
 }
 
-function handleLoop(args) {
+async function handleLoop(args) {
 	const action = args._?.[0];
 	if (action === "inspect") {
 		return { result: inspectLoopContract({ file: args.file, contract: args.contract }) };
@@ -712,7 +712,7 @@ function handleLoop(args) {
 	}
 	if (action === "run") {
 		return {
-			result: executeLoopContract({
+			result: await executeLoopContract({
 				file: args.file,
 				contract: args.contract,
 				target: args.target,
@@ -776,7 +776,7 @@ function handleTeam(args) {
 	return { result: unknownAction("team", ["inspect", "install", "pin", "update", "rollback"]) };
 }
 
-function handleRoute(args) {
+async function handleRoute(args) {
 	const action = args._?.[0];
 	const routeId = args._?.[1] || "";
 	const targetRoot = resolveTarget(args);
@@ -790,7 +790,7 @@ function handleRoute(args) {
 	else if (action === "test") {
 		// Governed execution of a single command stage (GLX Phase 3); default stays dry-run.
 		if (args.execute && args.stage) {
-			const er = routeCommands.executeRouteStage(routeId, args.stage, targetRoot, routesDir);
+			const er = await routeCommands.executeRouteStage(routeId, args.stage, targetRoot, routesDir);
 			routeResult = { text: er.text, exitCode: er.exitCode };
 		} else {
 			routeResult = routeCommands.testRoute(routeId, routesDir);

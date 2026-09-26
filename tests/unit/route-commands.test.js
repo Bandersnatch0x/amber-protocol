@@ -79,7 +79,7 @@ function registerVerbCapability(dir) {
 }
 
 describe("listRoutes", () => {
-	it("lists all three reference routes with id, version, and stage count", () => {
+	it("lists all three reference routes with id, version, and stage count", async () => {
 		const { text, exitCode } = listRoutes(ROUTES_DIR);
 		assert.strictEqual(exitCode, 0);
 		assert.match(text, /feature-standard/);
@@ -87,12 +87,12 @@ describe("listRoutes", () => {
 		assert.match(text, /refactor-safe/);
 	});
 
-	it("shows the stage count for a known route", () => {
+	it("shows the stage count for a known route", async () => {
 		const { text } = listRoutes(ROUTES_DIR);
 		assert.match(text, /feature-standard.*\b4 stages\b/);
 	});
 
-	it("returns exitCode 0 and a message when no routes exist", () => {
+	it("returns exitCode 0 and a message when no routes exist", async () => {
 		const { text, exitCode } = listRoutes(path.join(__dirname, "../../no-routes-here"));
 		assert.strictEqual(exitCode, 0);
 		assert.match(text, /No routes found/);
@@ -100,7 +100,7 @@ describe("listRoutes", () => {
 });
 
 describe("inspectRoute", () => {
-	it("prints the full JSON of a route by id", () => {
+	it("prints the full JSON of a route by id", async () => {
 		const { text, exitCode } = inspectRoute("feature-standard", ROUTES_DIR);
 		assert.strictEqual(exitCode, 0);
 		const jsonStart = text.indexOf("{");
@@ -108,13 +108,13 @@ describe("inspectRoute", () => {
 		assert.strictEqual(parsed.routeId, "feature-standard");
 	});
 
-	it("renders a stage tree with gate annotations", () => {
+	it("renders a stage tree with gate annotations", async () => {
 		const { text } = inspectRoute("feature-standard", ROUTES_DIR);
 		assert.match(text, /capture/);
 		assert.match(text, /gate: user-approval-plan/);
 	});
 
-	it("returns exitCode 1 for an unknown route id", () => {
+	it("returns exitCode 1 for an unknown route id", async () => {
 		const { text, exitCode } = inspectRoute("does-not-exist", ROUTES_DIR);
 		assert.strictEqual(exitCode, 1);
 		assert.match(text, /not found/);
@@ -122,7 +122,7 @@ describe("inspectRoute", () => {
 });
 
 describe("validateRouteFile", () => {
-	it("reports a valid route with exitCode 0", () => {
+	it("reports a valid route with exitCode 0", async () => {
 		const { text, exitCode } = validateRouteFile(
 			path.join(ROUTES_DIR, "feature-standard.route.json"),
 		);
@@ -130,14 +130,14 @@ describe("validateRouteFile", () => {
 		assert.match(text, /VALID/);
 	});
 
-	it("reports an invalid route with exitCode 1 and lists errors", () => {
+	it("reports an invalid route with exitCode 1 and lists errors", async () => {
 		const { text, exitCode } = validateRouteFile(BROKEN);
 		assert.strictEqual(exitCode, 1);
 		assert.match(text, /INVALID/);
 		assert.match(text, /routeId/);
 	});
 
-	it("returns exitCode 1 when no file path is given", () => {
+	it("returns exitCode 1 when no file path is given", async () => {
 		const { text, exitCode } = validateRouteFile("");
 		assert.strictEqual(exitCode, 1);
 		assert.match(text, /requires a file path/);
@@ -145,7 +145,7 @@ describe("validateRouteFile", () => {
 });
 
 describe("verb stage target resolution", () => {
-	it("parses the closed runner and capability pin grammar", () => {
+	it("parses the closed runner and capability pin grammar", async () => {
 		const parsed = parseVerbTarget("runner/ci@1.0.0#diagnose.check@1");
 		assert.strictEqual(parsed.ok, true);
 		assert.deepStrictEqual(parsed.pin, {
@@ -156,7 +156,7 @@ describe("verb stage target resolution", () => {
 		});
 	});
 
-	it("rejects malformed pins before consulting the runner registry", () => {
+	it("rejects malformed pins before consulting the runner registry", async () => {
 		for (const target of ["", "runner/ci@1.0.0", " runner/ci@1.0.0#diagnose.check@1"]) {
 			const parsed = parseVerbTarget(target);
 			assert.strictEqual(parsed.ok, false, target);
@@ -165,7 +165,7 @@ describe("verb stage target resolution", () => {
 		}
 	});
 
-	it("fails closed for an unregistered runner and capability", () => {
+	it("fails closed for an unregistered runner and capability", async () => {
 		const dir = mkVerbTarget();
 		const unknownRunner = resolveVerbTarget(dir, "runner/ghost@1.0.0#diagnose.check@1");
 		assert.strictEqual(unknownRunner.ok, false);
@@ -175,10 +175,10 @@ describe("verb stage target resolution", () => {
 		const unknownCapability = resolveVerbTarget(dir, "runner/ci@1.0.0#diagnose.ghost@1");
 		assert.strictEqual(unknownCapability.ok, false);
 		assert.strictEqual(unknownCapability.code, "AMBER_E_RUNNER_CAPABILITY_NOT_FOUND");
-		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
-	it("fails closed when the runner or capability version drifts", () => {
+	it("fails closed when the runner or capability version drifts", async () => {
 		const dir = mkVerbTarget();
 		registerVerbCapability(dir);
 
@@ -189,10 +189,10 @@ describe("verb stage target resolution", () => {
 		const capabilityDrift = resolveVerbTarget(dir, "runner/ci@1.0.0#diagnose.check@2");
 		assert.strictEqual(capabilityDrift.ok, false);
 		assert.strictEqual(capabilityDrift.code, "AMBER_E_RUNNER_CAPABILITY_NOT_FOUND");
-		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
-	it("resolves a registered pin and route execution remains a non-spawning guard", () => {
+	it("resolves a registered pin and route execution remains a non-spawning guard", async () => {
 		const dir = mkVerbTarget();
 		registerVerbCapability(dir);
 		const routesDir = path.join(dir, "routes");
@@ -216,17 +216,17 @@ describe("verb stage target resolution", () => {
 		assert.strictEqual(resolved.ok, true, resolved.errors?.join("; "));
 		assert.strictEqual(resolved.capability.name, "diagnose.check");
 
-		const execution = executeRouteStage("verb-route", "check", dir, routesDir);
+		const execution = await executeRouteStage("verb-route", "check", dir, routesDir);
 		assert.strictEqual(execution.exitCode, 0, execution.errors?.join("; "));
 		assert.strictEqual(execution.executed, false);
 		assert.match(execution.text, /session run/);
 		assert.strictEqual(fs.existsSync(path.join(dir, ".amber", "routes")), false);
-		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 });
 
 describe("testRoute (dry-run)", () => {
-	it("prints the ordered stage sequence for a route", () => {
+	it("prints the ordered stage sequence for a route", async () => {
 		const { text, exitCode } = testRoute("bugfix-quick", ROUTES_DIR);
 		assert.strictEqual(exitCode, 0);
 		assert.match(text, /1\. reproduce/);
@@ -234,12 +234,12 @@ describe("testRoute (dry-run)", () => {
 		assert.match(text, /3\. verify/);
 	});
 
-	it("marks where gates fire", () => {
+	it("marks where gates fire", async () => {
 		const { text } = testRoute("bugfix-quick", ROUTES_DIR);
 		assert.match(text, /GATE user-approval-fix fires after reproduce/);
 	});
 
-	it("returns exitCode 1 for an unknown route id", () => {
+	it("returns exitCode 1 for an unknown route id", async () => {
 		const { exitCode } = testRoute("nope", ROUTES_DIR);
 		assert.strictEqual(exitCode, 1);
 	});

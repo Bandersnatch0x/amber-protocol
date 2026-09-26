@@ -175,7 +175,7 @@ describe("R0 replay bundle (governance contract §9.1)", () => {
 			assert.ok(bundle.files["session-manifest.json"]);
 			void capture;
 		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 
@@ -197,7 +197,7 @@ describe("R0 replay bundle (governance contract §9.1)", () => {
 			assert.ok(fs.existsSync(path.join(outDir, "replay", "manifest.json")));
 			assert.ok(fs.existsSync(path.join(outDir, "replay", "governed-ledger.jsonl")));
 		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 });
@@ -239,7 +239,7 @@ describe("R1 decision replay (governance contract §9.2)", () => {
 				nonReplayable: 0,
 			});
 		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 
@@ -270,7 +270,7 @@ describe("R1 decision replay (governance contract §9.2)", () => {
 			const legacyRow = report.rows.find((row) => row.state === "NON_REPLAYABLE");
 			assert.match(legacyRow.reason, /no frozen admission inputs/);
 		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 });
@@ -306,7 +306,7 @@ describe("session drift fold (web-adapter seam, G-10)", () => {
 			// An unknown session folds to null (badge renders nothing).
 			assert.equal(sessionDriftFold(root, "ghost"), null);
 		} finally {
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 });

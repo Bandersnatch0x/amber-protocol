@@ -48,7 +48,7 @@ function highConfidenceRules(rule) {
 	};
 }
 
-function runWithNamedCommand(target, commandId, ledgerName = "named") {
+async function runWithNamedCommand(target, commandId, ledgerName = "named") {
 	const ledgerPath = path.join(target, ".amber", "loops", ledgerName, "ledger.jsonl");
 	appendLedgerRecord(ledgerPath, {
 		kind: "approved",
@@ -56,7 +56,7 @@ function runWithNamedCommand(target, commandId, ledgerName = "named") {
 	});
 	return {
 		ledgerPath,
-		result: runGovernedCommand({
+		result: await runGovernedCommand({
 			target,
 			commandId,
 			ledgerPath,
@@ -65,7 +65,7 @@ function runWithNamedCommand(target, commandId, ledgerName = "named") {
 	};
 }
 
-test("resolveCommandId accepts only one exact allow rule and returns its pattern", () => {
+test("resolveCommandId accepts only one exact allow rule and returns its pattern", async () => {
 	const rule = {
 		id: "allow-node-version",
 		action: "allow",
@@ -82,7 +82,7 @@ test("resolveCommandId accepts only one exact allow rule and returns its pattern
 	});
 });
 
-test("resolveCommandId distinguishes unknown, non-allow, and non-exact rules", () => {
+test("resolveCommandId distinguishes unknown, non-allow, and non-exact rules", async () => {
 	const cases = [
 		{
 			id: "missing",
@@ -108,7 +108,7 @@ test("resolveCommandId distinguishes unknown, non-allow, and non-exact rules", (
 	}
 });
 
-test("named command resolution refuses caller text and leaves a denied ledger record", () => {
+test("named command resolution refuses caller text and leaves a denied ledger record", async () => {
 	const target = tempTarget("caller-text");
 	const rules = highConfidenceRules({
 		id: "allow-node-version",
@@ -118,7 +118,7 @@ test("named command resolution refuses caller text and leaves a denied ledger re
 	});
 	writeRules(target, rules);
 	const ledgerPath = path.join(target, ".amber", "loops", "caller-text", "ledger.jsonl");
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target,
 		commandId: "allow-node-version",
 		command: "node -e process.exit(42)",
@@ -131,10 +131,10 @@ test("named command resolution refuses caller text and leaves a denied ledger re
 	assert.equal(record.kind, "denied");
 	assert.equal(record.commandId, "allow-node-version");
 	assert.equal(record.command, undefined);
-	fs.rmSync(target, { recursive: true, force: true });
+	fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("named command execution records commandId and matchedRule in the result and ledger", () => {
+test("named command execution records commandId and matchedRule in the result and ledger", async () => {
 	const rule = {
 		id: "allow-node-version",
 		action: "allow",
@@ -142,7 +142,7 @@ test("named command execution records commandId and matchedRule in the result an
 		pattern: "node --version",
 	};
 	const target = gitTarget("execute", highConfidenceRules(rule));
-	const { ledgerPath, result } = runWithNamedCommand(target, rule.id);
+	const { ledgerPath, result } = await runWithNamedCommand(target, rule.id);
 
 	assert.deepEqual(result.errors, [], JSON.stringify(result));
 	assert.equal(result.executed, true);
@@ -153,13 +153,13 @@ test("named command execution records commandId and matchedRule in the result an
 	assert.equal(result.ledgerRecord.commandId, rule.id);
 	assert.equal(result.ledgerRecord.action.command, rule.pattern);
 	assert.equal(readLedger(ledgerPath).at(-1).matchedRule, rule.id);
-	fs.rmSync(target, { recursive: true, force: true });
+	fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // Spec F062 Testing Decisions: "A run produces an Evidence receipt carrying an
 // output digest | traces to decision 5". A real git repo, a real named-command
 // execution, and the receipt read back from disk — not an in-memory claim.
-test("a named-command run produces an Evidence receipt carrying an output digest", () => {
+test("a named-command run produces an Evidence receipt carrying an output digest", async () => {
 	const rule = {
 		id: "allow-node-version",
 		action: "allow",
@@ -171,7 +171,7 @@ test("a named-command run produces an Evidence receipt carrying an output digest
 
 	const ledgerPath = path.join(target, ".amber", "loops", "evidence-digest", "ledger.jsonl");
 	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "evidence-digest:approval" });
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target,
 		commandId: rule.id,
 		ledgerPath,
@@ -200,13 +200,13 @@ test("a named-command run produces an Evidence receipt carrying an output digest
 	assert.equal(executed.kind, "executed");
 	assert.match(executed.outputDigest, /^sha256:[0-9a-f]{64}$/);
 	assert.equal(executed.evidenceId, "evidence/named/att-1");
-	fs.rmSync(target, { recursive: true, force: true });
+	fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // F070 H2b: a run with a prepared ExecutionRecord executes inside the
 // adapter-prepared workspace — the main checkout is never the default cwd
 // (Harness v2 §31) and the workspace outlives the command for observation.
-test("runGovernedCommand executes a prepared workspace without touching the main checkout", () => {
+test("runGovernedCommand executes a prepared workspace without touching the main checkout", async () => {
 	const rule = {
 		id: "allow-prepared-mutation",
 		action: "allow",
@@ -225,7 +225,7 @@ test("runGovernedCommand executes a prepared workspace without touching the main
 
 	const ledgerPath = path.join(target, ".amber", "loops", "prepared-workspace", "ledger.jsonl");
 	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "prepared-workspace:approval" });
-	const result = runGovernedCommand({
+	const result = await runGovernedCommand({
 		target,
 		commandId: rule.id,
 		ledgerPath,
@@ -242,5 +242,5 @@ test("runGovernedCommand executes a prepared workspace without touching the main
 	assert.equal(fs.existsSync(path.join(target, "h2b-mut.txt")), false, "main checkout stays clean");
 	assert.deepEqual(listWorktrees(target), before, "the prepared workspace is not auto-removed");
 	removeWorktree(target, "h2b-run-1");
-	fs.rmSync(target, { recursive: true, force: true });
+	fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });

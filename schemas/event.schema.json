@@ -24,6 +24,7 @@
 				"execution.started",
 				"execution.completed",
 				"execution.failed",
+				"execution.cancelled",
 				"validation.completed",
 				"context.granted",
 				"context.denied",

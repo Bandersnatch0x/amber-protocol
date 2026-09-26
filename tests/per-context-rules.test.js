@@ -37,7 +37,7 @@ function loopPackWith(extraRules) {
 	};
 }
 
-test("context allow rule permits a command the global rules.json does not allow", () => {
+test("context allow rule permits a command the global rules.json does not allow", async () => {
 	const dir = tmpGitRepo();
 	// global rules.json: default-deny, NO allow for `node --version`
 	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
@@ -67,13 +67,18 @@ test("context allow rule permits a command the global rules.json does not allow"
 	);
 	execSync("git add -A && git commit -qm pkg", { cwd: dir });
 	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		execute: true,
+	});
 	assert.deepEqual(r.errors, [], JSON.stringify(r.errors));
 	assert.equal(r.executed, true);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("a global deny is NOT overridden by a context allow (deny-wins is absolute)", () => {
+test("a global deny is NOT overridden by a context allow (deny-wins is absolute)", async () => {
 	const dir = tmpGitRepo();
 	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
 	fs.writeFileSync(
@@ -109,12 +114,17 @@ test("a global deny is NOT overridden by a context allow (deny-wins is absolute)
 	fs.writeFileSync(packPath, JSON.stringify(pack));
 	execSync("git add -A && git commit -qm pkg", { cwd: dir });
 	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		execute: true,
+	});
 	assert.ok(r.errors.join("\n").includes("AMBER_E_POLICY_DENY"), r.errors.join("\n"));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("a context deny blocks a command even if global rules would allow it", () => {
+test("a context deny blocks a command even if global rules would allow it", async () => {
 	const dir = tmpGitRepo();
 	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
 	fs.writeFileSync(
@@ -150,12 +160,17 @@ test("a context deny blocks a command even if global rules would allow it", () =
 	fs.writeFileSync(packPath, JSON.stringify(pack));
 	execSync("git add -A && git commit -qm pkg", { cwd: dir });
 	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		execute: true,
+	});
 	assert.ok(r.errors.join("\n").includes("AMBER_E_POLICY_DENY"), r.errors.join("\n"));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("route stage with rules composes the same way (context allow supplements global)", () => {
+test("route stage with rules composes the same way (context allow supplements global)", async () => {
 	const dir = tmpGitRepo();
 	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
 	fs.writeFileSync(
@@ -199,7 +214,7 @@ test("route stage with rules composes the same way (context allow supplements gl
 	execSync("git add -A && git commit -qm route", { cwd: dir });
 	const routesDir = path.join(dir, "routes");
 	approveRouteStage("r1", "verify", dir, "me", routesDir);
-	const r = executeRouteStage("r1", "verify", dir, routesDir);
+	const r = await executeRouteStage("r1", "verify", dir, routesDir);
 	assert.equal(r.exitCode, 0, r.text + JSON.stringify(r.errors));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });

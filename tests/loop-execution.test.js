@@ -52,38 +52,53 @@ const ALLOW_NODE = {
 	rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }],
 };
 
-test("execute without an approval is blocked (gate 2)", () => {
+test("execute without an approval is blocked (gate 2)", async () => {
 	const { dir, packPath } = tmpGitRepoWithPack("node --version", ALLOW_NODE);
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		execute: true,
+	});
 	assert.ok(r.errors.join("\n").includes("AMBER_E_LOOP_NOT_APPROVED"), r.errors.join("\n"));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("execute of a denied command is blocked by policy (gate 1, before approval)", () => {
+test("execute of a denied command is blocked by policy (gate 1, before approval)", async () => {
 	const { dir, packPath } = tmpGitRepoWithPack("rm -rf /tmp/whatever"); // DEFAULT_RULES denies
 	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		execute: true,
+	});
 	assert.ok(r.errors.join("\n").includes("AMBER_E_POLICY_DENY"), r.errors.join("\n"));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("approved + allowed command executes, records ledger, main checkout stays clean", () => {
+test("approved + allowed command executes, records ledger, main checkout stays clean", async () => {
 	const { dir, packPath } = tmpGitRepoWithPack("node --version", ALLOW_NODE);
 	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		execute: true,
+	});
 	assert.deepEqual(r.errors, [], JSON.stringify(r));
 	assert.equal(r.executed, true);
 	assert.equal(r.exitCode, 0);
 	const status = execSync("git status --porcelain", { cwd: dir, encoding: "utf8" });
 	assert.equal(status.trim(), "", "main checkout untouched");
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("a second execute is blocked — one approval, one execution (replay protection)", () => {
+test("a second execute is blocked — one approval, one execution (replay protection)", async () => {
 	const { dir, packPath } = tmpGitRepoWithPack("node --version", ALLOW_NODE);
 	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
-	const second = executeLoopContract({
+	await executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
+	const second = await executeLoopContract({
 		file: packPath,
 		contract: "c1",
 		target: dir,
@@ -93,13 +108,18 @@ test("a second execute is blocked — one approval, one execution (replay protec
 		second.errors.join("\n").includes("AMBER_E_LOOP_NOT_APPROVED"),
 		second.errors.join("\n"),
 	);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("no --execute falls through to dry-run (no execution)", () => {
+test("no --execute falls through to dry-run (no execution)", async () => {
 	const { dir, packPath } = tmpGitRepoWithPack("node --version", ALLOW_NODE);
-	const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, dryRun: true });
+	const r = await executeLoopContract({
+		file: packPath,
+		contract: "c1",
+		target: dir,
+		dryRun: true,
+	});
 	assert.equal(r.executed, undefined);
 	assert.equal(r.mode, "dry-run");
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });

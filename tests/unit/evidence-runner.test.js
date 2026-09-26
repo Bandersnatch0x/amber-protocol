@@ -27,10 +27,10 @@ function tmp() {
 	return dir;
 }
 
-test("runs an allowed command and records verification_passed on exit 0", () => {
+test("runs an allowed command and records verification_passed on exit 0", async () => {
 	const dir = tmp();
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s1", "ledger.jsonl");
-	const r = runEvidenceCommand({
+	const r = await runEvidenceCommand({
 		target: dir,
 		command: 'node -e "process.stdout.write(\\"hello\\"); process.exit(0)"',
 		ledgerPath,
@@ -45,13 +45,13 @@ test("runs an allowed command and records verification_passed on exit 0", () => 
 	assert.equal(recs[0].exitCode, 0);
 	assert.ok(recs[0].hash);
 	assert.match(recs[0].stdoutTail, /hello/);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("records verification_failed on a non-zero exit", () => {
+test("records verification_failed on a non-zero exit", async () => {
 	const dir = tmp();
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s2", "ledger.jsonl");
-	const r = runEvidenceCommand({
+	const r = await runEvidenceCommand({
 		target: dir,
 		command: 'node -e "process.stderr.write(\\"boom\\"); process.exit(3)"',
 		ledgerPath,
@@ -62,10 +62,10 @@ test("records verification_failed on a non-zero exit", () => {
 	const recs = fs.readFileSync(ledgerPath, "utf8").trim().split("\n").map(JSON.parse);
 	assert.equal(recs[0].kind, "verification_failed");
 	assert.match(recs[0].stderrTail, /boom/);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("uses verify-rules.json and ignores rules.json for verification policy", () => {
+test("uses verify-rules.json and ignores rules.json for verification policy", async () => {
 	const dir = tmp();
 	const gov = path.join(dir, ".amber", "governance");
 	// rules.json denies everything that verify-rules.json allows.
@@ -74,7 +74,7 @@ test("uses verify-rules.json and ignores rules.json for verification policy", ()
 		JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [] }),
 	);
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s4", "ledger.jsonl");
-	const r = runEvidenceCommand({
+	const r = await runEvidenceCommand({
 		target: dir,
 		command: 'node -e "process.exit(0)"',
 		ledgerPath,
@@ -83,13 +83,13 @@ test("uses verify-rules.json and ignores rules.json for verification policy", ()
 	assert.equal(r.executed, true);
 	assert.equal(r.denied, false);
 	assert.equal(r.exitCode, 0);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("denies a command the policy does not allow; nothing runs", () => {
+test("denies a command the policy does not allow; nothing runs", async () => {
 	const dir = tmp();
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s3", "ledger.jsonl");
-	const r = runEvidenceCommand({
+	const r = await runEvidenceCommand({
 		target: dir,
 		command: "git status",
 		ledgerPath,
@@ -102,14 +102,14 @@ test("denies a command the policy does not allow; nothing runs", () => {
 	assert.equal(recs[0].executesAnything, false);
 	assert.equal(recs[0].stdoutTail, undefined);
 	assert.equal(recs[0].stderrTail, undefined);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("denies a shell-composite command even when its head is allow-listed; nothing runs (B2)", () => {
+test("denies a shell-composite command even when its head is allow-listed; nothing runs (B2)", async () => {
 	const dir = tmp(); // policy allows the "node " prefix
 	const sideEffect = path.join(dir, "pwned.txt");
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s5", "ledger.jsonl");
-	const r = runEvidenceCommand({
+	const r = await runEvidenceCommand({
 		target: dir,
 		command: `node -e "process.exit(0)" && node -e "require('fs').writeFileSync(${JSON.stringify(sideEffect)},'x')"`,
 		ledgerPath,
@@ -120,14 +120,14 @@ test("denies a shell-composite command even when its head is allow-listed; nothi
 	assert.equal(fs.existsSync(sideEffect), false, "the chained side effect never ran");
 	const recs = fs.readFileSync(ledgerPath, "utf8").trim().split("\n").map(JSON.parse);
 	assert.equal(recs[0].kind, "verification_denied");
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // #315: the verification budget resolves from the flag, the env override, or
 // the 5-minute default — and fails closed on garbage.
 const { resolveBudgetMinutes } = require("../../scripts/lib/core/evidence-runner");
 
-test("resolveBudgetMinutes defaults to 5, honors the env override, and validates the flag range", () => {
+test("resolveBudgetMinutes defaults to 5, honors the env override, and validates the flag range", async () => {
 	assert.equal(resolveBudgetMinutes(undefined), 5);
 	assert.equal(resolveBudgetMinutes(null), 5);
 	assert.equal(resolveBudgetMinutes(1), 1);

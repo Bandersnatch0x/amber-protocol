@@ -51,7 +51,7 @@ function resolveBudgetMinutes(requested) {
 	return requested;
 }
 
-function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, subject = {} }) {
+async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, subject = {} }) {
 	const targetRoot = resolveTarget(target);
 
 	// Gate — verification policy (verify-rules.json; deny-wins, default-deny). Only

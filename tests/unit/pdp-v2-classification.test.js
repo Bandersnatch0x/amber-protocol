@@ -217,7 +217,7 @@ describe("governed integration — the frozen context ceiling feeds the PDP face
 			assert.equal(denied[0].matchedRule, DENY_RULE_ID);
 		} finally {
 			stageRunner._restoreAdapterTableForTest();
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 
@@ -236,7 +236,7 @@ describe("governed integration — the frozen context ceiling feeds the PDP face
 			assert.equal(executed.settlement.status, "succeeded", JSON.stringify(executed.message));
 		} finally {
 			stageRunner._restoreAdapterTableForTest();
-			fs.rmSync(root, { recursive: true, force: true });
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
 });

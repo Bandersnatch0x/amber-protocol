@@ -208,7 +208,7 @@ function frozenBinding(real, overrides = {}) {
 // ── spec §10 test 1: identity ──
 
 describe("run contract — identity (spec §10.1)", () => {
-	it("runId derives losslessly from the full (sessionId, attemptId) tuple", () => {
+	it("runId derives losslessly from the full (sessionId, attemptId) tuple", async () => {
 		const sessionId = "a".repeat(8) + "-1111-2222-3333-444444444444";
 		const attemptOne = "b".repeat(8) + "-aaaa-bbbb-cccc-dddddddddddd";
 		const attemptTwo = "b".repeat(8) + "-aaaa-bbbb-cccc-ddddddddddde";
@@ -279,7 +279,7 @@ describe("run contract — frozen admission record (spec §10.2, §10.5, §10.9)
 		}
 	});
 
-	it("sequence-sensitive arrays change the hash; set-like fields do not (§10.5)", () => {
+	it("sequence-sensitive arrays change the hash; set-like fields do not (§10.5)", async () => {
 		const ruleOne = { id: "a", action: "allow", match: "exact", pattern: "node --version" };
 		const ruleTwo = { id: "b", action: "deny", match: "exact", pattern: "rm -rf /" };
 		const ordered = { defaultAction: "deny", rules: [ruleOne, ruleTwo] };
@@ -304,7 +304,7 @@ describe("run contract — frozen admission record (spec §10.2, §10.5, §10.9)
 		);
 	});
 
-	it("two different requests under the same rules produce different inputDigests (§10.9)", () => {
+	it("two different requests under the same rules produce different inputDigests (§10.9)", async () => {
 		const identity = {
 			capabilityPin: PIN,
 			routeHash: "route-hash",
@@ -439,8 +439,8 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 		return ledgerPath;
 	}
 
-	function runAgainst(target, frozen, ledgerPath) {
-		return runGovernedCommand({
+	async function runAgainst(target, frozen, ledgerPath) {
+		return await runGovernedCommand({
 			target,
 			commandId: COMMAND_ID,
 			capabilityPin: PIN,
@@ -460,7 +460,7 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 		return readLedger(ledgerPath).filter((record) => record.kind === "denied");
 	}
 
-	it("gate-time policy drift refuses before evaluation and leaves the approval unconsumed (§10.6)", () => {
+	it("gate-time policy drift refuses before evaluation and leaves the approval unconsumed (§10.6)", async () => {
 		const { root: target } = makeGitTarget();
 		// The capture froze the fixture rules; the rules have since changed.
 		fs.writeFileSync(
@@ -470,7 +470,7 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 		const real = realFrozen(target);
 		const frozen = frozenBinding({ ...real, policyHash: policyHashOf(rulesObject(ALLOW_RULE)) });
 		const ledgerPath = grantedLedger(target);
-		const outcome = runAgainst(target, frozen, ledgerPath);
+		const outcome = await runAgainst(target, frozen, ledgerPath);
 		assert.strictEqual(outcome.refusal, "policy-drift");
 		assert.strictEqual(outcome.executed, undefined);
 		assert.strictEqual(denialRecords(ledgerPath)[0].refusal, "policy-drift");
@@ -482,7 +482,7 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
-	it("a capability-drift grant is refused at the gate (§10.3)", () => {
+	it("a capability-drift grant is refused at the gate (§10.3)", async () => {
 		const { root: target } = makeGitTarget();
 		const real = realFrozen(target);
 		const frozen = frozenBinding(real, { capabilityHash: "f".repeat(64) });
@@ -492,13 +492,13 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 			capabilityHash: frozen.capabilityHash,
 			boundAttemptId: "att-1",
 		});
-		const outcome = runAgainst(target, frozen, ledgerPath);
+		const outcome = await runAgainst(target, frozen, ledgerPath);
 		assert.strictEqual(outcome.refusal, "capability-drift");
 		assert.strictEqual(denialRecords(ledgerPath)[0].refusal, "capability-drift");
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
-	it("an attempt never executes on a grant bound to a different attempt (§10.3, R-AU-3.5)", () => {
+	it("an attempt never executes on a grant bound to a different attempt (§10.3, R-AU-3.5)", async () => {
 		const { root: target } = makeGitTarget();
 		const real = realFrozen(target);
 		const frozen = frozenBinding(real);
@@ -508,7 +508,7 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 			capabilityHash: frozen.capabilityHash,
 			boundAttemptId: "att-other",
 		});
-		const outcome = runAgainst(target, frozen, ledgerPath);
+		const outcome = await runAgainst(target, frozen, ledgerPath);
 		// The mutual binding is enforced by selection: the grant bound to
 		// att-other is not this attempt's grant, so the gate finds no eligible
 		// approval and refuses — the foreign grant is never consumed and the
@@ -519,7 +519,7 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
-	it("a scope-drifted grant refuses before consumption (R-AU-3.2)", () => {
+	it("a scope-drifted grant refuses before consumption (R-AU-3.2)", async () => {
 		const { root: target } = makeGitTarget();
 		const real = realFrozen(target);
 		const frozen = frozenBinding(real, { scopeHash: "1".repeat(64) });
@@ -529,23 +529,23 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 			capabilityHash: frozen.capabilityHash,
 			boundAttemptId: "att-1",
 		});
-		const outcome = runAgainst(target, frozen, ledgerPath);
+		const outcome = await runAgainst(target, frozen, ledgerPath);
 		assert.strictEqual(outcome.refusal, "scope-drift");
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
-	it("a request whose resolved command no longer hashes to the frozen inputDigest refuses (§10.9)", () => {
+	it("a request whose resolved command no longer hashes to the frozen inputDigest refuses (§10.9)", async () => {
 		const { root: target } = makeGitTarget();
 		const real = realFrozen(target);
 		const frozen = frozenBinding(real, { resolvedCommand: "node -v" });
 		const ledgerPath = grantedLedger(target);
-		const outcome = runAgainst(target, frozen, ledgerPath);
+		const outcome = await runAgainst(target, frozen, ledgerPath);
 		assert.strictEqual(outcome.refusal, "request-drift");
 		assert.strictEqual(denialRecords(ledgerPath)[0].refusal, "request-drift");
 		fs.rmSync(target, { recursive: true, force: true });
 	});
 
-	it("a grant whose binding matches the frozen tuple passes the gate and consumes", () => {
+	it("a grant whose binding matches the frozen tuple passes the gate and consumes", async () => {
 		const { root: target } = makeGitTarget();
 		const real = realFrozen(target);
 		const frozen = frozenBinding(real);
@@ -555,7 +555,7 @@ describe("run contract — pre-effect gate verification (spec §10.3, §10.6)", 
 			capabilityHash: frozen.capabilityHash,
 			boundAttemptId: "att-1",
 		});
-		const outcome = runAgainst(target, frozen, ledgerPath);
+		const outcome = await runAgainst(target, frozen, ledgerPath);
 		assert.deepEqual(outcome.errors, [], JSON.stringify(outcome));
 		assert.strictEqual(outcome.executed, true);
 		// Slice 4 join keys ride the receipt environment (R-RP-3).
@@ -630,7 +630,7 @@ describe("run contract — replay slices (spec §10.4, §10.8; plan Slice 5)", (
 		}
 	});
 
-	it("a truncated runId never resolves as a replay scope (R-ID-2)", () => {
+	it("a truncated runId never resolves as a replay scope (R-ID-2)", async () => {
 		const sessionId = "a".repeat(8) + "-1111-2222-3333-444444444444";
 		const attemptId = "b".repeat(8) + "-aaaa-bbbb-cccc-dddddddddddd";
 		assert.deepStrictEqual(handoffBundle.parseReplayScope("s1"), {

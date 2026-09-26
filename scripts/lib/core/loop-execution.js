@@ -86,7 +86,14 @@ function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 	};
 }
 
-function executeLoopContract({ file, contract: contractId, target, execute, dryRun, output }) {
+async function executeLoopContract({
+	file,
+	contract: contractId,
+	target,
+	execute,
+	dryRun,
+	output,
+}) {
 	const targetRoot = resolveTarget(target);
 
 	// Default path unchanged: no --execute → existing dry-run behaviour.
@@ -116,7 +123,7 @@ function executeLoopContract({ file, contract: contractId, target, execute, dryR
 	// worktree isolation, tamper-evident ledger). The loop's identity (contractId)
 	// is passed as `subject` so it is recorded on every ledger entry.
 	const budgetMinutes = contract.budget?.maxMinutes || contract.hardStops?.timeoutMinutes || 5;
-	const outcome = runGovernedCommand({
+	const outcome = await runGovernedCommand({
 		target: targetRoot,
 		command,
 		ledgerPath: lp,

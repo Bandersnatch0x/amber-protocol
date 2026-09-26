@@ -737,7 +737,7 @@ async function verifySession(projectRoot, options) {
 				return result(`Error: --budget-minutes ${error.message}`, 1);
 			}
 		}
-		execResult = runEvidenceCommand({
+		execResult = await runEvidenceCommand({
 			target: projectRoot,
 			command,
 			ledgerPath,

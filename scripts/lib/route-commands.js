@@ -216,7 +216,7 @@ function approveRouteStage(
 	);
 }
 
-function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_ROUTES_DIR) {
+async function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_ROUTES_DIR) {
 	const route = findRoute(routeId, routesDir);
 	if (!route)
 		return {
@@ -253,7 +253,7 @@ function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_R
 	}
 
 	const lp = routeLedgerPath(targetRoot, routeId);
-	const outcome = runGovernedCommand({
+	const outcome = await runGovernedCommand({
 		target: targetRoot,
 		command: stage.target,
 		ledgerPath: lp,

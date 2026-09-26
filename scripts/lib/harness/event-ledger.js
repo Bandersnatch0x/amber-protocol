@@ -41,6 +41,8 @@ const HARNESS_EVENT_TYPES = Object.freeze([
 	"execution.started",
 	"execution.completed",
 	"execution.failed",
+	// F081: truthful cancellation of an owned governed execution.
+	"execution.cancelled",
 	"validation.completed",
 	"context.granted",
 	"context.denied",

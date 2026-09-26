@@ -64,12 +64,12 @@ function writeContract(target, body, name = "exec.json") {
 	return file;
 }
 
-function admitViaCli(target, file) {
-	return dispatch("harness", { target, file, json: true, _: ["execution", "admit"] });
+async function admitViaCli(target, file) {
+	return await dispatch("harness", { target, file, json: true, _: ["execution", "admit"] });
 }
 
-function executionContractAdmitted(target) {
-	admitViaCli(target, writeContract(target, contractBody()));
+async function executionContractAdmitted(target) {
+	await admitViaCli(target, writeContract(target, contractBody()));
 }
 
 // Byte-level whole-target snapshot: file bytes plus directory entries (empty
@@ -95,8 +95,8 @@ function targetTreeBytes(target) {
 	return rows;
 }
 
-function prepareLocalRun(target, runId) {
-	const admitted = admitViaCli(
+async function prepareLocalRun(target, runId) {
+	const admitted = await admitViaCli(
 		target,
 		writeContract(
 			target,
@@ -121,11 +121,11 @@ function prepareLocalRun(target, runId) {
 		"utf8",
 	);
 	assert.equal(
-		dispatch("harness", { target, file: harnessFile, json: true, _: ["admit"] }).exitCode,
+		await dispatch("harness", { target, file: harnessFile, json: true, _: ["admit"] }).exitCode,
 		0,
 	);
 	assert.equal(
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -135,7 +135,7 @@ function prepareLocalRun(target, runId) {
 		}).exitCode,
 		0,
 	);
-	const prepared = dispatch("harness", {
+	const prepared = await dispatch("harness", {
 		target,
 		json: true,
 		contract: "exec-local",
@@ -147,13 +147,16 @@ function prepareLocalRun(target, runId) {
 	return prepared.result.record;
 }
 
-test("execution contracts admit immutably; bad prefixes refuse in core", () => {
+test("execution contracts admit immutably; bad prefixes refuse in core", async () => {
 	const target = tmpTarget("contract");
 	try {
-		const first = admitViaCli(target, writeContract(target, contractBody()));
+		const first = await admitViaCli(target, writeContract(target, contractBody()));
 		assert.equal(first.exitCode, 0);
 		assert.match(first.result.snapshotHash, /^sha256:[0-9a-f]{64}$/);
-		const identical = admitViaCli(target, writeContract(target, contractBody(), "again.json"));
+		const identical = await admitViaCli(
+			target,
+			writeContract(target, contractBody(), "again.json"),
+		);
 		assert.equal(identical.result.idempotent, true);
 
 		fs.writeFileSync(
@@ -170,7 +173,7 @@ test("execution contracts admit immutably; bad prefixes refuse in core", () => {
 			),
 			"utf8",
 		);
-		const traversal = dispatch("harness", {
+		const traversal = await dispatch("harness", {
 			target,
 			file: "bad.json",
 			json: true,
@@ -179,15 +182,15 @@ test("execution contracts admit immutably; bad prefixes refuse in core", () => {
 		assert.equal(traversal.exitCode, 1);
 		assert.match(traversal.result.errors[0], /repo-relative posix prefix/);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("the git-worktree adapter prepares a real workspace and reports the effective boundary", () => {
+test("the git-worktree adapter prepares a real workspace and reports the effective boundary", async () => {
 	const target = tmpTarget("worktree");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -200,8 +203,8 @@ test("the git-worktree adapter prepares a real workspace and reports the effecti
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -210,7 +213,7 @@ test("the git-worktree adapter prepares a real workspace and reports the effecti
 			_: ["start"],
 		});
 
-		const { result, exitCode } = dispatch("harness", {
+		const { result, exitCode } = await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -226,7 +229,7 @@ test("the git-worktree adapter prepares a real workspace and reports the effecti
 			"the adapter composes the one worktree seam",
 		);
 
-		const second = dispatch("harness", {
+		const second = await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -236,14 +239,14 @@ test("the git-worktree adapter prepares a real workspace and reports the effecti
 		assert.equal(second.exitCode, 1);
 		assert.equal(second.result.code, CODE_ALREADY_PREPARED);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("the local adapter prepares the bounded root without touching git", () => {
+test("the local adapter prepares the bounded root without touching git", async () => {
 	const target = tmpTarget("local");
 	try {
-		admitViaCli(
+		await admitViaCli(
 			target,
 			writeContract(
 				target,
@@ -254,7 +257,7 @@ test("the local adapter prepares the bounded root without touching git", () => {
 				"local.json",
 			),
 		);
-		const { result, exitCode } = dispatch("harness", {
+		const { result, exitCode } = await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-local",
@@ -273,18 +276,18 @@ test("the local adapter prepares the bounded root without touching git", () => {
 			"the bounded root lives under the harness state area",
 		);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("execution terminate is an explicit zero-write refusal, not cancel+release disguised as kill", () => {
+test("execution terminate is an explicit zero-write refusal, not cancel+release disguised as kill", async () => {
 	const target = tmpTarget("terminate-refusal");
 	try {
 		const runId = "run-terminate-1";
-		const prepared = prepareLocalRun(target, runId);
+		const prepared = await prepareLocalRun(target, runId);
 		const workspace = prepared.effective.workspace.path;
 		const before = targetTreeBytes(target);
-		const refused = dispatch("harness", {
+		const refused = await dispatch("harness", {
 			target,
 			json: true,
 			run: runId,
@@ -294,7 +297,8 @@ test("execution terminate is an explicit zero-write refusal, not cancel+release 
 		assert.equal(refused.result.code, "AMBER_E_INVALID_ARG");
 		const message = refused.result.errors.join("\n");
 		assert.match(message, /explicit refusal/);
-		assert.match(message, /no cancellable live-execution handle/);
+		assert.match(message, /harness execution cancel --run <id> --decision/);
+		assert.match(message, /harness execution handles/);
 		assert.match(message, /harness advance --run <id> --to cancelled/);
 		assert.match(message, /runner execution abort --request-hash/);
 		assert.match(message, /harness execution release --run <id>/);
@@ -313,7 +317,7 @@ test("execution terminate is an explicit zero-write refusal, not cancel+release 
 			{ _: ["execution", "terminate"] },
 		]) {
 			const snapshot = targetTreeBytes(target);
-			const result = dispatch("harness", { target, json: true, ...args });
+			const result = await dispatch("harness", { target, json: true, ...args });
 			assert.equal(result.exitCode, 1);
 			assert.equal(result.result.code, "AMBER_E_INVALID_ARG");
 			assert.match(result.result.errors.join("\n"), /explicit refusal/);
@@ -321,11 +325,11 @@ test("execution terminate is an explicit zero-write refusal, not cancel+release 
 			assert.deepEqual(targetTreeBytes(target), snapshot);
 		}
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("raw CLI routes execution terminate to the explicit refusal, not unknown action", () => {
+test("raw CLI routes execution terminate to the explicit refusal, not unknown action", async () => {
 	const target = tmpTarget("terminate-rawcli");
 	try {
 		const cli = path.join(__dirname, "..", "..", "scripts", "amber.js");
@@ -339,16 +343,16 @@ test("raw CLI routes execution terminate to the explicit refusal, not unknown ac
 			assert.equal(result.status, 1);
 			assert.match(result.stdout, /AMBER_E_INVALID_ARG/);
 			assert.match(result.stdout, /explicit refusal/);
-			assert.match(result.stdout, /no cancellable live-execution handle/);
+			assert.match(result.stdout, /harness execution cancel/);
 			assert.doesNotMatch(result.stdout, /requires admit, list, inspect/);
 			assert.deepEqual(targetTreeBytes(target), before);
 		}
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("executeInPreparedWorkspace runs in the prepared path and creates no worktree", () => {
+test("executeInPreparedWorkspace runs in the prepared path and creates no worktree", async () => {
 	const target = tmpTarget("prepared-seam");
 	try {
 		initRepo(target);
@@ -356,7 +360,7 @@ test("executeInPreparedWorkspace runs in the prepared path and creates no worktr
 		assert.equal(prepared.success, true);
 		const before = listWorktrees(target);
 		const mutation = `node -e "require('fs').writeFileSync('prepared-mut.txt','x')"`;
-		const { result, error } = executeInPreparedWorkspace(prepared.path, mutation, 1, {});
+		const { result, error } = await executeInPreparedWorkspace(prepared.path, mutation, 1, {});
 		assert.equal(error, undefined);
 		assert.equal(result.exitCode, 0, JSON.stringify(result));
 		assert.ok(fs.existsSync(path.join(prepared.path, "prepared-mut.txt")), "mutates the workspace");
@@ -368,11 +372,11 @@ test("executeInPreparedWorkspace runs in the prepared path and creates no worktr
 		assert.deepEqual(listWorktrees(target), before, "no worktree created or auto-removed");
 		removeWorktree(target, "h2b-prepared-1");
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("the §13 fold: ok, violation, and unevaluated are deterministic", () => {
+test("the §13 fold: ok, violation, and unevaluated are deterministic", async () => {
 	const declared = contractBody();
 	const effective = {
 		workspace: { type: "git-worktree", path: "wt", base: "main", branch: "b" },
@@ -417,11 +421,11 @@ test("the §13 fold: ok, violation, and unevaluated are deterministic", () => {
 	assert.equal(unevaluated.verdict, "unevaluated");
 });
 
-test("evaluate records the comparison, integrates the run, and BLOCKs on violation", () => {
+test("evaluate records the comparison, integrates the run, and BLOCKs on violation", async () => {
 	const target = tmpTarget("evaluate");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -434,8 +438,8 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -443,7 +447,7 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 			run: "run-block-1",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -458,7 +462,7 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 			JSON.stringify([{ kind: "mutation", paths: ["secrets/key"], source: "ledger#9" }]),
 			"utf8",
 		);
-		const { result, exitCode } = dispatch("harness", {
+		const { result, exitCode } = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-block-1",
@@ -468,7 +472,7 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 		assert.equal(exitCode, 0);
 		assert.equal(result.comparison.verdict, "violation");
 
-		const shown = dispatch("harness", {
+		const shown = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-block-1",
@@ -479,7 +483,12 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 		assert.equal(shown.result.record.contractSnapshotHash.length > 0, true);
 
 		// The run carries the boundary and is BLOCKed out of proceeding.
-		const status = dispatch("harness", { target, json: true, run: "run-block-1", _: ["status"] });
+		const status = await dispatch("harness", {
+			target,
+			json: true,
+			run: "run-block-1",
+			_: ["status"],
+		});
 		assert.equal(status.result.run.execution.contract, "exec-coding");
 		assert.equal(status.result.run.state, "cancelled");
 		assert.match(status.result.run.stateHistory.at(-1).reason || "", /boundary violation/);
@@ -488,7 +497,7 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 
 		// F070 H2b: observed growth replaces the H2a one-shot refusal. A
 		// second, identical evaluation is idempotent (appends nothing).
-		const again = dispatch("harness", {
+		const again = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-block-1",
@@ -499,15 +508,15 @@ test("evaluate records the comparison, integrates the run, and BLOCKs on violati
 		assert.equal(again.result.appended, 0);
 		assert.equal(again.result.comparison.verdict, "violation");
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("an unevaluated evaluation records the verdict without inventing ok", () => {
+test("an unevaluated evaluation records the verdict without inventing ok", async () => {
 	const target = tmpTarget("uneval");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -520,8 +529,8 @@ test("an unevaluated evaluation records the verdict without inventing ok", () =>
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -529,26 +538,31 @@ test("an unevaluated evaluation records the verdict without inventing ok", () =>
 			run: "run-uneval-1",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
 			run: "run-uneval-1",
 			_: ["execution", "prepare"],
 		});
-		const { result } = dispatch("harness", {
+		const { result } = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-uneval-1",
 			_: ["execution", "evaluate"],
 		});
 		assert.equal(result.comparison.verdict, "unevaluated");
-		const status = dispatch("harness", { target, json: true, run: "run-uneval-1", _: ["status"] });
+		const status = await dispatch("harness", {
+			target,
+			json: true,
+			run: "run-uneval-1",
+			_: ["status"],
+		});
 		assert.equal(status.result.run.state, "created", "no invented progression");
 		const events = readRunEvents(target, "run-uneval-1").map((event) => event.kind);
 		assert.equal(events.includes("execution.failed"), false);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
@@ -556,12 +570,12 @@ test("an unevaluated evaluation records the verdict without inventing ok", () =>
 // governed named command inside it (four gates on the governed ledger), let
 // the run's own observation append the mutation entry, and watch a violating
 // second attempt BLOCK the run from the run's own trail.
-test("a governed attempt in the prepared workspace observes its mutations and recomputes the fold", () => {
+test("a governed attempt in the prepared workspace observes its mutations and recomputes the fold", async () => {
 	const target = tmpTarget("h2b-run");
 	try {
 		initRepo(target);
 		// Declared write prefix: src/ only. The mutating command touches src/.
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -574,8 +588,8 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -583,7 +597,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 			run: "run-h2b-1",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -594,7 +608,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 		const admission = ["identity", "contract", "policy", "context", "execution", "approval"].map(
 			(name) => `${name}:fixture#${name}`,
 		);
-		const admitted = dispatch("harness", {
+		const admitted = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-1",
@@ -603,7 +617,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 			_: ["advance"],
 		});
 		assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.errors || admitted.result));
-		const running = dispatch("harness", {
+		const running = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-1",
@@ -637,7 +651,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 			approvalKey: "run-h2b-1:approval",
 		});
 
-		const attempt1 = dispatch("harness", {
+		const attempt1 = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-1",
@@ -669,7 +683,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 		assert.equal(fs.existsSync(path.join(target, "src", "h2b.txt")), false);
 
 		// Release removes the workspace as a recorded step; a second release refuses.
-		const released = dispatch("harness", {
+		const released = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-1",
@@ -678,7 +692,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 		assert.equal(released.exitCode, 0);
 		assert.ok(released.result.releasedAt);
 		assert.equal(fs.existsSync(record.effective.workspace.path), false, "worktree removed");
-		const again = dispatch("harness", {
+		const again = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-1",
@@ -687,7 +701,7 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 		assert.equal(again.exitCode, 1);
 		assert.equal(again.result.code, CODE_ALREADY_RELEASED);
 		// A released workspace never executes again.
-		const afterRelease = dispatch("harness", {
+		const afterRelease = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-1",
@@ -697,15 +711,15 @@ test("a governed attempt in the prepared workspace observes its mutations and re
 		assert.equal(afterRelease.exitCode, 1);
 		assert.equal(afterRelease.result.code, CODE_ALREADY_RELEASED);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("a violating governed attempt BLOCKs the run from its own observation", () => {
+test("a violating governed attempt BLOCKs the run from its own observation", async () => {
 	const target = tmpTarget("h2b-violate");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -718,8 +732,8 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -727,7 +741,7 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 			run: "run-h2b-2",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -737,7 +751,7 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 		const admission = ["identity", "contract", "policy", "context", "execution", "approval"].map(
 			(name) => `${name}:fixture#${name}`,
 		);
-		const admitted = dispatch("harness", {
+		const admitted = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-2",
@@ -746,7 +760,7 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 			_: ["advance"],
 		});
 		assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.errors || admitted.result));
-		const running = dispatch("harness", {
+		const running = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-2",
@@ -779,7 +793,7 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 			approvalKey: "run-h2b-2:approval",
 		});
 
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-2",
@@ -790,13 +804,18 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 		assert.equal(attempt.result.comparison.verdict, "violation");
 		assert.ok(attempt.result.comparison.findings.some((f) => f.kind === "outside-declared-write"));
 
-		const status = dispatch("harness", { target, json: true, run: "run-h2b-2", _: ["status"] });
+		const status = await dispatch("harness", {
+			target,
+			json: true,
+			run: "run-h2b-2",
+			_: ["status"],
+		});
 		assert.equal(status.result.run.state, "blocked", "BLOCK posture from the run's own trail");
 		const events = readRunEvents(target, "run-h2b-2").map((event) => event.kind);
 		assert.ok(events.includes("execution.failed"));
 
 		// A blocked run never executes (human recovery first); the command is refused.
-		const refused = dispatch("harness", {
+		const refused = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-2",
@@ -806,7 +825,7 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 		assert.equal(refused.exitCode, 1);
 		assert.equal(refused.result.code, CODE_RUN_TERMINAL);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
@@ -814,11 +833,11 @@ test("a violating governed attempt BLOCKs the run from its own observation", () 
 // exits non-zero is a completed governed attempt — its mutations are still
 // observed and folded, and the failure rides the result instead of masquerading
 // as a gate refusal.
-test("a failing command still observes and folds; the failure rides the result", () => {
+test("a failing command still observes and folds; the failure rides the result", async () => {
 	const target = tmpTarget("h2b-failcmd");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -831,8 +850,8 @@ test("a failing command still observes and folds; the failure rides the result",
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -840,7 +859,7 @@ test("a failing command still observes and folds; the failure rides the result",
 			run: "run-h2b-3",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -869,7 +888,7 @@ test("a failing command still observes and folds; the failure rides the result",
 			kind: "approved",
 			approvalKey: "run-h2b-3:approval",
 		});
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-3",
@@ -881,15 +900,15 @@ test("a failing command still observes and folds; the failure rides the result",
 		assert.equal(attempt.result.comparison.verdict, "ok", "the fold ran over the attempt");
 		assert.ok(attempt.result.errors.length > 0, "the command failure is reported");
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("a gate refusal fails closed: refused result, non-zero exit, no observation", () => {
+test("a gate refusal fails closed: refused result, non-zero exit, no observation", async () => {
 	const target = tmpTarget("h2b-refusal");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -902,8 +921,8 @@ test("a gate refusal fails closed: refused result, non-zero exit, no observation
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -911,7 +930,7 @@ test("a gate refusal fails closed: refused result, non-zero exit, no observation
 			run: "run-h2b-4",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -942,7 +961,7 @@ test("a gate refusal fails closed: refused result, non-zero exit, no observation
 			}),
 			"utf8",
 		);
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-4",
@@ -960,15 +979,15 @@ test("a gate refusal fails closed: refused result, non-zero exit, no observation
 		);
 		assert.equal(record.observed, undefined, "a refused attempt observes nothing");
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
-test("a local bounded-root workspace runs, observes by listing, and releases by deletion", () => {
+test("a local bounded-root workspace runs, observes by listing, and releases by deletion", async () => {
 	const target = tmpTarget("h2b-local-run");
 	try {
 		initRepo(target);
-		admitViaCli(
+		await admitViaCli(
 			target,
 			writeContract(
 				target,
@@ -992,8 +1011,8 @@ test("a local bounded-root workspace runs, observes by listing, and releases by 
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -1001,7 +1020,7 @@ test("a local bounded-root workspace runs, observes by listing, and releases by 
 			run: "run-h2b-5",
 			_: ["start"],
 		});
-		const prepared = dispatch("harness", {
+		const prepared = await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-local-run",
@@ -1032,7 +1051,7 @@ test("a local bounded-root workspace runs, observes by listing, and releases by 
 			kind: "approved",
 			approvalKey: "run-h2b-5:approval",
 		});
-		const attempt = dispatch("harness", {
+		const attempt = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-5",
@@ -1053,7 +1072,7 @@ test("a local bounded-root workspace runs, observes by listing, and releases by 
 			"main checkout clean",
 		);
 
-		const released = dispatch("harness", {
+		const released = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-5",
@@ -1062,7 +1081,7 @@ test("a local bounded-root workspace runs, observes by listing, and releases by 
 		assert.equal(released.exitCode, 0, JSON.stringify(released.result));
 		assert.equal(fs.existsSync(boundedRoot), false, "the bounded root is deleted on release");
 		// A released record refuses evaluation (nothing new can be observed).
-		const evaluated = dispatch("harness", {
+		const evaluated = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-5",
@@ -1071,17 +1090,17 @@ test("a local bounded-root workspace runs, observes by listing, and releases by 
 		assert.equal(evaluated.exitCode, 1);
 		assert.equal(evaluated.result.code, CODE_ALREADY_RELEASED);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
 // User Story 3 as a live sequence: two DISTINCT attempts accumulate into one
 // trail, and the final verdict spans both sources (attempt 2 BLOCKs the run).
-test("a multi-attempt trail grows across attempts and the final verdict spans both", () => {
+test("a multi-attempt trail grows across attempts and the final verdict spans both", async () => {
 	const target = tmpTarget("h2b-multi");
 	try {
 		initRepo(target);
-		executionContractAdmitted(target);
+		await executionContractAdmitted(target);
 		const contractForRun = path.join(target, "contract2.json");
 		fs.writeFileSync(
 			contractForRun,
@@ -1094,8 +1113,8 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 			}),
 			"utf8",
 		);
-		dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
-		dispatch("harness", {
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "harness-exec",
@@ -1103,7 +1122,7 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 			run: "run-h2b-6",
 			_: ["start"],
 		});
-		dispatch("harness", {
+		await dispatch("harness", {
 			target,
 			json: true,
 			contract: "exec-coding",
@@ -1113,7 +1132,7 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 		const admission = ["identity", "contract", "policy", "context", "execution", "approval"].map(
 			(name) => `${name}:fixture#${name}`,
 		);
-		const admitted = dispatch("harness", {
+		const admitted = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-6",
@@ -1122,7 +1141,7 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 			_: ["advance"],
 		});
 		assert.equal(admitted.exitCode, 0);
-		const running = dispatch("harness", {
+		const running = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-6",
@@ -1155,7 +1174,7 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 		const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 		const ledgerPath = path.join(target, ".amber", "loops", "run-h2b-6", "ledger.jsonl");
 		appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "run-h2b-6:approval-1" });
-		const first = dispatch("harness", {
+		const first = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-6",
@@ -1167,7 +1186,7 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 
 		// Attempt 2 consumes its OWN single-use approval (F052 fixture convention).
 		appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "run-h2b-6:approval-2" });
-		const second = dispatch("harness", {
+		const second = await dispatch("harness", {
 			target,
 			json: true,
 			run: "run-h2b-6",
@@ -1186,17 +1205,22 @@ test("a multi-attempt trail grows across attempts and the final verdict spans bo
 		);
 		assert.equal(record.observed.entries.length, 2, "the trail spans both attempts");
 		assert.equal(record.comparison.verdict, "violation", "the final verdict spans the trail");
-		const status = dispatch("harness", { target, json: true, run: "run-h2b-6", _: ["status"] });
+		const status = await dispatch("harness", {
+			target,
+			json: true,
+			run: "run-h2b-6",
+			_: ["status"],
+		});
 		assert.equal(status.result.run.state, "blocked");
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
 // Spec Testing Decision: flag mapping must be smoke-tested through the real
 // CLI (the parseArgs FLAG_SPECS whitelist silently turns unregistered flags
 // into positionals). Raw argv against the real scripts/amber.js process.
-test("raw-CLI --command-id maps through FLAG_SPECS (missing flag vs unknown run)", () => {
+test("raw-CLI --command-id maps through FLAG_SPECS (missing flag vs unknown run)", async () => {
 	const target = tmpTarget("h2b-rawcli");
 	try {
 		initRepo(target);
@@ -1237,6 +1261,6 @@ test("raw-CLI --command-id maps through FLAG_SPECS (missing flag vs unknown run)
 		assert.equal(withFlag.status, 1);
 		assert.match(withFlag.stdout, /no prepared execution for run/);
 	} finally {
-		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });

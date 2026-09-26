@@ -3161,6 +3161,42 @@ const CATALOG = {
 		layer: "Migration",
 		related: ["AMBER_E_HARNESS_LEGACY_NOT_FOUND"],
 	},
+	AMBER_E_HARNESS_EXEC_NO_HANDLE: {
+		title: "No live governed-execution handle for this run",
+		cause:
+			'A cancellation was requested for a run with no owned execution handle. The handle exists only while a governed command spawned through the shared seam is running; its absence means there is nothing to cancel — it is never read as "probably stopped".',
+		remedy:
+			"Inspect the recorded execution state (amber harness execution inspect --run <id>) and the owned handles (amber harness execution handles); cancel nothing, or cancel while the command is still running.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_EXEC_HANDLE_CORRUPT", "AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND"],
+	},
+	AMBER_E_HARNESS_EXEC_CANCEL_CONFLICT: {
+		title: "Cancellation conflicts with recorded state",
+		cause:
+			"A cancellation authorization was already spent, the run already carries a recorded cancellation, or the attempt settled before the cancellation could consume its Decision. Cancellation is single-use and race-losing, never a second terminal fact.",
+		remedy:
+			"Read the recorded cancellation and the run's settlement (amber harness execution handles, amber harness execution inspect --run <id>); use a fresh Decision only for a genuinely new cancellation.",
+		layer: "Governance",
+		related: ["AMBER_E_HARNESS_EXEC_NO_HANDLE"],
+	},
+	AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT: {
+		title: "Cancellation record failed its closed shape",
+		cause:
+			"A stored cancellation record under .amber/harness/executions/cancellations/ is not valid JSON or no longer matches its Snapshot Hash.",
+		remedy:
+			"Investigate the named record; cancellation reads fail closed rather than reporting an invented outcome.",
+		layer: "Verification",
+		related: ["AMBER_E_HARNESS_EXEC_HANDLE_CORRUPT"],
+	},
+	AMBER_E_HARNESS_EXEC_HANDLE_CORRUPT: {
+		title: "Governed-execution handle failed its closed shape",
+		cause:
+			"A F081 execution handle under .amber/harness/executions/ is not valid JSON, carries no runId/pid/lease/fence, or no longer matches its Snapshot Hash. Handles are the only thing a cancellation may address, so a broken one is refused rather than interpreted.",
+		remedy:
+			"Inspect the named handle; reconcile it with the run's recorded execution state (amber harness execution inspect --run <id>) and remove a stale handle after the process is confirmed gone.",
+		layer: "Verification",
+		related: ["AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND"],
+	},
 	AMBER_E_HARNESS_RUNTIME_INVALID: {
 		title: "Maintenance runtime request is invalid",
 		cause:

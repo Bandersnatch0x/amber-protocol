@@ -38,7 +38,7 @@ function writeHighNpmPolicy(dir) {
 	);
 }
 
-test("approveRouteStage writes an approved ledger record keyed by route:stage", () => {
+test("approveRouteStage writes an approved ledger record keyed by route:stage", async () => {
 	const dir = tmpRepoWithRoute();
 	const r = approveRouteStage("feature-standard", "verify", dir, "me");
 	assert.equal(r.exitCode, 0, r.text);
@@ -46,43 +46,43 @@ test("approveRouteStage writes an approved ledger record keyed by route:stage", 
 	const recs = fs.readFileSync(lp, "utf8").trim().split("\n").map(JSON.parse);
 	assert.equal(recs[0].kind, "approved");
 	assert.equal(recs[0].approvalKey, "feature-standard:verify");
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("approveRouteStage rejects an unknown stage", () => {
+test("approveRouteStage rejects an unknown stage", async () => {
 	const dir = tmpRepoWithRoute();
 	const r = approveRouteStage("feature-standard", "nope", dir, "me");
 	assert.equal(r.exitCode, 1);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("verifyRouteLedger reports intact on a fresh ledger", () => {
+test("verifyRouteLedger reports intact on a fresh ledger", async () => {
 	const dir = tmpRepoWithRoute();
 	approveRouteStage("feature-standard", "verify", dir, "me");
 	const r = verifyRouteLedger("feature-standard", dir);
 	assert.equal(r.exitCode, 0);
 	assert.match(r.text, /intact/);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("executeRouteStage without approval is blocked", () => {
+test("executeRouteStage without approval is blocked", async () => {
 	const dir = tmpRepoWithRoute();
 	writeHighNpmPolicy(dir);
-	const r = executeRouteStage("feature-standard", "verify", dir);
+	const r = await executeRouteStage("feature-standard", "verify", dir);
 	assert.equal(r.exitCode, 1);
 	assert.ok(r.errors.join("\n").includes("AMBER_E_LOOP_NOT_APPROVED"), r.errors.join("\n"));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("executeRouteStage on a non-command stage is rejected", () => {
+test("executeRouteStage on a non-command stage is rejected", async () => {
 	const dir = tmpRepoWithRoute();
-	const r = executeRouteStage("feature-standard", "capture", dir); // type: skill
+	const r = await executeRouteStage("feature-standard", "capture", dir); // type: skill
 	assert.equal(r.exitCode, 1);
 	assert.match(r.errors.join("\n"), /command stages/);
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("approved + allowed route stage executes, main checkout clean, ledger gains executed record", () => {
+test("approved + allowed route stage executes, main checkout clean, ledger gains executed record", async () => {
 	const dir = tmpRepoWithRoute();
 	writeHighNpmPolicy(dir);
 	fs.writeFileSync(
@@ -91,7 +91,7 @@ test("approved + allowed route stage executes, main checkout clean, ledger gains
 	);
 	execSync("git add -A && git commit -qm pkg", { cwd: dir });
 	approveRouteStage("feature-standard", "verify", dir, "me");
-	const r = executeRouteStage("feature-standard", "verify", dir);
+	const r = await executeRouteStage("feature-standard", "verify", dir);
 	assert.equal(r.exitCode, 0, r.text + JSON.stringify(r.errors));
 	const status = execSync("git status --porcelain", { cwd: dir, encoding: "utf8" });
 	assert.equal(status.trim(), "", "main checkout untouched");
@@ -101,10 +101,10 @@ test("approved + allowed route stage executes, main checkout clean, ledger gains
 		.split("\n")
 		.map(JSON.parse);
 	assert.equal(recs[1].kind, "executed");
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("second execute is blocked — one approval, one execution (replay protection)", () => {
+test("second execute is blocked — one approval, one execution (replay protection)", async () => {
 	const dir = tmpRepoWithRoute();
 	writeHighNpmPolicy(dir);
 	fs.writeFileSync(
@@ -113,9 +113,9 @@ test("second execute is blocked — one approval, one execution (replay protecti
 	);
 	execSync("git add -A && git commit -qm pkg", { cwd: dir });
 	approveRouteStage("feature-standard", "verify", dir, "me");
-	executeRouteStage("feature-standard", "verify", dir);
-	const second = executeRouteStage("feature-standard", "verify", dir);
+	await executeRouteStage("feature-standard", "verify", dir);
+	const second = await executeRouteStage("feature-standard", "verify", dir);
 	assert.equal(second.exitCode, 1);
 	assert.ok(second.errors.join("\n").includes("AMBER_E_LOOP_NOT_APPROVED"));
-	fs.rmSync(dir, { recursive: true, force: true });
+	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });

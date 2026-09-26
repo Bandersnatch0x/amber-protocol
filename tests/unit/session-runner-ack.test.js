@@ -16,7 +16,7 @@ const TEST_ROOT = path.join(__dirname, "../fixtures/session-runner-ack");
 
 function cleanup() {
 	if (fs.existsSync(TEST_ROOT)) {
-		fs.rmSync(TEST_ROOT, { recursive: true, force: true });
+		fs.rmSync(TEST_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 }
 

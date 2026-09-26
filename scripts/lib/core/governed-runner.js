@@ -437,27 +437,32 @@ function setExecutionAdapter(adapter) {
 	executionBoundaryAdapter = adapter;
 }
 
-function executeInWorktree(
+async function executeInWorktree(
 	targetRoot,
 	command,
 	label,
 	budgetMinutes,
-	{ captureDigest = false, preparedWorkspacePath } = {},
+	{ captureDigest = false, preparedWorkspacePath, handle = null } = {},
 ) {
 	// F070 H2b: a run with a prepared ExecutionRecord executes inside the
 	// adapter-prepared workspace (no throwaway worktree, no auto-remove — the
 	// workspace must outlive the command for mutation observation). Absent the
 	// handle, behavior is byte-for-byte the historical throwaway worktree.
+	//
+	// F081: the spawn is asynchronous and an owned handle is persisted for the
+	// duration, so the attempt is observable (and, with its own Decision,
+	// cancellable) while it runs.
 	if (preparedWorkspacePath !== undefined) {
 		return defaultExecutionAdapter().executeInPreparedWorkspace(
 			preparedWorkspacePath,
 			command,
 			budgetMinutes,
-			{ captureDigest },
+			{ captureDigest, handle },
 		);
 	}
 	return defaultExecutionAdapter().executeInWorktree(targetRoot, command, label, budgetMinutes, {
 		captureDigest,
+		handle,
 	});
 }
 
@@ -590,7 +595,7 @@ function recordGovernedExecution(targetRoot, ledgerPath, approval, execution, su
 	};
 }
 
-function runGovernedCommand({
+async function runGovernedCommand({
 	target,
 	command,
 	commandId,
@@ -816,9 +821,19 @@ function runGovernedCommand({
 			warnings: [],
 		};
 	}
-	const execution = executeInWorktree(targetRoot, resolvedCommand, label, budgetMinutes, {
+	// F081: the handle names the attempt's own ownership coordinates so a
+	// cancellation can address exactly this governed execution and nothing else.
+	const executionHandle = {
+		targetRoot,
+		runId: subject.runId ?? attemptId ?? label,
+		attemptId: attemptId ?? null,
+		label,
+		commandId: commandId ?? null,
+	};
+	const execution = await executeInWorktree(targetRoot, resolvedCommand, label, budgetMinutes, {
 		captureDigest: namedCommand,
 		preparedWorkspacePath,
+		handle: executionHandle,
 	});
 	if (execution.error)
 		return {

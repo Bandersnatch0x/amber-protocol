@@ -18,8 +18,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { spawnSync } = require("node:child_process");
-const { statePath } = require("../state-dir-resolver");
+const { spawn } = require("node:child_process");
+const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const {
+	persistExecutionHandle,
+	clearExecutionHandle,
+	signalPidTree,
+} = require("./execution-handles");
 
 const CODING_DOMAIN_ADAPTER_ID = "execution-domain/coding-worktree";
 const CODING_DOMAIN_ADAPTER_VERSION = "1";
@@ -119,12 +124,12 @@ function validate(targetRoot) {
 // `{ error }` on worktree-creation failure, and the captureDigest switch
 // selecting raw bytes (named-command/F062 output digest) or the historical
 // UTF-8 envelope.
-function executeInWorktree(
+async function executeInWorktree(
 	targetRoot,
 	command,
 	label,
 	budgetMinutes,
-	{ captureDigest = false } = {},
+	{ captureDigest = false, handle = null } = {},
 ) {
 	const { createWorktree, removeWorktree } = require("../worktree-manager");
 	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
@@ -132,54 +137,76 @@ function executeInWorktree(
 	const worktree = createWorktree(targetRoot, runId);
 	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
 	try {
-		return executeInPreparedWorkspace(worktree.path, command, budgetMinutes, { captureDigest });
+		return await executeInPreparedWorkspace(worktree.path, command, budgetMinutes, {
+			captureDigest,
+			handle,
+		});
 	} finally {
 		removeWorktree(targetRoot, runId);
 	}
 }
 
 /**
- * F070 H2b: execute inside an ALREADY-PREPARED workspace (the ExecutionRecord's
- * effective workspace) instead of a throwaway worktree. Same spawn/capture
- * semantics as executeInWorktree; no worktree is created and none is removed —
- * the workspace must outlive the command so its mutations stay observable.
+ * F070 H2b / F081: execute inside an ALREADY-PREPARED workspace (the
+ * ExecutionRecord's effective workspace) instead of a throwaway worktree.
+ * Same capture semantics as executeInWorktree; no worktree is created and none
+ * is removed — the workspace must outlive the command so its mutations stay
+ * observable.
+ *
+ * F081: the command is spawned ASYNCHRONOUSLY into its own process group and
+ * an owned handle is persisted for the duration, so another process can observe
+ * (and, with its own Decision, cancel) a live governed execution. The returned
+ * envelope is unchanged; the four gates and every ledger record stay where they
+ * were.
+ *
+ * `opts.handle` carries the ownership coordinates the handle records
+ * (`{ targetRoot, runId, attemptId, label, commandId }`); without it the seam is
+ * a plain async spawn with the historical envelope.
  */
-function executeInPreparedWorkspace(
+async function executeInPreparedWorkspace(
 	workspacePath,
 	command,
 	budgetMinutes,
-	{ captureDigest = false } = {},
+	{ captureDigest = false, handle = null } = {},
 ) {
 	let result;
 	const startedAt = new Date().toISOString();
+	const timeoutMs = budgetMinutes * 60_000;
+	let handleRecord = null;
 	try {
-		const spawned = spawnSync(command, {
+		const spawned = spawn(command, {
 			shell: true,
 			cwd: workspacePath,
-			// The legacy command seam intentionally keeps its historical UTF-8
-			// envelope.  Only the named-command/F062 seam needs raw bytes for the
-			// complete output digest.
-			encoding: captureDigest ? "buffer" : "utf8",
-			timeout: budgetMinutes * 60_000,
+			// Detached gives the child its own process group, so a cancellation
+			// can address the whole tree and never the parent CLI.
+			detached: process.platform !== "win32",
+			stdio: ["ignore", "pipe", "pipe"],
+			windowsHide: true,
 		});
+		if (handle && Number.isInteger(spawned.pid)) {
+			handleRecord = persistExecutionHandle({
+				...handle,
+				workspace: workspacePath,
+				pid: spawned.pid,
+				startedAt,
+				deadlineAt: new Date(Date.now() + timeoutMs).toISOString(),
+			});
+		}
+		const captured = await collectSpawn(spawned, timeoutMs);
 		if (!captureDigest) {
 			result = {
 				command,
-				exitCode: spawned.status === null ? -1 : spawned.status,
-				stdout: (spawned.stdout || "").slice(-4000),
-				stderr: (spawned.stderr || "").slice(-2000),
+				exitCode: captured.exitCode,
+				stdout: captured.stdoutText.slice(-4000),
+				stderr: captured.stderrText.slice(-2000),
 			};
 			return { result };
 		}
-		const stdout = Buffer.isBuffer(spawned.stdout)
-			? spawned.stdout
-			: Buffer.from(spawned.stdout || "", "utf8");
-		const stderr = Buffer.isBuffer(spawned.stderr)
-			? spawned.stderr
-			: Buffer.from(spawned.stderr || "", "utf8");
-		const timedOut = spawned.error?.code === "ETIMEDOUT";
-		const exitCode = spawned.status === null ? -1 : spawned.status;
-		const signal = spawned.signal || null;
+		const stdout = captured.stdoutBytes;
+		const stderr = captured.stderrBytes;
+		const timedOut = captured.timedOut;
+		const exitCode = captured.exitCode;
+		const signal = captured.signal;
 		const finishedAt = new Date().toISOString();
 		result = {
 			command,
@@ -209,8 +236,65 @@ function executeInPreparedWorkspace(
 					}
 				: { stdout: "", stderr: String(error.message || error).slice(-2000) }),
 		};
+	} finally {
+		if (handleRecord) clearExecutionHandle(handleRecord);
 	}
 	return { result };
+}
+
+// Await one spawned child with the same budget semantics spawnSync had: on
+// timeout the tree is signalled and the timeout is reported, never a success.
+const DRAIN_MS = 250;
+function collectSpawn(child, timeoutMs) {
+	return new Promise((resolve) => {
+		const stdoutChunks = [];
+		const stderrChunks = [];
+		let settled = false;
+		let timedOut = false;
+		const timer =
+			Number.isInteger(timeoutMs) && timeoutMs > 0
+				? setTimeout(() => {
+						timedOut = true;
+						signalPidTree(child.pid, "SIGTERM");
+					}, timeoutMs)
+				: null;
+		const finish = (exitCode, signal) => {
+			if (settled) return;
+			settled = true;
+			if (timer) clearTimeout(timer);
+			const stdoutBytes = Buffer.concat(stdoutChunks);
+			const stderrBytes = Buffer.concat(stderrChunks);
+			resolve({
+				exitCode,
+				signal,
+				timedOut,
+				stdoutBytes,
+				stderrBytes,
+				stdoutText: stdoutBytes.toString("utf8"),
+				stderrText: stderrBytes.toString("utf8"),
+			});
+		};
+		child.stdout?.on("data", (chunk) => stdoutChunks.push(Buffer.from(chunk)));
+		child.stderr?.on("data", (chunk) => stderrChunks.push(Buffer.from(chunk)));
+		child.on("error", (error) => {
+			stderrChunks.push(Buffer.from(String(error.message || error), "utf8"));
+			finish(-1, null);
+		});
+		// `exit` is the terminal fact about the PROCESS; `close` only fires once
+		// every stdio holder is gone, which a cancelled process tree can delay
+		// indefinitely (a surviving grandchild keeps the pipe open). Settle on
+		// `exit`, after a short bounded drain so trailing output still lands.
+		let drainTimer = null;
+		child.on("exit", (code, signal) => {
+			const exitCode = code === null ? -1 : code;
+			const exitSignal = signal || (timedOut ? "SIGTERM" : null);
+			drainTimer = setTimeout(() => finish(exitCode, exitSignal), DRAIN_MS);
+		});
+		child.on("close", (code, signal) => {
+			if (drainTimer) clearTimeout(drainTimer);
+			finish(code === null ? -1 : code, signal || (timedOut ? "SIGTERM" : null));
+		});
+	});
 }
 
 /**
@@ -228,21 +312,24 @@ function prepare(targetRoot, label) {
 }
 
 /**
- * execute: spawn the command inside the prepared worktree (delegates to the
- * spawn seam the governed-runner uses).
+ * execute: spawn the command inside the prepared worktree (the same awaited
+ * spawn seam the governed-runner uses — F081 made the execution model uniformly
+ * asynchronous, so this declared boundary method is async too).
  */
-function execute(worktreePath, command, { timeoutMs = 300_000 } = {}) {
-	const spawned = spawnSync(command, {
+async function execute(worktreePath, command, { timeoutMs = 300_000 } = {}) {
+	const child = spawn(command, {
 		shell: true,
 		cwd: worktreePath,
-		encoding: "utf8",
-		timeout: timeoutMs,
+		detached: process.platform !== "win32",
+		stdio: ["ignore", "pipe", "pipe"],
+		windowsHide: true,
 	});
+	const captured = await collectSpawn(child, timeoutMs);
 	return {
-		ok: spawned.status === null ? false : spawned.status === 0,
-		exitCode: spawned.status === null ? -1 : spawned.status,
-		stdout: (spawned.stdout || "").slice(-4000),
-		stderr: (spawned.stderr || "").slice(-2000),
+		ok: captured.exitCode === 0,
+		exitCode: captured.exitCode,
+		stdout: captured.stdoutText.slice(-4000),
+		stderr: captured.stderrText.slice(-2000),
 	};
 }
 
