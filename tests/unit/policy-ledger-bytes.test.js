@@ -38,6 +38,25 @@ const PRE_MIGRATION_SOURCE = "scripts/lib/core/policy-evaluation.js";
 const PRE_MIGRATION_SOURCE_BLOB = "a930a7bb5819456b138ef0932a35ed6a279fe90b";
 const OUTCOME_LOCK = path.join(".amber", "policies", "outcomes.lock");
 
+// The provenance half of this suite re-reads a PRE-migration commit's blob, so
+// it needs real history. A shallow clone (`git clone --depth 1`, the default of
+// actions/checkout in some workflows) has none, and the raw `git rev-parse`
+// failure reads like a product defect rather than a missing prerequisite — it
+// was found exactly that way, running this suite from a fresh depth-1 clone.
+// This helper keeps the verdict fail-closed (a check that cannot run IS a failed
+// check) while naming the remedy.
+function assertPreMigrationHistory() {
+	try {
+		execFileSync("git", ["cat-file", "-e", `${PRE_MIGRATION_COMMIT}^{commit}`], {
+			stdio: "ignore",
+		});
+	} catch (_error) {
+		assert.fail(
+			`this suite verifies the pre-migration provenance commit ${PRE_MIGRATION_COMMIT}, which this checkout does not contain; a shallow clone (--depth 1) has no history — re-clone without --depth, or run \`git fetch --unshallow\` (CI uses fetch-depth: 0 and is unaffected)`,
+		);
+	}
+}
+
 const SUBJECT = "spec/login@2";
 const NOW = new Date("2026-08-10T00:00:00.000Z");
 
@@ -228,6 +247,7 @@ test("the policy outcome ledger matches the pre-migration recording", () => {
 });
 
 test("the policy golden carries immutable pre-migration provenance", () => {
+	assertPreMigrationHistory();
 	const provenance = JSON.parse(fs.readFileSync(GOLDEN_PROVENANCE, "utf8"));
 	assert.equal(provenance.schemaVersion, 1);
 	assert.equal(provenance.fixture, path.basename(GOLDEN));
