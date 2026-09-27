@@ -143,8 +143,10 @@ never invent architecture, commands, or business rules — mark unknowns as "nee
   `npm run gen:agents`; never edit generated platform surfaces (`.claude/commands/`,
   `.agents/skills/`, `.gemini/commands/amber/`). CI fails on drift via `gen:agents:check`.
 - Before claiming done, all of these must pass (CI runs them on every push/PR):
-  `npm test`, `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`.
-  Wiki changes: `node scripts/validate-wiki.js --target .`.
+  `npm test`, `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`,
+  `node scripts/validate-wiki.js --target .`. CI runs the wiki step unconditionally; the same command
+  also covers the documented "wiki changes" condition. `amber drift` is inert on a `product-repo`
+  target (`n/a` for artifact/wiki/scaffold) and is never a gate.
 - New CLI command -> one definition in `scripts/lib/command-help.js` plus its handler binding in
   `scripts/lib/command-dispatcher.js`; startup rejects missing or orphaned handlers. Schema change ->
   sync `schemas/*.schema.json` with `scripts/validate-*.js`. New template -> `templates/` +

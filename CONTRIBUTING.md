@@ -19,10 +19,9 @@ Thank you for your interest in contributing to Amber Protocol!
 # Run all tests
 npm test
 
-# Run specific test suite
-npm run test:unit
-npm run test:integration
+# Run specific test suites
 npm run test:load
+npm run test:e2e
 
 # Run web viewer tests
 cd apps/web
@@ -32,7 +31,12 @@ npm run test:e2e
 # Run validation
 npm run manifests
 npm run doctor
+node scripts/validate-wiki.js --target .
 ```
+
+Test files live flat and under `tests/unit/`, `tests/integration/`-style groups; there is no
+`test:unit` or `test:integration` script — select a subset with `node --test <path>` and let CI run the
+full `npm test`.
 
 ### Code Style
 

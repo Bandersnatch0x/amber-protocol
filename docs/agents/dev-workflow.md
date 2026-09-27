@@ -13,7 +13,7 @@
 | 3   | 拷问 | `/grill-with-docs`                     | 逼问计划，沉淀 ADR + 词汇                     | 无未决问题；决策写入 `docs/adr/` 与 `UBIQUITOUS_LANGUAGE.md`                                                   |
 | 4   | 成谱 | `/to-spec`                             | 会话 → spec，发布到本地票仓                   | spec 票建立（`issues/NNNN-<slug>.md`）                                                                         |
 | 5   | 成票 | `/to-tickets`                          | spec → tracer-bullet 票 + blocking 边         | 票全建立且 `blocked-by` 边已声明                                                                               |
-| 6   | 落码 | `/implement`                           | 按票实现                                      | 门禁全绿：`npm test`、`npm run manifests`、`npm run doctor`、`npm run gen:agents:check`（wiki 改动加 `node scripts/validate-wiki.js --target .`） |
+| 6   | 落码 | `/implement`                           | 按票实现                                      | 门禁全绿：`npm test`、`npm run manifests`、`npm run doctor`、`npm run gen:agents:check`、`node scripts/validate-wiki.js --target .`（CI 全量执行这五项） |
 | 7   | 验收 | `code-review` + `spec-to-code-compliance` | 全量测试通过后的双重核查                      | 两轴评审（Standards + Spec）findings 全部裁决；spec-to-code 合规核查无 contradicts；报告落 `.scratch/`，结论登记到票的 Log；**交付证据**成立：改动已合入默认分支（见下） |
 
 进入规则：小任务直接从 3（方向未定）或 4（方向已定）进入；bug 修复对着 GitHub bug 票从 6 进入；只有超出单会话体量的工作才走 2。阶段 7 对每次交付生效，不可跳过。

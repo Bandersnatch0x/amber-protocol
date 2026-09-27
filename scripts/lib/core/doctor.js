@@ -80,6 +80,21 @@ function doctorProductRepo(targetRoot, classification) {
 		});
 	}
 
+	// Product-repo still ships and validates its own wiki (self-dogfood): the
+	// structural wiki checks were unreachable here because doctor returned early
+	// (#0148), so a broken docs/wiki could merge green. Only validate when the
+	// wiki exists — a product-repo without docs/wiki is not an error.
+	if (pathExists(path.join(targetRoot, "docs", "wiki"))) {
+		const wikiResult = validateWiki(targetRoot);
+		errors.push(...wikiResult.errors);
+		warnings.push(...wikiResult.warnings);
+		productChecks.push({
+			name: "wiki-structure",
+			errors: wikiResult.errors.length,
+			warnings: wikiResult.warnings.length,
+		});
+	}
+
 	const samplePackPath = path.join(targetRoot, "workflow-packs", "safe-amber-bootstrap.pack.json");
 	const sampleProfilePath = path.join(targetRoot, "profiles", "default.profile.json");
 	const packResult = inspectWorkflowPack(samplePackPath);
