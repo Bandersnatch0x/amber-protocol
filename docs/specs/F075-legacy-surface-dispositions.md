@@ -128,6 +128,25 @@ surfaces — kept with a mapping, kept pending a mapping, or removed with a deci
 **Out of the amendment:** `task`, `result`, `profile` (kept as §52 migration targets),
 and `profile deployment` (the only supported deployment-profile writer) are untouched.
 
+**Timing (owner ruling 2026-09-27):** the shared deprecation notice promised removal "in v2"
+while this amendment executes the removal in **v1.6.0**. The owner ratified early execution
+explicitly: the three families are removed now, with this amendment as the recorded
+"planned-for-v2, executed-early" waiver, because keeping a half-live deprecated surface
+(named in help text and audit output but unable to drive anything) was judged worse than
+advancing the deletion. Consequences, stated rather than implied: (a) the removal is a
+breaking change (`feat(cli)!`) delivered in a minor release; (b) the v2 milestone no longer
+owes these three surfaces; (c) the CHANGELOG entry is produced by `npm run changelog` at the
+next release cut — its current top section is the already-released 1.6.0, so a doc edit
+would falsify a shipped section, and the waiver is therefore recorded here and in
+`issues/0068` rather than hand-written into generated output.
+
+**Confirmation (owner ruling 2026-09-27):** the HITL basis for this amendment is
+`issues/0068` (user approval recorded 2026-09-22) plus the 2026-09-27 direction to execute
+that ticket. The F075 draft→accepted gate `issues/0122` covers only `task`/`result`/`profile`
+and is **not** re-opened for this amendment; the owner ruled an additional 0122-style
+confirmation ticket unnecessary, on the grounds that 0068 already carries the approval for
+these three surfaces.
+
 **Replacement routes:** `amber governance report` (readiness/risks/next actions),
 `amber maintenance` (stale docs, drift, proposals), and the `amber-diagnosis-adoption`
 journey skill for relocation work.
