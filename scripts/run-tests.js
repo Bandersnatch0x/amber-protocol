@@ -2,6 +2,7 @@
 
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 
 const { collectFilesBySuffix } = require("./lib/core/fs-utils");
@@ -59,6 +60,27 @@ function listRootSessions() {
 }
 const sessionsBefore = new Set(listRootSessions());
 
+// Temp sweep: suites that build fixtures with raw fs.mkdtempSync instead of
+// harness.js trackTempDir leave amber-* trees in os.tmpdir() forever — the
+// child process's exit hook only sees dirs handed out through the helper.
+// Diff the Temp listing across the run and remove amber-* dirs that appeared
+// during it. (2026-09: ~150k leaked dirs/week ate the whole system drive.)
+// ponytail: ceiling — a second concurrent npm test could sweep the first's
+// in-flight fixtures; and Ctrl+C before this line leaves the run's dirs.
+// Prefer new fixtures via harness.js trackTempDir, which needs neither.
+function listTempFixtures() {
+	let entries;
+	try {
+		entries = fs.readdirSync(os.tmpdir(), { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	return entries
+		.filter((e) => e.isDirectory() && e.name.startsWith("amber-"))
+		.map((e) => path.join(os.tmpdir(), e.name));
+}
+const fixturesBefore = new Set(listTempFixtures());
+
 // Relative paths keep the command line inside the Windows 32K limit even
 // from a deep worktree root (325 absolute paths overflow it: ENAMETOOLONG).
 const result = spawnSync(
@@ -71,7 +93,33 @@ const result = spawnSync(
 );
 if (result.error) {
 	console.error(`[amber] test runner failed to launch: ${result.error.message}`);
+	// Sweep what the crashed launch already left behind before bailing out.
+	for (const p of listTempFixtures().filter((f) => !fixturesBefore.has(f))) {
+		try {
+			fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 });
+		} catch {
+			// ponytail: best-effort — a locked fixture must never mask a test result.
+		}
+	}
 	process.exit(1);
+}
+
+// Warn-only, unlike the sessions guard: hundreds of sites still hand out raw
+// mkdtemp fixtures by design; this sweep is the safety net until they migrate
+// to harness.js trackTempDir.
+const leakedFixtures = listTempFixtures().filter((p) => !fixturesBefore.has(p));
+let fixturesFailed = 0;
+for (const p of leakedFixtures) {
+	try {
+		fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 });
+	} catch {
+		fixturesFailed++;
+	}
+}
+if (leakedFixtures.length > 0) {
+	console.error(
+		`[amber] temp sweep: removed ${leakedFixtures.length - fixturesFailed}/${leakedFixtures.length} leaked amber-* fixture dir(s) from Temp.`,
+	);
 }
 
 const leaked = listRootSessions().filter((id) => !sessionsBefore.has(id));
