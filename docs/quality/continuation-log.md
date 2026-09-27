@@ -67,6 +67,19 @@
 - 附注（Time to Trusted Continuation 首个样本）：J0=15:26:58Z，后继者完整作答≈J0+5min（盲读单文件、未运行命令）。成文定义是「J0 到首次通过 J2」——项目级首次通过是 T2，但 T2/T3 未记精确 J0 时钟故不可采样，首样本取自本行（行级时延）；未来行的存档记作答完成时刻。
 - 判定依据引用的存档（`.scratch/orchestration/continuation-t4/`）为本地工件，不入 git；本行即方法主张的入版记录。
 
+| T5（dogfood，计入本月 4 次分母） | 2026-09-27 | 本仓（dogfood） | F077–F082 收口后的继续（H7 runtime、真实取消、定位翻转、交付证据规则、0136–0140 三笔修复） | 2026-09-27（HEAD=`9b25b20`；J0 时 `amber handoff` 重新生成） | `session-handoff.md`（32,927 bytes / 278 行，sha256 `d8dbdfa8…`） | 新 agent 会话（`worker`，fresh context，盲读交接包 + 仓内只读） | 是 | ①改了什么=**对**（近期工作正确归因到 `9b25b20`／issue 0140，与 git 逐字一致；但把 Summary 单元被 session 锚定这一**已知缺口（T1 缺口 #2）**说成「handoff 自我矛盾」，且未去读它本可读的 `.amber/sessions/7e4e09ec-…/manifest.json`） ②谁批准=**缺**（无覆盖 0136–0140 的授权记录；`.amber/approvals`/`evidence`/`artifacts` 不存在；审批仅为 feature 证据行的自由文本串；判定人给「半对」，本行按既有约定与 T0 先例记「缺」） ③证据在哪=**对**（正确指出 `## Verification Evidence` 止于 F082，新工作证据在 `issues/0140` + 提交 diff） ④下一步=**对**（"start the next feature"；执行 `amber next` 得 F001/79 pending/`feature-standard`/0.75，exit 0，逐字复现） | **失败（3/4；②缺）** | 独立判定 agent（`reviewer`，只读；非后继者、非交接包作者） | 否 | 覆盖 F082 之后（0136–0140）的授权/user-direction 记录（手交包内证据行，或 `.amber` 下的 Decision/Approval） |
+
+### T5 判定依据
+
+- ① 判定人核验 refs/reflog：HEAD 自交接包生成后未变（`9b25b20`），最近四条与 handoff 的 Recent commits 逐字对应；`e0c4f2a`（2026-09-20）、`338c07b`、`25a6104`（2026-09-22）均真。此格计 **对**，但后继者的**叙事框架有错**：`.amber/sessions/7e4e09ec-…/manifest.json` 存在且为 43 条 session 记录中最新（`createdAt 2026-09-19`、`status: completed`），Summary 单元**作为 session 记录是准确的**——真问题是 session 叙事 vs git 叙事的老缺口，不是内部矛盾。
+- ② 状态描述属实（目录不存在、审批止于 F082 字符串型证据行），但该格的问题——**谁**批准了最新工作——没有被回答，按击杀规则不得计分。缺失工件：覆盖 0136–0140 的授权记录。**口径分歧已原样保留**：判定人记「半对」，本行按账本既定「通过=4/4」与 T0 同形先例记「缺」；两种读法的取舍需 owner 裁决（「工件确实缺失但被诚实披露」算 缺 还是 半对）。
+- ③④ 无新缺口：③ 正确指出证据主要在手交包之外且 `Verification Evidence` 止于 F082；④ 与手交包 Next Actions 一致且被 CLI 独立佐证。
+- 第五步（T5+ 新增要求）**PASS**：后继者实际执行了一条只读动作并得到与 ④ 一致的输出；监督者用真 node v24.19.0 逐字复现（同四行、exit 0）。但**证据方式有缺陷（P2）**：它用 `git status --porcelain` 自证只读，而 `issues/`、`.amber/`、`.scratch/`、`/.session-handoff.md` 全在 `.gitignore` —— 这些区的写入不会出现在 status 里，它是**盲证人**；判定人指出本可用 `.amber/` 前后哈希对比。
+- 【记录者注记】监督者首次复核自身出错两次并已修正：以 `shell: true` 传 `--objective` 被引号吃掉（得到 "No matching route for objective \"start\""），并以 `process.execPath`（本沙箱为 bun）跑 `--test`（得到 FAIL）。两次均为监督者调用缺陷，非后继者之误；修正后 108/逐字复现/全历史通过三项均成立。
+- 【记录者注记】测量期间有**并行写入者**：`issues/0141`–`0148`（文档治理地图 + 7 子票）于 `2026-09-26T16:28:57` 写入（gitignored 树，HEAD 不变）。后继者当时把 `0141` 读成 `0140` 并报告「id 撞号」，复核时不可复现（0140–0148 现已唯一）；判定人推测其为测量后对 gitignored 树的撞号修正，记为「当时可能成立、现在无法证实或推翻」。当日 open 票因此由 8 升至 16。
+- 存档：`.scratch/orchestration/continuation-t5/README.md`（原始输出、判定人全文摘要、三项复核命令与结果）为本地工件不入 git；本行即方法主张的入版记录。
+- 本行**无修复提交**（T5 为纯测量行）；暴露的三条协议改进已写入存档：只读动作须用状态区哈希而非 `git status` 自证、计数须注记口径（`A..B` 左开；本条 108 vs `--first-parent` 64）、判定 agent 须具备只读命令能力（本次判定人无 shell，靠 reflog 推断并列出了应由监督者执行的命令）。
+
 ## 外部仓记录
 
 与上方 dogfood 表**分开发记账**（账本头规则）。协议与流程见 `docs/product/EXTERNAL_PILOT.md`；开始前的内部前置见 `issues/0135`（发布），参与方见 `issues/0137`。
