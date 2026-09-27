@@ -14,6 +14,8 @@ const { doctor } = require("../../scripts/lib/core/doctor");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const CI_WORKFLOW = path.join(REPO_ROOT, ".github", "workflows", "ci.yml");
+const CODEOWNERS = path.join(REPO_ROOT, ".github", "CODEOWNERS");
+const GOVERNANCE_DOC = path.join(REPO_ROOT, "docs", "agents", "documentation-governance.md");
 
 function tmpProductRepo() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-doc-gate-"));
@@ -43,6 +45,44 @@ describe("CI documentation gates", () => {
 			/amber\.js drift --target/,
 			"the drift step reports n/a for every dimension on a product-repo and was removed (issues/0149)",
 		);
+	});
+});
+
+describe("documentation authority surfaces", () => {
+	it("keeps the governance contract readable from the repository", () => {
+		const doc = fs.readFileSync(GOVERNANCE_DOC, "utf8");
+		for (const section of [
+			"## 1. 权威模型",
+			"## 2. 入口职责矩阵",
+			"## 3. 物理边界矩阵",
+			"## 4. 责任",
+		]) {
+			assert.ok(doc.includes(section), `documentation-governance.md must keep ${section}`);
+		}
+	});
+
+	it("declares AGENTS.md as the single rule source and CLAUDE.md as its mirror", () => {
+		const agents = fs.readFileSync(path.join(REPO_ROOT, "AGENTS.md"), "utf8");
+		const claude = fs.readFileSync(path.join(REPO_ROOT, "CLAUDE.md"), "utf8");
+		assert.match(agents, /single source of repository-level rules/);
+		assert.match(claude, /AGENTS\.md` is the single source of repository-level rules/);
+		assert.match(claude, /docs\/agents\/documentation-governance\.md/);
+	});
+
+	it("routes the documentation surfaces to their owner", () => {
+		const owners = fs.readFileSync(CODEOWNERS, "utf8");
+		for (const route of [
+			"/docs/specs/",
+			"/docs/adr/",
+			"/docs/plans/",
+			"/docs/wiki/",
+			"/CONTEXT.md",
+			"/README.md",
+			"/README.zh-CN.md",
+		]) {
+			const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			assert.match(owners, new RegExp(`^${escaped}`, "m"), `CODEOWNERS must route ${route}`);
+		}
 	});
 });
 

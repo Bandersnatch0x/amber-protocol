@@ -10,6 +10,11 @@ coordination around a specification; it is not a second copy of the normative te
 
 ## Placement and authority
 
+This matrix is the placement summary; the repository-level contract — authority model, entry-point
+duties, physical boundaries, responsibilities, and gates — lives in
+[documentation-governance.md](documentation-governance.md) and is the single place those rules are
+defined.
+
 Use this matrix before creating or moving a document:
 
 | Content | Canonical home | Boundary |

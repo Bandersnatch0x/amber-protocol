@@ -15,6 +15,11 @@ safety:
 Amber Protocol is a repository-local governance layer for agent-assisted engineering.
 All capability is exposed through one CLI entry point.
 
+**This file is the single source of repository-level rules** (boundaries, gates, routing, safety).
+`CLAUDE.md` is the Claude Code mirror of it and must not contradict it — a disagreement is fixed here
+first (issues/0154). Documentation authority, placement, and responsibilities are defined once in
+`docs/agents/documentation-governance.md`.
+
 Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
 
 Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).

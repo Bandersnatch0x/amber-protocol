@@ -175,11 +175,17 @@ All changes must:
 
 ## Documentation Requirements
 
+Repository-level rules — which content is canonical where, who owns it, what is gated — live in
+[docs/agents/documentation-governance.md](./docs/agents/documentation-governance.md). Read it before
+adding a new documentation surface; this section is only the contributor checklist.
+
 When adding new commands or features:
 
 1. Update `README.md` with command examples
 2. Add help text to CLI (see existing `usage()` functions)
-3. Update `CLAUDE.md` if changing core architecture
+3. Register the command in `scripts/lib/command-registry.js`; the platform surfaces
+   (`.claude/commands/`, `.agents/skills/`, `.gemini/commands/amber/`) and the public CLI reference are
+   generated from it and `skills/<name>/SKILL.md` — never edit generated files
 4. Add architecture documentation for significant new components
 
 ## Public Documentation Site & Corpus Governance
@@ -211,6 +217,22 @@ CLI reference pages under `apps/docs/docs/reference/cli/` are generated from `sc
    - Rationale for the change
    - Test coverage summary
    - Any breaking changes noted
+
+### Ownership, review routing, and merge gating
+
+- **Owner:** review routing is declared in [`.github/CODEOWNERS`](./.github/CODEOWNERS). This repository
+  currently has a single maintainer, so every route — including specs, ADRs, plans, the wiki,
+  `CONTEXT.md`, the bilingual entrypoints, and `apps/docs/` — names that owner, and the global fallback
+  covers anything else. Same-person routing is deliberate here, not a missing assignment.
+- **Publishing and rollback:** the same owner carries both (content ownership, release authorization, and
+  rollback responsibility are not separated while there is one maintainer). The mechanical release gates
+  are listed in the Release Process section; rollback steps are in
+  [docs/quality/rollback-procedures.md](./docs/quality/rollback-procedures.md).
+- **Merge gating (unverified):** whether branch protection makes the `test`/`docs` jobs required before
+  merge cannot be proven from repository files. Until the maintainer confirms the GitHub repository
+  settings and writes the result back here, treat a green workflow as **evidence of a passing run, not of
+  a blocked merge**. This limitation is recorded in `issues/0145`, `issues/0148`, and
+  `issues/0154`; it is not a claim that protection is missing.
 
 ## Design Principles
 

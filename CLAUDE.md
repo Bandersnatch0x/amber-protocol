@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Precedence (issues/0151, 0154): `AGENTS.md` is the single source of repository-level rules**
+(boundaries, gates, routing, safety). This file is the Claude Code mirror: it may add platform-specific
+guidance and descriptive architecture notes, but it must never contradict `AGENTS.md`. If the two
+disagree, `AGENTS.md` wins and this file is corrected. Documentation authority, placement, and
+responsibilities are defined once in [docs/agents/documentation-governance.md](docs/agents/documentation-governance.md).
+
 Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
 
 Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).

@@ -38,3 +38,14 @@
 # Public Documentation Site
 /apps/docs/                 @Bandersnatch0x
 
+# Documentation authority routes (issues/0154 — same owner, explicit routing)
+/docs/specs/                @Bandersnatch0x
+/docs/adr/                  @Bandersnatch0x
+/docs/plans/                @Bandersnatch0x
+/docs/wiki/                 @Bandersnatch0x
+/docs/agents/               @Bandersnatch0x
+/CONTEXT.md                 @Bandersnatch0x
+/README.md                  @Bandersnatch0x
+/README.zh-CN.md            @Bandersnatch0x
+/CONTRIBUTING.md            @Bandersnatch0x
+
