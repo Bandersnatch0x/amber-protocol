@@ -4,7 +4,7 @@
 // consistency review D-4).
 //
 // The reference repo records rule adjudications as a structured, chain-hashed
-// event stream; coding-harness had only prose `issues/` Log. This ledger closes
+// event stream; this repository had only prose `issues/` Log. This ledger closes
 // that gap. Like the canonical-source gates (issues/0150), these checks are
 // read-only and repository-local: the ledger is tracked at docs/governance/, so
 // the chain verifies on a fresh clone and in CI without any `.amber/` runtime.
