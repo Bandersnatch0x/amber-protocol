@@ -88,3 +88,101 @@ test("the dependency note for phase records that it has no promotion shortcut", 
 	assert.match(section, /explicit authorization/);
 	assert.match(section, /never destructive/);
 });
+
+// issues/0150 (adjudicated under issues/0141): the reference stayed hand-written,
+// so the registry's own option contract is the mechanical check. Every invocation
+// the reference shows must use only options that the registry declares for that
+// command (or its subcommands), which is what the generated skill/MCP surfaces
+// are built from. Descriptions and examples are deliberately out of scope.
+const GLOBAL_OPTIONS = new Set([
+	"--target",
+	"--json",
+	"--help",
+	"--all",
+	"--verbose",
+	"--quiet",
+	"--force",
+	"--yes",
+	"--confirm",
+]);
+
+function registry() {
+	return require(REGISTRY);
+}
+
+function allowedOptionsByCommand() {
+	const reg = registry();
+	const allowed = new Map();
+	for (const command of reg.COMMANDS) {
+		const options = new Set([
+			...(reg.commandInvocationContract(command)?.allowedOptions || []),
+			...GLOBAL_OPTIONS,
+		]);
+		for (const subcommand of reg.knownSubcommands(command) || []) {
+			for (const option of reg.commandInvocationContract(command, subcommand)?.allowedOptions ||
+				[]) {
+				options.add(option);
+			}
+		}
+		allowed.set(command, options);
+	}
+	return allowed;
+}
+
+function invocationSpans(doc) {
+	return [...doc.matchAll(/`([^`\n]*amber [^`\n]*)`/g)].map((match) => match[1]);
+}
+
+function normalizeInvocation(span) {
+	return span.replace(/^\s*(\$\s*)?(node\s+scripts\/amber\.js|amber)\s+/, "").trim();
+}
+
+function optionViolations(doc) {
+	const reg = registry();
+	const allowed = allowedOptionsByCommand();
+	const violations = [];
+	for (const span of invocationSpans(doc)) {
+		const invocation = normalizeInvocation(span);
+		// Top-level flags (`amber --help`) and placeholder forms (`amber <command>`)
+		// are not command invocations.
+		if (!invocation || invocation.startsWith("--") || invocation.startsWith("<")) continue;
+		const command = invocation.split(/\s+/)[0];
+		if (!reg.COMMANDS.includes(command)) {
+			violations.push(`${invocation} — \`${command}\` is not a registry command`);
+			continue;
+		}
+		const options = new Set(allowed.get(command));
+		const unknown = [...new Set([...invocation.matchAll(/--[a-z0-9-]+/g)].map((m) => m[0]))].filter(
+			(option) => !options.has(option),
+		);
+		if (unknown.length > 0) {
+			violations.push(`${invocation} — undeclared option(s): ${unknown.join(", ")}`);
+		}
+	}
+	return violations;
+}
+
+test("documented invocations use only registry-declared options", () => {
+	const doc = fs.readFileSync(CLI_REFERENCE, "utf8");
+	const violations = optionViolations(doc);
+	assert.deepEqual(
+		violations,
+		[],
+		`documented invocations disagree with the registry:\n${violations.join("\n")}`,
+	);
+});
+
+test("the option gate discriminates: an invented option is reported", () => {
+	const doc = fs.readFileSync(CLI_REFERENCE, "utf8");
+	const probe = "amber session lease --session <id> --owner-id";
+	assert.ok(doc.includes(probe), "the discrimination fixture must name a real documented span");
+	const tampered = doc.replace(
+		probe,
+		"amber session lease --session <id> --not-a-real-option --owner-id",
+	);
+	const violations = optionViolations(tampered);
+	assert.ok(
+		violations.some((entry) => entry.includes("--not-a-real-option")),
+		"an undeclared option must be reported",
+	);
+});

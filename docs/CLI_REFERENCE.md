@@ -2024,12 +2024,18 @@ Knowledge Plan subcommands (declarative plan + structured knowledge base):
 
 ```bash
 node scripts/amber.js wiki knowledge plan --target .      # pre-flight inspection + propose or update the plan
-node scripts/amber.js wiki knowledge scaffold --target .  # scaffold docs/wiki/knowledge-plan.json (or --yaml)
+node scripts/amber.js wiki knowledge scaffold --target .  # scaffold docs/wiki/knowledge-plan.json (canonical; --yaml writes the interoperable YAML variant instead)
 node scripts/amber.js wiki knowledge inspect --target .   # dump the loaded plan
 node scripts/amber.js wiki knowledge report --target .    # coverage report against declared documents
 node scripts/amber.js wiki knowledge validate --target .  # schema validation of the plan
 node scripts/amber.js wiki knowledge build --target .     # materialize pages under docs/wiki/knowledge/
 ```
+
+`knowledge build` is a one-shot gap-filling scaffold, not a reproducible build: pages that already
+exist are skipped and never overwritten, so editorially revised pages survive. This repository keeps
+exactly one plan file, `docs/wiki/knowledge-plan.json` — the loader also accepts a `.yaml` plan as an
+external-format import (load order: JSON → YAML → `.amber/knowledge-plan.yaml`), but JSON is canonical
+here.
 
 ### status
 

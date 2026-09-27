@@ -215,7 +215,7 @@ const COMMAND_HELP = {
 		"Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.",
 		"",
 		"Subcommands:",
-		'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive]',
+		'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive] [--agent <id>]',
 		"      Create a new session, write manifest + timeline, optionally create worktree.",
 		"  status [<id>]",
 		"      Show status of current session or specified session by ID.",

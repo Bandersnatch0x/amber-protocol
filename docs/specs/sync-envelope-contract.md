@@ -84,7 +84,7 @@ the admission pipeline):
 | `loop-contract` | `workflow-packs/<name>.pack.json` |
 | `context-page` | `.amber/context/pages/<pageId>.json` |
 | `context-request` | `.amber/context/requests/<requestId>.json` |
-| `knowledge-plan` | `docs/wiki/knowledge-plan.json` (or `.yaml`) |
+| `knowledge-plan` | `docs/wiki/knowledge-plan.json` (canonical; a `.yaml` plan is accepted as an external-format import) |
 | `workflow-assessment` | `docs/workflow-assessment.md` (or `.json`) |
 | `memory-entry` | `.amber/memory/registry/<entryId>.json` |
 | `memory-request` | `.amber/memory/requests/<requestId>.json` |

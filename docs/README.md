@@ -2,6 +2,8 @@
 
 欢迎来到 Amber Protocol 的文档中心。Amber Protocol 是一个为 AI 辅助开发设计的仓库级治理与控制层。
 
+> **范围声明（0141 裁决 16）：** 本文件是**仓库内**文档的导航入口，不等于公开发布的文档语料。公开文档站只发布 manifest allowlist 中的 Layer A 内容（内部 ADR/spec/wiki 只能作为改写输入，`.amber/**`、agent 指令与内部评审树禁止发布）；公开站的权威 CLI 参考与页面以 [Public Documentation Site](../apps/docs/) 为准。仓库级文档治理规则见 [documentation-governance.md](agents/documentation-governance.md)。
+
 ## 🚀 新用户入门
 
 **第一次使用？从这里开始：**
@@ -97,6 +99,4 @@
 
 ---
 
-**最后更新：** 2026-09-03
-
-**文档版本：** 与 Amber Protocol v1.1.0 同步
+**版本口径：** 本文档中心不声明自身版本号；当前版本以根 `package.json` 的 `version` 与 [CHANGELOG](product/release/CHANGELOG.md) 为准（相对链接，避免版本号再次漂移）。

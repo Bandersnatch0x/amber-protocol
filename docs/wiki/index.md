@@ -35,7 +35,9 @@ do not execute workflows or mutate repository state.
 
 This repository supports a declarative Knowledge Plan capability.
 
-- Plan file: `docs/wiki/knowledge-plan.json` (or `.yaml`). Supports common external plan file formats for interoperability.
+- Plan file: `docs/wiki/knowledge-plan.json` — the canonical plan for this repository (one plan file only).
+  The loader also still accepts a plan written in a common external YAML plan format for
+  interoperability, but the JSON file wins by load order and no second plan file is kept here.
 - `amber wiki knowledge build` materializes structured knowledge pages under
   `docs/wiki/knowledge/`.
 - Commands:
