@@ -132,6 +132,14 @@ and `profile deployment` (the only supported deployment-profile writer) are unto
 `amber maintenance` (stale docs, drift, proposals), and the `amber-diagnosis-adoption`
 journey skill for relocation work.
 
+**Verification:** the completeness clause above is mechanically guarded by
+`tests/unit/removed-command-references.test.js` — live surfaces must not name a removed
+family, and the three allowed mentions (this disposition table, the public version-history
+page, and the continuity guide's removal note) each carry their own tighter constraint.
+The removal and its first follow-up fixes passed a two-axis review (Standards + Spec, plus
+an adversarial pass) on 2026-09-27; the report is a local artifact (`.scratch/`) and the
+conclusions are recorded in `issues/0068`.
+
 ## Further Notes
 
 - Design decisions follow the standing user directive (map `issues/0066` close-out

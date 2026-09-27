@@ -47,7 +47,10 @@ const LIVE_FILES = ["AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "docs/CLI_REFER
 const ALLOWED_SURFACES = new Map([
 	[
 		"scripts/lib/harness/legacy-core.js",
-		{ mode: "disposition-table", why: "F075 §52 disposition table — where removed surfaces are declared" },
+		{
+			mode: "disposition-table",
+			why: "F075 §52 disposition table — where removed surfaces are declared",
+		},
 	],
 	[
 		"apps/docs/docs/about/version-history.md",
@@ -55,7 +58,10 @@ const ALLOWED_SURFACES = new Map([
 	],
 	[
 		"apps/docs/docs/guides/session-handoff-and-continuity.md",
-		{ mode: "marker-line", why: "names the removed command while explaining the current .gitignore advice" },
+		{
+			mode: "marker-line",
+			why: "names the removed command while explaining the current .gitignore advice",
+		},
 	],
 ]);
 
