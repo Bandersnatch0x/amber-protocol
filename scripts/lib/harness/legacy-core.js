@@ -195,7 +195,7 @@ const LEGACY_DISPOSITIONS = Object.freeze([
 		correspondence: null,
 		status:
 			"removed (no harness correspondence — the local distribution-metadata install path has no surviving driver once the command is gone)",
-		replacement: "amber maintenance (scaffold drift, upgrade guidance); amber doctor",
+		replacement: "amber maintenance (scaffold drift, artifact drift); amber doctor",
 	},
 	{
 		surface: "adoption",

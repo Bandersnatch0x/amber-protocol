@@ -164,7 +164,7 @@ const COMMAND_HELP = {
 	result:
 		"⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2.",
 	maintenance:
-		"Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.",
+		"Inspect stale docs, wiki lint readiness, scaffold drift, artifact drift, distill candidates, and reviewable maintenance proposals.",
 	loop: [
 		"Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
 		"Loop status accepts one ledger JSON file or a directory and reports bounded no-progress signals without executing anything.",

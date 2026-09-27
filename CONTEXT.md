@@ -667,7 +667,7 @@ The separate role assigned in an orchestration record to evaluate worker output 
 _Avoid_: checker, verifier, approver
 
 **Maintenance Proposal**:
-A reviewable artifact suggesting updates for stale knowledge, upgrade guidance, drift, repeated findings, or regression candidates. Produced by `maintenance propose`; does not automatically modify wiki, standards, or tests.
+A reviewable artifact suggesting updates for stale knowledge, scaffold/artifact drift, repeated findings, or regression candidates. Produced by `maintenance propose`; does not automatically modify wiki, standards, or tests.
 _Avoid_: auto-fix, cleanup task, maintenance run
 
 **Regression Proposal**:

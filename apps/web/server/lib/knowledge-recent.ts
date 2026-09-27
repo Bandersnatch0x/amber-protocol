@@ -15,7 +15,7 @@ const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/web-adapter.
   buildKnowledgeGraph: (target: string) => RawGraph;
 };
 const { inspectMaintenance } = requireCli('../../../../scripts/lib/web-adapter.js') as {
-  inspectMaintenance: (target: string, registryPath?: string) => MaintenanceInspection;
+  inspectMaintenance: (target: string) => MaintenanceInspection;
 };
 
 const execFileAsync = promisify(execFile);
@@ -106,7 +106,6 @@ interface RawDrift {
 interface MaintenanceInspection {
   staleDocs?: Array<{ path?: unknown; reason?: unknown }>;
   wikiLint?: { errors?: unknown[]; warnings?: unknown[] };
-  rulePackDrift?: { drifted?: unknown; diff?: unknown[] };
   evolutionRollup?: Array<{ text?: unknown }>;
   regressionProposals?: Array<{ taskId?: unknown; assertion?: unknown }>;
   scaffoldDrift?: { files?: Array<{ path?: unknown; classification?: unknown }> };
@@ -316,11 +315,6 @@ export function collectMaintenanceChanges(
       const id = text(finding.id);
       const classification = text(finding.classification);
       if (id && classification === 'drifted') add(`artifact:${id}`, `${id}: ${classification}`);
-    }
-  }
-  if (inspection.rulePackDrift?.drifted) {
-    for (const finding of inspection.rulePackDrift.diff ?? []) {
-      add(`rule-pack:${String(finding)}`, finding);
     }
   }
   for (const [index, finding] of (inspection.errors ?? []).entries()) {

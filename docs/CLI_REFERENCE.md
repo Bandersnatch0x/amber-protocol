@@ -1878,8 +1878,7 @@ node scripts/amber.js maintenance inspect --target .
 Reports:
 - Stale documentation
 - Wiki lint issues
-- Rule pack drift
-- Upgrade opportunities
+- Scaffold drift and artifact drift
 
 ### maintenance propose
 

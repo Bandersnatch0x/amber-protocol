@@ -63,10 +63,9 @@ scripts/lib/cli-typed-seam.js -> CLI projection of the shared Action capability 
 scripts/lib/context/          -> Public Context Interface and command adapter boundary
 scripts/lib/core/registry-ledger.js -> Shared tamper-evident ledger and Decision primitives
 scripts/lib/core/ledger-family.js -> Declarative factory for full-orchestration ledger families
-scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
+scripts/lib/core/             -> Domain modules (loops, doctor, profiles, governance, etc.); imported directly (no facade — ADR-0005)
 scripts/lib/core/context-*.js -> Context lifecycle, assurance evidence, projections, benchmarks, source adapters, retention, and Loadout assembly
 scripts/lib/core/governed-runner.js -> Governed execution gates (ledger, policy, confidence, approval, worktree)
-scripts/lib/core/agent-orchestration.js -> Artifact-only worker/reviewer dispatch records and approval markers
 scripts/lib/migrate-command.js -> Schema migration and ADR-0012 version backfill for recognized artifacts
 scripts/lib/route-commands.js -> Route engine (loader, selector, inspector)
 scripts/lib/session-commands.js -> Session lifecycle (start, status, list, abort, continue)
@@ -83,7 +82,7 @@ apps/web/                     -> Phase C web viewer (Vite + React + tRPC)
 
 ### Control Layers (Priority Order)
 
-1. **Governance** (Highest) - Approval records, policy boundaries, adoption controls
+1. **Governance** (Highest) - Approval records, policy boundaries, and governed acceptance controls
 2. **Verification** (High) - Doctor, audit, validation, review, gate surfaces
 3. **Observability** (High) - Timelines, manifests, ledgers, reports
 4. **Lifecycle** (Medium) - Routes, sessions, checkpoints, worktrees
@@ -155,20 +154,15 @@ node scripts/amber.js session abort <session-id>
 node scripts/amber.js session continue
 ```
 
-### Adoption (for existing projects)
+### Diagnosis (for existing projects)
+
+The `adoption` command family was removed (issues/0068). Use the governance report and the
+read-only audit for the same diagnosis:
 
 ```bash
-# Generate adoption report
-node scripts/amber.js adoption report --target path/to/project --output-dir docs/examples/adoptions
-
-# Create adoption bundle
-node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle
-
-# Gate check
-node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions
-
-# Generate next actions
-node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md
+# Read-only inspection, then a scored readiness/risks/next-actions report
+node scripts/amber.js audit --target path/to/project
+node scripts/amber.js governance report --target path/to/project --json
 ```
 
 ### Migration
@@ -227,7 +221,7 @@ the first-round candidate list live in **[`docs/dogfood-weekly.md`](docs/dogfood
 ### Key Design Principles
 
 1. **Idempotency**: `init` and `wiki` commands skip existing files; re-running is safe
-2. **Read-Only by Default**: `audit` and adoption reports never modify target projects
+2. **Read-Only by Default**: `audit` and `governance report` never modify target projects
 3. **Dry-Run First**: Planning and review commands generate artifacts before execution
 4. **Safety Boundaries**: V1 does NOT execute dynamic workflows, dispatch live agents, or auto-rewrite existing project docs
 5. **Schema-Driven**: All route/session/timeline structures are validated against JSON Schema

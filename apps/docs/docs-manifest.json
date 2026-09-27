@@ -343,7 +343,7 @@
       "path": "reference/cli/maintenance.md",
       "group": "Reference",
       "title": "amber maintenance",
-      "description": "Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.",
+      "description": "Inspect stale docs, wiki lint readiness, scaffold drift, artifact drift, distill candidates, and reviewable maintenance proposals.",
       "layer": "Generated"
     },
     {

@@ -292,7 +292,7 @@ function fixWikiMarkers(projectRoot) {
 	return { fixed, fixedCount: fixed.length };
 }
 
-// The 8 maintenance actions this dispatch chokepoint owns. handleMaintenance
+// The maintenance actions this dispatch chokepoint owns. handleMaintenance
 // routes its two sibling actions (scaffold-drift, distill) itself; every other
 // maintenance action flows through runMaintenanceAction so the per-branch arg
 // shaping (thresholdDays/threshold parse, fixMarkers conditional) lives in

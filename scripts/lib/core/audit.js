@@ -365,9 +365,11 @@ function auditTargetRepo(targetRoot, classification) {
 		untouchedFiles: conflicts,
 		...buildAuditDetection(targetRoot),
 		nextSafeCommand: buildNextSafeCommand(targetRoot),
-		// After audit on an existing unharnessed repo, next is init (or adoption report).
+		// After audit on an existing unharnessed repo the next step is init; the
+		// follow-up diagnosis route is the governance report (the adoption command
+		// family was removed — issues/0068).
 		nextAfterAudit: `node scripts/amber.js init --target ${JSON.stringify(targetRoot)}`,
-		adoptionHint: "amber adoption report --target . --output-dir docs/examples/adoptions",
+		nextDiagnosisCommand: `node scripts/amber.js governance report --target ${JSON.stringify(targetRoot)} --json`,
 	};
 }
 

@@ -62,7 +62,7 @@ amber <command> --target <repo> [options]
 | <code>learnings</code> | Inspect post-accept learning write-back triggers for a feature, or book the review. | No | [Docs](/reference/cli/learnings) |
 | <code>break-loop</code> | Scaffold and validate a post-mortem for a defect class that recurred after a fix (recurrence >= 2). | No | [Docs](/reference/cli/break-loop) |
 | <code>pack</code> | Inspect or validate declarative workflow packs without executing them. | No | [Docs](/reference/cli/pack) |
-| <code>maintenance</code> | Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals. | No | [Docs](/reference/cli/maintenance) |
+| <code>maintenance</code> | Inspect stale docs, wiki lint readiness, scaffold drift, artifact drift, distill candidates, and reviewable maintenance proposals. | No | [Docs](/reference/cli/maintenance) |
 | <code>loop</code> | Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling. | Yes | [Docs](/reference/cli/loop) |
 | <code>ledger</code> | Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM. | Yes | [Docs](/reference/cli/ledger) |
 | <code>route</code> | Inspect, validate, and dry-run delivery routes from routes/*.route.json. | Yes | [Docs](/reference/cli/route) |

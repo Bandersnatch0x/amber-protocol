@@ -8,8 +8,7 @@ Last Reviewed: 2026-08-08
 
 Concise, high-signal facts for rapid orientation.
 
-- **core-engine** — scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, adoption, scaffold, maintenance, team, and workflow-pack logic. _(architecture, core)_
-- **adoption-composer** — scripts/lib/core/adoption-composer/ is a sub-module with dedicated renderers (bundle, decision, gate, report) for composing adoption reports — split from the core adoption logic. _(adoption)_
+- **core-engine** — scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, scaffold, maintenance, and workflow-pack logic. _(architecture, core)_
 - **cli-wrappers** — scripts/lib/*-commands.js files are thin CLI command handlers. They parse arguments and delegate to scripts/lib/core/ functions. Map each to its core counterpart. _(cli, architecture)_
 - **aux-modules** — src/migration/ and src/security/ are auxiliary utility modules separate from the CLI core. Migration handles state schema upgrades; security provides read-only scanners (dependency, permission, secret). _(migration, security)_
 - **skills-source-of-truth** — skills/ contains the platform-agnostic `amber` router and four deep journey definitions. Platform-specific files in .claude/, .agents/skills/, .gemini/commands/ are generated, never hand-edited. Run `npm run gen:agents` after changing skills/. _(skills, generation)_

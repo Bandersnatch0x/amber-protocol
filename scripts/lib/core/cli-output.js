@@ -730,79 +730,6 @@ function renderGateReport(result) {
 	printErrorFooter(result);
 }
 
-function renderAdoptionKind(result) {
-	const { kind } = result;
-	console.log(`Output: ${result.outputPath || "n/a"}`);
-	console.log(`Target: ${result.target || "n/a"}`);
-	console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
-	if (kind === "adoption-selected-files") {
-		console.log(
-			`Selected files: ${Array.isArray(result.selectedFiles) ? result.selectedFiles.length : 0}`,
-		);
-		console.log(
-			`Required selected: ${Array.isArray(result.requiredSelected) ? result.requiredSelected.length : 0}`,
-		);
-		console.log(
-			`Optional selected: ${Array.isArray(result.optionalSelected) ? result.optionalSelected.length : 0}`,
-		);
-	}
-	if (kind === "adoption-apply-plan") {
-		console.log(`Dry run: ${result.dryRun}`);
-		console.log(`Apply ready: ${result.applyReady}`);
-		console.log(`Created preview: ${result.preview ? result.preview.created.length : 0}`);
-		console.log(`Skipped existing: ${result.preview ? result.preview.skipped.length : 0}`);
-	}
-	if (kind === "adoption-decision-record" || kind === "adoption-next-actions") {
-		console.log(`Gate decision: ${result.gateDecision}`);
-	}
-	if (kind === "adoption-decision-record") {
-		console.log(`Approval status: ${result.approvalStatus}`);
-		console.log(`Decisions: ${Array.isArray(result.decisions) ? result.decisions.length : 0}`);
-		if (Array.isArray(result.decisions)) {
-			for (const decision of result.decisions) {
-				console.log(`  - ${decision.id}: ${decision.status}`);
-			}
-		}
-	}
-	if (kind === "adoption-next-actions") {
-		console.log(
-			`Approval gates: ${Array.isArray(result.approvalGates) ? result.approvalGates.length : 0}`,
-		);
-		if (Array.isArray(result.approvalGates)) {
-			for (const gate of result.approvalGates) {
-				console.log(`  - ${gate.id}: ${gate.question}`);
-			}
-		}
-	}
-	if (kind === "adoption-bundle") {
-		console.log(`Latest report: ${result.latestReport || "none"}`);
-		console.log(`Gate decision: ${result.gateDecision}`);
-		console.log(`Files: ${Array.isArray(result.files) ? result.files.length : 0}`);
-		if (Array.isArray(result.files)) {
-			for (const file of result.files) {
-				console.log(`  - ${file.relativePath}`);
-			}
-		}
-		console.log(`Next safe action: ${result.nextSafeAction}`);
-	}
-	if (kind === "adoption-status") {
-		console.log(`Reports: ${result.reports.count}`);
-		console.log(`Latest report: ${result.latestReport ? result.latestReport.file : "none"}`);
-		console.log(`Index checked: ${result.index.checked}`);
-		console.log(`Index valid: ${result.index.valid ?? "n/a"}`);
-		console.log(`Gate decision: ${result.gate.decision}`);
-		if (result.outputPath) {
-			console.log(`Status report: ${result.outputPath}`);
-		}
-		console.log(`Blockers: ${result.blockers.length}`);
-		for (const blocker of result.blockers) {
-			console.log(`  - ${blocker.id}: ${blocker.message}`);
-		}
-		console.log(`Next safe action: ${result.nextSafeAction}`);
-	}
-	printErrorFooter(result);
-}
-
 function renderGeneric(result) {
 	console.log(`Target: ${result.target || "n/a"}`);
 	if (typeof result.text === "string") {
@@ -916,11 +843,6 @@ const SHAPE_RENDERERS = Object.freeze([
 		id: "gate-report",
 		match: (r) => r.report && r.decision && Array.isArray(r.findings),
 		render: renderGateReport,
-	},
-	{
-		id: "adoption",
-		match: (r) => typeof r.kind === "string" && r.kind.startsWith("adoption-"),
-		render: renderAdoptionKind,
 	},
 	{
 		id: "approval-required",

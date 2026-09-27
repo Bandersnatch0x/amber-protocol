@@ -85,12 +85,6 @@
         "hints": "Cover session-commands.js, session-state-machine.js, session-manifest.js, route-commands.js, route-loader.js, checkpoint-manager.js, worktree-manager.js, and lifecycle.js."
       },
       {
-        "title": "Adoption System",
-        "goal": "Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module.",
-        "parent": "",
-        "hints": "Cover adoption-reports.js, adoption-proposals.js, adoption-gate.js, adoption-metrics.js, adoption-bundle.js, and the adoption-composer/ sub-module with its renderers."
-      },
-      {
         "title": "Loop Engineering & Governed Execution",
         "goal": "Document loop contracts, ledgers, dry-run mode, and the four-gate governed execution path.",
         "parent": "",
@@ -131,13 +125,8 @@
   "knowledgeCards": [
     {
       "id": "core-engine",
-      "text": "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, adoption, scaffold, maintenance, team, and workflow-pack logic.",
+      "text": "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, scaffold, maintenance, and workflow-pack logic.",
       "tags": ["architecture", "core"]
-    },
-    {
-      "id": "adoption-composer",
-      "text": "scripts/lib/core/adoption-composer/ is a sub-module with dedicated renderers (bundle, decision, gate, report) for composing adoption reports — split from the core adoption logic.",
-      "tags": ["adoption"]
     },
     {
       "id": "cli-wrappers",

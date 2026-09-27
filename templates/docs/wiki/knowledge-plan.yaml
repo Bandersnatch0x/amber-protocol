@@ -49,9 +49,6 @@ knowledgePlan:
     - title: "Session & Lifecycle Management"
       goal: "Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine."
       hints: "Cover session-commands.js, session-state-machine.js, session-manifest.js, route-commands.js, route-loader.js, checkpoint-manager.js, worktree-manager.js, and lifecycle.js."
-    - title: "Adoption System"
-      goal: "Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module."
-      hints: "Cover adoption-reports.js, adoption-proposals.js, adoption-gate.js, adoption-metrics.js, adoption-bundle.js, and the adoption-composer/ sub-module with its renderers."
     - title: "Loop Engineering & Governed Execution"
       goal: "Document loop contracts, ledgers, dry-run mode, and the four-gate governed execution path."
       hints: "Cover loops.js, loop-execution.js, loop-ledger.js, loop-policy.js, governed-runner.js, execution-validator.js."
@@ -73,8 +70,7 @@ knowledgePlan:
 
 knowledgecard:
   notes:
-    - text: "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, adoption, scaffold, maintenance, team, and workflow-pack logic."
-    - text: "scripts/lib/core/adoption-composer/ is a sub-module with dedicated renderers (bundle, decision, gate, report) for composing adoption reports."
+    - text: "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, scaffold, maintenance, and workflow-pack logic."
     - text: "scripts/lib/*-commands.js files are thin CLI command handlers. They parse arguments and delegate to scripts/lib/core/ functions."
     - text: "src/migration/ and src/security/ are auxiliary utility modules separate from the CLI core."
     - text: "skills/ contains platform-agnostic skill definitions. Platform files are generated from skills/."

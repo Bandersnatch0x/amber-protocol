@@ -18,6 +18,6 @@ User input: $ARGUMENTS
 
 Evidence order: target classification, read-only audit, readiness findings, proposed file set, approval, created/skipped files, post-change doctor and validation.
 
-On failure, leave existing files untouched, report the exact conflict and recovery command, and retain any dry-run report. Deprecated `adoption` commands remain available through `amber --all`, but prefer audit/governance for new work.
+On failure, leave existing files untouched, report the exact conflict and recovery command, and retain any dry-run report. The deprecated `adoption` command family was removed (issues/0068) — use audit/`governance report` for new work.
 
 Preserve the same approval, isolation, and ledger boundaries when diagnosis becomes a delivery change. This journey never treats a diagnostic result as write authority.

@@ -261,10 +261,10 @@
 			],
 			"evidence": [
 				{
-					"command": "node --test tests/phase-v4.test.js tests/phase-v4-5.test.js tests/unit/build-replay-content.test.js tests/unit/governance-report.test.js",
+					"command": "node --test tests/phase-v4.test.js tests/unit/build-replay-content.test.js tests/unit/governance-report.test.js",
 					"result": "23 passed, 0 failed",
 					"date": "2026-08-07",
-					"notes": "Covers strict task Session binding, producer-to-governance evidence, replay compatibility, and preparation-coordinate refactoring."
+					"notes": "Covers strict task Session binding, producer-to-governance evidence, replay compatibility, and preparation-coordinate refactoring. (Recorded command string kept as history; the file it named, tests/phase-v4-5.test.js, was removed 2026-09-27 with the deprecated agent/team/adoption families — issues/0068.)"
 				},
 				{
 					"command": "npm test",
@@ -416,7 +416,7 @@
 			"user_visible_behavior": "Converge the ~35-command surface behind an intent router with deep journey skills and a default-help projection, as a follow-up to the F018 typed governance seam.",
 			"status": "accepted",
 			"verification": [
-				"node --test tests/unit/cli-typed-seam.test.js tests/unit/journey-router.test.js tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js tests/amber-cli.test.js tests/integration/session-commands.test.js tests/integration/amber-mcp.test.js tests/integration/amber-next.test.js tests/integration/action-type-schema.test.js tests/integration/interactive-session.test.js tests/load/sequential-sessions.test.js tests/phase-v4.test.js tests/phase-v4-5.test.js tests/e2e/autonomous-session.test.js tests/e2e/concurrent-sessions.test.js tests/e2e/product-service-packages.test.js",
+				"node --test tests/unit/cli-typed-seam.test.js tests/unit/journey-router.test.js tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js tests/amber-cli.test.js tests/integration/session-commands.test.js tests/integration/amber-mcp.test.js tests/integration/amber-next.test.js tests/integration/action-type-schema.test.js tests/integration/interactive-session.test.js tests/load/sequential-sessions.test.js tests/phase-v4.test.js tests/e2e/autonomous-session.test.js tests/e2e/concurrent-sessions.test.js tests/e2e/product-service-packages.test.js",
 				"npm test",
 				"npm run manifests",
 				"npm run doctor",

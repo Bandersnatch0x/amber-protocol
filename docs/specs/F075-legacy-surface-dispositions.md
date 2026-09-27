@@ -2,7 +2,7 @@
 
 **spec_id:** F075
 **Status:** accepted
-**Updated:** 2026-09-24
+**Updated:** 2026-09-27
 **Provenance:** Harness v2 proposal §20 (旧命令作为 compatibility surface，逐步复用 Harness Core), §52 Rules 4–7 (declared, not improvised: Rule 4 adapters read old ledgers; Rule 6 session maps to Session; the mapping discipline of ADR-0101 decision 4), ADR-0101 decision 4 (each mapping lands as an adapter with a conformance test); wayfinder map `issues/0066` close-out (task/result/profile inspect kept as §52 migration targets — the last old-surface disposition); the legacy frozen writer (`scripts/lib/core/task-execution.js`: `persistExecutionArtifacts` writes `ledger.json`/`evidence.json`/`replay.md` under `.amber/executions/<taskId>/` plus `.amber/worktrees/<taskId>/`); user direction 2026-09-24 (「先做2,3,4」)
 **Feature:** F075
 

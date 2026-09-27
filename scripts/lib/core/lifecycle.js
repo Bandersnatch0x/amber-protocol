@@ -212,7 +212,7 @@ const STEPS = [
 			Boolean(ctx.state.existingProject),
 		isDone: () => true,
 		why: () =>
-			"this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.",
+			"this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber governance report.",
 		remedy: (ctx) => `amber audit --target ${shellQuote(ctx.targetDisplay)}`,
 	},
 	{

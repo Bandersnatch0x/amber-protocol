@@ -117,7 +117,6 @@ function scoreSections(readiness, maintenance) {
 
 	const maintenancePenalty =
 		Math.min(35, (maintenance.staleDocs || []).length * 4) +
-		(maintenance.rulePackDrift?.drifted ? 20 : 0) +
 		(maintenance.scaffoldDrift?.drifted ? 20 : 0) +
 		(maintenance.artifactDrift?.drifted ? 15 : 0) +
 		Math.min(20, (maintenance.errors || []).length * 10);
@@ -350,7 +349,6 @@ function buildGovernanceReport(target, options = {}) {
 		maintenance: {
 			staleDocs: maintenance.staleDocs || [],
 			wikiLint: maintenance.wikiLint || {},
-			rulePackDrift: maintenance.rulePackDrift || {},
 			scaffoldDrift: maintenance.scaffoldDrift || {},
 			artifactDrift: maintenance.artifactDrift || {},
 			errors: maintenance.errors || [],

@@ -55,7 +55,7 @@ This checklist ensures quality and consistency for Amber Protocol releases.
   - [ ] `amber init` creates expected files
   - [ ] `amber audit --summary` completes without errors
   - [ ] `amber doctor` passes all checks
-  - [ ] `amber adoption report` generates valid output
+  - [ ] `amber governance report` generates valid output (the `amber adoption report` check retired with that command family — issues/0068)
 - [ ] Test in Docker isolation (see Docker testing section below)
 
 ### Simulated External User Testing

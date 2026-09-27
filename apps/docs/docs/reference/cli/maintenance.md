@@ -2,7 +2,7 @@
 id: maintenance
 title: "amber maintenance"
 sidebar_label: "maintenance"
-description: "Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals."
+description: "Inspect stale docs, wiki lint readiness, scaffold drift, artifact drift, distill candidates, and reviewable maintenance proposals."
 ---
 
 import CommandBlock from '@site/src/components/command-block';
@@ -18,7 +18,7 @@ import CommandBlock from '@site/src/components/command-block';
 
 ## Summary
 
-Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.
+Inspect stale docs, wiki lint readiness, scaffold drift, artifact drift, distill candidates, and reviewable maintenance proposals.
 
 ## Usage
 
@@ -38,7 +38,7 @@ amber maintenance --target <repo> [--json]
 ## Command Details
 
 ```text
-Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.
+Inspect stale docs, wiki lint readiness, scaffold drift, artifact drift, distill candidates, and reviewable maintenance proposals.
 ```
 
 ## Boundaries & Safety
