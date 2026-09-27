@@ -66,8 +66,11 @@
 - **发布与回滚：** 由同一 owner 承担（当前单一维护者场景下不强制分离），见 `CONTRIBUTING.md`。
 - **审计证据：** 证据的存在与晋升是阶段 7 的人工职责，**不新增机械门禁**；但阶段 7 必须显式记录
   证据落点，见 `docs/agents/dev-workflow.md` 的交付证据一节。
-- **分支保护：** 仓库文件无法证明哪些 CI 作业在合并前强制。该事实保持「未验证」，需维护者在
-  GitHub 设置中确认后回写 `CONTRIBUTING.md`；在此之前任何人不得把「CI 绿」当作「合并被阻断」。
+- **分支保护（已确认 2026-09-27）：** `master` 已在 GitHub 上受保护：必走 PR + 1 approving review +
+  CODEOWNERS 审批（stale approval 自动失效）；必需状态检查（strict）为 `Commit identity`、`Node 20.x`、
+  `Node 22.x`、`Coverage`；必需 conversation resolution；禁 force-push 与删分支；`enforce_admins=false`
+  （单维护者保留 admin bypass）。自此「CI 绿」是合并阻断门禁的证据。事实回写位为 `CONTRIBUTING.md`
+  的 Merge gating 小节；本文仅引用。裁决 17（`issues/0141`、`issues/0154`）据此关闭。
 
 ## 5. 机械门禁（与 `issues/0149`、`issues/0150` 一致）
 
