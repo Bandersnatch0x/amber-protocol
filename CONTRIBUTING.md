@@ -228,11 +228,14 @@ CLI reference pages under `apps/docs/docs/reference/cli/` are generated from `sc
   rollback responsibility are not separated while there is one maintainer). The mechanical release gates
   are listed in the Release Process section; rollback steps are in
   [docs/quality/rollback-procedures.md](./docs/quality/rollback-procedures.md).
-- **Merge gating (unverified):** whether branch protection makes the `test`/`docs` jobs required before
-  merge cannot be proven from repository files. Until the maintainer confirms the GitHub repository
-  settings and writes the result back here, treat a green workflow as **evidence of a passing run, not of
-  a blocked merge**. This limitation is recorded in `issues/0145`, `issues/0148`, and
-  `issues/0154`; it is not a claim that protection is missing.
+- **Merge gating (confirmed 2026-09-27):** the `master` branch is protected on GitHub. Pull requests are
+  required to merge; at least **1 approving review** and **CODEOWNERS review** are required (stale
+  approvals are dismissed on new pushes); the required status checks that must pass before merge are
+  **Commit identity**, **Node 20.x**, **Node 22.x**, and **Coverage** (strict / branch-up-to-date);
+  conversation resolution is required; force-pushes and branch deletion are blocked. `enforce_admins` is
+  **off**, so the single maintainer retains an admin bypass (necessary while there is one reviewer). A
+  green workflow on `master` is therefore now **evidence of a merge-blocking gate**, not merely a passing
+  run. Adjudication 17 of `issues/0141` is closed by this confirmation; see also `issues/0154`.
 
 ## Design Principles
 
