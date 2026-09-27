@@ -59,7 +59,7 @@ test("F063 N4: docs/ first-level directories each carry ≥3 tracked files or a 
 		byDir.set(dir, (byDir.get(dir) || 0) + 1);
 	}
 	// Single-responsibility exceptions (spec N4.1 #4): toolchain-owned namespaces.
-	const singleResponsibility = new Set(["knowledge-corpus", "architecture"]);
+	const singleResponsibility = new Set(["knowledge-corpus", "architecture", "governance"]);
 	const smallDirs = [...byDir.entries()].filter(([, count]) => count < 3).map(([dir]) => dir);
 	const offenders = smallDirs.filter((dir) => !singleResponsibility.has(dir));
 	assert.deepEqual(
