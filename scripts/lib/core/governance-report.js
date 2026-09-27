@@ -4,7 +4,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { inspect: inspectMaintenance } = require("../maintenance");
-const { resolveRegistryPath } = require("./team");
 const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
 const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { readJSONL } = require("./jsonl");
@@ -319,7 +318,7 @@ function buildGovernanceReport(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
 	const readiness = inspectGovernanceReadiness(targetRoot);
-	const maintenance = inspectMaintenance(targetRoot, resolveRegistryPath(options.registry));
+	const maintenance = inspectMaintenance(targetRoot);
 	const scores = scoreSections(readiness, maintenance);
 	const nextActions = buildStructuredNextActions(readiness, targetRoot, targetDisplay);
 	const state = gatherState(targetRoot);

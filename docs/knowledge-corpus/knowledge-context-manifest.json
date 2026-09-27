@@ -3,9 +3,9 @@
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
     "adr": 34,
-    "wiki": 10,
+    "wiki": 9,
     "architecture": 9,
-    "total": 53
+    "total": 52
   },
   "rows": [
     {
@@ -525,18 +525,6 @@
       }
     },
     {
-      "id": "knowledge:wiki:adoption-system",
-      "category": "wiki",
-      "sourceNodeId": "wiki:adoption-system",
-      "pageId": "knowledge-wiki-adoption-system",
-      "sourcePath": "docs/wiki/knowledge/adoption-system/adoption-system.md",
-      "title": "Adoption System",
-      "source": {
-        "rawHash": "sha256:b0a52734d9ea05650407fc559d92fb2aed961546ce27bd5751ce0b59057ed804",
-        "normHash": "sha256:376be8eb0eb2c857fc1223759a209bc3d7919b8d976f0a70a7a04b3c33626df4"
-      }
-    },
-    {
       "id": "knowledge:wiki:cli-architecture-command-dispatch",
       "category": "wiki",
       "sourceNodeId": "wiki:cli-architecture-command-dispatch",
@@ -645,5 +633,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:f32fdcf5d4cafd70f56a6c5b1e2ee119a7658fb912227d209fd9fcab69b38a2c"
+  "manifestHash": "sha256:20e6275cf681198652a1d7daffa4ce4bb5c525d13b4cbe02b9cde4831dd7e0c3"
 }

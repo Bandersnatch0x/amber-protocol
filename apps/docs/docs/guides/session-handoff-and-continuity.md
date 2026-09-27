@@ -91,7 +91,7 @@ Validation checks that every required file exists, that `manifest.json` parses a
 
 ## Boundaries & Safety
 
-- **`session-handoff.md` is personal, generated state.** It is regenerated on demand and is not meant to be committed to a shared repository — Amber's own `.gitignore` advice (`amber team`) lists it alongside `notes.md` and `PROGRESS.md`. Commit the bundle only when a shared artifact is genuinely intended.
+- **`session-handoff.md` is personal, generated state.** It is regenerated on demand and is not meant to be committed to a shared repository — Amber's scaffolding marks it alongside `notes.md` and `PROGRESS.md` in its `.gitignore` advice, which `amber doctor` surfaces (the `amber team` command that used to print it was removed in v1.6). Commit the bundle only when a shared artifact is genuinely intended.
 - **Target-scoped writes.** All reads and mutations are confined to `--target <repo>`.
 - **Fail-closed validation.** Corrupt governance state, a malformed manifest, or a missing required section halts the command with a non-zero exit code.
 - **No dynamic workflow execution.** Handoff generation records state; it does not dispatch agents, run target build or test commands, or schedule loop execution.

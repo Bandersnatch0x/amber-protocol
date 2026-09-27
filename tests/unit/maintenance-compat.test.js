@@ -14,13 +14,13 @@ const legacy = require("../../scripts/lib/core/maintenance");
 const facade = require("../../scripts/lib/maintenance");
 
 // Exports retained on the legacy surface for the deprecation cycle.
+// The three team-distribution helpers left with the `amber team` family
+// (issues/0068) — they had no consumer besides the removed command and the
+// removed maintenance upgrade/migration assistants.
 const LEGACY_EXPORTS = [
 	"listWikiMarkdownFiles",
 	"detectStaleDocs",
 	"buildWikiLintCi",
-	"detectRulePackDrift",
-	"buildUpgradeAssistant",
-	"buildMigrationAssistant",
 	"countEvolutionFindings",
 	"extractEvolutionFindings",
 	"extractRegressionProposals",

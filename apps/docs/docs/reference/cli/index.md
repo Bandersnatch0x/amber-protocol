@@ -98,6 +98,3 @@ amber <command> --target <repo> [options]
 | <code>profile</code> | ⚠️  DEPRECATED (legacy `inspect` action only): Inspect declarative project profiles. Will be removed in v2 — use 'amber governance' instead. | No | [Docs](/reference/cli/profile) |
 | <code>task</code> | ⚠️  DEPRECATED: Prepare isolated task ledger, evidence, replay, and worktree artifacts. Will be removed in v2. | No | [Docs](/reference/cli/task) |
 | <code>result</code> | ⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2. | No | [Docs](/reference/cli/result) |
-| <code>agent</code> | ⚠️  DEPRECATED: Create and control auditable worker/reviewer dispatch records without executing agent work. Will be removed in v2. | No | [Docs](/reference/cli/agent) |
-| <code>team</code> | ⚠️  DEPRECATED: Inspect, install, pin, update, and roll back local team distribution metadata. Will be removed in v2. | No | [Docs](/reference/cli/team) |
-| <code>adoption</code> | ⚠️  DEPRECATED: Generate, list, or index safe adoption report artifacts without modifying target repositories. Will be removed in v2 — use 'amber governance audit' instead. | No | [Docs](/reference/cli/adoption) |

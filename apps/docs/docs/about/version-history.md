@@ -41,6 +41,6 @@ Legacy prefix `amber-protocol` has been deprecated.
 
 ### Deprecated Commands (v1 Compatibility)
 The following commands are marked deprecated and scheduled for removal in v2.0.0:
-- `amber adoption` → Use [`amber audit`](/reference/cli/audit) and [`amber governance`](/reference/cli/governance).
+- `amber adoption` → Use [`amber audit`](/reference/cli/audit) and [`amber governance`](/reference/cli/governance). **Removed in v1.6** (`amber harness legacy` carries the disposition row).
 - `amber profile inspect` → Use [`amber governance`](/reference/cli/governance). Note that `amber profile deployment` remains active and supported.
-- `amber task`, `amber result`, `amber agent`, `amber team` → Replaced by core session and canonical artifact commands.
+- `amber task`, `amber result` → Replaced by core session and canonical artifact commands. `amber agent`, `amber team` → **removed in v1.6** (same disposition table).

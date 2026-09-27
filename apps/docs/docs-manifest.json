@@ -1,6 +1,6 @@
 {
   "version": "1.6.0",
-  "totalDocuments": 80,
+  "totalDocuments": 77,
   "documents": [
     {
       "id": "start-here/index",
@@ -339,35 +339,11 @@
       "layer": "Generated"
     },
     {
-      "id": "reference/cli/agent",
-      "path": "reference/cli/agent.md",
-      "group": "Reference",
-      "title": "amber agent",
-      "description": "⚠️  DEPRECATED: Create and control auditable worker/reviewer dispatch records without executing agent work. Will be removed in v2.",
-      "layer": "Generated"
-    },
-    {
-      "id": "reference/cli/team",
-      "path": "reference/cli/team.md",
-      "group": "Reference",
-      "title": "amber team",
-      "description": "⚠️  DEPRECATED: Inspect, install, pin, update, and roll back local team distribution metadata. Will be removed in v2.\n\nUse install --dry-run to preview .amber/team metadata writes before creating local state.",
-      "layer": "Generated"
-    },
-    {
       "id": "reference/cli/maintenance",
       "path": "reference/cli/maintenance.md",
       "group": "Reference",
       "title": "amber maintenance",
       "description": "Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.",
-      "layer": "Generated"
-    },
-    {
-      "id": "reference/cli/adoption",
-      "path": "reference/cli/adoption.md",
-      "group": "Reference",
-      "title": "amber adoption",
-      "description": "⚠️  DEPRECATED: Generate, list, or index safe adoption report artifacts without modifying target repositories. Will be removed in v2 — use 'amber governance audit' instead.\n\nExamples:\n  amber adoption report --target path/to/repo --output docs/examples/project-adoption-report.md\n  amber adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle\n  amber adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md\n  amber adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md\n  amber adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run\n  amber adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md",
       "layer": "Generated"
     },
     {

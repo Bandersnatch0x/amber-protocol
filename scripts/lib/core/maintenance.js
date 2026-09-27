@@ -20,7 +20,6 @@ const { resolveStateDirForRead } = require("../state-dir-resolver");
 const {
 	pathExists,
 	readJson,
-	readJsonSafe,
 	readText,
 	relativeSlash,
 	resolveTarget,
@@ -37,17 +36,6 @@ const {
 } = require("./evolution-findings");
 
 const { TEMPLATE_ROOT } = require("./constants");
-
-const {
-	compareSemver,
-	isTeamRegistryValid,
-	latestTeamVersion,
-	loadTeamLock,
-	loadTeamRegistry,
-	resolveRegistryPath,
-	teamStatePaths,
-	validateTeamRegistryData,
-} = require("./team");
 
 // MESSAGES moved with buildMaintenanceProposalContent into maintenance-propose.js.
 
@@ -125,78 +113,6 @@ function buildWikiLintCi(targetRoot) {
 	};
 }
 
-// Integrity drift: does the installed lock still match the rulePacks that ITS
-// OWN installed version declares? Answers "has my install been tampered with or
-// fallen out of sync with its version spec?" Compare with detectPackDrift, which
-// instead measures the gap to the LATEST version.
-function detectRulePackDrift(targetRoot, registry) {
-	const paths = teamStatePaths(targetRoot);
-	const lock = loadTeamLock(paths);
-	if (!lock) {
-		return { installed: false, drifted: false, expected: [], actual: [] };
-	}
-
-	const release = registry.versions && registry.versions[lock.installedVersion];
-	const expected = release && Array.isArray(release.rulePacks) ? [...release.rulePacks].sort() : [];
-	const actual = Array.isArray(lock.rulePacks) ? [...lock.rulePacks].sort() : [];
-
-	return {
-		installed: true,
-		drifted: JSON.stringify(expected) !== JSON.stringify(actual),
-		expected,
-		actual,
-		installedVersion: lock.installedVersion,
-	};
-}
-
-function buildUpgradeAssistant(targetRoot, registry) {
-	const paths = teamStatePaths(targetRoot);
-	const lock = loadTeamLock(paths);
-	const latestVersion = latestTeamVersion(registry);
-
-	if (!lock) {
-		return {
-			installed: false,
-			currentVersion: null,
-			latestVersion,
-			installCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap --dry-run --json`,
-		};
-	}
-
-	return {
-		installed: true,
-		currentVersion: lock.installedVersion,
-		latestVersion,
-		updateAvailable: compareSemver(lock.installedVersion, latestVersion) < 0,
-		previewCommand: `node scripts/amber.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --dry-run --json`,
-		upgradeCommand: `node scripts/amber.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --confirm --json`,
-	};
-}
-
-function buildMigrationAssistant(targetRoot, registry) {
-	const paths = teamStatePaths(targetRoot);
-	const lock = loadTeamLock(paths);
-	const latestVersion = latestTeamVersion(registry);
-	const latestRelease = registry.versions[latestVersion];
-
-	if (!lock) {
-		return {
-			needed: true,
-			reason: "team distribution is not installed",
-			nextCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap --dry-run --json`,
-		};
-	}
-
-	return {
-		needed:
-			lock.profile !== latestRelease.profile ||
-			compareSemver(lock.installedVersion, latestVersion) < 0,
-		currentProfile: lock.profile,
-		targetProfile: latestRelease.profile,
-		nextCommand: `node scripts/amber.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --dry-run --json`,
-	};
-}
-
 function rollupEvolutionFindings(projectRoot, minCount = EVOLUTION_FINDING_MIN_COUNT) {
 	const findings = significantEvolutionFindings(projectRoot, minCount).map(
 		({ finding, count }) => ({ text: finding, count }),
@@ -269,11 +185,8 @@ function extractRegressionProposals(targetRoot) {
 	return proposals.sort((left, right) => left.taskId.localeCompare(right.taskId)).slice(0, 50);
 }
 
-function inspectMaintenance(target, registryPath) {
+function inspectMaintenance(target) {
 	const targetRoot = resolveTarget(target);
-	const loaded = loadTeamRegistry(registryPath);
-	const registryValid = isTeamRegistryValid(loaded);
-	const unavailableReason = registryValid ? null : "team registry validation failed";
 	const wikiValidation = validateWiki(targetRoot);
 	const staleDocsResult = detectStaleDocs(targetRoot);
 	const { detectScaffoldDrift } = require("./scaffold-version-drift");
@@ -299,33 +212,6 @@ function inspectMaintenance(target, registryPath) {
 			errors: wikiValidation.errors,
 			warnings: wikiValidation.warnings,
 		},
-		rulePackDrift: registryValid
-			? detectRulePackDrift(targetRoot, loaded.registry)
-			: {
-					available: false,
-					reason: unavailableReason,
-					installed: false,
-					drifted: false,
-					expected: [],
-					actual: [],
-				},
-		migrationAssistant: registryValid
-			? buildMigrationAssistant(targetRoot, loaded.registry)
-			: {
-					available: false,
-					reason: unavailableReason,
-					needed: false,
-					nextCommand: null,
-				},
-		upgradeAssistant: registryValid
-			? buildUpgradeAssistant(targetRoot, loaded.registry)
-			: {
-					available: false,
-					reason: unavailableReason,
-					installed: false,
-					currentVersion: null,
-					latestVersion: null,
-				},
 		evolutionRollup: evidenceOutcome.evolution.significant,
 		structuredFindings: evidenceOutcome.evolution.structured,
 		// Recurrence evidence (trusted-control evolution contract §9, E8; plan
@@ -337,8 +223,8 @@ function inspectMaintenance(target, registryPath) {
 		evidenceAvailability: evidenceOutcome.availability,
 		scaffoldDrift: scaffoldDriftResult,
 		artifactDrift: detectArtifactDrift(targetRoot),
-		errors: [...loaded.errors, ...(evidenceOutcome.errors || [])],
-		warnings: [...(loaded.warnings || []), ...(evidenceOutcome.warnings || [])],
+		errors: [...(evidenceOutcome.errors || [])],
+		warnings: [...(evidenceOutcome.warnings || [])],
 	};
 	if (attributionCarrier !== null) {
 		inspection.findingAttribution = attributionCarrier.findingAttribution;
@@ -368,58 +254,10 @@ const {
 	proposeMaintenance: proposeMaintenanceImpl,
 } = require("./maintenance-propose");
 
-function proposeMaintenance(target, registryPath, priority) {
+function proposeMaintenance(target, priority) {
 	// Reach inspect through module.exports so a test stub on
 	// maintenance.inspectMaintenance is still observed by propose.
-	return proposeMaintenanceImpl(target, registryPath, priority, module.exports.inspectMaintenance);
-}
-
-// Upgrade-gap drift: how do the installed rulePacks compare to the LATEST
-// version's rulePacks? Answers "am I behind the newest release?" (`diff` lists
-// packs the latest version adds). Distinct from detectRulePackDrift, which
-// compares against the installed version's own spec, not the latest.
-function detectPackDrift(projectRoot, registryPath) {
-	const paths = teamStatePaths(projectRoot);
-	const loaded = loadMaintenanceRegistry(registryPath);
-	if (!isTeamRegistryValid(loaded)) {
-		return { errors: loaded.errors, warnings: loaded.warnings };
-	}
-	if (!pathExists(paths.lockPath)) {
-		return { drifted: false, installed: [], latest: [], diff: [] };
-	}
-
-	const { value: lock, error: lockError } = readJsonSafe(paths.lockPath);
-	if (lockError) {
-		throw new Error(lockError);
-	}
-	if (!lock || typeof lock !== "object" || Array.isArray(lock)) {
-		throw new Error(`Team lock file is not a valid object: ${paths.lockPath}`);
-	}
-
-	const installed = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
-	const latestVer = latestTeamVersion(loaded.registry);
-	const latest = loaded.registry.versions[latestVer].rulePacks;
-	const diff = latest.filter((p) => !installed.includes(p));
-
-	return {
-		drifted: JSON.stringify([...installed].sort()) !== JSON.stringify([...latest].sort()),
-		installed,
-		latest,
-		diff,
-	};
-}
-
-function loadMaintenanceRegistry(registryPath) {
-	const { value: registry, error } = readJsonSafe(registryPath);
-	if (error) {
-		throw new Error(error);
-	}
-	const validation = validateTeamRegistryData(registry);
-	return {
-		registry,
-		errors: validation.errors,
-		warnings: validation.warnings,
-	};
+	return proposeMaintenanceImpl(target, priority, module.exports.inspectMaintenance);
 }
 
 function validateWikiStructure(projectRoot) {
@@ -454,51 +292,16 @@ function fixWikiMarkers(projectRoot) {
 	return { fixed, fixedCount: fixed.length };
 }
 
-function previewUpgrade(projectRoot, version, registryPath) {
-	const loaded = loadMaintenanceRegistry(registryPath);
-	if (!isTeamRegistryValid(loaded)) {
-		return { errors: loaded.errors, warnings: loaded.warnings };
-	}
-	const paths = teamStatePaths(projectRoot);
-	const lock = loadTeamLock(paths);
-	const targetVersion = version || latestTeamVersion(loaded.registry);
-	const targetRelease = loaded.registry.versions[targetVersion];
-
-	if (!lock) {
-		return {
-			currentVersion: null,
-			targetVersion,
-			changes: { addedPacks: targetRelease?.rulePacks || [], removedPacks: [], updatedPacks: [] },
-		};
-	}
-
-	const current = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
-	const target = Array.isArray(targetRelease?.rulePacks) ? targetRelease.rulePacks : [];
-	const addedPacks = target.filter((p) => !current.includes(p));
-	const removedPacks = current.filter((p) => !target.includes(p));
-	const updatedPacks = target.filter((p) => current.includes(p));
-
-	return {
-		currentVersion: lock.installedVersion,
-		targetVersion,
-		changes: { addedPacks, removedPacks, updatedPacks },
-	};
-}
-
 // The 8 maintenance actions this dispatch chokepoint owns. handleMaintenance
 // routes its two sibling actions (scaffold-drift, distill) itself; every other
 // maintenance action flows through runMaintenanceAction so the per-branch arg
-// shaping (thresholdDays/threshold parse, fixMarkers conditional, and the
-// registry -> registryPath resolution that closes the CLI-arg leak) lives in
-// exactly one place. The raw CLI `registry` arg never reaches a domain function
-// unresolved.
+// shaping (thresholdDays/threshold parse, fixMarkers conditional) lives in
+// exactly one place.
 const MAINTENANCE_ACTIONS = [
 	"inspect",
 	"propose",
 	"stale-docs",
 	"wiki-lint",
-	"pack-drift",
-	"upgrade-preview",
 	"evolution-rollup",
 	"regression-proposals",
 ];
@@ -526,9 +329,6 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 			? targetRoot
 			: options;
 	const resolvedTarget = resolveTarget(typeof targetRoot === "string" ? targetRoot : args.target);
-	// Single place the CLI `registry` leak is closed: resolve to a path string
-	// before any domain function sees it.
-	const registryPath = resolveRegistryPath(args.registry);
 
 	// "proposal" is a long-standing alias for "propose".
 	const normalized = action === "proposal" ? "propose" : action;
@@ -538,13 +338,13 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 			// inspectMaintenance is a shared core interface (governance-report,
 			// adoption-reports) and stays exported; reach it through the exports
 			// object so tests can stub the delegation seam and observe the args.
-			return module.exports.inspectMaintenance(resolvedTarget, registryPath);
+			return module.exports.inspectMaintenance(resolvedTarget);
 		case "propose": {
 			// proposeMaintenance is handler-only (not exported), but tests stub it
 			// on the exports object, so prefer the exported binding when present and
 			// fall back to the lexical definition otherwise.
 			const propose = module.exports.proposeMaintenance || proposeMaintenance;
-			return propose(resolvedTarget, registryPath, args.priority);
+			return propose(resolvedTarget, args.priority);
 		}
 		case "stale-docs": {
 			const parsed = args.thresholdDays ? Number.parseInt(args.thresholdDays, 10) : undefined;
@@ -569,24 +369,6 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 						fixedMarkerCount: fixResult.fixedCount,
 					}
 				: result;
-		}
-		case "pack-drift": {
-			const drift = detectPackDrift(resolvedTarget, registryPath);
-			return {
-				target: resolvedTarget,
-				...drift,
-				errors: drift.errors || [],
-				warnings: drift.warnings || [],
-			};
-		}
-		case "upgrade-preview": {
-			const preview = previewUpgrade(resolvedTarget, args.version, registryPath);
-			return {
-				target: resolvedTarget,
-				...preview,
-				errors: preview.errors || [],
-				warnings: preview.warnings || [],
-			};
 		}
 		case "evolution-rollup": {
 			const parsed = args.threshold ? Number.parseInt(args.threshold, 10) : undefined;
@@ -619,9 +401,6 @@ module.exports = {
 	listWikiMarkdownFiles,
 	detectStaleDocs,
 	buildWikiLintCi,
-	detectRulePackDrift,
-	buildUpgradeAssistant,
-	buildMigrationAssistant,
 	countEvolutionFindings,
 	extractEvolutionFindings,
 	extractRegressionProposals,

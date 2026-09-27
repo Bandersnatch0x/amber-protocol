@@ -1044,7 +1044,7 @@ const en = {
     'A worktree is a separate Git checkout for this session, so governed work does not disturb your main checkout.',
   'ux.backend.lifecycle.prefix': 'Lifecycle advances past: {step}.',
   'ux.backend.lifecycle.why.audit':
-    'this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.',
+    'this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber governance report.',
   'ux.backend.lifecycle.why.init': 'Amber starter files are not all present.',
   'ux.backend.lifecycle.why.initAfterAudit':
     'Amber starter files are not all present (audit done or skipped) — safe next install is init.',
@@ -2138,7 +2138,7 @@ const zh: Record<TranslationKey, string> = {
     '工作树（worktree）是为该会话单独创建的 Git 检出，避免受治理的工作影响主检出。',
   'ux.backend.lifecycle.prefix': '生命周期将推进到：{step}。',
   'ux.backend.lifecycle.why.audit':
-    '这看起来是一个已有项目——安装前可先用审计（只读）检查一下；多仓库采纳评审请另外运行 amber adoption report。',
+    '这看起来是一个已有项目——安装前可先用审计（只读）检查一下；多仓库采纳评审请另外运行 amber governance report。',
   'ux.backend.lifecycle.why.init': 'Amber 初始文件尚未齐备。',
   'ux.backend.lifecycle.why.initAfterAudit':
     'Amber 初始文件尚未齐备（审计已完成或跳过）——安全的下一步是 init 安装。',

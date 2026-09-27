@@ -167,18 +167,6 @@ function renderLegacySections(inspection) {
 		}
 	}
 
-	lines.push("", "## Upgrade Assistant", "");
-	lines.push(`- Current: ${inspection.upgradeAssistant.currentVersion || "not installed"}`);
-	lines.push(`- Latest: ${inspection.upgradeAssistant.latestVersion}`);
-	if (inspection.upgradeAssistant.previewCommand) {
-		lines.push(`- Preview: \`${inspection.upgradeAssistant.previewCommand}\``);
-	}
-
-	lines.push("", "## Rule-Pack Drift", "");
-	lines.push(`- Drifted: ${inspection.rulePackDrift.drifted}`);
-	lines.push(`- Expected: ${(inspection.rulePackDrift.expected || []).join(", ") || "none"}`);
-	lines.push(`- Actual: ${(inspection.rulePackDrift.actual || []).join(", ") || "none"}`);
-
 	lines.push("", "## Evolution Rollup", "");
 	if (inspection.evolutionRollup.length === 0) {
 		lines.push("- No repeated findings detected.");
@@ -396,8 +384,8 @@ function persistProposalRecord(proposalRoot, proposalPath, content) {
 // inspectMaintenance is injected (not required) so this module does not depend
 // back on maintenance.js. The dispatch caller passes maintenance's exported
 // inspect binding, preserving the test stub seam.
-function proposeMaintenance(target, registryPath, priority, inspectMaintenance) {
-	const inspection = inspectMaintenance(target, registryPath);
+function proposeMaintenance(target, priority, inspectMaintenance) {
+	const inspection = inspectMaintenance(target);
 	if (inspection.errors.length > 0) {
 		return {
 			target: inspection.target,
@@ -446,8 +434,8 @@ function proposeMaintenance(target, registryPath, priority, inspectMaintenance) 
 		}
 
 		const priorityLevels = {
-			high: ["staleDocs", "rulePackDrift"],
-			medium: ["upgradeAssistant", "evolutionRollup"],
+			high: ["staleDocs"],
+			medium: ["evolutionRollup"],
 			low: ["regressionProposals"],
 		};
 
@@ -466,10 +454,6 @@ function proposeMaintenance(target, registryPath, priority, inspectMaintenance) 
 
 		filteredInspection = { ...inspection };
 		if (!allowedCategories.includes("staleDocs")) filteredInspection.staleDocs = [];
-		if (!allowedCategories.includes("rulePackDrift"))
-			filteredInspection.rulePackDrift = { drifted: false, expected: [], actual: [] };
-		if (!allowedCategories.includes("upgradeAssistant"))
-			filteredInspection.upgradeAssistant = { currentVersion: null, latestVersion: null };
 		if (!allowedCategories.includes("evolutionRollup")) filteredInspection.evolutionRollup = [];
 		if (!allowedCategories.includes("regressionProposals"))
 			filteredInspection.regressionProposals = [];

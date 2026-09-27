@@ -21,7 +21,7 @@ The commands below are organized into service packages. Service packages are doc
 | Service package | Existing commands |
 | --- | --- |
 | Repository Onboarding | [`init`](#init), [`doctor`](#doctor), `wiki`, `governance report` |
-| Adoption Review | [`adoption report`](#adoption-report), `adoption bundle`, [`adoption gate`](#adoption-gate) |
+| Diagnosis & Adoption | `governance report`, `maintenance` subcommands (the `adoption` family was removed in v1.6) |
 | Governed Delivery | [`plan`](#plan), [`gate`](#gate), [`review`](#review), [`accept`](#accept), [`session complete-check`](#session-complete-check) |
 | Continuity Layer | [`session start`](#session-start), [`session status`](#session-status), `session continue`, `handoff bundle`, `handoff validate` |
 | Security Governance | [`security audit`](#security-audit), security governance packs |
@@ -244,24 +244,12 @@ Test a skill with input.
 amber-protocol skill test <name> --input "<text>"
 ```
 
-## Adoption Commands
-> ⚠️ **DEPRECATED** — will be removed in v2. Use `amber governance audit` instead.
+## Removed Commands (v1.6)
 
-### `adoption report`
-
-Generate adoption report.
-
-```bash
-amber-protocol adoption report --target <dir> [--output <file>] [--output-dir <dir>]
-```
-
-### `adoption gate`
-
-Check adoption gate status.
-
-```bash
-amber-protocol adoption gate --target <dir> [--output <file>]
-```
+The `agent`, `team`, and `adoption` command families were removed (issues/0068; F075
+amendment 2026-09-27). Use `amber governance report` for readiness/risks/next actions,
+`amber maintenance` for stale-docs and drift work, and the `amber-diagnosis-adoption`
+journey skill for relocation work.
 
 ## Maintenance Commands
 

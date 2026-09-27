@@ -465,8 +465,8 @@ const SESSION_STATES = Object.freeze({
  * @param {string} [registryPath]
  * @returns {Record<string, unknown>}
  */
-function inspectMaintenance(target, registryPath) {
-	return maintenance.inspectMaintenance(target, registryPath);
+function inspectMaintenance(target) {
+	return maintenance.inspectMaintenance(target);
 }
 
 /**

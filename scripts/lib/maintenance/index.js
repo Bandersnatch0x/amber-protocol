@@ -59,19 +59,18 @@ function evidence(target) {
 }
 
 /**
- * Complete Maintenance inspection: stale Wiki, Wiki lint, Team Distribution
- * guidance, Rule Pack drift, scaffold drift, artifact drift, Amber Evolution,
- * Regression Proposals, and redacted partial-evidence warnings.
+ * Complete Maintenance inspection: stale Wiki, Wiki lint, scaffold drift,
+ * artifact drift, Amber Evolution, Regression Proposals, and redacted
+ * partial-evidence warnings.
  *
  * Full inspection composes the focused evidence outcome (F014-M2), so
  * consumers reading both get one consistent evidence truth.
  *
  * @param {string} target
- * @param {string} [registryPath]
  * @returns {object} structured inspection outcome
  */
-function inspect(target, registryPath) {
-	return inspectMaintenance(target, registryPath);
+function inspect(target) {
+	return inspectMaintenance(target);
 }
 
 /**

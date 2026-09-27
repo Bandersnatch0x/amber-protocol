@@ -1,5 +1,9 @@
 "use strict";
 
+// Maintenance proposal surface (survived the agent/team/adoption removal —
+// issues/0068). The team-distribution scaffolding that used to set this fixture
+// up is gone, so the target is a plain `amber init` tree.
+
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -21,161 +25,14 @@ function runHarness(args) {
 	});
 }
 
-function initializedTeamTarget(name) {
+function initializedTarget(name) {
 	const target = tempDir(name);
 	assert.equal(runHarness(["init", "--target", target]).status, 0);
-	assert.equal(
-		runHarness([
-			"team",
-			"install",
-			"--target",
-			target,
-			"--version",
-			"1.0.0",
-			"--preset",
-			"safe-bootstrap",
-		]).status,
-		0,
-	);
 	return target;
 }
 
-test("maintenance inspect detects stale docs upgrade guidance and rule-pack drift", () => {
-	const target = initializedTeamTarget("inspect");
-	const overviewPath = path.join(target, "docs", "wiki", "product", "overview.md");
-	fs.writeFileSync(
-		overviewPath,
-		"# Overview\n\nLast Reviewed: 2020-01-01\n\nOld product context.\n",
-	);
-	const lockPath = path.join(target, ".amber", "team", "lock.json");
-	const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-	lock.rulePacks = ["custom.rule-pack.json"];
-	fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
-
-	const result = runHarness(["maintenance", "inspect", "--target", target, "--json"]);
-
-	assert.equal(result.status, 0, result.stderr);
-	const payload = JSON.parse(result.stdout);
-	assert.equal(payload.readOnly, true);
-	assert.ok(payload.staleDocs.some((doc) => doc.path === "docs/wiki/product/overview.md"));
-	assert.match(payload.wikiLint.ciCommand, /amber\.js wiki/);
-	assert.equal(payload.rulePackDrift.drifted, true);
-	assert.deepEqual(payload.rulePackDrift.actual, ["custom.rule-pack.json"]);
-	assert.equal(payload.upgradeAssistant.currentVersion, "1.0.0");
-	assert.equal(payload.upgradeAssistant.latestVersion, "1.1.0");
-	assert.match(payload.upgradeAssistant.previewCommand, /team update .*--dry-run/);
-});
-
-test("maintenance inspect recommends a dry-run team install before writing local state", () => {
-	const target = tempDir("uninstalled");
-
-	const result = runHarness(["maintenance", "inspect", "--target", target, "--json"]);
-
-	assert.equal(result.status, 0, result.stderr);
-	const payload = JSON.parse(result.stdout);
-	assert.equal(payload.migrationAssistant.needed, true);
-	assert.match(payload.migrationAssistant.nextCommand, /team install .*--dry-run --json/);
-	assert.match(payload.upgradeAssistant.installCommand, /team install .*--dry-run --json/);
-});
-
-test("maintenance inspect reports an invalid team registry without running registry assistants", () => {
-	const target = tempDir("invalid-registry");
-	const registryPath = path.join(target, "team-registry.json");
-	fs.writeFileSync(registryPath, "{}\n");
-
-	const result = runHarness([
-		"maintenance",
-		"inspect",
-		"--target",
-		target,
-		"--registry",
-		registryPath,
-		"--json",
-	]);
-
-	assert.equal(result.status, 1, result.stderr);
-	const payload = JSON.parse(result.stdout);
-	assert.ok(payload.errors.includes("Team registry must define versions."));
-	assert.deepEqual(payload.rulePackDrift, {
-		available: false,
-		reason: "team registry validation failed",
-		installed: false,
-		drifted: false,
-		expected: [],
-		actual: [],
-	});
-	assert.equal(payload.migrationAssistant.available, false);
-	assert.equal(payload.migrationAssistant.nextCommand, null);
-	assert.equal(payload.upgradeAssistant.available, false);
-	assert.equal(payload.upgradeAssistant.latestVersion, null);
-	assert.doesNotMatch(result.stderr, /TypeError/);
-
-	const install = runHarness([
-		"team",
-		"install",
-		"--target",
-		target,
-		"--registry",
-		registryPath,
-		"--version",
-		"1.0.0",
-		"--preset",
-		"safe-bootstrap",
-		"--dry-run",
-		"--json",
-	]);
-	assert.equal(install.status, 1, install.stderr);
-	const installPayload = JSON.parse(install.stdout);
-	assert.ok(installPayload.errors.includes("Team registry must define versions."));
-	assert.doesNotMatch(`${install.stdout}\n${install.stderr}`, /TypeError|Cannot read properties/);
-});
-
-test("team install rejects nested-malformed registry entries without TypeError", () => {
-	const target = tempDir("nested-malformed-registry");
-	const registryPath = path.join(target, "team-registry.json");
-	fs.writeFileSync(
-		registryPath,
-		`${JSON.stringify({
-			name: "amber-protocol-team-registry",
-			presets: [null],
-			rulePacks: [{ id: "amber-delivery" }],
-			profiles: [{ id: "default" }],
-			versions: {
-				"1.0.0": {
-					preset: "safe-bootstrap",
-					profile: "default",
-					workflowPacks: [],
-					rulePacks: [],
-					managedProjectFiles: [],
-					compatibility: {},
-				},
-			},
-		})}\n`,
-	);
-
-	const result = runHarness([
-		"team",
-		"install",
-		"--target",
-		target,
-		"--registry",
-		registryPath,
-		"--version",
-		"1.0.0",
-		"--preset",
-		"safe-bootstrap",
-		"--dry-run",
-		"--json",
-	]);
-
-	assert.equal(result.status, 1, result.stderr);
-	const payload = JSON.parse(result.stdout);
-	assert.ok(payload.errors.includes("Team registry presets[0] must be an object."));
-	assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /TypeError|Cannot read properties/);
-});
-
 test("maintenance propose writes reviewable gardening proposal without changing source docs", () => {
-	const target = initializedTeamTarget("propose");
+	const target = initializedTarget("propose");
 	const evolutionPath = path.join(target, "docs", "wiki", "engineering", "harness-evolution.md");
 	fs.mkdirSync(path.dirname(evolutionPath), { recursive: true });
 	fs.writeFileSync(

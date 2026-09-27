@@ -178,6 +178,33 @@ const LEGACY_DISPOSITIONS = Object.freeze([
 		status:
 			"deletion candidate (no harness correspondence; superseded by governance/maintenance — removal is an explicit user decision)",
 	},
+	// Removed 2026-09-27 (spec F075 amendment; ticket issues/0068, user approval
+	// 2026-09-22). These rows are the §52 ledger entry for a removal: the surface
+	// is gone, the decision and its replacement route stay readable.
+	{
+		surface: "agent",
+		command: "amber agent dispatch|review|status",
+		correspondence: null,
+		status:
+			"removed (no harness correspondence — dispatch records without execution are superseded by the harness spine: Contract → Run → Event)",
+		replacement: "amber harness (contract/run/event spine); amber governance report",
+	},
+	{
+		surface: "team",
+		command: "amber team inspect|install|pin|update|rollback",
+		correspondence: null,
+		status:
+			"removed (no harness correspondence — the local distribution-metadata install path has no surviving driver once the command is gone)",
+		replacement: "amber maintenance (scaffold drift, upgrade guidance); amber doctor",
+	},
+	{
+		surface: "adoption",
+		command: "amber adoption report|list|index|validate|compare|gate|status|bundle|next-actions",
+		correspondence: null,
+		status:
+			"removed (advisory report artifacts superseded by the governance report and the diagnosis/adoption journey)",
+		replacement: "amber governance report; the amber-diagnosis-adoption journey skill",
+	},
 ]);
 
 /**

@@ -67,7 +67,6 @@ describe("proposeMaintenance attribution carrier", () => {
 			const result = proposeMaintenance(
 				target,
 				null,
-				null,
 				stubInspect({ findingAttribution: VALID_BLOCK }),
 			);
 			assert.deepEqual(result.errors, []);
@@ -93,7 +92,6 @@ describe("proposeMaintenance attribution carrier", () => {
 			const malformed = { ...VALID_BLOCK, responsibleArtifact: "prod-database" };
 			const result = proposeMaintenance(
 				target,
-				null,
 				null,
 				stubInspect({ findingAttribution: malformed }),
 			);
@@ -127,7 +125,7 @@ describe("proposeMaintenance attribution carrier", () => {
 				{ findingAttribution: { ...VALID_BLOCK, entrySurface: 42 } },
 				{ findingAttribution: "tool-output" },
 			]) {
-				const result = proposeMaintenance(target, null, null, stubInspect(overrides));
+				const result = proposeMaintenance(target, null, stubInspect(overrides));
 				assert.ok(
 					result.errors.length > 0,
 					`must refuse ${JSON.stringify(overrides.findingAttribution)}`,
@@ -142,7 +140,7 @@ describe("proposeMaintenance attribution carrier", () => {
 	it("keeps legacy inspections explicitly unattributed with byte-identical legacy output", () => {
 		const target = tmpTarget();
 		try {
-			const result = proposeMaintenance(target, null, null, stubInspect());
+			const result = proposeMaintenance(target, null, stubInspect());
 			assert.deepEqual(result.errors, []);
 			assert.equal(result.findingAttribution, null, "legacy: no fabricated block");
 			assert.equal(result.attributionStatus, "legacy-unattributed");
@@ -170,13 +168,13 @@ describe("proposeMaintenance attribution carrier", () => {
 		const badTarget = tmpTarget();
 		try {
 			const withBlock = stubInspect({ findingAttribution: VALID_BLOCK });
-			const high = proposeMaintenance(okTarget, null, "high", withBlock);
+			const high = proposeMaintenance(okTarget, "high", withBlock);
 			assert.deepEqual(high.errors, []);
 			assert.equal(high.attributionStatus, "validated", "attribution is not a priority category");
 			const written = fs.readFileSync(path.join(okTarget, high.proposalPath), "utf8");
 			assert.match(written, /## Attribution/);
 
-			const bad = proposeMaintenance(badTarget, null, "urgent", withBlock);
+			const bad = proposeMaintenance(badTarget, "urgent", withBlock);
 			assert.match(bad.errors.join(" "), /Unknown priority "urgent"/);
 			assert.equal(proposalsDir(badTarget), null, "unknown priority writes nothing");
 		} finally {
@@ -188,12 +186,7 @@ describe("proposeMaintenance attribution carrier", () => {
 	it("treats an explicit null block as invalid, not an invented legacy path (B1R ST-B1-01)", () => {
 		const target = tmpTarget();
 		try {
-			const result = proposeMaintenance(
-				target,
-				null,
-				null,
-				stubInspect({ findingAttribution: null }),
-			);
+			const result = proposeMaintenance(target, null, stubInspect({ findingAttribution: null }));
 			assert.ok(result.errors.length > 0, "explicit null must be an explicit error");
 			assert.match(result.errors.join(" "), /findingAttribution is invalid/);
 			assert.match(result.errors.join(" "), /got null/);
@@ -211,7 +204,6 @@ describe("proposeMaintenance attribution carrier", () => {
 		try {
 			const result = proposeMaintenance(
 				target,
-				null,
 				null,
 				stubInspect({
 					findingAttribution: { ...VALID_BLOCK, failureMode: `Authorization: Bearer ${token}` },
@@ -236,7 +228,6 @@ describe("proposeMaintenance attribution carrier", () => {
 		try {
 			const result = proposeMaintenance(
 				target,
-				null,
 				null,
 				stubInspect({
 					findingAttribution: {
@@ -273,7 +264,6 @@ describe("proposeMaintenance attribution carrier", () => {
 			try {
 				const result = proposeMaintenance(
 					target,
-					null,
 					null,
 					stubInspect({ findingAttribution: { ...VALID_BLOCK, failureMode } }),
 				);

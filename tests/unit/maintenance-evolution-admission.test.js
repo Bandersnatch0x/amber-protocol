@@ -622,7 +622,7 @@ test("a secret-bearing expectedEffect refuses at pre-admission with no echo and 
 	const target = tmpTarget("pre-secret");
 	try {
 		const token = "SyntheticSecretGhIjKlMnOpQrStUvWx";
-		const result = proposeMaintenance(target, null, null, () => ({
+		const result = proposeMaintenance(target, null, () => ({
 			target,
 			errors: [],
 			warnings: [],
@@ -648,7 +648,7 @@ test("a secret-bearing evidence path refuses at pre-admission with no echo and n
 	const target = tmpTarget("pre-secret-path");
 	try {
 		const token = "ghp_SyntheticTokenAbCdEfGhIj";
-		const result = proposeMaintenance(target, null, null, () => ({
+		const result = proposeMaintenance(target, null, () => ({
 			target,
 			errors: [],
 			warnings: [],
@@ -672,7 +672,7 @@ test("a secret-bearing evidence path refuses at pre-admission with no echo and n
 test("malformed carrier fields (not secrets) flow to their validity rule and write a rejection record", () => {
 	const target = tmpTarget("shape-to-rule");
 	try {
-		const result = proposeMaintenance(target, null, null, () => ({
+		const result = proposeMaintenance(target, null, () => ({
 			target,
 			errors: [],
 			warnings: [],
@@ -768,7 +768,7 @@ test("multiline effect statements render as quoted data and cannot become headin
 	try {
 		fs.mkdirSync(path.join(target, "docs", "wiki"), { recursive: true });
 		fs.writeFileSync(path.join(target, "docs", "wiki", "runbook.md"), "# Runbook\n");
-		const result = proposeMaintenance(target, null, null, () => ({
+		const result = proposeMaintenance(target, null, () => ({
 			target,
 			errors: [],
 			warnings: [],

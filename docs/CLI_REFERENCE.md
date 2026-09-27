@@ -2250,39 +2250,21 @@ node scripts/amber.js result inspect \
   --task task-1
 ```
 
-### agent
-> ⚠️ **DEPRECATED** — will be removed in v2.
+### Removed in v1.6 (agent / team / adoption)
 
-Create and control auditable worker/reviewer dispatch records without executing agent work:
+The `agent`, `team`, and `adoption` command families were **removed**
+(issues/0068; spec `docs/specs/F075-legacy-surface-dispositions.md` amendment 2026-09-27).
+They are no longer callable and have no help surface. Replacement routes:
 
-```bash
-node scripts/amber.js agent dispatch --target . --task task-1 --worker worker-a --reviewer reviewer-b
-node scripts/amber.js agent stop --target . --task task-1
-node scripts/amber.js agent resume --target . --task task-1
-node scripts/amber.js agent review --target . --task task-1
-```
+| Removed | Use instead |
+| --- | --- |
+| `agent dispatch|stop|resume|review` | `amber harness` (Contract → Run → Event spine); `amber session` |
+| `team inspect|install|pin|update|rollback` | `amber maintenance scaffold-drift`; `amber doctor` |
+| `adoption report|list|index|validate|compare|gate|status|bundle` | `amber governance report`; the `amber-diagnosis-adoption` journey skill |
 
-### team
-> ⚠️ **DEPRECATED** — will be removed in v2.
+The disposition rows live in `amber harness legacy`.
 
-Inspect, install, pin, update, and roll back local team distribution metadata. Use `install --dry-run` to preview `.amber/team` metadata writes before creating local state:
-
-```bash
-node scripts/amber.js team inspect --target .
-node scripts/amber.js team install --target . --version 1.0.0 --preset safe-bootstrap --dry-run --json
-```
-
-### adoption
-> ⚠️ **DEPRECATED** — will be removed in v2. Use `amber governance audit` instead.
-
-Generate, list, or index safe adoption report artifacts without modifying target repositories:
-
-```bash
-node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions
-node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions
-```
-
-## Examples
+## Examples## Examples
 
 ### Start Simple Session
 

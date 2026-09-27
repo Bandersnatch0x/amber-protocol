@@ -33,7 +33,6 @@ This knowledge base is derived from the declarative knowledge plan.
 | [CLI Architecture & Command Dispatch](./cli-architecture-command-dispatch/cli-architecture-command-dispatch.md) | Document how scripts/amber.js loads Command definitions from command-help.js, binds handlers in command-dispatcher.js, and delegates domain work to scripts/lib/core/. |
 | [Governance Model & Seven Layers](./governance-model-seven-layers/governance-model-seven-layers.md) | Map the seven governance control layers to concrete commands, data structures, and enforcement points. |
 | [Session & Lifecycle Management](./session-lifecycle-management/session-lifecycle-management.md) | Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine. |
-| [Adoption System](./adoption-system/adoption-system.md) | Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module. |
 | [Loop Engineering & Governed Execution](./loop-engineering-governed-execution/loop-engineering-governed-execution.md) | Document loop contracts, ledgers, dry-run mode, and the four-gate governed execution path. |
 | [Skills & Platform Generation](./skills-platform-generation/skills-platform-generation.md) | Explain the skill system: SKILL.md as source of truth, gen:agents generation, and platform integrations. |
 | [Web Dashboard](./web-dashboard/web-dashboard.md) | Document the apps/web React dashboard architecture: tRPC API, TanStack Router routes, and session/timeline components. |

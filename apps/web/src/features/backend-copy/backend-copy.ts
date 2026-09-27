@@ -18,7 +18,7 @@ export type TranslateFn = (key: I18nKey, params?: Record<string, string | number
 // ---------------------------------------------------------------------------
 
 const LIFECYCLE_WHY_KEYS: Record<string, I18nKey> = {
-  'this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.':
+  'this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber governance report.':
     'ux.backend.lifecycle.why.audit',
   'amber starter files are not all present.': 'ux.backend.lifecycle.why.init',
   'amber starter files are not all present (audit done or skipped) — safe next install is init.':

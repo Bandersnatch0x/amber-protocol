@@ -96,6 +96,42 @@ mapping onto the unified lifecycle, composed from the frozen on-disk legacy shap
   (a mutation — needs its own decision); §52 Rules 1–3 (the old ledgers/approvals
   continue to work as-is); MCP projection.
 
+## Amendment (2026-09-27) — `agent` / `team` / `adoption` removal
+
+**Decision:** the three deprecated command families `amber agent`, `amber team`, and
+`amber adoption` are **removed**, not mapped. Provenance: ticket `issues/0068` (user
+approval recorded 2026-09-22) re-affirmed for execution 2026-09-27; registry HELP already
+promised "Will be removed in v2"; wayfinder map `issues/0066`.
+
+**Why removal and not a mapping:** these surfaces carry no harness-spine correspondence to
+declare — `agent` dispatched worker/reviewer *records* without executing agent work (the
+harness spine owns execution via Contract → Run → Event), `team` managed a local
+distribution-metadata install path that no surviving surface can drive once its command is
+gone, and `adoption` produced advisory report artifacts superseded by
+`amber governance report` + the diagnosis/adoption journey skills. Declaring a mapping for
+them would invent a correspondence, which ADR-0101 forbids.
+
+**Removal is complete, not partial:** no surviving surface may reference a removed one, so
+the change removes, in the same delivery: the three commands (registry HELP/OUTPUT/tier/
+handlers), their command-only modules (`core/agent-orchestration.js`, `core/adoption-*.js`,
+`core/adoption-composer/`), the team-distribution machinery whose only consumers were the
+removed command or maintenance/governance output sections that guided it
+(`core/team.js`, `maintenance` `upgradeAssistant`/`migrationAssistant`/`rulePackDrift`, and
+the governance-report maintenance inputs that fed them), plus their tests and live-document
+surfaces. Historical records (`docs/quality/`, `docs/product/`, ADRs, specs, `issues/`)
+keep their references: they are provenance, not live surfaces (0147 disposition).
+
+**Disposition table:** `agent`, `team`, and `adoption` appear in `LEGACY_DISPOSITIONS` with
+status `removed`, so `amber harness legacy` reads as the single §52 ledger for old
+surfaces — kept with a mapping, kept pending a mapping, or removed with a decision.
+
+**Out of the amendment:** `task`, `result`, `profile` (kept as §52 migration targets),
+and `profile deployment` (the only supported deployment-profile writer) are untouched.
+
+**Replacement routes:** `amber governance report` (readiness/risks/next actions),
+`amber maintenance` (stale docs, drift, proposals), and the `amber-diagnosis-adoption`
+journey skill for relocation work.
+
 ## Further Notes
 
 - Design decisions follow the standing user directive (map `issues/0066` close-out

@@ -1,7 +1,7 @@
 "use strict";
 
-// F014-M2: partial Maintenance evidence propagates through full inspection,
-// Governance Report, and Adoption Report without becoming a blocking error.
+// F014-M2: partial Maintenance evidence propagates through full inspection and
+// the Governance Report without becoming a blocking error.
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -11,7 +11,6 @@ const path = require("node:path");
 
 const { inspectMaintenance } = require("../../scripts/lib/core/maintenance");
 const { buildGovernanceReport } = require("../../scripts/lib/core/governance-report");
-const { generateAdoptionReport } = require("../../scripts/lib/core/adoption-reports");
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
 
 function tempTarget(name) {
@@ -122,23 +121,3 @@ test("partial evidence warns in Governance Report without blocking", () => {
 	}
 });
 
-test("Adoption Report writes from retained valid data and includes partial warnings", () => {
-	const target = tempTarget("adopt");
-	try {
-		scaffoldHarness(target);
-		writeEvidence(target, "good", validProposal("good", "assert"));
-		writeEvidence(target, "broken", "{ nope");
-		const outPath = path.join(target, "docs", "adoption-report.md");
-		fs.mkdirSync(path.dirname(outPath), { recursive: true });
-		const result = generateAdoptionReport(target, { output: outPath });
-		// Report still written from valid data.
-		assert.ok(fs.existsSync(outPath), "adoption report written");
-		assert.equal(result.errors.length, 0);
-		assert.ok(
-			result.warnings.some((w) => /evidence unreadable or invalid/.test(w)),
-			"adoption report includes partial evidence warning",
-		);
-	} finally {
-		cleanup(target);
-	}
-});

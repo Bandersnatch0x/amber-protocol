@@ -856,7 +856,6 @@
 				"tests/phase-v2.test.js",
 				"tests/phase-v2-5.test.js",
 				"tests/phase-v4.test.js",
-				"tests/phase-v4-5.test.js",
 				"docs/CLI_REFERENCE.md",
 				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md"
 			]

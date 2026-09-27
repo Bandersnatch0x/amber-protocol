@@ -34,55 +34,19 @@ test("Repository Onboarding: init and doctor", () => {
 	assert.equal(doctor.status, 0, doctor.stderr);
 });
 
-test("Adoption Review: report, gate, and bundle", () => {
-	const target = tempDir("adoption");
-	const outputDir = tempDir("adoption-output");
+test("Diagnosis Journey: governance report on an uninitialised target", () => {
+	// The `amber adoption` report/gate/bundle family was removed (issues/0068);
+	// `amber governance report` is the declared replacement route, so this e2e
+	// covers the same shape — read a target, produce a decision, name next actions.
+	const target = tempDir("governance-report");
 	fs.writeFileSync(path.join(target, "package-lock.json"), JSON.stringify({}));
 
-	const report = runAmber([
-		"adoption",
-		"report",
-		"--target",
-		target,
-		"--output-dir",
-		outputDir,
-		"--json",
-	]);
+	const report = runAmber(["governance", "report", "--target", target, "--json"]);
 	assert.equal(report.status, 0, report.stderr);
-	const reportPayload = JSON.parse(report.stdout);
-	assert.ok(fs.existsSync(reportPayload.reportPath));
-
-	const gate = runAmber(["adoption", "gate", "--report", reportPayload.reportPath, "--json"]);
-	assert.equal(gate.status, 0, gate.stderr);
-	const gatePayload = JSON.parse(gate.stdout);
-	assert.ok(["ready", "wait"].includes(gatePayload.decision));
-
-	const reportsDir = path.dirname(reportPayload.reportPath);
-	const index = runAmber([
-		"adoption",
-		"index",
-		"--reports-dir",
-		reportsDir,
-		"--output",
-		path.join(outputDir, "index.md"),
-		"--json",
-	]);
-	assert.equal(index.status, 0, index.stderr);
-
-	const bundleDir = path.join(tempDir("bundle"), "bundle");
-	const bundle = runAmber([
-		"adoption",
-		"bundle",
-		"--reports-dir",
-		reportsDir,
-		"--index",
-		path.join(outputDir, "index.md"),
-		"--output-dir",
-		bundleDir,
-		"--json",
-	]);
-	assert.equal(bundle.status, 0, bundle.stderr);
-	assert.ok(fs.existsSync(path.join(bundleDir, "manifest.json")));
+	const payload = JSON.parse(report.stdout);
+	assert.ok(["proceed", "warn", "block"].includes(payload.decision));
+	assert.ok(Array.isArray(payload.nextActions));
+	assert.ok(payload.scores && typeof payload.scores.overall === "number");
 });
 
 test("Governed Delivery: plan, gate, review, and session complete-check", () => {

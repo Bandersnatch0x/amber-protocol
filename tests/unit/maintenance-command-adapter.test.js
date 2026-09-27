@@ -1,8 +1,10 @@
 "use strict";
 
-// F014-M3: the Maintenance command adapter owns all ten subcommands.
-// Characterizes action recognition, alias handling, envelopes, registry-path
-// closure, and unknown-action guidance through maintenanceDispatch.
+// F014-M3: the Maintenance command adapter owns the maintenance subcommands.
+// Characterizes action recognition, alias handling, envelopes, and
+// unknown-action guidance through maintenanceDispatch. The team-distribution
+// actions (`pack-drift`, `upgrade-preview`) were removed with the `amber team`
+// family (issues/0068).
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -15,13 +17,11 @@ const {
 	maintenanceDispatch,
 } = require("../../scripts/lib/maintenance/adapters/command");
 
-const ALL_TEN = [
+const ALL_ACTIONS = [
 	"inspect",
 	"propose",
 	"stale-docs",
 	"wiki-lint",
-	"pack-drift",
-	"upgrade-preview",
 	"evolution-rollup",
 	"regression-proposals",
 	"scaffold-drift",
@@ -33,14 +33,14 @@ function tempTarget() {
 }
 
 describe("maintenance command adapter", () => {
-	it("declares exactly the ten documented subcommands", () => {
-		assert.deepEqual([...MAINTENANCE_ACTIONS].sort(), [...ALL_TEN].sort());
+	it("declares exactly the documented subcommands", () => {
+		assert.deepEqual([...MAINTENANCE_ACTIONS].sort(), [...ALL_ACTIONS].sort());
 	});
 
 	it("resolves every subcommand to a structured result envelope", () => {
 		const tmp = tempTarget();
 		try {
-			for (const action of ALL_TEN) {
+			for (const action of ALL_ACTIONS) {
 				const out = maintenanceDispatch(action, { target: tmp });
 				assert.ok(out && out.result, `"${action}" must yield an envelope`);
 				assert.ok(Array.isArray(out.result.errors), `"${action}" errors array`);
@@ -57,12 +57,12 @@ describe("maintenance command adapter", () => {
 		}
 	});
 
-	it("unknown action returns the full ten-subcommand guidance", () => {
+	it("unknown action returns the full subcommand guidance", () => {
 		const tmp = tempTarget();
 		try {
 			const out = maintenanceDispatch("bogus", { target: tmp });
 			assert.ok(out.result.errors.length > 0);
-			for (const action of ALL_TEN) {
+			for (const action of ALL_ACTIONS) {
 				assert.ok(out.result.errors.join(" ").includes(action), `guidance lists ${action}`);
 			}
 		} finally {

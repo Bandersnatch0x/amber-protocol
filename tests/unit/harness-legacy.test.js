@@ -174,7 +174,16 @@ test("the nearest-neighbor table is closed; the CLI subverbs smoke through the d
 	assert.equal(view.exitCode, 0);
 	assert.equal(view.result.runProjection.state, "running");
 	const table = dispatch("harness", { target, json: true, _: ["legacy"] });
-	assert.equal(table.result.dispositions.length, 3);
+	// Six §52 rows: the three mapped/kept surfaces plus the three removed
+	// families declared by the F075 amendment (2026-09-27, issues/0068).
+	assert.equal(table.result.dispositions.length, 6);
+	for (const surface of ["agent", "team", "adoption"]) {
+		const row = table.result.dispositions.find((d) => d.surface === surface);
+		assert.ok(row, `disposition table must carry a ${surface} row`);
+		assert.match(row.status, /^removed/);
+		assert.equal(row.correspondence, null);
+		assert.ok(row.replacement, `${surface} row must name its replacement route`);
+	}
 	const profile = dispatch("harness", { target, json: true, _: ["legacy", "profile"] });
 	assert.equal(profile.result.declaredAbsence, true);
 	assert.match(profile.result.status, /deletion candidate/);

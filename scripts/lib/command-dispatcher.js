@@ -34,11 +34,6 @@ const { inspectWorkflowPack, inspectWorkflowPackReadiness } = require("./core/wo
 const { inspectProjectProfile } = require("./core/profiles");
 const { prepareTaskExecution, inspectTaskResult } = require("./core/task-execution");
 const {
-	dispatchAgentTask,
-	setAgentDispatchStatus,
-	recordAgentReview,
-} = require("./core/agent-orchestration");
-const {
 	inspectLoopContract,
 	recommendLoopContract,
 	recordLoopContract,
@@ -49,30 +44,9 @@ const {
 	approveLoopContract,
 	verifyLoopLedger,
 } = require("./core/loop-execution");
-const {
-	inspectTeamDistribution,
-	installTeamDistribution,
-	pinTeamDistribution,
-	updateTeamDistribution,
-	rollbackTeamDistribution,
-} = require("./core/team");
 const routeCommands = require("./route-commands");
 const { resolveTargetRoutesDirectory } = require("./route-loader");
 const featureCommands = require("./feature-commands");
-const {
-	generateAdoptionReport,
-	listAdoptionReports,
-	writeAdoptionReportsIndex,
-	validateAdoptionReports,
-	compareAdoptionReports,
-} = require("./core/adoption-reports");
-const { gateAdoptionReport, statusAdoptionReports } = require("./core/adoption-gate");
-const { bundleAdoptionArtifacts, writeAdoptionNextActions } = require("./core/adoption-bundle");
-const {
-	writeAdoptionDecisionRecord,
-	writeAdoptionApplyPlan,
-	writeAdoptionSelectedFiles,
-} = require("./core/adoption-proposals");
 const sessionCommands = require("./session-commands");
 const {
 	resolveTarget,
@@ -113,38 +87,6 @@ const { validateWorkflowPack, validateLoopContract } = require("./core/execution
 function handleMaintenance(args) {
 	const { maintenanceDispatch } = require("./maintenance/adapters/command");
 	return maintenanceDispatch(args._?.[0], args);
-}
-
-function handleAdoption(args) {
-	const action = args._?.[0];
-	if (action === "report") return { result: generateAdoptionReport(args.target, args) };
-	if (action === "list") return { result: listAdoptionReports(args) };
-	if (action === "index") return { result: writeAdoptionReportsIndex(args) };
-	if (action === "validate") return { result: validateAdoptionReports(args) };
-	if (action === "compare") return { result: compareAdoptionReports(args) };
-	if (action === "gate") return { result: gateAdoptionReport(args) };
-	if (action === "status") return { result: statusAdoptionReports(args) };
-	if (action === "bundle") return { result: bundleAdoptionArtifacts(args) };
-	if (action === "next-actions") return { result: writeAdoptionNextActions(args) };
-	if (action === "decision-record") return { result: writeAdoptionDecisionRecord(args) };
-	if (action === "apply-plan") return { result: writeAdoptionApplyPlan(args) };
-	if (action === "selected-files") return { result: writeAdoptionSelectedFiles(args) };
-	return {
-		result: unknownAction("adoption", [
-			"report",
-			"list",
-			"index",
-			"validate",
-			"compare",
-			"gate",
-			"status",
-			"bundle",
-			"next-actions",
-			"decision-record",
-			"apply-plan",
-			"selected-files",
-		]),
-	};
 }
 
 function handleLedger(args) {
@@ -689,17 +631,6 @@ function handleResult(args) {
 	return { result: inspectTaskResult(args.target, args.task) };
 }
 
-function handleAgent(args) {
-	const action = args._?.[0];
-	if (action === "dispatch") return { result: dispatchAgentTask(args.target, args) };
-	if (action === "stop")
-		return { result: setAgentDispatchStatus(args.target, args.task, "stopped") };
-	if (action === "resume")
-		return { result: setAgentDispatchStatus(args.target, args.task, "dispatched") };
-	if (action === "review") return { result: recordAgentReview(args.target, args) };
-	return { result: unknownAction("agent", ["dispatch", "stop", "resume", "review"]) };
-}
-
 async function handleLoop(args) {
 	const action = args._?.[0];
 	if (action === "inspect") {
@@ -764,16 +695,6 @@ async function handleLoop(args) {
 			"validate-loop",
 		]),
 	};
-}
-
-function handleTeam(args) {
-	const action = args._?.[0];
-	if (action === "inspect") return { result: inspectTeamDistribution(args.target, args) };
-	if (action === "install") return { result: installTeamDistribution(args.target, args) };
-	if (action === "pin") return { result: pinTeamDistribution(args.target, args) };
-	if (action === "update") return { result: updateTeamDistribution(args.target, args) };
-	if (action === "rollback") return { result: rollbackTeamDistribution(args.target, args) };
-	return { result: unknownAction("team", ["inspect", "install", "pin", "update", "rollback"]) };
 }
 
 async function handleRoute(args) {
@@ -1290,12 +1211,9 @@ const COMMAND_HANDLERS = {
 	sync: handleSync,
 	task: handleTask,
 	result: handleResult,
-	agent: handleAgent,
 	loop: handleLoop,
 	ledger: handleLedger,
-	team: handleTeam,
 	maintenance: handleMaintenance,
-	adoption: handleAdoption,
 	route: handleRoute,
 	session: handleSession,
 	migrate: handleMigrate,

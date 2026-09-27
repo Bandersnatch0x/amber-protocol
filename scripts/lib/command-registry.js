@@ -163,26 +163,8 @@ const COMMAND_HELP = {
 	task: "⚠️  DEPRECATED: Prepare isolated task ledger, evidence, replay, and worktree artifacts. Will be removed in v2.",
 	result:
 		"⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2.",
-	agent:
-		"⚠️  DEPRECATED: Create and control auditable worker/reviewer dispatch records without executing agent work. Will be removed in v2.",
-	team: [
-		"⚠️  DEPRECATED: Inspect, install, pin, update, and roll back local team distribution metadata. Will be removed in v2.",
-		"",
-		"Use install --dry-run to preview .amber/team metadata writes before creating local state.",
-	],
 	maintenance:
 		"Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.",
-	adoption: [
-		"⚠️  DEPRECATED: Generate, list, or index safe adoption report artifacts without modifying target repositories. Will be removed in v2 — use 'amber governance audit' instead.",
-		"",
-		"Examples:",
-		"  amber adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
-		"  amber adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle",
-		"  amber adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md",
-		"  amber adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md",
-		"  amber adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run",
-		"  amber adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md",
-	],
 	loop: [
 		"Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
 		"Loop status accepts one ledger JSON file or a directory and reports bounded no-progress signals without executing anything.",
@@ -2036,13 +2018,6 @@ const COMMAND_OUTPUT = {
 		dryRun: true,
 		usage: "Usage: amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]",
 	},
-	team: {
-		usage: [
-			"Usage: amber team <inspect|install|pin|update|rollback> --target <repo> [--json]",
-			"       amber team install --target <repo> --version <version> --preset <preset> [--dry-run] [--json]",
-			"       amber team update --target <repo> --version <version> [--dry-run|--confirm] [--json]",
-		].join("\n"),
-	},
 	gate: {
 		usage: [
 			"Usage: amber gate <evaluate|show|list> --target <repo> [--json]  (F050 Gate Contracts)",
@@ -2362,10 +2337,7 @@ const COMMANDS = Object.freeze([
 	"profile",
 	"task",
 	"result",
-	"agent",
-	"team",
 	"maintenance",
-	"adoption",
 	"loop",
 	"ledger",
 	"route",
@@ -2442,9 +2414,6 @@ const TIER_BY_COMMAND = {
 	profile: "deprecated",
 	task: "deprecated",
 	result: "deprecated",
-	agent: "deprecated",
-	team: "deprecated",
-	adoption: "deprecated",
 	pack: "expert",
 	maintenance: "expert",
 	status: "expert",

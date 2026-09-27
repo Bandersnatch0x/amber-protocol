@@ -21,8 +21,6 @@ const MAINTENANCE_ACTIONS = [
 	"propose",
 	"stale-docs",
 	"wiki-lint",
-	"pack-drift",
-	"upgrade-preview",
 	"evolution-rollup",
 	"regression-proposals",
 	"scaffold-drift",
