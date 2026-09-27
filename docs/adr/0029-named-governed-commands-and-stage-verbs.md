@@ -254,7 +254,9 @@ they are never a second cursor.
 > placement: approval consumption is per-ledger (`latestUnconsumedApproval`), so the approval and
 > its consumption must share one hash chain. The records stay durable, hash-chained, and fully
 > correlated with the settled event via requestId/attemptId/evidenceId/outputDigest; the
-> compliance audit that caught this is `spec-compliance/` (2026-09-02, REQ-12).
+> compliance audit that caught this ran in the local-only `spec-compliance/` workspace
+> (2026-09-02, REQ-12) — that workspace is gitignored and not a tracked artifact, so this
+> sentence is the promoted, self-contained record of the finding.
 
 The commit order is: acquire/verify the lease lock; append the immutable request event; perform or
 return the attempt; record the Evidence receipt and any F052 execution settlement; append the

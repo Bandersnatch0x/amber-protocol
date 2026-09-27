@@ -159,8 +159,9 @@ inline. Its contract is now:
 > any job is created. Reason: this mutation writes `manifest.completedStages` directly
 > (`persistCompletedStage`), which on a verb route would diverge the projection from the
 > ledger-owned cursor — the same refusal the CLI's legacy verify guard applies
-> (`scripts/lib/session-commands.js`). Found by the F062 compliance audit (spec-compliance/,
-> REQ-09/REQ-13, 2026-09-02).
+> (`scripts/lib/session-commands.js`). Found by the F062 compliance audit (REQ-09/REQ-13,
+> 2026-09-02; the audit ran in the local-only `spec-compliance/` workspace, which is gitignored
+> and not a tracked artifact — the finding above is the promoted, self-contained record).
 - Job transitions broadcast the SSE event `evidence-job-changed`
   (`{ type, sessionId, jobId, status, timestamp }`), defined in
   `server/types/session-events.ts`.

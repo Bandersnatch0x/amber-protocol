@@ -55,7 +55,8 @@
 | 临时与工具产物 | `.scratch/<source>/` | 否 | 一切中间产物；原始输出默认留在此处 |
 | 历史归档 | `docs/legacy/` | 是（例外） | 保持现状，不规范化 |
 | 机器测试输出 | `coverage/`、`test-results/` | 否 | 可随时删除 |
-| 人工测试报告 | 与 `docs/quality/` 二选一（见 0153） | 待定 | 不长期双份存在 |
+| 人工测试/试点报告 | `test-reports/`（本地）；有长期价值才晋升 `docs/quality/` | 否 | 手跑报告默认留 gitignored 的 `test-reports/`；**不长期双份**——一旦晋升到 `docs/quality/` 就从 `test-reports/` 移除 |
+| 审计/合规工作区 | `spec-compliance*/`（本地） | 否 | gitignored 审计工作区；结论必须晋升进引用它的 ADR/票据正文（该路径不入版本，不得被当作可解析制品引用） |
 
 **`.gitignore` 不是 artifact map：** 是否被忽略只说明提交策略，不说明该产物的权威位置或生命周期。
 
