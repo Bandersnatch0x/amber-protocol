@@ -105,4 +105,11 @@ You have successfully completed the first governed workflow when:
 2. A new session directory exists under `.amber/sessions/` with a valid `manifest.json` and `timeline.jsonl`.
 3. You can verify that Amber operated without modifying any user source files outside `.amber/`.
 
+## Continuing the Loop: Assurance and Handoff
+
+Steps 1–5 above are the **first** governed workflow — the audit → next subset of the full lifecycle. The loop continues with the assurance and handoff stages:
+
+- **Assure** — record replayable Evidence and settle it under a single-use human Approval; see [Evidence and Assurance](/concepts/evidence).
+- **Handoff** — bundle live state and continue across agent boundaries or developer shifts; see [Session Handoff and Continuity](/guides/session-handoff-and-continuity).
+
 Now explore the [Core Concepts](/concepts) or learn how to [Adopt Amber on an Existing Project](/guides/adopting-existing-project).

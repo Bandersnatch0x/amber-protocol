@@ -617,12 +617,16 @@ function verifyVersionSync() {
 }
 
 // 12. Replayable Reader Result Scenarios (New Reader & Experienced Reader)
-function verifyReaderScenarios() {
+function verifyReaderScenarios(options = {}) {
 	const errors = [];
 
-	// Scenario 1: First-Time Reader Journey
-	const firstWorkflowPath = path.join(DOCS_DIR, "docs", "start-here", "first-governed-workflow.md");
-	const boundariesPath = path.join(DOCS_DIR, "docs", "about", "boundaries.md");
+	// Scenario 1: First-Time Reader Journey. Paths are injectable for tests so the
+	// continuity assertions below can be proven to bite on a doctored fixture.
+	const firstWorkflowPath =
+		options.firstWorkflowPath ||
+		path.join(DOCS_DIR, "docs", "start-here", "first-governed-workflow.md");
+	const boundariesPath =
+		options.boundariesPath || path.join(DOCS_DIR, "docs", "about", "boundaries.md");
 
 	if (!fs.existsSync(firstWorkflowPath)) {
 		errors.push("Scenario 1 failed: first-governed-workflow.md does not exist.");
@@ -637,6 +641,39 @@ function verifyReaderScenarios() {
 		if (!content.includes("expectedSignal")) {
 			errors.push(
 				"Scenario 1 failed: Expected signals / artifacts missing from first governed workflow steps.",
+			);
+		}
+		// The canonical first-workflow path must hand the reader to the
+		// assurance/handoff half of the full lifecycle, or a reader finishes the
+		// walkthrough never learning the loop continues (issues/0063 R3).
+		for (const [label, needle] of [
+			["assurance/evidence", "/concepts/evidence"],
+			["handoff/continuity", "/guides/session-handoff-and-continuity"],
+		]) {
+			if (!content.includes(needle)) {
+				errors.push(
+					`Scenario 1 failed: the walkthrough does not link to the ${label} half of the lifecycle (${needle}).`,
+				);
+			}
+		}
+	}
+
+	// The landing page states the FULL governed lifecycle; it must be labelled as
+	// such and link to the walkthrough's subset, so the two "5-step" surfaces read
+	// as one model rather than two competing ones (issues/0063 R3).
+	const landingPath = options.landingPath || path.join(SRC_DIR, "pages", "index.tsx");
+	if (!fs.existsSync(landingPath)) {
+		errors.push("Scenario 1 failed: landing page index.tsx does not exist.");
+	} else {
+		const landing = fs.readFileSync(landingPath, "utf8");
+		if (!landing.includes("/start-here/first-governed-workflow")) {
+			errors.push(
+				"Scenario 1 failed: the landing lifecycle does not link to the first-governed-workflow walkthrough.",
+			);
+		}
+		if (!/full governed lifecycle/i.test(landing)) {
+			errors.push(
+				"Scenario 1 failed: the landing lifecycle must be labelled as the full governed lifecycle so it reads as the superset of the walkthrough's subset.",
 			);
 		}
 	}

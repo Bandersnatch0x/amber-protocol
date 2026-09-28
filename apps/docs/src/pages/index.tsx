@@ -207,11 +207,15 @@ export default function Home(): React.JSX.Element {
             <div className={styles.sectionHeader}>
               <div className={styles.sectionBadge}>Governed Workflow</div>
               <h2 id="workflow-heading" className={styles.sectionTitle}>
-                The 5-Stage Governed Engineering Loop
+                The Full Governed Lifecycle (5 Stages)
               </h2>
               <p className={styles.sectionSubtitle}>
                 Every unit of agent-assisted engineering moves through strict, verifiable lifecycle
-                gates from initial audit to final acceptance and distilled knowledge write-back.
+                gates from initial audit to final acceptance and distilled knowledge write-back. The{' '}
+                <Link to="/start-here/first-governed-workflow">First Governed Workflow</Link>{' '}
+                walkthrough covers the audit → next subset of this loop; the assurance and handoff
+                stages continue in the{' '}
+                <Link to="/guides/session-handoff-and-continuity">continuity guide</Link>.
               </p>
             </div>
 

@@ -364,3 +364,90 @@ buildTest("public docs verification seam runs end-to-end and returns exit code 0
 	const code = runVerification();
 	assert.equal(code, 0, "runVerification must return exit code 0");
 });
+
+// 0063 R3 guard: the first-workflow walkthrough must hand the reader to the
+// assurance/handoff half of the lifecycle, and the landing lifecycle must be
+// labelled as the full lifecycle and link to the walkthrough's subset.
+const READER_SCENARIO_BOUNDARIES = path.join(
+	ROOT_DIR,
+	"apps",
+	"docs",
+	"docs",
+	"about",
+	"boundaries.md",
+);
+
+function scen1Fixture({ workflow, landing }) {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-scen1-"));
+	const workflowPath = path.join(dir, "first-governed-workflow.md");
+	const landingPath = path.join(dir, "index.tsx");
+	fs.writeFileSync(workflowPath, workflow);
+	fs.writeFileSync(landingPath, landing);
+	return { dir, workflowPath, landingPath };
+}
+
+// A workflow that satisfies every pre-existing Scenario 1 requirement.
+const SCEN1_WORKFLOW_BASE =
+	"audit init doctor session start next expectedSignal\n" +
+	"[Evidence and Assurance](/concepts/evidence)\n" +
+	"[Session Handoff and Continuity](/guides/session-handoff-and-continuity)\n";
+const SCEN1_LANDING_BASE =
+	"The Full Governed Lifecycle (5 Stages) /start-here/first-governed-workflow\n";
+
+test("Scenario 1 continuity assertions pass on a conforming workflow + landing", () => {
+	const fx = scen1Fixture({ workflow: SCEN1_WORKFLOW_BASE, landing: SCEN1_LANDING_BASE });
+	try {
+		const errors = verifyReaderScenarios({
+			firstWorkflowPath: fx.workflowPath,
+			landingPath: fx.landingPath,
+			boundariesPath: READER_SCENARIO_BOUNDARIES,
+		});
+		assert.deepEqual(errors, [], `expected clean scenario, got: ${errors.join("; ")}`);
+	} finally {
+		fs.rmSync(fx.dir, { recursive: true, force: true });
+	}
+});
+
+test("Scenario 1 reports a walkthrough that never links to the assurance/handoff half", () => {
+	const fx = scen1Fixture({
+		workflow: "audit init doctor session start next expectedSignal\n",
+		landing: SCEN1_LANDING_BASE,
+	});
+	try {
+		const errors = verifyReaderScenarios({
+			firstWorkflowPath: fx.workflowPath,
+			landingPath: fx.landingPath,
+			boundariesPath: READER_SCENARIO_BOUNDARIES,
+		});
+		assert.ok(
+			errors.some((e) => e.includes("assurance/evidence")),
+			`expected an evidence-continuity error, got: ${errors.join("; ")}`,
+		);
+		assert.ok(
+			errors.some((e) => e.includes("handoff/continuity")),
+			`expected a handoff-continuity error, got: ${errors.join("; ")}`,
+		);
+	} finally {
+		fs.rmSync(fx.dir, { recursive: true, force: true });
+	}
+});
+
+test("Scenario 1 reports a landing lifecycle that is not labelled as the full lifecycle", () => {
+	const fx = scen1Fixture({
+		workflow: SCEN1_WORKFLOW_BASE,
+		landing: "/start-here/first-governed-workflow\n", // no "full governed lifecycle" label
+	});
+	try {
+		const errors = verifyReaderScenarios({
+			firstWorkflowPath: fx.workflowPath,
+			landingPath: fx.landingPath,
+			boundariesPath: READER_SCENARIO_BOUNDARIES,
+		});
+		assert.ok(
+			errors.some((e) => e.includes("full governed lifecycle")),
+			`expected a missing-label error, got: ${errors.join("; ")}`,
+		);
+	} finally {
+		fs.rmSync(fx.dir, { recursive: true, force: true });
+	}
+});

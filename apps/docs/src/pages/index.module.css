@@ -264,6 +264,15 @@
   line-height: 1.6;
 }
 
+/* Inline links inside landing text blocks must not rely on colour alone
+   (axe link-in-text-block); the site-wide .markdown rule covers content pages,
+   not the custom landing page (issues/0063 R3). */
+.sectionSubtitle a,
+.heroSubtitle a,
+.ctaDesc a {
+  text-decoration: underline;
+}
+
 [data-theme='light'] .sectionSubtitle {
   color: #475569;
 }
