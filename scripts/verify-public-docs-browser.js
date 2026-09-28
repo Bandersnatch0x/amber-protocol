@@ -15,9 +15,9 @@
  * the build (a browser + axe-core are required):
  *
  *   Row 7  — accessibility floor & responsive widths: axe-core reports zero
- *            serious/critical violations on the shipped default (dark) theme,
- *            and there is no page-level horizontal overflow at 320/375/768.
- *            (Light-theme contrast is tracked separately as issues/0157.)
+ *            serious/critical violations on both the dark default theme and
+ *            the light theme, and there is no page-level horizontal overflow
+ *            at 320/375/768.
  *   Row 10 — light/dark token rendering across page types, preserved across
  *            client-side navigation.
  *
@@ -161,38 +161,45 @@ async function hasHorizontalOverflow(page) {
 	);
 }
 
-// Row 7: axe serious/critical = 0 on the dark default theme + no horizontal
-// overflow at the narrow-screen widths. `pages` is injectable for tests.
+// Row 7: axe serious/critical = 0 on both the dark default and the light theme
+// + no horizontal overflow at the narrow-screen widths. `pages` is injectable
+// for tests. (Light-theme parity added by issues/0157.)
 async function verifyBrowserAccessibility(browser, origin, pages = REPRESENTATIVE_PAGES) {
 	const errors = [];
-	const context = await browser.newContext({ colorScheme: "dark" });
-	try {
-		for (const rel of pages) {
-			const page = await context.newPage();
-			page.setDefaultTimeout(20000);
-			const target = `${origin}${BASE}${rel === "/" ? "/" : rel}`;
-			try {
-				await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
-				await page.waitForSelector("#__docusaurus", { timeout: 15000 });
-				const violations = await runAxe(page);
-				for (const v of violations) {
-					errors.push(`a11y (${rel}): axe ${v.impact} violation "${v.id}" on ${v.nodes} node(s).`);
-				}
-				for (const width of VIEWPORTS) {
-					await page.setViewportSize({ width, height: 900 });
-					await page.waitForTimeout(120);
-					if (await hasHorizontalOverflow(page)) {
-						errors.push(`responsive (${rel}): page-level horizontal overflow at ${width}px.`);
+	for (const scheme of ["dark", "light"]) {
+		const context = await browser.newContext({ colorScheme: scheme });
+		try {
+			for (const rel of pages) {
+				const page = await context.newPage();
+				page.setDefaultTimeout(20000);
+				const target = `${origin}${BASE}${rel === "/" ? "/" : rel}`;
+				try {
+					await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
+					await page.waitForSelector("#__docusaurus", { timeout: 15000 });
+					const violations = await runAxe(page);
+					for (const v of violations) {
+						errors.push(
+							`a11y (${scheme} ${rel}): axe ${v.impact} violation "${v.id}" on ${v.nodes} node(s).`,
+						);
 					}
+					for (const width of VIEWPORTS) {
+						await page.setViewportSize({ width, height: 900 });
+						await page.waitForTimeout(120);
+						if (await hasHorizontalOverflow(page)) {
+							errors.push(
+								`responsive (${scheme} ${rel}): page-level horizontal overflow at ${width}px.`,
+							);
+						}
+					}
+				} catch (e) {
+					errors.push(`a11y (${scheme} ${rel}): could not evaluate — ${e.message}`);
+				} finally {
+					await page.close();
 				}
-			} catch (e) {
-				errors.push(`a11y (${rel}): could not evaluate — ${e.message}`);
-			} finally {
-				await page.close();
 			}
+		} finally {
+			await context.close();
 		}
-	} finally {
-		await context.close();
 	}
 	return errors;
 }
@@ -313,7 +320,7 @@ async function runBrowserVerification() {
 	}
 	const allErrors = [];
 	try {
-		console.log("Gate 7 (browser): accessibility floor & responsive widths (dark default theme)…");
+		console.log("Gate 7 (browser): accessibility floor & responsive widths (dark + light themes)…");
 		allErrors.push(...(await verifyBrowserAccessibility(browser, origin)));
 		console.log("Gate 10 (browser): light/dark token rendering, preserved across navigation…");
 		allErrors.push(...(await verifyThemeRendering(browser, origin)));
@@ -322,7 +329,7 @@ async function runBrowserVerification() {
 		server.close();
 	}
 	if (allErrors.length === 0) {
-		console.log("✅ Browser verification passed: rows 7 & 10 clean on the dark default theme.");
+		console.log("✅ Browser verification passed: rows 7 & 10 clean on the dark and light themes.");
 		return 0;
 	}
 	console.log(`\n❌ Browser verification found ${allErrors.length} issue(s):`);

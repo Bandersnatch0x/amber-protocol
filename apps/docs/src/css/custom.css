@@ -4,8 +4,8 @@
  */
 
 :root {
-  --ifm-color-primary: #d97706;
-  --ifm-color-primary-dark: #b45309;
+  --ifm-color-primary: #b45309;
+  --ifm-color-primary-dark: #92400e;
   --ifm-color-primary-darker: #92400e;
   --ifm-color-primary-darkest: #78350f;
   --ifm-color-primary-light: #f59e0b;
@@ -208,4 +208,48 @@ pre,
 [data-theme='dark'] .token.doctype,
 [data-theme='dark'] .token.cdata {
   color: #a1a1aa !important;
+}
+
+/*
+ * Light-theme contrast floor (issues/0157): the light palette must also clear
+ * axe serious/critical = 0. The amber primary is darkened to amber-700 so link
+ * and active-state text meets 4.5:1 on white and near-white (#f2f2f2) menu rows;
+ * keyboard keys, the light Prism `function` token, and active navbar/menu text
+ * are pinned to accessible values.
+ */
+[data-theme='light'] kbd {
+  color: #1f2937;
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+[data-theme='light'] .token.function {
+  color: #b31d28 !important;
+}
+
+[data-theme='light'] .token.comment,
+[data-theme='light'] .token.prolog,
+[data-theme='light'] .token.doctype,
+[data-theme='light'] .token.cdata {
+  color: #4b5563 !important;
+}
+
+[data-theme='light'] .token.parameter,
+[data-theme='light'] .token.variable,
+[data-theme='light'] .token.constant,
+[data-theme='light'] .token.symbol {
+  color: #0e7490 !important;
+}
+
+[data-theme='light'] .token.string,
+[data-theme='light'] .token.attr-value,
+[data-theme='light'] .token.char,
+[data-theme='light'] .token.regex {
+  color: #b3105c !important;
+}
+
+[data-theme='light'] .navbar__link--active,
+[data-theme='light'] .menu__link--active,
+[data-theme='light'] .breadcrumbs__item--active .breadcrumbs__link {
+  color: #92400e;
 }

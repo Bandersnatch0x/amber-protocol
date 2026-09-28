@@ -55,6 +55,12 @@
   margin-bottom: 1rem;
 }
 
+/* Light theme: amber text on the pale-amber badge fails 4.5:1 (issues/0157);
+   use a deep amber that clears contrast while staying on-brand. */
+[data-theme='light'] .sectionBadge {
+  color: #92400e;
+}
+
 .sectionTitle {
   font-size: 2.35rem;
   font-weight: 800;
