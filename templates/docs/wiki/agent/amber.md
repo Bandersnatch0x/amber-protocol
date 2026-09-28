@@ -39,7 +39,7 @@ A handoff must let another person continue without chat history: goal, work comp
 
 The Amber setup can describe and track a continuous-improvement loop without executing it autonomously.
 
-- Use `.workflow/continuous-improvement/state.json` for queue, approval gates, and result notes.
+- Use `.amber/continuous-improvement/state.json` for queue, approval gates, and result notes.
 - Use [Continuous improvement](continuous-improvement.md) for the operating loop.
 - Use [Workflow packets](workflow-packets.md) when research, implementation, and review need separation.
 - Stop at approval gates before destructive, external, expensive, broad, or security-sensitive work.

@@ -110,8 +110,8 @@ Creates, when safe:
 - `session-handoff.md`
 - `clean-state-checklist.md`
 - `evaluator-rubric.md`
-- `.workflow/continuous-improvement/state.json`
-- `.workflow/continuous-improvement/packets/README.md`
+- `.amber/continuous-improvement/state.json`
+- `.amber/continuous-improvement/packets/README.md`
 - `docs/wiki/` skeleton
 
 Rules:
@@ -259,8 +259,8 @@ amber-protocol/
     session-handoff.md
     clean-state-checklist.md
     evaluator-rubric.md
-    .workflow/continuous-improvement/state.json
-    .workflow/continuous-improvement/packets/README.md
+    .amber/continuous-improvement/state.json
+    .amber/continuous-improvement/packets/README.md
     docs/wiki/...
   scripts/
     scaffold-amber.js

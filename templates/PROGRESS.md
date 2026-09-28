@@ -11,7 +11,7 @@ None.
 ## Active Workflow
 
 - Mode: manual
-- State file: `.workflow/continuous-improvement/state.json`
+- State file: `.amber/continuous-improvement/state.json`
 - Current slice: none
 
 ## Last Verification

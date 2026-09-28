@@ -16,10 +16,10 @@ const {
 function fakeTemplateRoot() {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-tpl-"));
 	fs.mkdirSync(path.join(root, "docs/wiki/agent"), { recursive: true });
-	fs.mkdirSync(path.join(root, ".workflow/continuous-improvement"), { recursive: true });
+	fs.mkdirSync(path.join(root, ".amber/continuous-improvement"), { recursive: true });
 	fs.writeFileSync(path.join(root, "docs/wiki/agent/amber.md"), "amber v1\n");
 	fs.writeFileSync(path.join(root, "AGENTS.md"), "agents v1\n");
-	fs.writeFileSync(path.join(root, ".workflow/continuous-improvement/state.json"), "{}\n");
+	fs.writeFileSync(path.join(root, ".amber/continuous-improvement/state.json"), "{}\n");
 	return root;
 }
 

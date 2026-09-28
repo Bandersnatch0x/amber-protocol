@@ -28,7 +28,6 @@ const MINIMUM_HARNESS_FILES = [
 	"routes/bugfix-quick.route.json",
 	"routes/feature-standard.route.json",
 	"routes/refactor-safe.route.json",
-	".workflow/continuous-improvement/state.json",
 	"docs/wiki/glossary.md",
 ];
 
@@ -108,8 +107,19 @@ const AMBER_CONTROLLED_CONTENT_FILES = new Set([
 ]);
 
 // Runtime state files Amber's init scaffolds but must NEVER overwrite — refreshing
-// these would destroy accumulated project state.
-const AMBER_STATE_FILES = new Set([".workflow/continuous-improvement/state.json"]);
+// these would destroy accumulated project state. The canonical location moved from
+// `.workflow/` to `.amber/` (issues/0156); the legacy path stays in the set so
+// provenance still tiers an already-installed repo's old-location file as `state`
+// and doctor tolerates it (backward compatibility).
+const AMBER_STATE_FILES = new Set([
+	".amber/continuous-improvement/state.json",
+	".workflow/continuous-improvement/state.json",
+]);
+
+// The canonical continuous-improvement state path (issues/0156) and the legacy
+// pre-0156 location that doctor/validators still tolerate on already-installed repos.
+const CONTINUOUS_IMPROVEMENT_STATE_PATH = ".amber/continuous-improvement/state.json";
+const LEGACY_CONTINUOUS_IMPROVEMENT_STATE_PATH = ".workflow/continuous-improvement/state.json";
 
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$/;
 
@@ -126,5 +136,7 @@ module.exports = {
 	CLI_VERSION,
 	AMBER_CONTROLLED_CONTENT_FILES,
 	AMBER_STATE_FILES,
+	CONTINUOUS_IMPROVEMENT_STATE_PATH,
+	LEGACY_CONTINUOUS_IMPROVEMENT_STATE_PATH,
 	SEMVER_PATTERN,
 };

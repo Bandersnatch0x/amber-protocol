@@ -20,7 +20,7 @@ None.
 
 ## Workflow State
 
-- Continuous-improvement state: `.workflow/continuous-improvement/state.json`
+- Continuous-improvement state: `.amber/continuous-improvement/state.json`
 - Active workflow: none
 - Last result note: none
 

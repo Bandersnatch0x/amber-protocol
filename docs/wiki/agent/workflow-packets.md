@@ -10,7 +10,7 @@ updated: 2026-06-17
 
 Use packets when the task has independent tracks, ambiguity, or enough risk that research and review should be separated from implementation.
 
-Packets can be assigned to subagents when a runner exists. Without a runner, simulate roles by writing isolated packet notes under `.workflow/continuous-improvement/packets/` before synthesis.
+Packets can be assigned to subagents when a runner exists. Without a runner, simulate roles by writing isolated packet notes under `.amber/continuous-improvement/packets/` before synthesis.
 
 ## Flow
 

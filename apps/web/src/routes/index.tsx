@@ -80,7 +80,7 @@ const artifacts = [
   { path: 'PROGRESS.md', to: '/sessions' },
   { path: 'session-handoff.md', to: '/sessions' },
   { path: 'docs/wiki/', to: '/knowledge' },
-  { path: '.workflow/continuous-improvement/state.json', to: '/suggestions' },
+  { path: '.amber/continuous-improvement/state.json', to: '/suggestions' },
 ] as const;
 
 /** Lifecycle step ids emitted by scripts/lib/core/lifecycle.js (STEPS). */

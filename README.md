@@ -189,7 +189,7 @@ The through-line: strengthen `Governance`, `Verification`, and `Observability`; 
 - `AGENTS.md` and `CLAUDE.md` — agent-facing rules
 - `feature_list.json` — tracked feature state
 - `PROGRESS.md`, `session-handoff.md`, `clean-state-checklist.md`, `evaluator-rubric.md`
-- `.workflow/continuous-improvement/state.json`
+- `.amber/continuous-improvement/state.json`
 - a minimal `docs/wiki/` — project context, system map, runbook, verification, glossary
 
 All starter files are safe defaults. `init` and `wiki` skip existing files and report what _would_ be created in dry-run mode.

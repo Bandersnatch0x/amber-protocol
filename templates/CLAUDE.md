@@ -9,7 +9,7 @@ Start every session by reading:
 3. `feature_list.json`
 4. `docs/wiki/index.md`
 5. `docs/wiki/engineering/verification.md`
-6. `.workflow/continuous-improvement/state.json` when continuing a goal or automation wake
+6. `.amber/continuous-improvement/state.json` when continuing a goal or automation wake
 
 V1 scope is limited to safe init, audit, wiki, doctor, and handoff workflows. Do not execute dynamic workflows, dispatch subagents, orchestrate worktrees, or automatically rewrite old project documents.
 

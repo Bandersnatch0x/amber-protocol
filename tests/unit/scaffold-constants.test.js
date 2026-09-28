@@ -25,5 +25,9 @@ test("AMBER_CONTROLLED_CONTENT_FILES holds the reference docs (no starters)", ()
 });
 
 test("AMBER_STATE_FILES holds runtime state, never overwritten", () => {
+	// Canonical location (issues/0156).
+	assert.ok(AMBER_STATE_FILES.has(".amber/continuous-improvement/state.json"));
+	// Legacy pre-0156 location stays in the set so provenance still tiers an
+	// already-installed repo's old-location file as `state` (backward compat).
 	assert.ok(AMBER_STATE_FILES.has(".workflow/continuous-improvement/state.json"));
 });

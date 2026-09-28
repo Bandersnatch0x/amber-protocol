@@ -9,7 +9,7 @@ updated: 2026-06-17
 # Working Rules
 
 - Read `PROGRESS.md`, `feature_list.json`, and `docs/wiki/index.md` before work.
-- Read `session-handoff.md` and `.workflow/continuous-improvement/state.json` when resuming or running a health pass.
+- Read `session-handoff.md` and `.amber/continuous-improvement/state.json` when resuming or running a health pass.
 - Keep one active feature at a time.
 - Write a small objective/scope/evidence contract before editing.
 - Prefer one coherent improvement slice per wake or session.

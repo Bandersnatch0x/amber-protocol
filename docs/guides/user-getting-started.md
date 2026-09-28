@@ -38,7 +38,7 @@ This scaffolds safe defaults:
 - `PROGRESS.md`
 - `session-handoff.md`
 - `docs/wiki/` skeleton
-- `.workflow/continuous-improvement/state.json`
+- `.amber/continuous-improvement/state.json`
 
 Re-running `init` skips existing files, so it is safe to call more than once.
 

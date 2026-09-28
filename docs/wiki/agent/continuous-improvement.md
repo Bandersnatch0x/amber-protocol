@@ -19,7 +19,7 @@ This is a controlled operating mode, not dynamic workflow execution. It selects 
 - `PROGRESS.md`
 - `session-handoff.md`
 - `feature_list.json`
-- `.workflow/continuous-improvement/state.json`
+- `.amber/continuous-improvement/state.json` (legacy `.workflow/continuous-improvement/state.json` still read if present)
 - `docs/wiki/index.md`
 - Current repo state such as `git status --short`
 
@@ -42,7 +42,7 @@ This is a controlled operating mode, not dynamic workflow execution. It selects 
 5. Execute one coherent slice.
 6. Run a separate review pass.
 7. Verify with commands or file evidence matched to the slice.
-8. Update `PROGRESS.md`, `session-handoff.md`, and `.workflow/continuous-improvement/state.json` when state changes.
+8. Update `PROGRESS.md`, `session-handoff.md`, and `.amber/continuous-improvement/state.json` when state changes.
 9. Stop for completion evidence, a true blocker, or an approval gate.
 
 ## Safe Defaults

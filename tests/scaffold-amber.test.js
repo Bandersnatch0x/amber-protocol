@@ -31,11 +31,11 @@ test("scaffold creates a valid Harness in an empty repo", () => {
 
 	assert.ok(result.created.includes("AGENTS.md"));
 	assert.ok(result.created.includes("docs/wiki/index.md"));
-	assert.ok(result.created.includes(".workflow/continuous-improvement/state.json"));
+	assert.ok(result.created.includes(".amber/continuous-improvement/state.json"));
 	assert.equal(result.skipped.length, 0);
 	assert.equal(fs.existsSync(path.join(target, "feature_list.json")), true);
 	assert.equal(
-		fs.existsSync(path.join(target, ".workflow", "continuous-improvement", "packets", "README.md")),
+		fs.existsSync(path.join(target, ".amber", "continuous-improvement", "packets", "README.md")),
 		true,
 	);
 	assert.match(
@@ -61,7 +61,7 @@ test("scaffold creates a valid Harness in an empty repo", () => {
 test("continuous improvement state template is validated by doctor", () => {
 	const target = copyFixture("empty-repo");
 	scaffoldHarness(target);
-	const statePath = path.join(target, ".workflow", "continuous-improvement", "state.json");
+	const statePath = path.join(target, ".amber", "continuous-improvement", "state.json");
 	fs.writeFileSync(statePath, JSON.stringify({ version: "1", mode: "", queue: {} }, null, 2));
 
 	const stateResult = validateContinuousImprovementStateFile(statePath);

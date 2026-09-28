@@ -165,7 +165,15 @@ function validateFeatureListFile(filePath) {
 	}
 }
 
-function validateContinuousImprovementStateFile(filePath) {
+// `label` is the repo-relative path used in error messages. The canonical
+// location moved from `.workflow/` to `.amber/` (issues/0156); doctor passes
+// the actual location it read (canonical or legacy), so the message names the
+// file the operator can act on. Defaults to the canonical path for callers
+// that validate a known-canonical file directly.
+function validateContinuousImprovementStateFile(
+	filePath,
+	label = ".amber/continuous-improvement/state.json",
+) {
 	const errors = [];
 	const warnings = [];
 	let data;
@@ -174,29 +182,29 @@ function validateContinuousImprovementStateFile(filePath) {
 		data = readJson(filePath);
 	} catch (error) {
 		return {
-			errors: [`Cannot read .workflow/continuous-improvement/state.json: ${error.message}`],
+			errors: [`Cannot read ${label}: ${error.message}`],
 			warnings,
 		};
 	}
 
 	if (!data || typeof data !== "object" || Array.isArray(data)) {
 		return {
-			errors: [".workflow/continuous-improvement/state.json must contain an object."],
+			errors: [`${label} must contain an object.`],
 			warnings,
 		};
 	}
 
 	if (!Number.isInteger(data.version)) {
-		errors.push(".workflow/continuous-improvement/state.json version must be an integer.");
+		errors.push(`${label} version must be an integer.`);
 	}
 
 	if (typeof data.mode !== "string" || data.mode.trim() === "") {
-		errors.push(".workflow/continuous-improvement/state.json mode must be a non-empty string.");
+		errors.push(`${label} mode must be a non-empty string.`);
 	}
 
 	for (const field of ["queue", "approvalGates", "resultNotes"]) {
 		if (!Array.isArray(data[field])) {
-			errors.push(`.workflow/continuous-improvement/state.json ${field} must be an array.`);
+			errors.push(`${label} ${field} must be an array.`);
 		}
 	}
 
@@ -205,24 +213,18 @@ function validateContinuousImprovementStateFile(filePath) {
 		data.activeWorkflow !== undefined &&
 		typeof data.activeWorkflow !== "object"
 	) {
-		errors.push(
-			".workflow/continuous-improvement/state.json activeWorkflow must be null or an object.",
-		);
+		errors.push(`${label} activeWorkflow must be null or an object.`);
 	}
 
 	if (Array.isArray(data.queue)) {
 		data.queue.forEach((item, index) => {
 			if (!item || typeof item !== "object" || Array.isArray(item)) {
-				errors.push(
-					`.workflow/continuous-improvement/state.json queue[${index}] must be an object.`,
-				);
+				errors.push(`${label} queue[${index}] must be an object.`);
 				return;
 			}
 			for (const field of ["id", "title", "status"]) {
 				if (typeof item[field] !== "string" || item[field].trim() === "") {
-					errors.push(
-						`.workflow/continuous-improvement/state.json queue[${index}].${field} must be a non-empty string.`,
-					);
+					errors.push(`${label} queue[${index}].${field} must be a non-empty string.`);
 				}
 			}
 		});

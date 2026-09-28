@@ -54,7 +54,7 @@ See Amber control layers in README.md (Governance > Verification > Observability
 Amber uses multiple durable spines:
 
 - **Contract-defined**: `.amber/loops/{contractId}/...` (ledgers, state per loop-contract.schema.json)
-- **Continuous improvement**: `.workflow/continuous-improvement/state.json`
+- **Continuous improvement**: `.amber/continuous-improvement/state.json`
 - **Sessions & handoff**: `.amber/sessions/`, `session-handoff.md`
 - **Project tracking**: `feature_list.json`, `PROGRESS.md`, timelines in sessions
 - **Optional human-friendly overlay**: `STATE.md` at root (High Priority / Watch List / Recent Noise / Post-Run Critique)

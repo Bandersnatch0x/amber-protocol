@@ -19,13 +19,13 @@ const {
 function fakeTemplateRoot() {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-tpl-"));
 	fs.mkdirSync(path.join(root, "docs/wiki/agent"), { recursive: true });
-	fs.mkdirSync(path.join(root, ".workflow/continuous-improvement"), { recursive: true });
+	fs.mkdirSync(path.join(root, ".amber/continuous-improvement"), { recursive: true });
 	fs.writeFileSync(
 		path.join(root, "docs/wiki/agent/amber.md"),
 		"---\nupdated: 2026-01-01\n---\n# Amber\n",
 	);
 	fs.writeFileSync(path.join(root, "AGENTS.md"), "agent rules\n");
-	fs.writeFileSync(path.join(root, ".workflow/continuous-improvement/state.json"), "{}\n");
+	fs.writeFileSync(path.join(root, ".amber/continuous-improvement/state.json"), "{}\n");
 	return root;
 }
 
@@ -57,7 +57,7 @@ test("templateManagedFiles lists repo-relative POSIX paths", () => {
 	const root = fakeTemplateRoot();
 	const files = templateManagedFiles(root).sort();
 	assert.deepEqual(files, [
-		".workflow/continuous-improvement/state.json",
+		".amber/continuous-improvement/state.json",
 		"AGENTS.md",
 		"docs/wiki/agent/amber.md",
 	]);
@@ -68,6 +68,8 @@ test("fileTier classifies controlled / authored / state", () => {
 	assert.equal(fileTier("docs/wiki/glossary.md"), "controlled");
 	assert.equal(fileTier("docs/wiki/index.md"), "controlled");
 	assert.equal(fileTier("AGENTS.md"), "authored");
+	assert.equal(fileTier(".amber/continuous-improvement/state.json"), "state");
+	// Legacy pre-0156 location still tiers as state (backward compat).
 	assert.equal(fileTier(".workflow/continuous-improvement/state.json"), "state");
 });
 
@@ -86,7 +88,7 @@ test("buildProvenance stamps the on-disk hash per managed file with tier", () =>
 	assert.ok(provenance.files["docs/wiki/agent/amber.md"]);
 	assert.equal(provenance.files["docs/wiki/agent/amber.md"].tier, "controlled");
 	assert.equal(provenance.files["AGENTS.md"].tier, "authored");
-	assert.equal(provenance.files[".workflow/continuous-improvement/state.json"].tier, "state");
+	assert.equal(provenance.files[".amber/continuous-improvement/state.json"].tier, "state");
 	// Missing files are omitted.
 	fs.rmSync(path.join(target, "AGENTS.md"));
 	const p2 = buildProvenance(target, { templateRoot: tpl, inferred: false });

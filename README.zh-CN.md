@@ -207,7 +207,7 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 - `AGENTS.md` 和 `CLAUDE.md` —— 面向 agent 的规则
 - `feature_list.json` —— 被追踪的功能状态
 - `PROGRESS.md`、`session-handoff.md`、`clean-state-checklist.md`、`evaluator-rubric.md`
-- `.workflow/continuous-improvement/state.json`
+- `.amber/continuous-improvement/state.json`
 - 最小 `docs/wiki/` —— 项目上下文、系统图、runbook、验证、术语表
 
 所有 starter 文件都是安全默认值。`init` 和 `wiki` 跳过已有文件，并在 dry-run 模式报告将会创建的内容。

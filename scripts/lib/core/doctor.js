@@ -12,7 +12,7 @@ const {
 
 const { REQUIRED_HARNESS_FILES } = require("./constants");
 
-const { pathExists, resolveTarget } = require("./fs-utils");
+const { pathExists, resolveTarget, relativeSlash } = require("./fs-utils");
 
 const { statePath } = require("../state-dir-resolver");
 
@@ -438,19 +438,31 @@ function doctor(target, options = {}) {
 		featureResult.errors.length === 0 ? "valid" : featureResult.errors[0],
 	);
 
-	// Continuous improvement state
-	const continuousImprovementResult = validateContinuousImprovementStateFile(
-		path.join(targetRoot, ".workflow", "continuous-improvement", "state.json"),
-	);
-	errors.push(...continuousImprovementResult.errors);
-	warnings.push(...continuousImprovementResult.warnings);
-	addCheck(
-		"Continuous improvement state",
-		continuousImprovementResult.errors.length === 0,
-		continuousImprovementResult.errors.length === 0
-			? "valid"
-			: continuousImprovementResult.errors[0],
-	);
+	// Continuous improvement state (issues/0156): runtime state seeded by init at
+	// the canonical `.amber/` location, with the legacy `.workflow/` location still
+	// tolerated on already-installed repos. It is runtime, not a required doc, so a
+	// missing file is not an error — only a present-but-malformed file is.
+	// Canonical location resolves through the state-dir seam (.amber, with the
+	// F036 legacy .harness fallback); the pre-0156 `.workflow/` location is a
+	// separate legacy dimension handled explicitly below.
+	const ciCanonical = statePath(targetRoot, "continuous-improvement", "state.json");
+	const ciLegacy = path.join(targetRoot, ".workflow", "continuous-improvement", "state.json");
+	const ciPath = pathExists(ciCanonical) ? ciCanonical : pathExists(ciLegacy) ? ciLegacy : null;
+	if (ciPath) {
+		const ciLabel = relativeSlash(targetRoot, ciPath);
+		const continuousImprovementResult = validateContinuousImprovementStateFile(ciPath, ciLabel);
+		errors.push(...continuousImprovementResult.errors);
+		warnings.push(...continuousImprovementResult.warnings);
+		addCheck(
+			"Continuous improvement state",
+			continuousImprovementResult.errors.length === 0,
+			continuousImprovementResult.errors.length === 0
+				? "valid"
+				: continuousImprovementResult.errors[0],
+		);
+	} else {
+		addCheck("Continuous improvement state", null, "no state file — check skipped");
+	}
 
 	// Wiki validation
 	const wikiResult = validateWiki(targetRoot, { okf: options.okf === true });

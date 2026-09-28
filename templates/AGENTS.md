@@ -24,7 +24,7 @@ safety:
 2. Read `PROGRESS.md` and `session-handoff.md`.
 3. Read `feature_list.json`.
 4. Read `docs/wiki/index.md`.
-5. Read `.workflow/continuous-improvement/state.json` when continuing a goal, automation wake, or health pass.
+5. Read `.amber/continuous-improvement/state.json` when continuing a goal, automation wake, or health pass (the legacy `.workflow/continuous-improvement/state.json` location is still read if present).
 6. Run the standard verification command recorded in `docs/wiki/engineering/verification.md`.
 7. Inspect current repo state and treat pre-existing dirty files as user-owned.
 8. Before editing, name the objective, files in scope, files out of scope, and verification evidence.
@@ -51,7 +51,7 @@ Ask before deleting files, running destructive git operations, changing secrets 
 - User-visible behavior is verified.
 - `feature_list.json` contains evidence for passing work.
 - `PROGRESS.md` and `session-handoff.md` describe the next action or blocker.
-- `.workflow/continuous-improvement/state.json` is updated when a continuous-improvement loop changes queue, result notes, or active workflow state.
+- `.amber/continuous-improvement/state.json` is updated when a continuous-improvement loop changes queue, result notes, or active workflow state.
 
 ## Closeout Flow
 
@@ -60,5 +60,5 @@ Ask before deleting files, running destructive git operations, changing secrets 
 3. Update feature status and evidence.
 4. Update `PROGRESS.md`.
 5. Update `session-handoff.md`.
-6. Update `.workflow/continuous-improvement/state.json` if the work came from that loop.
+6. Update `.amber/continuous-improvement/state.json` if the work came from that loop.
 7. Clean temporary files and debugging output.

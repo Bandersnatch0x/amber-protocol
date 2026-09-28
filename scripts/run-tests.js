@@ -85,7 +85,10 @@ const fixturesBefore = new Set(listTempFixtures());
 // from a deep worktree root (325 absolute paths overflow it: ENAMETOOLONG).
 const result = spawnSync(
 	process.execPath,
-	["--test", ...files.map((file) => path.relative(ROOT, file))],
+	// ponytail: cap parallel test files so nested `node --test` (CLI-spawning
+	// suites, validator self-test dispatch) can't fork-bomb the box — saw ~3370
+	// node procs at peak. Raise the number if the run gets too slow.
+	["--test", "--test-concurrency=4", ...files.map((file) => path.relative(ROOT, file))],
 	{
 		stdio: "inherit",
 		cwd: ROOT,
