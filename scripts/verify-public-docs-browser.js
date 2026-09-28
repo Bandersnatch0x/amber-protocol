@@ -180,6 +180,14 @@ async function verifyBrowserAccessibility(browser, origin, pages = REPRESENTATIV
 				try {
 					await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
 					await page.waitForSelector("#__docusaurus", { timeout: 15000 });
+					// Let hydration settle the theme attribute and deferred styling before
+					// measuring: running axe mid-hydration produced flaky contrast hits.
+					await page
+						.waitForFunction(() => document.documentElement.getAttribute("data-theme") !== null, {
+							timeout: 5000,
+						})
+						.catch(() => {});
+					await page.waitForTimeout(300);
 					const violations = await runAxe(page);
 					for (const v of violations) {
 						errors.push(

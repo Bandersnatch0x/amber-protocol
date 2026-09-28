@@ -41,7 +41,9 @@ export const CommandBlock: React.FC<CommandBlockProps> = ({
         ? styles.badgeGoverned
         : nature === 'gated-execution'
           ? styles.badgeGated
-          : styles.badgeScaffold;
+          : nature === 'idempotent-write'
+            ? styles.badgeIdempotent
+            : styles.badgeScaffold;
 
   return (
     <div className={styles.container}>

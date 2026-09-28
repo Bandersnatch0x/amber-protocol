@@ -107,6 +107,32 @@ pre,
   contain: paint;
 }
 
+/* Clipped code blocks advertise that they scroll (issues/0063 O8) instead of
+   silently cutting off long commands at narrow widths. */
+pre,
+.theme-code-block {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 158, 11, 0.5) transparent;
+}
+
+pre::-webkit-scrollbar,
+.theme-code-block ::-webkit-scrollbar {
+  height: 8px;
+}
+
+pre::-webkit-scrollbar-thumb,
+.theme-code-block ::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.5);
+  border-radius: 4px;
+}
+
+/* The footer aligns to the same 1240px container as the landing sections
+   (issues/0063 O6); Infima's default is 1320px, so its first column lined up
+   with neither the sidebar nor the article. */
+.footer .container {
+  max-width: 1240px;
+}
+
 /* Machine generated reference banner */
 .amber-generated-banner {
   padding: 0.75rem 1rem;

@@ -55,6 +55,15 @@
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
+/* idempotent-write is a write without an approval gate and must read as its own
+   class, not as scaffolding (issues/0063 O1): a teal tone, distinct from
+   read-only green, governed amber, gated red and scaffold blue. */
+.badgeIdempotent {
+  background: rgba(20, 184, 166, 0.15);
+  color: #0f766e;
+  border: 1px solid rgba(20, 184, 166, 0.3);
+}
+
 /* Light theme: the mid-tone badge text fails 4.5:1 on its pale tinted
    background (issues/0157); deepen each to a 700-level tone that clears it. */
 [data-theme='light'] .badgeReadOnly {
@@ -69,6 +78,9 @@
 [data-theme='light'] .badgeScaffold {
   color: #1d4ed8;
 }
+[data-theme='light'] .badgeIdempotent {
+  color: #115e59;
+}
 
 /* Dark theme: the mid-tone blue/red badge text fails 4.5:1 on its dark tinted
    background (issues/0157); lighten to a 300-level tone that clears it. */
@@ -77,6 +89,9 @@
 }
 [data-theme='dark'] .badgeGated {
   color: #fca5a5;
+}
+[data-theme='dark'] .badgeIdempotent {
+  color: #5eead4;
 }
 
 .commandRow {

@@ -225,7 +225,42 @@ function generateCliIndex(pkgMeta) {
 }
 
 function generateSidebars() {
-	const cliItems = ["reference/cli/index", ...COMMANDS.map((c) => `reference/cli/${c}`)];
+	// Nest the CLI commands by tier (issues/0063 R6) so the sidebar agrees with
+	// the generated overview's tier tables instead of one flat 53-row list, and
+	// mark the deprecated verbs so they read as deprecated outside the overview.
+	const tierOrder = ["journey", "core", "expert", "deprecated"];
+	const tierLabels = {
+		journey: "🚀 Journey Entry",
+		core: "🛡️ Core Governance",
+		expert: "⚙️ Expert & Inspection",
+		deprecated: "⚠️ Deprecated (v1 compatibility)",
+	};
+	const byTier = new Map(tierOrder.map((tier) => [tier, []]));
+	for (const command of COMMANDS) {
+		const tier = COMMAND_TIERS[command] || "core";
+		(byTier.get(tier) || byTier.get("core")).push(command);
+	}
+	const tierCategories = tierOrder
+		.filter((tier) => byTier.get(tier).length > 0)
+		.map((tier) => {
+			const items = byTier
+				.get(tier)
+				.map((command) =>
+					tier === "deprecated"
+						? `{ type: 'doc', id: 'reference/cli/${command}', label: '${command} (deprecated)' }`
+						: `'reference/cli/${command}'`,
+				)
+				.join(", ");
+			return [
+				"        {",
+				"          type: 'category',",
+				`          label: '${tierLabels[tier]}',`,
+				"          collapsible: true,",
+				`          items: [${items}],`,
+				"        },",
+			].join("\n");
+		})
+		.join("\n");
 
 	const content = `import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
@@ -274,9 +309,13 @@ const sidebars: SidebarsConfig = {
       items: [
         'reference/index',
         {
+          // Tiers mirror the generated CLI overview (issues/0063 R6).
           type: 'category',
           label: 'CLI Commands',
-          items: ${JSON.stringify(cliItems, null, 12).replace(/\n\s{12}/g, "\n        ")},
+          items: [
+        'reference/cli/index',
+${tierCategories}
+          ],
         },
         'reference/schemas',
         'reference/action-types',
