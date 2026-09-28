@@ -304,6 +304,74 @@ async function verifyThemeRendering(browser, origin, pageTypes = THEME_PAGE_TYPE
 	return errors;
 }
 
+// Narrow-screen section navigation (issues/0063 O7). Docusaurus hides the
+// desktop TOC below 997px, so the tablet width relies on the collapsible
+// "On this page" TOC. Assert it is present at 768px and expands to real section
+// links, so losing in-page navigation is a gate failure, not a silent UX
+// regression. `pages` is injectable for tests.
+async function verifyNarrowSectionNavigation(
+	browser,
+	origin,
+	pages = ["/reference/cli/next", "/reference/cli/audit"],
+) {
+	const errors = [];
+	const context = await browser.newContext();
+	try {
+		for (const rel of pages) {
+			const page = await context.newPage();
+			page.setDefaultTimeout(20000);
+			await page.setViewportSize({ width: 768, height: 900 });
+			const target = `${origin}${BASE}${rel === "/" ? "/" : rel}`;
+			try {
+				await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
+				await page.waitForSelector("#__docusaurus", { timeout: 15000 });
+				await page.waitForTimeout(300);
+				const probe = await page.evaluate(() => {
+					const visible = (el) => {
+						if (!el) return false;
+						const r = el.getBoundingClientRect();
+						return r.width > 0 && r.height > 0;
+					};
+					if (visible(document.querySelector(".theme-doc-toc-desktop"))) {
+						return { mode: "desktop" };
+					}
+					const mobile = document.querySelector(".theme-doc-toc-mobile");
+					if (!mobile) return { error: "no section-navigation control" };
+					const toggle = mobile.querySelector("button, summary, [role=button]");
+					if (!toggle) return { error: 'the "On this page" control has no toggle' };
+					toggle.click();
+					return { mode: "mobile" };
+				});
+				if (probe.error) {
+					errors.push(`section nav (${rel} @768px): ${probe.error}.`);
+					continue;
+				}
+				if (probe.mode === "mobile") {
+					await page.waitForTimeout(400);
+					const links = await page.evaluate(
+						() =>
+							[...document.querySelectorAll(".theme-doc-toc-mobile a")].filter(
+								(a) => a.getBoundingClientRect().height > 0,
+							).length,
+					);
+					if (links < 1) {
+						errors.push(
+							`section nav (${rel} @768px): the "On this page" control expanded to no section links.`,
+						);
+					}
+				}
+			} catch (e) {
+				errors.push(`section nav (${rel} @768px): could not evaluate — ${e.message}`);
+			} finally {
+				await page.close();
+			}
+		}
+	} finally {
+		await context.close();
+	}
+	return errors;
+}
+
 async function runBrowserVerification() {
 	if (!fs.existsSync(BUILD_DIR)) {
 		console.log("[skip] apps/docs/build not found — run `npm run docs:build` first.");
@@ -336,6 +404,8 @@ async function runBrowserVerification() {
 		allErrors.push(...(await verifyBrowserAccessibility(browser, origin)));
 		console.log("Gate 10 (browser): light/dark token rendering, preserved across navigation…");
 		allErrors.push(...(await verifyThemeRendering(browser, origin)));
+		console.log("Gate 7b (browser): section navigation reachable at the 768px tablet width…");
+		allErrors.push(...(await verifyNarrowSectionNavigation(browser, origin)));
 	} finally {
 		await browser.close();
 		server.close();
@@ -361,6 +431,7 @@ module.exports = {
 	runAxe,
 	verifyBrowserAccessibility,
 	verifyThemeRendering,
+	verifyNarrowSectionNavigation,
 	runBrowserVerification,
 };
 

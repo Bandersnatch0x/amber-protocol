@@ -97,3 +97,42 @@ test("the scanned representative pages include a command-block nature badge", ga
 		`no scanned page renders a nature badge — badge a11y fixes go unverified; scanned: ${mod.REPRESENTATIVE_PAGES.join(", ")}`,
 	);
 });
+
+// 0063 O7 guard: Docusaurus hides the desktop TOC below 997px, so the tablet
+// width depends on the collapsible "On this page" TOC. Prove the check passes
+// on doc pages and fails on a page that has no section navigation at all.
+test("section navigation is reachable at 768px on doc pages", gated, async () => {
+	const browser = await chromium.launch();
+	try {
+		const server = await mod.startServer();
+		const origin = `http://localhost:${server.address().port}`;
+		try {
+			const errors = await mod.verifyNarrowSectionNavigation(browser, origin);
+			assert.deepEqual(errors, [], `expected reachable section nav, got: ${errors.join("; ")}`);
+		} finally {
+			server.close();
+		}
+	} finally {
+		await browser.close();
+	}
+});
+
+test("the section-navigation check bites on a page with no section nav", gated, async () => {
+	const browser = await chromium.launch();
+	try {
+		const server = await mod.startServer();
+		const origin = `http://localhost:${server.address().port}`;
+		try {
+			// The landing page is not a doc page, so it has no "On this page" TOC.
+			const errors = await mod.verifyNarrowSectionNavigation(browser, origin, ["/"]);
+			assert.ok(
+				errors.some((e) => e.includes("section nav")),
+				`expected a missing-section-nav error, got: ${errors.join("; ")}`,
+			);
+		} finally {
+			server.close();
+		}
+	} finally {
+		await browser.close();
+	}
+});
