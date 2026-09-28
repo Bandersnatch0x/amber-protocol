@@ -266,6 +266,10 @@ jobs:
         working-directory: apps/docs
         run: npm ci
 
+      - name: Install docs browser (chromium)
+        working-directory: apps/docs
+        run: npx playwright install --with-deps chromium
+
       - name: Check generated CLI reference
         run: npm run docs:gen:check
 
@@ -275,6 +279,9 @@ jobs:
 
       - name: Verify public docs gates
         run: npm run docs:verify
+
+      - name: Verify public docs browser gates (0020 rows 7 & 10)
+        run: npm run docs:verify:browser
 
       - name: Run public docs tests
         run: npm run docs:test

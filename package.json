@@ -79,6 +79,7 @@
 		"docs:gen": "node scripts/gen-docs-cli.js",
 		"docs:gen:check": "node scripts/gen-docs-cli.js --check",
 		"docs:verify": "node scripts/verify-public-docs.js",
+		"docs:verify:browser": "node scripts/verify-public-docs-browser.js",
 		"docs:test": "node scripts/run-tests.js tests/public-docs-seam.test.js"
 	},
 	"lint-staged": {

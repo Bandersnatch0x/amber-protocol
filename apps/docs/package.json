@@ -28,6 +28,8 @@
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.10.2",
     "@docusaurus/types": "3.10.2",
+    "@playwright/test": "^1.63.0",
+    "axe-core": "^4.13.0",
     "typescript": "^6.0.3"
   },
   "engines": {

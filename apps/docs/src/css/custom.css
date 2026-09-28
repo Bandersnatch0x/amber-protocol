@@ -189,3 +189,23 @@ pre,
 .navbar__search-input {
   min-height: 40px;
 }
+
+/*
+ * Accessibility floor (issues/0063 row 7, axe serious/critical = 0 on the
+ * shipped dark default theme):
+ *  - in-content links must not rely on color alone (axe link-in-text-block),
+ *    so give markdown body links a persistent underline (anchor hash-links and
+ *    card/button links are excluded to preserve their affordance);
+ *  - dark-theme code comments must clear the 4.5:1 contrast floor against the
+ *    code-block background (axe color-contrast on .token.comment et al.).
+ */
+.markdown a:not(.hash-link):not(.card):not(.button) {
+  text-decoration: underline;
+}
+
+[data-theme='dark'] .token.comment,
+[data-theme='dark'] .token.prolog,
+[data-theme='dark'] .token.doctype,
+[data-theme='dark'] .token.cdata {
+  color: #a1a1aa !important;
+}
