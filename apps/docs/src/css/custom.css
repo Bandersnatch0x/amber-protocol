@@ -25,18 +25,6 @@
   --ifm-footer-background-color: #0f172a;
   --ifm-footer-color: #cbd5e1;
 
-  --amber-badge-bg-readonly: #f0fdf4;
-  --amber-badge-text-readonly: #166534;
-  --amber-badge-border-readonly: #bbf7d0;
-
-  --amber-badge-bg-write: #fef3c7;
-  --amber-badge-text-write: #92400e;
-  --amber-badge-border-write: #fde68a;
-
-  --amber-badge-bg-target: #f1f5f9;
-  --amber-badge-text-target: #334155;
-  --amber-badge-border-target: #cbd5e1;
-
   /* Command-block surface/text tokens (issues/0063 R2). Light values. */
   --amber-border: #e2e8f0;
   --amber-bg-surface: #ffffff;
@@ -71,18 +59,6 @@ html[data-theme='dark'] {
   --ifm-navbar-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.5);
   --ifm-footer-background-color: #09090b;
   --ifm-footer-color: #a1a1aa;
-
-  --amber-badge-bg-readonly: #052e16;
-  --amber-badge-text-readonly: #86efac;
-  --amber-badge-border-readonly: #14532d;
-
-  --amber-badge-bg-write: #451a03;
-  --amber-badge-text-write: #fde68a;
-  --amber-badge-border-write: #78350f;
-
-  --amber-badge-bg-target: #1e293b;
-  --amber-badge-text-target: #cbd5e1;
-  --amber-badge-border-target: #334155;
 
   /* Command-block surface/text tokens (issues/0063 R2). Dark values. */
   --amber-border: rgba(245, 158, 11, 0.25);
@@ -120,7 +96,6 @@ button.clean-btn {
 }
 
 .menu__link {
-  min-height: 40px;
   padding: 0.5rem 0.75rem;
 }
 
@@ -130,74 +105,6 @@ pre,
   max-width: 100%;
   overflow-x: auto;
   contain: paint;
-}
-
-/* 4-Element Command Block Styling */
-.amber-command-block {
-  margin: 1.5rem 0;
-  border-radius: 8px;
-  border: 1px solid var(--ifm-color-emphasis-300);
-  background: var(--ifm-background-surface-color);
-  overflow: hidden;
-}
-
-.amber-command-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--ifm-color-emphasis-100);
-  border-bottom: 1px solid var(--ifm-color-emphasis-300);
-  font-size: 0.825rem;
-}
-
-.amber-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  border: 1px solid transparent;
-}
-
-.amber-badge-target {
-  background: var(--amber-badge-bg-target);
-  color: var(--amber-badge-text-target);
-  border-color: var(--amber-badge-border-target);
-}
-
-.amber-badge-readonly {
-  background: var(--amber-badge-bg-readonly);
-  color: var(--amber-badge-text-readonly);
-  border-color: var(--amber-badge-border-readonly);
-}
-
-.amber-badge-write {
-  background: var(--amber-badge-bg-write);
-  color: var(--amber-badge-text-write);
-  border-color: var(--amber-badge-border-write);
-}
-
-.amber-command-body {
-  padding: 0.75rem 1rem;
-  background: var(--ifm-pre-background, #1e1e1e);
-  color: #f8fafc;
-  font-family: var(--ifm-font-family-monospace);
-  overflow-x: auto;
-}
-
-.amber-command-output {
-  padding: 0.6rem 1rem;
-  background: var(--ifm-background-surface-color);
-  border-top: 1px dashed var(--ifm-color-emphasis-300);
-  font-size: 0.85rem;
-  color: var(--ifm-color-emphasis-800);
-}
-
-.amber-command-output strong {
-  color: var(--ifm-color-emphasis-900);
 }
 
 /* Machine generated reference banner */

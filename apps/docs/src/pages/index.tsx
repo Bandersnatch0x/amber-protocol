@@ -15,7 +15,7 @@ const PILLARS = [
   },
   {
     icon: '⚡',
-    title: '54 Declarative Action Verbs',
+    title: '21 Declarative Action Verbs',
     description:
       'Amber models development through explicit verbs (Action Types) backed by strict JSON schemas. Agents act through governed CLI interfaces, not around them.',
     link: '/reference/action-types',
@@ -123,7 +123,7 @@ export default function Home(): React.JSX.Element {
                 Core Concepts
               </Link>
               <Link className={styles.secondaryBtn} to="/reference/cli">
-                CLI Reference (54 Verbs)
+                CLI Reference (54 commands)
               </Link>
             </div>
           </div>
@@ -133,7 +133,7 @@ export default function Home(): React.JSX.Element {
               <span className={`${styles.terminalDot} ${styles.dotRed}`} />
               <span className={`${styles.terminalDot} ${styles.dotYellow}`} />
               <span className={`${styles.terminalDot} ${styles.dotGreen}`} />
-              <span className={styles.terminalTitle}>amber-governance-terminal</span>
+              <span className={styles.terminalTitle}>amber-governance-terminal — illustrative</span>
             </div>
             <div className={styles.terminalBody}>
               <div className={styles.terminalLine}>
