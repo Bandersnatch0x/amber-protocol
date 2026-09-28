@@ -415,23 +415,42 @@ function verifyAccessibilityAndResponsive() {
 	return errors;
 }
 
-// 8. SEO Baseline Gate
-function verifySeoBaseline() {
-	const errors = [];
-	const htmlFiles = collectFiles(
+// Collect the reader-facing HTML pages the SEO/edit-link gates operate on as
+// { rel, content } records. Excludes 404 and the search shell, matching the
+// prior per-gate collectFiles predicates. Factored out so tests can inject
+// doctored pages and prove the gates bite (0063 rows 8/9).
+function collectSeoPages() {
+	return collectFiles(
 		BUILD_DIR,
 		(p) => p.endsWith(".html") && !path.basename(p).startsWith("404") && !p.includes("search"),
-	);
+	).map((file) => ({
+		rel: path.relative(BUILD_DIR, file).replace(/\\/g, "/"),
+		content: fs.readFileSync(file, "utf8"),
+	}));
+}
 
-	const sitemapPath = path.join(BUILD_DIR, "sitemap.xml");
-	if (!fs.existsSync(sitemapPath)) {
-		errors.push("SEO baseline: sitemap.xml is missing from build output.");
+// 8. SEO Baseline Gate
+// Contract 0020 row 8: every page carries a non-empty <title>, a meta
+// description, and a canonical link, AND titles + descriptions are 100% unique
+// across the corpus (a shared title/description reads as duplicate content and
+// splits ranking). `pages` is injectable for tests; the sitemap presence check
+// only runs against the real build.
+function verifySeoBaseline(pages) {
+	const errors = [];
+	const injected = Array.isArray(pages);
+	const htmlPages = injected ? pages : collectSeoPages();
+
+	if (!injected) {
+		const sitemapPath = path.join(BUILD_DIR, "sitemap.xml");
+		if (!fs.existsSync(sitemapPath)) {
+			errors.push("SEO baseline: sitemap.xml is missing from build output.");
+		}
 	}
 
-	for (const file of htmlFiles) {
-		const content = fs.readFileSync(file, "utf8");
-		const rel = path.relative(BUILD_DIR, file).replace(/\\/g, "/");
+	const titleOwners = new Map();
+	const descriptionOwners = new Map();
 
+	for (const { rel, content } of htmlPages) {
 		if (!/<title[^>]*>.+?<\/title>/i.test(content)) {
 			errors.push(`SEO check: Page ${rel} lacks a non-empty <title> tag.`);
 		}
@@ -443,29 +462,69 @@ function verifySeoBaseline() {
 		if (!content.includes('rel="canonical"')) {
 			errors.push(`SEO check: Page ${rel} lacks canonical link tag.`);
 		}
+
+		const titleMatch = content.match(/<title[^>]*>(.*?)<\/title>/i);
+		if (titleMatch && titleMatch[1].trim()) {
+			const title = titleMatch[1].trim();
+			(titleOwners.get(title) || titleOwners.set(title, []).get(title)).push(rel);
+		}
+
+		const descriptionMatch =
+			content.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/i) ||
+			content.match(/<meta[^>]*property="og:description"[^>]*content="([^"]*)"/i);
+		if (descriptionMatch && descriptionMatch[1].trim()) {
+			const description = descriptionMatch[1].trim();
+			(
+				descriptionOwners.get(description) ||
+				descriptionOwners.set(description, []).get(description)
+			).push(rel);
+		}
+	}
+
+	for (const [title, owners] of titleOwners) {
+		if (owners.length > 1) {
+			errors.push(
+				`SEO uniqueness: <title> "${title}" is shared by ${owners.length} pages: ${owners.join(", ")}`,
+			);
+		}
+	}
+	for (const owners of descriptionOwners.values()) {
+		if (owners.length > 1) {
+			errors.push(
+				`SEO uniqueness: meta description is shared by ${owners.length} pages: ${owners.join(", ")}`,
+			);
+		}
 	}
 
 	return errors;
 }
 
 // 9. Edit Links Gate
-function verifyEditLinks() {
+// Contract 0020 row 9: every content page carries a GitHub edit link AND that
+// link resolves to a source file that actually exists in the repository —
+// presence of the prefix alone would let an edit link point at a moved or
+// renamed source and still "pass". `pages` is injectable for tests.
+const EDIT_LINK_SOURCE_RE =
+	/github\.com\/Bandersnatch0x\/amber-protocol\/tree\/master\/(apps\/docs\/[^"'\s<>]+)/;
+
+function verifyEditLinks(pages) {
 	const errors = [];
-	const htmlFiles = collectFiles(
-		BUILD_DIR,
-		(p) =>
-			p.endsWith(".html") &&
-			!path.basename(p).startsWith("404") &&
-			!p.includes("search") &&
-			path.relative(BUILD_DIR, p).replace(/\\/g, "/") !== "index.html",
-	);
+	const injected = Array.isArray(pages);
+	const htmlPages = injected
+		? pages
+		: collectSeoPages().filter((page) => page.rel !== "index.html");
 
-	for (const file of htmlFiles) {
-		const content = fs.readFileSync(file, "utf8");
-		const rel = path.relative(BUILD_DIR, file).replace(/\\/g, "/");
-
-		if (!content.includes("github.com/Bandersnatch0x/amber-protocol/tree/master/apps/docs/")) {
+	for (const { rel, content } of htmlPages) {
+		const match = content.match(EDIT_LINK_SOURCE_RE);
+		if (!match) {
 			errors.push(`Edit links check: Page ${rel} lacks a valid GitHub edit link.`);
+			continue;
+		}
+		const sourceRel = match[1].replace(/\/+$/, "");
+		if (!fs.existsSync(path.join(ROOT_DIR, sourceRel))) {
+			errors.push(
+				`Edit links check: Page ${rel} edit link points at a source path that does not exist: ${sourceRel}`,
+			);
 		}
 	}
 

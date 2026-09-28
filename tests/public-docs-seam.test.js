@@ -201,6 +201,79 @@ buildTest("public docs verification seam: 9. Edit Links Gate", () => {
 	assert.deepEqual(errors, [], `Edit links check failed: ${errors.join("; ")}`);
 });
 
+// 0063 row 8 guard: the uniqueness half of the SEO gate must bite in both
+// directions (duplicate title, duplicate description) and stay silent on a
+// unique corpus. Fully injected pages — no build needed.
+const seoPage = (rel, title, description) => ({
+	rel,
+	content: `<html><head><title>${title}</title><meta name="description" content="${description}"><link rel="canonical" href="/${rel}"></head><body></body></html>`,
+});
+
+test("SEO gate reports a <title> shared by more than one page", () => {
+	const errors = verifySeoBaseline([
+		seoPage("a.html", "Same Title", "description a"),
+		seoPage("b.html", "Same Title", "description b"),
+	]);
+	assert.ok(
+		errors.some((e) => e.includes("<title>") && e.includes("a.html") && e.includes("b.html")),
+		`Expected a duplicate-title error naming both pages, got: ${errors.join("; ")}`,
+	);
+});
+
+test("SEO gate reports a meta description shared by more than one page", () => {
+	const errors = verifySeoBaseline([
+		seoPage("a.html", "Title A", "Shared description"),
+		seoPage("b.html", "Title B", "Shared description"),
+	]);
+	assert.ok(
+		errors.some((e) => e.includes("meta description is shared")),
+		`Expected a duplicate-description error, got: ${errors.join("; ")}`,
+	);
+});
+
+test("SEO gate stays silent on unique titles and descriptions", () => {
+	const errors = verifySeoBaseline([
+		seoPage("a.html", "Title A", "description a"),
+		seoPage("b.html", "Title B", "description b"),
+	]);
+	assert.deepEqual(errors, [], `Unique pages must not error: ${errors.join("; ")}`);
+});
+
+// 0063 row 9 guard: the edit-link gate must verify the link resolves to a real
+// source, not merely that the prefix is present.
+test("Edit links gate reports a link whose source path does not exist", () => {
+	const errors = verifyEditLinks([
+		{
+			rel: "x.html",
+			content:
+				'<a href="https://github.com/Bandersnatch0x/amber-protocol/tree/master/apps/docs/docs/__does_not_exist__.md">Edit</a>',
+		},
+	]);
+	assert.ok(
+		errors.some((e) => e.includes("does not exist") && e.includes("__does_not_exist__")),
+		`Expected an unresolved-source error, got: ${errors.join("; ")}`,
+	);
+});
+
+test("Edit links gate passes a link that resolves to a real source file", () => {
+	const errors = verifyEditLinks([
+		{
+			rel: "x.html",
+			content:
+				'<a href="https://github.com/Bandersnatch0x/amber-protocol/tree/master/apps/docs/package.json">Edit</a>',
+		},
+	]);
+	assert.deepEqual(errors, [], `A resolvable edit link must not error: ${errors.join("; ")}`);
+});
+
+test("Edit links gate reports a content page with no edit link at all", () => {
+	const errors = verifyEditLinks([{ rel: "x.html", content: "<html><body>no link</body></html>" }]);
+	assert.ok(
+		errors.some((e) => e.includes("lacks a valid GitHub edit link")),
+		`Expected a missing-edit-link error, got: ${errors.join("; ")}`,
+	);
+});
+
 buildTest("public docs verification seam: 10. Zero Telemetry Gate", () => {
 	const errors = verifyZeroTelemetry();
 	assert.deepEqual(errors, [], `Zero telemetry check failed: ${errors.join("; ")}`);
