@@ -30,9 +30,8 @@ amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--str
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber accept --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

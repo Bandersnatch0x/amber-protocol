@@ -11,7 +11,7 @@ export interface CommandBlockProps {
     | 'gated-execution'
     | 'scaffold';
   command: string;
-  expectedSignal: string;
+  expectedSignal?: string;
 }
 
 export const CommandBlock: React.FC<CommandBlockProps> = ({
@@ -62,10 +62,12 @@ export const CommandBlock: React.FC<CommandBlockProps> = ({
         </button>
       </div>
 
-      <div className={styles.footer}>
-        <span className={styles.signalLabel}>Expected artifact or signal:</span>
-        <span className={styles.signalValue}>{expectedSignal}</span>
-      </div>
+      {expectedSignal ? (
+        <div className={styles.footer}>
+          <span className={styles.signalLabel}>Expected artifact or signal:</span>
+          <span className={styles.signalValue}>{expectedSignal}</span>
+        </div>
+      ) : null}
     </div>
   );
 };

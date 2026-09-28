@@ -36,7 +36,6 @@ amber eval <run|list|show|admit> --target <repo> [--json]
   context="Target Repository"
   nature="governed-write"
   command="amber eval --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -44,7 +44,6 @@ amber runner <register|capability|request|authorize|requests|prepare|settle|abor
   context="Target Repository"
   nature="governed-write"
   command="amber runner --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

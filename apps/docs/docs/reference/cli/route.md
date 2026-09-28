@@ -32,7 +32,6 @@ amber route <list|inspect|validate|test|approve|verify-ledger> <route-id> [--tar
   context="Target Repository"
   nature="read-only"
   command="amber route --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

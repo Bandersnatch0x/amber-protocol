@@ -30,9 +30,8 @@ amber review --target <repo> --plan <relative-plan-path> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber review --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

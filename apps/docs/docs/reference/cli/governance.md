@@ -32,9 +32,8 @@ amber governance <docs|evidence|policy|audit|readiness|report|standards|rules> [
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="governed-write"
   command="amber governance --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -33,9 +33,8 @@ amber principal register --target <repo> --id <id> --kind <human|service> [--rol
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber principal --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -32,7 +32,6 @@ amber status --target <repo> [--json]
   context="Target Repository"
   nature="read-only"
   command="amber status --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

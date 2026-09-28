@@ -73,14 +73,26 @@ function generateCommandDoc(commandName, pkgMeta) {
 		}
 	}
 
-	const isReadOnly =
-		tier === "expert" && ["status", "explain"].includes(commandName)
-			? true
-			: ["audit", "doctor", "status", "explain", "next", "route"].includes(commandName) ||
-				summary.toLowerCase().includes("read-only") ||
-				summary.toLowerCase().includes("inspect");
-
-	const nature = isReadOnly ? "read-only" : "governed-write";
+	// Nature is derived from real registry metadata, not prose: TYPED_COMMANDS
+	// (isGoverned) is exactly the set that requires an explicit `--yes` governed
+	// mutation, so those are `governed-write`; a small explicit allow-list marks
+	// the genuinely read-only verbs; everything else writes but without an
+	// approval gate, i.e. `idempotent-write` (issues/0063 R1). Prose substrings
+	// like "inspect"/"read-only" are no longer consulted.
+	const READ_ONLY_COMMANDS = new Set([
+		"audit",
+		"doctor",
+		"next",
+		"route",
+		"status",
+		"explain",
+		"drift",
+	]);
+	const nature = READ_ONLY_COMMANDS.has(commandName)
+		? "read-only"
+		: isGoverned
+			? "governed-write"
+			: "idempotent-write";
 
 	const lines = [
 		"---",
@@ -117,7 +129,6 @@ function generateCommandDoc(commandName, pkgMeta) {
 		`  context="Target Repository"`,
 		`  nature="${nature}"`,
 		`  command="amber ${commandName} --target path/to/repo"`,
-		`  expectedSignal="Governed command execution signal"`,
 		`/>`,
 		"",
 	];

@@ -30,9 +30,8 @@ amber break-loop --target <repo> --issue <n> --title "<title>" --recurrence <n> 
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber break-loop --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

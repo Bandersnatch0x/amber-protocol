@@ -32,7 +32,6 @@ amber next --target <repo> [--feature <id>] [--session <id>] [--objective <text>
   context="Target Repository"
   nature="read-only"
   command="amber next --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

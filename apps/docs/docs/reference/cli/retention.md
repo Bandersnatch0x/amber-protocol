@@ -45,9 +45,8 @@ amber retention <classify|evaluate|classifications|hold|release|holds|holder|hol
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber retention --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

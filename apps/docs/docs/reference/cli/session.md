@@ -32,7 +32,6 @@ amber session <start|status|list|abort|continue|complete-check|verify|approve|ve
   context="Target Repository"
   nature="governed-write"
   command="amber session --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

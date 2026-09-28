@@ -30,9 +30,8 @@ amber wiki --target <repo> [--json] [--dry-run]
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber wiki --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

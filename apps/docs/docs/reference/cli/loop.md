@@ -30,9 +30,8 @@ amber loop <inspect|recommend|run|approve|verify-ledger|record|status|validate-l
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="governed-write"
   command="amber loop --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

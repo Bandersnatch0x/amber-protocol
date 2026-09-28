@@ -30,9 +30,8 @@ amber drift --target <repo> [--scope artifact|wiki|scaffold|all] [--format text|
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="read-only"
   command="amber drift --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

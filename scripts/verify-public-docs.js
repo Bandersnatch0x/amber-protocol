@@ -10,6 +10,7 @@ const { spawnSync } = require("node:child_process");
 const ROOT_DIR = path.resolve(__dirname, "..");
 const DOCS_DIR = path.join(ROOT_DIR, "apps", "docs");
 const BUILD_DIR = path.join(DOCS_DIR, "build");
+const SRC_DIR = path.join(DOCS_DIR, "src");
 const MANIFEST_PATH = path.join(DOCS_DIR, "docs-manifest.json");
 const PKG_PATH = path.join(ROOT_DIR, "package.json");
 
@@ -743,6 +744,71 @@ async function probePublishedEndpoint(baseUrl) {
 	return errors;
 }
 
+// 13. CSS-module class integrity (static, no build): every `styles.<name>` a
+// page references must resolve to a selector in its imported *.module.css.
+// Catches the class of defect where markup and its stylesheet drift apart and
+// the page renders `class="undefined"` (issues/0063 C1). `srcDir` is injectable
+// for tests.
+function verifyCssModuleClasses(srcDir = SRC_DIR) {
+	const errors = [];
+	if (!fs.existsSync(srcDir)) return errors;
+	const tsxFiles = collectFiles(srcDir, (p) => p.endsWith(".tsx"));
+	for (const file of tsxFiles) {
+		const content = fs.readFileSync(file, "utf8");
+		const imp = content.match(/import\s+styles\s+from\s+['"]([^'"]+\.module\.css)['"]/);
+		if (!imp) continue;
+		const rel = path.relative(ROOT_DIR, file).replace(/\\/g, "/");
+		const modulePath = path.resolve(path.dirname(file), imp[1]);
+		if (!fs.existsSync(modulePath)) {
+			errors.push(`CSS-module integrity: ${rel} imports ${imp[1]}, which does not exist.`);
+			continue;
+		}
+		const css = fs.readFileSync(modulePath, "utf8");
+		const defined = new Set([...css.matchAll(/\.([a-zA-Z_][\w-]*)/g)].map((m) => m[1]));
+		const referenced = [
+			...new Set([...content.matchAll(/styles\.([A-Za-z0-9_]+)/g)].map((m) => m[1])),
+		];
+		const missing = referenced.filter((name) => !defined.has(name));
+		if (missing.length > 0) {
+			errors.push(
+				`CSS-module integrity: ${rel} references ${missing.length} class(es) not defined in ${path.basename(modulePath)}: ${missing.join(", ")}`,
+			);
+		}
+	}
+	return errors;
+}
+
+// 14. Custom-property integrity (static, no build): every project-owned
+// `var(--amber-*)` used in apps/docs/src CSS must be declared somewhere in that
+// same CSS set. Framework `--ifm-*` properties are Docusaurus-provided and out
+// of scope. Catches the class of defect where a component references design
+// tokens that dissolve to nothing (issues/0063 R2). `srcDir` is injectable.
+function verifyCustomProperties(srcDir = SRC_DIR) {
+	const errors = [];
+	if (!fs.existsSync(srcDir)) return errors;
+	const cssFiles = collectFiles(srcDir, (p) => p.endsWith(".css"));
+	const defined = new Set();
+	const used = [];
+	for (const file of cssFiles) {
+		const content = fs.readFileSync(file, "utf8");
+		for (const m of content.matchAll(/(--amber-[A-Za-z0-9-]+)\s*:/g)) defined.add(m[1]);
+		for (const m of content.matchAll(/var\(\s*(--amber-[A-Za-z0-9-]+)/g)) {
+			used.push({ prop: m[1], rel: path.relative(ROOT_DIR, file).replace(/\\/g, "/") });
+		}
+	}
+	const reported = new Set();
+	for (const { prop, rel } of used) {
+		const key = `${rel}:${prop}`;
+		if (!defined.has(prop) && !reported.has(key)) {
+			reported.add(key);
+			errors.push(
+				`Custom-property integrity: ${rel} uses ${prop}, which is declared nowhere in apps/docs/src CSS.`,
+			);
+		}
+	}
+	return errors;
+}
+
 function runVerification() {
 	console.log("🔍 Running Public Documentation Site Verification Seam (Ticket 0020 & 0024)...\n");
 
@@ -773,6 +839,8 @@ function runVerification() {
 			name: "12. Replayable Reader Result Scenarios",
 			fn: () => verifyReaderScenarios(),
 		},
+		{ name: "13. CSS-Module Class Integrity Gate", fn: () => verifyCssModuleClasses() },
+		{ name: "14. Custom-Property Integrity Gate", fn: () => verifyCustomProperties() },
 	];
 
 	for (const gate of gates) {
@@ -833,6 +901,8 @@ module.exports = {
 	verifyZeroTelemetry,
 	verifyVersionSync,
 	verifyReaderScenarios,
+	verifyCssModuleClasses,
+	verifyCustomProperties,
 	probePublishedEndpoint,
 	runVerification,
 };

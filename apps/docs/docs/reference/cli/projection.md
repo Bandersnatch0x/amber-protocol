@@ -30,9 +30,8 @@ amber projection --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber projection --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

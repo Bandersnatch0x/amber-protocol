@@ -30,9 +30,8 @@ amber hooks <check|install|uninstall|status> --target <repo> | amber hooks bread
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber hooks --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

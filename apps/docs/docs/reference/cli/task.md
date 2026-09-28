@@ -30,9 +30,8 @@ amber task --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber task --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

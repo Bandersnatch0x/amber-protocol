@@ -30,9 +30,8 @@ amber learnings --target <repo> [--feature <id>] [--reviewed --owner <id>] [--su
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber learnings --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

@@ -30,9 +30,8 @@ amber knowledge --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber knowledge --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

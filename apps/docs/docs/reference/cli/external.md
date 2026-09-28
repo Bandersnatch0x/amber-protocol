@@ -43,7 +43,6 @@ amber external <register|effects|propose|authorize|proposals|execute|settle|reco
   context="Target Repository"
   nature="governed-write"
   command="amber external --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

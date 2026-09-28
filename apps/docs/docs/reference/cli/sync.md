@@ -30,9 +30,8 @@ amber sync --target <repo> [--execute] [--json] | amber sync envelope <pack|unpa
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber sync --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

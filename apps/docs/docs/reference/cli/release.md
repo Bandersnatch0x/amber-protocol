@@ -39,9 +39,8 @@ amber release <prepare|authorize|deploy|rollback|transactions|status|receipts|sh
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber release --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

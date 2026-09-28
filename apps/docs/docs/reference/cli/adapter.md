@@ -41,9 +41,8 @@ amber adapter <register|read|candidate|compare|comparisons|cutover|rollback|cuto
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber adapter --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

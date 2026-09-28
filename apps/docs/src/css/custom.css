@@ -36,9 +36,25 @@
   --amber-badge-bg-target: #f1f5f9;
   --amber-badge-text-target: #334155;
   --amber-badge-border-target: #cbd5e1;
+
+  /* Command-block surface/text tokens (issues/0063 R2). Light values. */
+  --amber-border: #e2e8f0;
+  --amber-bg-surface: #ffffff;
+  --amber-bg-secondary: #f1f5f9;
+  --amber-text-primary: #0f172a;
+  --amber-text-secondary: #334155;
+  --amber-text-muted: #475569;
+  --amber-500: #92400e;
+  --amber-400: #b45309;
 }
 
-[data-theme='dark'] {
+/*
+ * Dark token overrides are scoped to `html[data-theme='dark']` (specificity
+ * 0,1,1) so they tie Infima's own `html[data-theme='dark']` block and win on
+ * source order (issues/0063 C2). A bare `[data-theme='dark']` (0,1,0) lost, so
+ * the amber contrast background and page canvas silently kept Infima's values.
+ */
+html[data-theme='dark'] {
   --ifm-color-primary: #f59e0b;
   --ifm-color-primary-dark: #d97706;
   --ifm-color-primary-darker: #b45309;
@@ -67,6 +83,16 @@
   --amber-badge-bg-target: #1e293b;
   --amber-badge-text-target: #cbd5e1;
   --amber-badge-border-target: #334155;
+
+  /* Command-block surface/text tokens (issues/0063 R2). Dark values. */
+  --amber-border: rgba(245, 158, 11, 0.25);
+  --amber-bg-surface: #12161f;
+  --amber-bg-secondary: #0b0e15;
+  --amber-text-primary: #f8fafc;
+  --amber-text-secondary: #cbd5e1;
+  --amber-text-muted: #94a3b8;
+  --amber-500: #f59e0b;
+  --amber-400: #fcd34d;
 }
 
 /* Zero page-level horizontal overflow guarantee */
@@ -253,6 +279,23 @@ pre,
 [data-theme='light'] .token.selector,
 [data-theme='light'] .token.tag {
   color: #0369a1 !important;
+}
+
+/*
+ * Footer (issues/0063 R5): Infima's `.footer--dark` hardcodes
+ * `--ifm-footer-background-color: #303846` on the element, overriding our theme
+ * tokens so the footer shipped the same grey in both themes. Restore the
+ * amber-aligned dark shades per theme; keeping `footer.style: 'dark'` preserves
+ * Infima's legible light footer text/links over them.
+ */
+.footer--dark {
+  --ifm-footer-background-color: #0f172a;
+  background-color: var(--ifm-footer-background-color);
+}
+
+html[data-theme='dark'] .footer--dark {
+  --ifm-footer-background-color: #09090b;
+  background-color: var(--ifm-footer-background-color);
 }
 
 [data-theme='light'] .navbar__link--active,

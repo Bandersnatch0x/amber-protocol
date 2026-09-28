@@ -68,9 +68,8 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber harness --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

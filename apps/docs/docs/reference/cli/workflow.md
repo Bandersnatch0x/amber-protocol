@@ -34,9 +34,8 @@ amber workflow <assess|findings|plan|compare> --target <repo>
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber workflow --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

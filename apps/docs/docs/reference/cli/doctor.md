@@ -32,7 +32,6 @@ amber doctor --target <repo> [--json]
   context="Target Repository"
   nature="read-only"
   command="amber doctor --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

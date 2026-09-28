@@ -32,7 +32,6 @@ amber explain [<code>] [--markdown <path>] [--json]
   context="Target Repository"
   nature="read-only"
   command="amber explain --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

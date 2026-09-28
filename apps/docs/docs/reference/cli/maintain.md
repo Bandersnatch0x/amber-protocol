@@ -39,9 +39,8 @@ amber maintain <register-detector|detect|propose|triage|complete|rollup|detector
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber maintain --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -1,30 +1,213 @@
-/* Amber Protocol Landing Page Styles - Unified High-Craft Governance Aesthetic */
+/* Amber Protocol landing page styles.
+ *
+ * Reconciled to the markup in index.tsx (issues/0063 C1): every class below is
+ * referenced by the page, and every class the page references is defined here.
+ * Light-theme text tones stay on the deep-amber floor established by issues/0157
+ * so the landing page clears axe serious/critical = 0 in both themes.
+ */
 
-.mainContainer {
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.heroSection {
   position: relative;
-  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.05) 0%, transparent 60%),
-              linear-gradient(180deg, rgba(5, 7, 13, 0.98) 0%, rgba(9, 13, 22, 1) 100%);
-  min-height: 100vh;
+  padding: 4.5rem 1.5rem 4rem;
+  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(5, 7, 13, 0.98) 0%, rgba(9, 13, 22, 1) 100%);
   color: #f8fafc;
   overflow: hidden;
 }
 
-[data-theme='light'] .mainContainer {
-  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.08) 0%, transparent 60%),
-              linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+[data-theme='light'] .heroSection {
+  background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.1) 0%, transparent 60%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   color: #0f172a;
 }
 
-/* 2. Diagram Section */
-.diagramSection {
-  padding: 3rem 1.5rem 2rem;
+.heroContainer {
   max-width: 1240px;
   margin: 0 auto;
-  position: relative;
-  z-index: 10;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 3rem;
+  align-items: center;
 }
 
-/* 3. Section Common Header */
+@media (max-width: 996px) {
+  .heroContainer {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+}
+
+.heroContent {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  padding: 0.35rem 0.85rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 9999px;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.04em;
+  margin-bottom: 1.25rem;
+}
+
+[data-theme='light'] .heroBadge {
+  color: #92400e;
+}
+
+.heroBadgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+}
+
+.heroTitle {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin: 0 0 1.25rem;
+  color: #ffffff;
+}
+
+[data-theme='light'] .heroTitle {
+  color: #0f172a;
+}
+
+@media (max-width: 640px) {
+  .heroTitle {
+    font-size: 2.25rem;
+  }
+}
+
+.heroHighlight {
+  color: #fbbf24;
+}
+
+[data-theme='light'] .heroHighlight {
+  color: #92400e;
+}
+
+.heroSubtitle {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  max-width: 34rem;
+  margin: 0 0 2rem;
+}
+
+[data-theme='light'] .heroSubtitle {
+  color: #475569;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* ── Hero terminal vignette ───────────────────────────────────────────────── */
+
+.heroTerminal {
+  background: #05070d;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='light'] .heroTerminal {
+  background: #0b1120;
+  border-color: rgba(15, 23, 42, 0.4);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.25);
+}
+
+.terminalHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.terminalDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.dotRed {
+  background: #ff5f56;
+}
+
+.dotYellow {
+  background: #ffbd2e;
+}
+
+.dotGreen {
+  background: #27c93f;
+}
+
+.terminalTitle {
+  margin-left: 0.4rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.terminalBody {
+  padding: 1rem 1.1rem 1.25rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.terminalLine {
+  margin-bottom: 0.85rem;
+}
+
+.terminalLine:last-child {
+  margin-bottom: 0;
+}
+
+.terminalPrompt {
+  color: #fbbf24;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.terminalCmd {
+  color: #f8fafc;
+  word-break: break-word;
+}
+
+.terminalOutput {
+  color: #cbd5e1;
+  margin-top: 0.3rem;
+}
+
+.terminalSuccess {
+  color: #4ade80;
+}
+
+/* ── Section shell (shared) ───────────────────────────────────────────────── */
+
 .section {
   padding: 5rem 1.5rem;
   max-width: 1240px;
@@ -49,7 +232,7 @@
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.75rem;
   font-weight: 700;
-  color: #f59e0b;
+  color: #fbbf24;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 1rem;
@@ -85,7 +268,8 @@
   color: #475569;
 }
 
-/* 4. Core Architecture Pillars Grid */
+/* ── Architecture pillar cards ────────────────────────────────────────────── */
+
 .grid3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -104,84 +288,40 @@
   }
 }
 
-.pillarCard {
+.card {
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(245, 158, 11, 0.2);
   border-radius: 12px;
   padding: 2rem 1.75rem;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(12px);
-  position: relative;
-  overflow: hidden;
+  min-width: 0;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.pillarCard::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.8) 50%, transparent 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.pillarCard:hover::before {
-  opacity: 1;
-}
-
-[data-theme='light'] .pillarCard {
+[data-theme='light'] .card {
   background: #ffffff;
   border-color: #e2e8f0;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
-.pillarCard:hover {
+.card:hover {
   border-color: rgba(245, 158, 11, 0.6);
   transform: translateY(-3px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 158, 11, 0.1);
 }
 
-[data-theme='light'] .pillarCard:hover {
+[data-theme='light'] .card:hover {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08), 0 0 20px rgba(245, 158, 11, 0.15);
 }
 
-.pillarCardTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
+.cardIcon {
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-bottom: 1rem;
 }
 
-.pillarIconBox {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pillarIcon {
-  width: 22px;
-  height: 22px;
-  color: #f59e0b;
-}
-
-.pillarTag {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.675rem;
-  font-weight: 700;
-  color: rgba(245, 158, 11, 0.85);
-  letter-spacing: 0.05em;
-}
-
-.pillarTitle {
+.cardTitle {
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -189,11 +329,11 @@
   color: #ffffff;
 }
 
-[data-theme='light'] .pillarTitle {
+[data-theme='light'] .cardTitle {
   color: #0f172a;
 }
 
-.pillarBody {
+.cardBody {
   font-size: 0.925rem;
   line-height: 1.6;
   color: #94a3b8;
@@ -201,26 +341,35 @@
   margin-bottom: 1.5rem;
 }
 
-[data-theme='light'] .pillarBody {
+[data-theme='light'] .cardBody {
   color: #475569;
 }
 
-.pillarLink {
+.cardLink {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #f59e0b;
+  color: #fbbf24;
   text-decoration: none !important;
   display: inline-flex;
   align-items: center;
   transition: all 0.2s ease;
 }
 
-.pillarLink:hover {
-  color: #fbbf24;
+[data-theme='light'] .cardLink {
+  color: #92400e;
+}
+
+.cardLink:hover {
+  color: #fcd34d;
   transform: translateX(2px);
 }
 
-/* 5. Governed Workflow Pipeline */
+[data-theme='light'] .cardLink:hover {
+  color: #b45309;
+}
+
+/* ── Governed lifecycle timeline ──────────────────────────────────────────── */
+
 .workflowSection {
   background: rgba(9, 13, 22, 0.6);
   border-top: 1px solid rgba(245, 158, 11, 0.15);
@@ -239,74 +388,60 @@
   margin: 0 auto;
 }
 
-.pipelineGrid {
+.timelineGrid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 1.25rem;
-  position: relative;
 }
 
 @media (max-width: 1024px) {
-  .pipelineGrid {
+  .timelineGrid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 640px) {
-  .pipelineGrid {
+  .timelineGrid {
     grid-template-columns: 1fr;
   }
 }
 
-.pipelineItem {
+.timelineItem {
   background: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(245, 158, 11, 0.22);
   border-radius: 12px;
   padding: 1.5rem 1.25rem;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
 }
 
-[data-theme='light'] .pipelineItem {
+[data-theme='light'] .timelineItem {
   background: #ffffff;
   border-color: #e2e8f0;
 }
 
-.pipelineItem:hover {
+.timelineItem:hover {
   border-color: #f59e0b;
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 15px rgba(245, 158, 11, 0.1);
 }
 
-.pipelineItemHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-}
-
-.pipelineStepNum {
+.timelineStep {
   font-family: var(--ifm-font-family-monospace);
-  font-size: 0.85rem;
-  font-weight: 900;
-  color: #f59e0b;
-}
-
-.pipelinePhaseTag {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  letter-spacing: 0.05em;
+  color: #fbbf24;
+  margin-bottom: 0.6rem;
 }
 
-.pipelineTitle {
+[data-theme='light'] .timelineStep {
+  color: #92400e;
+}
+
+.timelineTitle {
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -314,62 +449,52 @@
   color: #ffffff;
 }
 
-[data-theme='light'] .pipelineTitle {
+[data-theme='light'] .timelineTitle {
   color: #0f172a;
 }
 
-.pipelineCodeBox {
-  display: flex;
-  align-items: center;
+.timelineCode {
+  display: block;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(245, 158, 11, 0.2);
   border-radius: 6px;
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.6rem;
   margin-bottom: 0.85rem;
-  overflow-x: auto;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  color: #fcd34d;
+  white-space: normal;
+  word-break: break-word;
 }
 
-[data-theme='light'] .pipelineCodeBox {
+[data-theme='light'] .timelineCode {
   background: #f1f5f9;
   border-color: #cbd5e1;
+  color: #92400e;
 }
 
-.pipelineCodeBox code {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.725rem;
-  color: #fbbf24;
-  white-space: nowrap;
-  background: transparent;
-  padding: 0;
-  border: none;
-}
-
-[data-theme='light'] .pipelineCodeBox code {
-  color: #b45309;
-}
-
-.pipelineDesc {
+.timelineDesc {
   font-size: 0.85rem;
   color: #94a3b8;
   line-height: 1.5;
   margin: 0;
 }
 
-[data-theme='light'] .pipelineDesc {
+[data-theme='light'] .timelineDesc {
   color: #475569;
 }
 
-/* 6. Bottom Adoption CTA */
+/* ── Bottom adoption CTA ──────────────────────────────────────────────────── */
+
 .ctaBanner {
   background: radial-gradient(circle at 50% 30%, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.95) 75%),
-              rgba(15, 23, 42, 0.9);
+    rgba(15, 23, 42, 0.9);
   border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: 20px;
   padding: 4.5rem 2rem;
   text-align: center;
   margin: 2rem auto 3rem;
   max-width: 1080px;
-  backdrop-filter: blur(16px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 158, 11, 0.08);
 }
 
@@ -377,11 +502,6 @@
   background: #ffffff;
   border-color: #cbd5e1;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08), 0 0 20px rgba(245, 158, 11, 0.1);
-}
-
-.ctaHeader {
-  max-width: 680px;
-  margin: 0 auto 2rem;
 }
 
 .ctaTitle {
@@ -398,53 +518,22 @@
 
 .ctaDesc {
   font-size: 1.1rem;
-  color: #94a3b8;
+  color: #cbd5e1;
   line-height: 1.6;
+  max-width: 640px;
+  margin: 0 auto 2rem;
 }
 
 [data-theme='light'] .ctaDesc {
   color: #475569;
 }
 
-.ctaQuickBox {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 2.25rem;
-}
+/* ── Shared action buttons ────────────────────────────────────────────────── */
 
-.quickstartSnippet {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: #05070d;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  padding: 0.8rem 1.6rem;
-  border-radius: 10px;
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.95rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-}
-
-[data-theme='light'] .quickstartSnippet {
-  background: #0f172a;
-  color: #ffffff;
-}
-
-.quickPrompt {
-  color: #f59e0b;
-  font-weight: 800;
-}
-
-.quickCommand {
-  color: #f8fafc;
-  font-weight: 600;
-}
-
-.ctaActions {
+.heroActions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.25rem;
+  gap: 1rem;
   align-items: center;
 }
 
@@ -501,3 +590,6 @@
   transform: translateY(-2px);
 }
 
+[data-theme='light'] .secondaryBtn:hover {
+  color: #92400e !important;
+}

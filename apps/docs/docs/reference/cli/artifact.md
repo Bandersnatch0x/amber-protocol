@@ -32,9 +32,8 @@ amber artifact admit --target <repo> --id <identity> --body <markdown> [--type <
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber artifact --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -40,7 +40,6 @@ amber breakglass <grant|revoke|grants|use|show|settle|review|status> --target <r
   context="Target Repository"
   nature="governed-write"
   command="amber breakglass --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

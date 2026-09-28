@@ -30,9 +30,8 @@ amber init --target <repo> [--with-wiki] [--skip-detection] [--json] [--dry-run]
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber init --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

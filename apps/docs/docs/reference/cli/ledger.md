@@ -32,7 +32,6 @@ amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|o
   context="Target Repository"
   nature="governed-write"
   command="amber ledger --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

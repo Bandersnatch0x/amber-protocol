@@ -32,7 +32,6 @@ amber contracts validate [--target <amber-checkout>] [--json]
   context="Target Repository"
   nature="governed-write"
   command="amber contracts --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

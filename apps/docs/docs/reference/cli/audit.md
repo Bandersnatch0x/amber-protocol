@@ -32,7 +32,6 @@ amber audit --target <repo> [--json] [--summary]
   context="Target Repository"
   nature="read-only"
   command="amber audit --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

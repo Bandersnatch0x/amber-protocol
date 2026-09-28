@@ -18,6 +18,8 @@ const {
 	verifyZeroTelemetry,
 	verifyVersionSync,
 	verifyReaderScenarios,
+	verifyCssModuleClasses,
+	verifyCustomProperties,
 	runVerification,
 } = require("../scripts/verify-public-docs");
 
@@ -199,6 +201,75 @@ buildTest("public docs verification seam: 8. SEO Baseline Gate", () => {
 buildTest("public docs verification seam: 9. Edit Links Gate", () => {
 	const errors = verifyEditLinks();
 	assert.deepEqual(errors, [], `Edit links check failed: ${errors.join("; ")}`);
+});
+
+// 0063 P0 static guards: these read apps/docs/src (not the build), so they run
+// without a build. They prove the two integrity gates are clean on the real
+// source AND that each bites on a planted violation.
+const os = require("node:os");
+
+test("CSS-module + custom-property integrity gates are clean on the real src", () => {
+	assert.deepEqual(
+		verifyCssModuleClasses(),
+		[],
+		"a page references a CSS-module class its stylesheet never defines",
+	);
+	assert.deepEqual(
+		verifyCustomProperties(),
+		[],
+		"a --amber-* custom property is used but declared nowhere in apps/docs/src",
+	);
+});
+
+test("CSS-module integrity gate reports a referenced-but-undefined class", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cssmod-"));
+	try {
+		fs.writeFileSync(path.join(dir, "x.module.css"), ".present { color: red; }\n");
+		fs.writeFileSync(
+			path.join(dir, "x.tsx"),
+			"import styles from './x.module.css';\nexport default () => (<div className={styles.present}><span className={styles.ghostClass} /></div>);\n",
+		);
+		const errors = verifyCssModuleClasses(dir);
+		assert.ok(
+			errors.some((e) => e.includes("ghostClass")),
+			`expected ghostClass to be flagged, got: ${errors.join("; ")}`,
+		);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("CSS-module integrity gate stays silent when every referenced class resolves", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cssmod-ok-"));
+	try {
+		fs.writeFileSync(path.join(dir, "x.module.css"), ".a { color: red; }\n.b { color: blue; }\n");
+		fs.writeFileSync(
+			path.join(dir, "x.tsx"),
+			"import styles from './x.module.css';\nexport default () => (<div className={`${styles.a} ${styles.b}`} />);\n",
+		);
+		assert.deepEqual(verifyCssModuleClasses(dir), []);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("custom-property integrity gate reports an undeclared --amber var and ignores framework vars", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-prop-"));
+	try {
+		fs.writeFileSync(
+			path.join(dir, "a.css"),
+			":root { --amber-border: #ccc; }\n.x { border: 1px solid var(--amber-border); color: var(--amber-ghost); background: var(--ifm-background-color); }\n",
+		);
+		const errors = verifyCustomProperties(dir);
+		assert.ok(
+			errors.some((e) => e.includes("--amber-ghost")),
+			`expected --amber-ghost to be flagged, got: ${errors.join("; ")}`,
+		);
+		assert.ok(!errors.some((e) => e.includes("--amber-border")), "declared --amber var must pass");
+		assert.ok(!errors.some((e) => e.includes("--ifm-")), "framework --ifm-* vars are out of scope");
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 // 0063 row 8 guard: the uniqueness half of the SEO gate must bite in both

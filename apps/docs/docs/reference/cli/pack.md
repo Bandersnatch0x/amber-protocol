@@ -30,9 +30,8 @@ amber pack --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber pack --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Command Details

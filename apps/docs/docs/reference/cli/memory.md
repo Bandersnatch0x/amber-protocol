@@ -32,7 +32,6 @@ amber memory <request|ingest|approve|book|abandon|status> [--target <repo>] [--j
   context="Target Repository"
   nature="governed-write"
   command="amber memory --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -30,9 +30,8 @@ amber security --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="governed-write"
+  nature="idempotent-write"
   command="amber security --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

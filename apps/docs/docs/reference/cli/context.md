@@ -32,7 +32,6 @@ amber context --target <repo> [--json]
   context="Target Repository"
   nature="governed-write"
   command="amber context --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

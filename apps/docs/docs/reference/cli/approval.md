@@ -35,9 +35,8 @@ amber approval <grant|revoke|consume|show|list> --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber approval --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

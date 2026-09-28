@@ -58,7 +58,7 @@
 /* Light theme: the mid-tone badge text fails 4.5:1 on its pale tinted
    background (issues/0157); deepen each to a 700-level tone that clears it. */
 [data-theme='light'] .badgeReadOnly {
-  color: #047857;
+  color: #065f46;
 }
 [data-theme='light'] .badgeGoverned {
   color: #92400e;

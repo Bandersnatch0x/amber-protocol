@@ -34,9 +34,8 @@ amber gate <evaluate|show|list> --target <repo> [--json]  (F050 Gate Contracts)
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber gate --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands

@@ -33,9 +33,8 @@ amber policy <evaluate|show|list> --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber policy --target path/to/repo"
-  expectedSignal="Governed command execution signal"
 />
 
 ## Subcommands
