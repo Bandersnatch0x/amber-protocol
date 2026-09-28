@@ -68,6 +68,13 @@ const config: Config = {
         indexBlog: false,
         indexPages: false,
         docsRouteBasePath: '/',
+        // Prefer the matched heading path on each suggestion so a hit reads as
+        // its section, not just its page title (issues/0063 O5). The duplicate
+        // hits for one page cannot be collapsed: the plugin (0.49.2) exposes no
+        // dedupe option and no swizzlable SearchBar theme path (no
+        // getThemePath / dist/client/theme), so collapsing them would mean
+        // patching the bundled client or hacking its DOM.
+        explicitSearchResultPath: true,
       },
     ],
   ],
