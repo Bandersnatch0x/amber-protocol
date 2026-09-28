@@ -10,7 +10,7 @@ const {
 	validateHandoff,
 } = require("./audit");
 
-const { REQUIRED_HARNESS_FILES } = require("./constants");
+const { REQUIRED_HARNESS_FILES, LEGACY_CONTINUOUS_IMPROVEMENT_STATE_PATH } = require("./constants");
 
 const { pathExists, resolveTarget, relativeSlash } = require("./fs-utils");
 
@@ -446,7 +446,7 @@ function doctor(target, options = {}) {
 	// F036 legacy .harness fallback); the pre-0156 `.workflow/` location is a
 	// separate legacy dimension handled explicitly below.
 	const ciCanonical = statePath(targetRoot, "continuous-improvement", "state.json");
-	const ciLegacy = path.join(targetRoot, ".workflow", "continuous-improvement", "state.json");
+	const ciLegacy = path.join(targetRoot, LEGACY_CONTINUOUS_IMPROVEMENT_STATE_PATH);
 	const ciPath = pathExists(ciCanonical) ? ciCanonical : pathExists(ciLegacy) ? ciLegacy : null;
 	if (ciPath) {
 		const ciLabel = relativeSlash(targetRoot, ciPath);

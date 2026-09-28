@@ -429,6 +429,13 @@ function collectSeoPages() {
 	}));
 }
 
+// Append a page to the list of pages sharing a given title/description value.
+function recordOwner(map, key, rel) {
+	const owners = map.get(key);
+	if (owners) owners.push(rel);
+	else map.set(key, [rel]);
+}
+
 // 8. SEO Baseline Gate
 // Contract 0020 row 8: every page carries a non-empty <title>, a meta
 // description, and a canonical link, AND titles + descriptions are 100% unique
@@ -465,19 +472,14 @@ function verifySeoBaseline(pages) {
 
 		const titleMatch = content.match(/<title[^>]*>(.*?)<\/title>/i);
 		if (titleMatch && titleMatch[1].trim()) {
-			const title = titleMatch[1].trim();
-			(titleOwners.get(title) || titleOwners.set(title, []).get(title)).push(rel);
+			recordOwner(titleOwners, titleMatch[1].trim(), rel);
 		}
 
 		const descriptionMatch =
 			content.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/i) ||
 			content.match(/<meta[^>]*property="og:description"[^>]*content="([^"]*)"/i);
 		if (descriptionMatch && descriptionMatch[1].trim()) {
-			const description = descriptionMatch[1].trim();
-			(
-				descriptionOwners.get(description) ||
-				descriptionOwners.set(description, []).get(description)
-			).push(rel);
+			recordOwner(descriptionOwners, descriptionMatch[1].trim(), rel);
 		}
 	}
 
@@ -520,7 +522,7 @@ function verifyEditLinks(pages) {
 			errors.push(`Edit links check: Page ${rel} lacks a valid GitHub edit link.`);
 			continue;
 		}
-		const sourceRel = match[1].replace(/\/+$/, "");
+		const sourceRel = match[1].replace(/[#?].*$/, "").replace(/\/+$/, "");
 		if (!fs.existsSync(path.join(ROOT_DIR, sourceRel))) {
 			errors.push(
 				`Edit links check: Page ${rel} edit link points at a source path that does not exist: ${sourceRel}`,

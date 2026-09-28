@@ -2,7 +2,11 @@
 
 const path = require("node:path");
 
-const { VALID_STATUSES, WIKI_CONTEXT_STARTER_FILES } = require("./constants");
+const {
+	VALID_STATUSES,
+	WIKI_CONTEXT_STARTER_FILES,
+	CONTINUOUS_IMPROVEMENT_STATE_PATH,
+} = require("./constants");
 
 const {
 	pathExists,
@@ -172,7 +176,7 @@ function validateFeatureListFile(filePath) {
 // that validate a known-canonical file directly.
 function validateContinuousImprovementStateFile(
 	filePath,
-	label = ".amber/continuous-improvement/state.json",
+	label = CONTINUOUS_IMPROVEMENT_STATE_PATH,
 ) {
 	const errors = [];
 	const warnings = [];
