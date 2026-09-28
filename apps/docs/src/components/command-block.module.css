@@ -70,6 +70,15 @@
   color: #1d4ed8;
 }
 
+/* Dark theme: the mid-tone blue/red badge text fails 4.5:1 on its dark tinted
+   background (issues/0157); lighten to a 300-level tone that clears it. */
+[data-theme='dark'] .badgeScaffold {
+  color: #93c5fd;
+}
+[data-theme='dark'] .badgeGated {
+  color: #fca5a5;
+}
+
 .commandRow {
   display: flex;
   justify-content: space-between;

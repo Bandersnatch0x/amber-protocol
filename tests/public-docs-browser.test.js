@@ -12,6 +12,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const path = require("node:path");
 
 const mod = require("../scripts/verify-public-docs-browser");
 
@@ -59,4 +60,40 @@ test("the axe check reports a planted color-contrast violation", gated, async ()
 	} finally {
 		await browser.close();
 	}
+});
+
+// Resolve a baseUrl-relative page path to its built HTML file, mirroring the
+// gate's static-server resolution (dir -> index.html; else <rel>.html).
+function readBuildHtml(rel) {
+	const clean = rel === "/" ? "" : rel.replace(/^\//, "").replace(/\/$/, "");
+	const candidates = clean
+		? [path.join(mod.BUILD_DIR, clean, "index.html"), path.join(mod.BUILD_DIR, `${clean}.html`)]
+		: [path.join(mod.BUILD_DIR, "index.html")];
+	const hit = candidates.find((p) => fs.existsSync(p));
+	return hit ? fs.readFileSync(hit, "utf8") : null;
+}
+
+// Hardening (audit follow-up): the gate serves the build under the baseUrl it
+// parses from docusaurus.config; if that drifts from the baseUrl the build
+// actually used, every page would 404. Pin them together.
+test("the gate's served baseUrl matches the built asset prefix", gated, () => {
+	const index = fs.readFileSync(path.join(mod.BUILD_DIR, "index.html"), "utf8");
+	assert.ok(
+		index.includes(`href="${mod.BASE}/`),
+		`built assets must live under the gate's served baseUrl "${mod.BASE}" — config/build drift would 404 every page`,
+	);
+});
+
+// Hardening (audit follow-up): the row-7 axe pass only protects the light/dark
+// command-block nature badges if at least one scanned page actually renders
+// one. Guard the coverage so a future page-set trim cannot silently drop it.
+test("the scanned representative pages include a command-block nature badge", gated, () => {
+	const withBadge = mod.REPRESENTATIVE_PAGES.filter((rel) => {
+		const html = readBuildHtml(rel);
+		return html && /natureBadge/.test(html);
+	});
+	assert.ok(
+		withBadge.length >= 1,
+		`no scanned page renders a nature badge — badge a11y fixes go unverified; scanned: ${mod.REPRESENTATIVE_PAGES.join(", ")}`,
+	);
 });

@@ -248,6 +248,13 @@ pre,
   color: #b3105c !important;
 }
 
+[data-theme='light'] .token.atrule,
+[data-theme='light'] .token.key,
+[data-theme='light'] .token.selector,
+[data-theme='light'] .token.tag {
+  color: #0369a1 !important;
+}
+
 [data-theme='light'] .navbar__link--active,
 [data-theme='light'] .menu__link--active,
 [data-theme='light'] .breadcrumbs__item--active .breadcrumbs__link {

@@ -35,8 +35,10 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const BUILD_DIR = path.join(ROOT_DIR, "apps", "docs", "build");
 const CONFIG = path.join(ROOT_DIR, "apps", "docs", "docusaurus.config.ts");
 
-// Representative pages — one per major reader group. Row 7 scans all of these;
-// row 10 exercises four distinct page types. Paths are baseUrl-relative.
+// Representative pages — one per major reader group, plus two that render
+// command-block nature badges and rich Prism tokens so the light/dark a11y
+// fixes for those surfaces are actually exercised (issues/0157 coverage).
+// Row 7 scans all of these; row 10 exercises four distinct page types.
 const REPRESENTATIVE_PAGES = [
 	"/",
 	"/start-here/installation",
@@ -44,6 +46,8 @@ const REPRESENTATIVE_PAGES = [
 	"/concepts/",
 	"/troubleshooting/",
 	"/about/",
+	"/guides/governance-gates-and-audit/",
+	"/guides/adopting-existing-project/",
 ];
 const THEME_PAGE_TYPES = ["/", "/start-here/installation", "/reference/cli/next", "/concepts/"];
 const VIEWPORTS = [320, 375, 768];
