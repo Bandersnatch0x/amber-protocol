@@ -462,3 +462,209 @@ test("raw CLI: handles view, cancel flags, and truncated values through the real
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
+
+// F081 §3.5 requires one `execution.cancel.requested` + `execution.cancelled`
+// pair per cancellation, not a lone terminal event.
+test("a cancellation records the required requested + cancelled event pair", async () => {
+	const target = gitTarget("pair", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		const { promise, handle } = await startRunning(target);
+		try {
+			await cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "pair check",
+			});
+			assert.deepEqual(
+				readHarnessEvents(target)
+					.filter((event) => event.runId === RUN_ID)
+					.map((event) => event.kind)
+					.filter((kind) => kind.startsWith("execution.cancel")),
+				["execution.cancel.requested", "execution.cancelled"],
+				"the request must be recorded before the settlement",
+			);
+			assert.equal(isProcessAlive(handle.pid), false, "the observed pid is gone");
+		} finally {
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// F081 §3.3: the authorization is consumed BEFORE any effect. A reused Decision
+// must be refused while the second process is still alive — not after it has
+// already been killed and the conflict is reported post-mortem.
+test("a reused Decision is refused before any signal is delivered", async () => {
+	const target = gitTarget("spend-order", allowRules(SLEEP_COMMAND));
+	const secondRun = "run-cancel-2";
+	try {
+		decisionFixture(target);
+		approve(target);
+
+		// The first cancellation spends decision/cancel-1.
+		const first = await startRunning(target);
+		try {
+			const cancelled = await cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "first",
+			});
+			assert.equal(cancelled.outcome, "terminated");
+		} finally {
+			await first.promise.catch(() => {});
+		}
+
+		// A SECOND live run with its OWN ledger and its OWN (unconsumed) approval,
+		// so the only thing that can refuse the replay is the spent Decision.
+		const secondLedger = path.join(target, ".amber", "loops", "cancel-run-2", "ledger.jsonl");
+		appendLedgerRecord(secondLedger, {
+			kind: "approved",
+			approvalKey: "cancel-run-2:approval",
+		});
+		const secondPromise = runGovernedCommand({
+			target,
+			commandId: "allow-cancel",
+			ledgerPath: secondLedger,
+			label: "cancel-run-2",
+			subject: { runId: secondRun },
+			budgetMinutes: 5,
+		});
+		const secondFile = path.join(
+			target,
+			".amber",
+			"harness",
+			"executions",
+			`${secondRun}.handle.json`,
+		);
+		const deadline = Date.now() + 10_000;
+		while (Date.now() < deadline && !fs.existsSync(secondFile)) {
+			await new Promise((resolve) => setTimeout(resolve, 25));
+		}
+		const secondHandle = readExecutionHandle(target, secondRun);
+		assert.ok(secondHandle && secondHandle.status === "live", JSON.stringify(secondHandle));
+		try {
+			await assert.rejects(
+				() =>
+					cancelExecution(target, {
+						runId: secondRun,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "replay",
+					}),
+				(error) => error.amberCode === CODE_CONFLICT && /already spent/.test(error.message),
+			);
+			// The point of the fix: the refusal landed before the signal.
+			assert.equal(
+				isProcessAlive(secondHandle.pid),
+				true,
+				"a reused Decision must not kill the process before the refusal",
+			);
+			assert.equal(
+				readHarnessEvents(target).filter(
+					(event) => event.runId === secondRun && event.kind === "execution.cancelled",
+				).length,
+				0,
+				"a refused cancellation records no terminal fact",
+			);
+			assert.equal(
+				fs.existsSync(
+					path.join(
+						target,
+						".amber",
+						"harness",
+						"executions",
+						"cancellations",
+						`${secondRun}.json`,
+					),
+				),
+				false,
+				"a refused cancellation writes no record",
+			);
+
+			// A different, unspent Decision settles the second run cleanly, which
+			// also proves the refusal above was about the SPEND, not about the
+			// run being uncancellable.
+			const settled = await cancelExecution(target, {
+				runId: secondRun,
+				decision: { identity: "decision/cancel-2", revision: 1 },
+				reason: "cleanup with a fresh Decision",
+			});
+			assert.equal(settled.outcome, "terminated");
+		} finally {
+			if (isProcessAlive(secondHandle.pid)) {
+				try {
+					process.kill(secondHandle.pid, "SIGKILL");
+				} catch (_error) {
+					/* already gone */
+				}
+			}
+			await secondPromise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// F081 §3.2: the handle must belong to the requested target. A handle copied
+// into another target's store still satisfies its own shape and Snapshot Hash,
+// so only target-binding can refuse it — before anything is signalled.
+test("a handle issued for another target is refused before any signal", async () => {
+	const a = gitTarget("x-target-a", allowRules(SLEEP_COMMAND));
+	const b = gitTarget("x-target-b", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(a);
+		approve(a);
+		const { promise, handle } = await startRunning(a);
+		try {
+			decisionFixture(b);
+			approve(b);
+			// Copy A's handle into B's store UNCHANGED.
+			const bHandleFile = path.join(b, ".amber", "harness", "executions", `${RUN_ID}.handle.json`);
+			fs.mkdirSync(path.dirname(bHandleFile), { recursive: true });
+			fs.copyFileSync(handle.file, bHandleFile);
+			assert.equal(
+				JSON.parse(fs.readFileSync(bHandleFile, "utf8")).target,
+				path.resolve(a),
+				"the copied handle still names A as its target",
+			);
+
+			await assert.rejects(
+				() =>
+					cancelExecution(b, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "cross-target attempt",
+					}),
+				(error) => /different target/.test(error.message),
+			);
+			assert.equal(
+				isProcessAlive(handle.pid),
+				true,
+				"the other target's process must survive a cross-target cancellation",
+			);
+
+			// Legitimate cleanup: A's OWN target and Decision terminate A, which
+			// also shows the refusal above was target-binding, not a dead handle.
+			const settledA = await cancelExecution(a, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "cleanup after the cross-target refusal",
+			});
+			assert.equal(settledA.outcome, "terminated");
+		} finally {
+			if (isProcessAlive(handle.pid)) {
+				try {
+					process.kill(handle.pid, "SIGKILL");
+				} catch (_error) {
+					/* already gone */
+				}
+			}
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(a, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		fs.rmSync(b, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});

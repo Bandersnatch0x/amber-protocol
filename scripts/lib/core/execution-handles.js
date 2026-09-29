@@ -153,13 +153,19 @@ function clearExecutionHandle(record) {
 	}
 }
 
-function handleProblem(record) {
+function handleProblem(record, targetRoot) {
 	if (!record || typeof record !== "object" || Array.isArray(record))
 		return "execution handle is not an object";
 	for (const field of ["runId", "workspace", "startedAt", "target"]) {
 		if (typeof record[field] !== "string" || record[field].length === 0)
 			return `execution handle carries no ${field}`;
 	}
+	// F081 §3.2: a handle is bound to the target it was issued for, and that
+	// binding is enforced here at the SHARED read boundary so no caller can
+	// signal the pid it names. Shape/hash validity is not target validity: a
+	// handle copied into another target's store is still internally consistent.
+	if (path.resolve(record.target) !== path.resolve(targetRoot))
+		return `execution handle was issued for a different target (${record.target}); it is not valid for ${path.resolve(targetRoot)}`;
 	if (!Number.isInteger(record.pid) || record.pid < 1) return "execution handle carries no pid";
 	if (!Number.isInteger(record.fence) || record.fence < 1)
 		return "execution handle carries no fence";
@@ -188,7 +194,7 @@ function readExecutionHandle(targetRoot, runId) {
 	} catch (error) {
 		throw typedError(CODE_CORRUPT, `execution handle is not valid JSON: ${error.message}`);
 	}
-	const problem = handleProblem(record);
+	const problem = handleProblem(record, targetRoot);
 	if (problem !== null)
 		throw typedError(CODE_CORRUPT, `execution handle fails its closed shape: ${problem}`);
 	return {

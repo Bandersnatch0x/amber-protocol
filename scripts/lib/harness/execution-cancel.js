@@ -19,7 +19,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { statePathForCreate } = require("../state-dir-resolver");
 const {
 	canonicalHashOf,
 	decisionPinProblem,
@@ -124,7 +124,28 @@ function decisionSpentIn(fold, decision) {
 	return fold.some((event) => (event.pointers || []).includes(marker));
 }
 
-function cancellationAppendGuard(runId, decision) {
+function cancelRequestPointerPrefix(runId) {
+	return `execution-cancel-request:${safeId(runId)}#`;
+}
+
+function cancellationPointerPrefix(runId) {
+	return `execution-cancel:${safeId(runId)}#`;
+}
+
+function runCarriesCancellation(fold, runId) {
+	return fold.find((event) =>
+		(event.pointers || []).some(
+			(pointer) =>
+				pointer.startsWith(cancelRequestPointerPrefix(runId)) ||
+				pointer.startsWith(cancellationPointerPrefix(runId)),
+		),
+	);
+}
+
+// The SPEND guard runs in-lock for the `execution.cancel.requested` append: the
+// authorization is consumed (and the request recorded) BEFORE any signal, so a
+// reused Decision or a second cancellation is refused without an effect.
+function cancellationSpendGuard(runId, decision) {
 	return (fold) => {
 		if (decisionSpentIn(fold, decision))
 			return {
@@ -135,12 +156,43 @@ function cancellationAppendGuard(runId, decision) {
 					`decision ${decision.identity}@${decision.revision} is already spent; a cancellation authorization is single-use`,
 				],
 			};
-		const already = fold.find(
-			(event) =>
-				event.kind === "execution.cancelled" &&
-				(event.pointers || []).some((pointer) =>
-					pointer.startsWith(`execution-cancel:${safeId(runId)}#`),
-				),
+		const already = runCarriesCancellation(fold, runId);
+		if (already)
+			return {
+				ok: false,
+				code: CODE_CONFLICT,
+				record: null,
+				errors: [
+					`run ${JSON.stringify(runId)} already carries a recorded cancellation (${already.at}); one cancellation per attempt`,
+				],
+			};
+		return null;
+	};
+}
+
+// The settlement guard runs in-lock for the `execution.cancelled` append: a
+// settlement can never precede its recorded request, and one attempt settles at
+// most once.
+function cancellationSettlementGuard(runId) {
+	return (fold) => {
+		const requested = fold.find((event) =>
+			(event.pointers || []).some((pointer) =>
+				pointer.startsWith(cancelRequestPointerPrefix(runId)),
+			),
+		);
+		if (!requested)
+			return {
+				ok: false,
+				code: CODE_CONFLICT,
+				record: null,
+				errors: [
+					`no recorded cancellation request for run ${JSON.stringify(runId)}; a settlement cannot precede its authorization`,
+				],
+			};
+		const already = fold.find((event) =>
+			(event.pointers || []).some((pointer) =>
+				pointer.startsWith(cancellationPointerPrefix(runId)),
+			),
 		);
 		if (already)
 			return {
@@ -178,8 +230,43 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 
 	// Step 2: the cancellation's OWN human Decision (never the execution's).
 	const decision = resolveCancellationDecision(targetRoot, pin);
+	const decisionPointer = cancellationDecisionPointer(decision);
 
-	// Step 3: observe BEFORE signalling. A pid that is already gone is a stale
+	// Step 3: SPEND the authorization BEFORE any effect (F081 §3.3). The
+	// `execution.cancel.requested` append is the in-lock spend point, so a
+	// reused Decision — or a second cancellation — is refused HERE, before the
+	// pid is signalled, instead of after the process is already dead.
+	const requestPointer = `${cancelRequestPointerPrefix(runId)}${canonicalHashOf({
+		runId,
+		at,
+		handle: handle.snapshotHash,
+		decision: decisionPointer,
+	})}`;
+	const request = emitHarnessEvent(
+		targetRoot,
+		{
+			kind: "execution.cancel.requested",
+			schemaVersion: SCHEMA_VERSION,
+			at,
+			runId,
+			actor: decision.principal,
+			inputHash: handle.snapshotHash,
+			reason: `governed execution cancellation requested (pid ${handle.pid}); ${reason}`.slice(
+				0,
+				2000,
+			),
+			pointers: [requestPointer, decisionPointer],
+		},
+		cancellationSpendGuard(runId, decision),
+	);
+	if (!request || request.ok !== true) {
+		throw typedError(
+			(request && request.code) || CODE_CONFLICT,
+			(request && request.errors && request.errors[0]) || "cancellation refused",
+		);
+	}
+
+	// Step 4: observe BEFORE signalling. A pid that is already gone is a stale
 	// handle — a cancellation can never claim a kill it did not perform.
 	const aliveBefore = isProcessAlive(handle.pid);
 	let outcome;
@@ -214,6 +301,7 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 		outcome,
 		handleCleared,
 		decision,
+		requestPointer,
 		reason,
 		at,
 	};
@@ -234,7 +322,7 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 	});
 
 	const pointers = [
-		`execution-cancel:${safeId(runId)}#${record.snapshotHash}`,
+		`${cancellationPointerPrefix(runId)}${record.snapshotHash}`,
 		cancellationDecisionPointer(decision),
 	];
 	let appended;
@@ -255,7 +343,7 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 					),
 				pointers,
 			},
-			cancellationAppendGuard(runId, decision),
+			cancellationSettlementGuard(runId),
 		);
 	} catch (error) {
 		fs.rmSync(file, { force: true });

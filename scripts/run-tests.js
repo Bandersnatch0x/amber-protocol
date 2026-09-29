@@ -60,26 +60,34 @@ function listRootSessions() {
 }
 const sessionsBefore = new Set(listRootSessions());
 
-// Temp sweep: suites that build fixtures with raw fs.mkdtempSync instead of
-// harness.js trackTempDir leave amber-* trees in os.tmpdir() forever — the
-// child process's exit hook only sees dirs handed out through the helper.
-// Diff the Temp listing across the run and remove amber-* dirs that appeared
-// during it. (2026-09: ~150k leaked dirs/week ate the whole system drive.)
-// ponytail: ceiling — a second concurrent npm test could sweep the first's
-// in-flight fixtures; and Ctrl+C before this line leaves the run's dirs.
-// Prefer new fixtures via harness.js trackTempDir, which needs neither.
-function listTempFixtures() {
+// Temp sweep, scoped to a RUN-OWNED root. Suites that build fixtures with raw
+// fs.mkdtempSync instead of harness.js trackTempDir leave amber-* trees in
+// Temp forever (2026-09: ~150k leaked dirs/week ate the whole system drive),
+// but a runner that deletes every amber-* directory that merely APPEARED
+// during the run also deletes a concurrent session's in-flight fixtures:
+// appearing is not ownership. TMPDIR/TEMP/TMP are re-pointed at this directory
+// for the child, so every os.tmpdir() fixture the run creates lands inside it
+// and the post-run sweep can only ever remove directories this run created.
+// Prefer new fixtures via harness.js trackTempDir, which needs no sweep at all.
+const RUN_TEMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-run-"));
+function listRunTempFixtures() {
 	let entries;
 	try {
-		entries = fs.readdirSync(os.tmpdir(), { withFileTypes: true });
+		entries = fs.readdirSync(RUN_TEMP_ROOT, { withFileTypes: true });
 	} catch {
 		return [];
 	}
 	return entries
 		.filter((e) => e.isDirectory() && e.name.startsWith("amber-"))
-		.map((e) => path.join(os.tmpdir(), e.name));
+		.map((e) => path.join(RUN_TEMP_ROOT, e.name));
 }
-const fixturesBefore = new Set(listTempFixtures());
+function removeRunTempRoot() {
+	try {
+		fs.rmSync(RUN_TEMP_ROOT, { recursive: true, force: true, maxRetries: 3 });
+	} catch {
+		// ponytail: best-effort — a locked fixture must never mask a test result.
+	}
+}
 
 // Relative paths keep the command line inside the Windows 32K limit even
 // from a deep worktree root (325 absolute paths overflow it: ENAMETOOLONG).
@@ -92,25 +100,27 @@ const result = spawnSync(
 	{
 		stdio: "inherit",
 		cwd: ROOT,
+		// One run-owned Temp root: every os.tmpdir() fixture the suites create
+		// lands inside it, which is what makes the sweep below ownership-safe.
+		env: {
+			...process.env,
+			TMPDIR: RUN_TEMP_ROOT,
+			TEMP: RUN_TEMP_ROOT,
+			TMP: RUN_TEMP_ROOT,
+		},
 	},
 );
 if (result.error) {
 	console.error(`[amber] test runner failed to launch: ${result.error.message}`);
-	// Sweep what the crashed launch already left behind before bailing out.
-	for (const p of listTempFixtures().filter((f) => !fixturesBefore.has(f))) {
-		try {
-			fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 });
-		} catch {
-			// ponytail: best-effort — a locked fixture must never mask a test result.
-		}
-	}
+	// Tear down whatever the crashed launch already left behind before bailing.
+	removeRunTempRoot();
 	process.exit(1);
 }
 
 // Warn-only, unlike the sessions guard: hundreds of sites still hand out raw
 // mkdtemp fixtures by design; this sweep is the safety net until they migrate
-// to harness.js trackTempDir.
-const leakedFixtures = listTempFixtures().filter((p) => !fixturesBefore.has(p));
+// to harness.js trackTempDir. It only ever descends into the run-owned root.
+const leakedFixtures = listRunTempFixtures();
 let fixturesFailed = 0;
 for (const p of leakedFixtures) {
 	try {
@@ -121,9 +131,10 @@ for (const p of leakedFixtures) {
 }
 if (leakedFixtures.length > 0) {
 	console.error(
-		`[amber] temp sweep: removed ${leakedFixtures.length - fixturesFailed}/${leakedFixtures.length} leaked amber-* fixture dir(s) from Temp.`,
+		`[amber] temp sweep: removed ${leakedFixtures.length - fixturesFailed}/${leakedFixtures.length} leaked amber-* fixture dir(s) from the run-owned Temp root.`,
 	);
 }
+removeRunTempRoot();
 
 const leaked = listRootSessions().filter((id) => !sessionsBefore.has(id));
 if (leaked.length > 0) {
