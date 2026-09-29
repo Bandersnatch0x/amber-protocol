@@ -27,6 +27,7 @@ const RESUME_CHECKPOINT_FIELDS = [
 
 const { findFeatureById } = require("./validators");
 const { codedError } = require("./error-catalog");
+const { patchObjectFields, detectIndent } = require("./json-text");
 
 const { MESSAGES } = require("./terminology");
 
@@ -864,12 +865,26 @@ function acceptPlan(target, planRelativePath, options = {}) {
 				const data = readJson(featureListPath);
 				const idx = data.features.findIndex((f) => f && f.id === featureId);
 				if (idx !== -1 && data.features[idx].status !== "accepted") {
+					const acceptedAt = localIsoDate();
 					const updatedFeatures = data.features.map((f, i) =>
-						i === idx ? { ...f, status: "accepted", updated: localIsoDate() } : f,
+						i === idx ? { ...f, status: "accepted", updated: acceptedAt } : f,
 					);
+					const intended = { ...data, features: updatedFeatures };
+					// Patch the one entry in the bytes that are already there. Serializing
+					// the whole document instead expands every array and uses 2-space
+					// indentation in a tab-indented file, turning a one-status acceptance
+					// into a 3,200-line diff and failing `npm run format:check`. The
+					// helper returns null when it cannot prove the edit is faithful.
+					const raw = fs.readFileSync(featureListPath, "utf8");
+					const patched = patchObjectFields(raw, {
+						identityKey: "id",
+						identityValue: featureId,
+						fields: { status: "accepted", updated: acceptedAt },
+						expected: intended,
+					});
 					fs.writeFileSync(
 						featureListPath,
-						JSON.stringify({ ...data, features: updatedFeatures }, null, 2) + "\n",
+						`${patched ?? `${JSON.stringify(intended, null, detectIndent(raw))}\n`}`,
 					);
 					featureUpdated = true;
 				}

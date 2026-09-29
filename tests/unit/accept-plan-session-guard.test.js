@@ -99,3 +99,84 @@ test("accept without --session is unaffected by the guard", () => {
 	);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// accept rewrites feature_list.json to record the status. It must edit that entry
+// and leave every other byte alone: JSON.stringify expands every array and cannot
+// know the file's own indentation, so recording one status used to rewrite the
+// whole file — 3,200 lines in this repository — and fail `npm run format:check`.
+test("accept edits the accepted entry without reformatting feature_list.json", () => {
+	const { dir, planRel } = setup({ planFeature: "F001", sessionFeature: "F001" });
+	const file = path.join(dir, "feature_list.json");
+	// The setup plan is intentionally minimal; acceptance needs the full shape.
+	fs.writeFileSync(
+		path.join(dir, planRel),
+		[
+			"# Plan: p",
+			"",
+			"Feature: F001",
+			"User Confirmation: confirmed",
+			"",
+			"## High Level Design",
+			"- approach",
+			"",
+			"## Context manifests",
+			"- implement: docs/specs/contract.md",
+			"- review: docs/adr/0001.md",
+			"",
+			"## Vertical Slices",
+			"- [ ] slice 1",
+			"",
+			"## Resume Checkpoint",
+			"- Resume Point: ready.",
+			"- Blockers: none.",
+			"- Next Action: verify.",
+			"- Recovery Instructions: reopen the plan.",
+			"",
+			"## Acceptance Criteria",
+			"- Guardrails: no new execution authority; the phase boundary is unchanged.",
+			"",
+			"## Verification",
+			"- npm test",
+			"",
+			"## Evidence Schema",
+			"- Command: npm test",
+			"- Result: pass",
+			"- Date: 2026-09-29",
+			"",
+		].join("\n"),
+	);
+	// Context manifest entries must resolve inside the target repository.
+	fs.mkdirSync(path.join(dir, "docs", "specs"), { recursive: true });
+	fs.mkdirSync(path.join(dir, "docs", "adr"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "docs", "specs", "contract.md"), "# contract\n");
+	fs.writeFileSync(path.join(dir, "docs", "adr", "0001.md"), "# adr\n");
+	// The authored layout: tabs, short arrays inline, one feature per line.
+	const authored = [
+		"{",
+		'\t"features": [',
+		'\t\t{ "id": "F001", "title": "one", "status": "passing", "verification": ["x"], "evidence": ["npm test: green"], "notes": ["a", "b"] },',
+		'\t\t{ "id": "F002", "title": "two", "status": "passing", "verification": ["y"], "evidence": ["npm test: green"] }',
+		"\t]",
+		"}",
+		"",
+	].join("\n");
+	fs.writeFileSync(file, authored);
+
+	const { result } = dispatch("accept", { target: dir, plan: planRel });
+	assert.equal(result.accepted, true, (result.errors || []).join("; "));
+
+	const after = fs.readFileSync(file, "utf8");
+	assert.match(after, /"status": "accepted"/, "the status is recorded");
+	assert.match(
+		after,
+		/"id": "F002", "title": "two", "status": "passing", "verification": \["y"\]/,
+		"an unrelated entry keeps its single-line, inline-array layout",
+	);
+	assert.match(after, /"notes": \["a", "b"\]/, "a short array is not expanded");
+	assert.equal(
+		after.split("\n").length,
+		authored.split("\n").length,
+		"the document keeps its shape",
+	);
+	fs.rmSync(dir, { recursive: true, force: true });
+});

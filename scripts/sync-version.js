@@ -15,68 +15,32 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { patchValuesByKey, detectIndent } = require("./lib/core/json-text");
+
 const TARGETS = [
 	".claude-plugin/plugin.json",
 	".claude-plugin/settings.json",
 	".codex-plugin/plugin.json",
 ];
 
+// Rewrite only the values that changed, in the bytes that are already there.
+// Re-serializing the whole document instead normalizes its formatting:
+// `JSON.stringify` expands every array, while prettier keeps a short one inline,
+// so a version bump rewrote `"skills": ["./skills/"]` across three lines and
+// `npm run format:check` rejected .claude-plugin/plugin.json — on the release
+// commit itself. `syncReadme` already patches its version badge textually for the
+// same reason: never rewrite more than the value you came to change. The patch
+// returns null rather than guess; formatting drift is a lint failure, a wrong
+// version is a release failure, so the fallback is a full serialization.
 function syncJson(root, rel, update) {
 	const abs = path.join(root, rel);
 	if (!fs.existsSync(abs)) return false;
 	const text = fs.readFileSync(abs, "utf8");
-	const indent = text.match(/\n([\t ]+)"/)?.[1] || "\t";
 	const draft = JSON.parse(text);
 	if (!update(draft)) return false;
-	fs.writeFileSync(abs, patchJsonText(text, draft, indent));
+	const patched = patchValuesByKey(text, draft);
+	fs.writeFileSync(abs, patched ?? `${JSON.stringify(draft, null, detectIndent(text))}\n`);
 	return true;
-}
-
-// Collect the scalar values that differ between the committed document and the
-// updated one, keyed by their JSON key name (the unit a textual patch can
-// address without knowing the path).
-function changedScalars(before, after, acc = new Map()) {
-	if (Array.isArray(before) && Array.isArray(after)) {
-		after.forEach((value, index) => changedScalars(before[index], value, acc));
-		return acc;
-	}
-	if (before && after && typeof before === "object" && typeof after === "object") {
-		for (const key of Object.keys(after)) {
-			const previous = before[key];
-			const next = after[key];
-			if (next && typeof next === "object") changedScalars(previous, next, acc);
-			else if (previous !== next) acc.set(key, { from: previous, to: next });
-		}
-	}
-	return acc;
-}
-
-// Apply an updated document by rewriting ONLY the values that changed, in the
-// bytes that are already there. Re-serializing the whole document instead
-// normalizes its formatting: `JSON.stringify` expands every array, while
-// prettier keeps a short one inline, so a version bump rewrote
-// `"skills": ["./skills/"]` across three lines and `npm run format:check`
-// rejected .claude-plugin/plugin.json — on the release commit itself.
-// `syncReadme` already patches its version badge textually for the same reason:
-// never rewrite more than the value you came to change.
-function patchJsonText(text, draft, indent) {
-	const before = JSON.parse(text);
-	let patched = text;
-	for (const [key, { from, to }] of changedScalars(before, draft)) {
-		const escape = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const re = new RegExp(`("${escape(key)}"\\s*:\\s*)${escape(JSON.stringify(from))}`, "g");
-		patched = patched.replace(re, (_match, prefix) => prefix + JSON.stringify(to));
-	}
-	// Fail-safe: if the byte-level patch did not reproduce the intended document
-	// (an unexpected shape, or a duplicate key holding a different value), fall
-	// back to a full re-serialization. Formatting drift is a lint failure; a
-	// wrong version is a release failure.
-	try {
-		if (JSON.stringify(JSON.parse(patched)) === JSON.stringify(draft)) return patched;
-	} catch {
-		/* fall through to the re-serialized document */
-	}
-	return `${JSON.stringify(draft, null, indent)}\n`;
 }
 
 function syncPackageLock(root, version) {
