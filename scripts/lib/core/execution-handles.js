@@ -80,24 +80,51 @@ function pidIsZombie(pid) {
 
 /**
  * The kernel's identity for a running process, or null when the platform cannot
- * provide one. Linux exposes a start time (the 22nd field of /proc/<pid>/stat, in
- * clock ticks since boot) that no other process can carry: a recycled pid belongs
- * to a process with a different start time. Comparing it is how this seam knows
- * the pid it is about to signal is still OURS.
+ * provide one. A recycled pid belongs to a process with a different identity, and
+ * comparing it is how this seam knows the pid it is about to signal is still OURS.
+ *
+ *   - Linux: the process start time (the 22nd field of /proc/<pid>/stat, in clock
+ *     ticks since boot) — a plain file read.
+ *   - macOS: `ps -o lstart=` — locale-formatted, but stable within a run. Implemented;
+ *     not exercised by this session's test runs (no macOS host).
+ *   - Windows: deliberately unimplemented — see the note at the end of the function.
+ *
+ * Any other platform returns null, and the caller must read "no identity" as
+ * "cannot falsify ownership" — a residual, never a guess.
  */
 function processIdentity(pid) {
-	if (process.platform !== "linux" || !Number.isInteger(pid) || pid < 1) return null;
-	try {
-		const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
-		const fields = stat
-			.slice(stat.lastIndexOf(")") + 2)
-			.trim()
-			.split(/\s+/);
-		// Field 3 (state) is fields[0], so starttime (field 22) is fields[19].
-		return fields[19] ?? null;
-	} catch {
-		return null;
+	if (!Number.isInteger(pid) || pid < 1) return null;
+	if (process.platform === "linux") {
+		try {
+			const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+			const fields = stat
+				.slice(stat.lastIndexOf(")") + 2)
+				.trim()
+				.split(/\s+/);
+			// Field 3 (state) is fields[0], so starttime (field 22) is fields[19].
+			return fields[19] ?? null;
+		} catch {
+			return null;
+		}
 	}
+	if (process.platform === "darwin") {
+		try {
+			const started = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "ignore"],
+			}).trim();
+			return started.length === 0 ? null : started;
+		} catch {
+			return null;
+		}
+	}
+	// Windows is deliberately NOT probed. Its only identity primitive is a process
+	// spawn (Get-Process via PowerShell), and measuring it here showed ~1-3s per call —
+	// which turned this suite from 37s into 100s for a check that matters only when a
+	// pid was recycled between two reads. `tasklist` carries no start time and `wmic` is
+	// gone from current Windows. So on Windows the recorded pid is signalled after the
+	// liveness, zombie and ownership-shape checks, and that gap is a stated residual.
+	return null;
 }
 
 /**
@@ -269,9 +296,12 @@ function readExecutionHandle(targetRoot, runId) {
 	return {
 		...record,
 		file,
-		// A live pid is not enough: a recycled pid means the recorded process is
-		// gone and an unrelated one holds its number, so the handle is stale.
-		status: isProcessAlive(record.pid) && pidStillOwned(record) ? "live" : "stale",
+		// Observed liveness only. This verdict is read in polling loops (a readiness
+		// wait, a handle listing), so it must stay cheap; identity verification is
+		// reserved for the decision that SIGNALS, in `pidStillOwned`. The residual is
+		// stated: a recycled pid reads `live` here, and only the cancellation path
+		// refuses to act on it.
+		status: isProcessAlive(record.pid) ? "live" : "stale",
 	};
 }
 

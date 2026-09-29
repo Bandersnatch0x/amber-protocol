@@ -67,7 +67,11 @@ start time where the platform exposes one (Linux `/proc/<pid>/stat`), and a pid 
 identity no longer matches is never signalled (`already-exited`, `signalResult.reason:
 "pid-reused"`). The residual, stated plainly: a platform that cannot name a process identity
 cannot falsify ownership, so there the recorded pid is signalled as before — the handle's
-fence and lease name the owner, but they are not a process identity.
+fence and lease name the owner, but they are not a process identity. One more limit,
+learned by testing: the seam observes the RECORDED pid, not the tree. `shell: true` means
+that pid is the shell, so a group member that ignores `SIGTERM` can outlive the handle —
+the group signal makes the common case whole, while the outcome is decided on the recorded
+pid alone.
 5. writes one immutable cancellation record and one `execution.cancel.requested` +
    `execution.cancelled` event pair on the existing Harness ledger.
 

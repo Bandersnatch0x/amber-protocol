@@ -38,6 +38,39 @@ const {
 const RUN_ID = "run-cancel-1";
 const SLEEP_COMMAND = `node -e "setTimeout(()=>{},60000)"`;
 
+// Stop a whole process tree. The cancellation seam refuses to signal a pid it cannot
+// prove is ours, so a test that deliberately breaks that ownership must clean up after
+// itself — and a bare `kill` of the shell leaves the grandchild holding the workspace.
+function killTree(pid) {
+	try {
+		if (process.platform === "win32") {
+			execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+			return;
+		}
+		try {
+			process.kill(-pid, "SIGKILL");
+		} catch (_error) {
+			process.kill(pid, "SIGKILL");
+		}
+	} catch (_error) {
+		/* already gone */
+	}
+}
+
+// Windows releases directory handles a moment after the tree is killed, and rmSync's
+// own retries are too short for a git child that was still finishing.
+function removeTree(dir) {
+	for (let attempt = 0; attempt < 20; attempt += 1) {
+		try {
+			fs.rmSync(dir, { recursive: true, force: true });
+			return;
+		} catch (error) {
+			if (attempt === 19) throw error;
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+		}
+	}
+}
+
 function tmpTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cancel-${label}-`));
 }
@@ -135,7 +168,9 @@ async function startRunning(
 	return { promise, handle };
 }
 
-test("the closed cancellation outcome vocabulary is exactly what was observed", () => {
+// This asserts the closed vocabulary itself; the OBSERVED classification is asserted
+// exhaustively in the classifyOutcome test below.
+test("the cancellation outcome vocabulary is the closed three-value set", () => {
 	assert.deepEqual([...OUTCOMES], ["terminated", "already-exited", "unknown"]);
 });
 
@@ -273,7 +308,7 @@ test("classifyOutcome never reports a kill the seam did not perform", () => {
 // identity (Linux start time); when the live pid carries a different identity the
 // seam sends nothing and records what it observed.
 test("a handle whose pid now belongs to another process is never signalled", async () => {
-	if (process.platform !== "linux") return; // the identity comes from /proc
+	if (process.platform !== "linux") return; // identity is read from /proc (see the seam)
 	const target = gitTarget("pid-reuse", allowRules(SLEEP_COMMAND));
 	try {
 		decisionFixture(target);
@@ -306,6 +341,109 @@ test("a handle whose pid now belongs to another process is never signalled", asy
 				"nothing was sent to the process holding that pid",
 			);
 			assert.ok(fs.existsSync(cancelled.cancellationFile), "the observation is still recorded");
+		} finally {
+			// The seam will not touch this pid (its identity says it is not ours), so the
+			// tree is stopped directly.
+			if (isProcessAlive(handle.pid)) killTree(handle.pid);
+			await promise.catch(() => {});
+		}
+	} finally {
+		removeTree(target);
+	}
+});
+
+// §3's `unknown` for a FIRST attempt: the pid was alive, the signal was delivered,
+// and it did not exit within the bound — reported as unknown, never as success.
+//
+// The child ignores SIGTERM, so it survives the group signal the seam sends. It is
+// spawned directly (no shell), so the recorded pid IS the process that ignores it.
+// POSIX only: Windows stops a tree with taskkill /F, so no survivor can be built
+// there and the branch is unreachable by design.
+test("a signal that is delivered but survives the bound records unknown", async () => {
+	if (process.platform === "win32") return;
+	const target = gitTarget("survives-bound", allowRules(SLEEP_COMMAND));
+	const survivor = spawn(
+		process.execPath,
+		["-e", "process.on('SIGTERM',()=>{});console.log('ready');setTimeout(()=>{},30000)"],
+		{ detached: true, stdio: ["ignore", "pipe", "ignore"] },
+	);
+	// Wait for the child to announce readiness: its SIGTERM handler must already be
+	// INSTALLED, or the default disposition kills it and the branch under test is
+	// never reached.
+	await new Promise((resolve) => {
+		let seen = "";
+		survivor.stdout.on("data", (chunk) => {
+			seen += String(chunk);
+			if (seen.includes("ready")) resolve();
+		});
+	});
+	try {
+		decisionFixture(target);
+		persistExecutionHandle({
+			targetRoot: target,
+			runId: RUN_ID,
+			attemptId: null,
+			label: "cancel-run",
+			commandId: "allow-cancel",
+			workspace: target,
+			pid: survivor.pid,
+			startedAt: new Date().toISOString(),
+		});
+		const cancelled = await cancelExecution(target, {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "the process ignores SIGTERM",
+		});
+		assert.equal(cancelled.signalResult.signalled, true, "the signal was delivered");
+		assert.equal(cancelled.outcome, "unknown", "a survivor is never a kill");
+		assert.equal(isProcessAlive(survivor.pid), true, "the process is still running");
+	} finally {
+		if (isProcessAlive(survivor.pid)) killTree(survivor.pid);
+		removeTree(target);
+	}
+});
+
+// The spec's "with no surviving evidence ... records unknown, never a claimed
+// termination": once a cancellation has spent its authorization and could not
+// settle, the retry finishes from whatever survived. Here the attempt had already
+// cleared its own handle, so nothing survived.
+test("a resume with no surviving handle or record records unknown", async () => {
+	const target = gitTarget("resume-none", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		const { promise, handle } = await startRunning(target);
+		try {
+			// Block the record write: a FILE where the cancellations directory belongs. The
+			// first cancel still SPENDS its Decision (the request is appended before the
+			// signal) and then fails to settle — the recoverable state the spec describes.
+			const blocked = path.join(target, ".amber", "harness", "executions", "cancellations");
+			fs.mkdirSync(path.dirname(blocked), { recursive: true });
+			fs.writeFileSync(blocked, "blocked", "utf8");
+			await assert.rejects(
+				() =>
+					cancelExecution(target, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "first attempt; the record write will fail",
+					}),
+				() => true,
+			);
+			fs.rmSync(blocked, { force: true });
+			// The attempt settles on its own and its `finally` clears the handle.
+			await promise.catch(() => {});
+			assert.equal(fs.existsSync(handle.file), false, "no handle survives the attempt");
+
+			const resumed = await cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "finish the settlement with the same Decision",
+			});
+			assert.equal(resumed.resumed, true, "this settles a consumed request");
+			assert.equal(resumed.cancellation.observation, "none");
+			assert.equal(resumed.outcome, "unknown", "no surviving evidence is never a kill");
+			assert.equal(resumed.aliveBefore, null);
+			assert.equal(resumed.signalResult.signalled, false);
 		} finally {
 			if (isProcessAlive(handle.pid)) {
 				try {
