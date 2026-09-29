@@ -58,6 +58,16 @@ means *no handle*, which cancellation reports as such.
      the bound;
    - `unknown` — the pid was alive, the signal was delivered, and it did not exit within
      the bound (never reported as success);
+
+`terminated` is therefore claimed only when BOTH hold: the signal was delivered and the pid
+is observed gone. When the signal was not delivered and the pid is gone anyway, the process
+exited on its own — that is `already-exited`, never a kill the seam did not perform. The
+seam also verifies the pid is still OURS before signalling: the handle records the process
+start time where the platform exposes one (Linux `/proc/<pid>/stat`), and a pid whose
+identity no longer matches is never signalled (`already-exited`, `signalResult.reason:
+"pid-reused"`). The residual, stated plainly: a platform that cannot name a process identity
+cannot falsify ownership, so there the recorded pid is signalled as before — the handle's
+fence and lease name the owner, but they are not a process identity.
 5. writes one immutable cancellation record and one `execution.cancel.requested` +
    `execution.cancelled` event pair on the existing Harness ledger.
 
@@ -66,14 +76,24 @@ rewrites the run's terminal result, and **never** claims a kill it did not obser
 
 ### 4. Race-safe settlement
 
-Cancellation and natural settlement both target one terminal fact:
+One cancellation per attempt, and the attempt's own terminal fact stays the natural one:
 
-- whichever appends the terminal settlement first wins;
-- the loser observes the settled state and reports `already-settled` with the recorded
-  outcome instead of writing a second terminal fact;
-- the natural path records a signalled exit as a *cancelled* attempt
-  (`execution.failed` with a `cancelled: true` marker and the observed signal), so a
-  cancelled attempt is never readable as an ordinary failure.
+- the cancellation writes its own immutable record and the `execution.cancel*` pair; it never
+  writes the run's terminal result and never appends a second terminal fact;
+- a cancellation that arrives after the attempt settled refuses —
+  `AMBER_E_HARNESS_EXEC_NO_HANDLE` when the handle is gone, or the conflict refusal when a
+  record already exists — and that refusal names the **recorded outcome**: the outcome the
+  settlement event cites on the chain, so an edited record is reported as unconfirmed
+  instead of being read back as "the outcome";
+- two racing cancellations settle once: the loser refuses, and a racing loser never removes
+  the winner's record;
+- the natural path records a signalled exit as a *cancelled* attempt: `execution.failed`
+  carries `cancelled: true` together with the observed `signal` and the `execution-cancel*`
+  pointer it was attributed from, so a cancelled attempt is never readable as an ordinary
+  failure. Attribution is deterministic: it comes from the cancellation REQUEST, which is
+  appended BEFORE the signal, not from the settlement record, which is only written after the
+  process is observed dead — waiting for that record would make the marker depend on which
+  of two racing writers finished first.
 
 ### 5. Restart reconciliation
 
@@ -174,8 +194,9 @@ stale handles with the observed liveness, and `cancel` on a stale handle records
   `close`: a cancelled process tree can keep a stdio pipe open indefinitely, and settlement
   must not depend on a survivor releasing it.
 - `shell: true` is preserved (the historical command semantics), so the recorded pid is the
-  shell's; the whole tree is signalled, and the outcome is still decided by observed
-  liveness, never by the signal's return.
+  shell's and the whole tree is signalled. The outcome is decided by observed liveness
+  TOGETHER WITH whether the signal was delivered (§3): a kill is claimed only when both hold,
+  so a process that exited on its own is `already-exited`, not a kill.
 
 ## Out of Scope
 

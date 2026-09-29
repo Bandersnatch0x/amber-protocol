@@ -86,5 +86,9 @@ one persisted handle per running governed command.
 ## Evidence Schema
 
 - Command: node --test tests/unit/harness-execution-cancel.test.js; npm test
-- Result: pass (17/17 cancellation cases; full suite 3873 pass, 0 fail, 4 skipped)
+- Result: pass (25/25 cancellation cases; full suite 3892 pass, 0 fail, 4 skipped) — re-run
+  after the round-7 independent review, which found the earlier "17/17 / 3873" figures stale
+  and three contract defects; the fixes (F2 outcome classification, F3 process identity,
+  §4.2 recorded outcome in the refusal, §4.3 cancelled marker, F4 json-text duplicate-key
+  refusal, F5 atomic record write) are covered by the cases the count now includes.
 - Date: 2026-09-29
