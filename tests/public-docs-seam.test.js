@@ -402,7 +402,11 @@ test("Scenario 1 continuity assertions pass on a conforming workflow + landing",
 			landingPath: fx.landingPath,
 			boundariesPath: READER_SCENARIO_BOUNDARIES,
 		});
-		assert.deepEqual(errors, [], `expected clean scenario, got: ${errors.join("; ")}`);
+		// The root test job has no built site, and Scenario 2 reads the BUILT search
+		// index (the docs CI job builds it). Only Scenario 1's own errors are in
+		// scope for a fixture that injects Scenario 1's paths.
+		const scenario1 = errors.filter((error) => /Scenario 1/.test(error));
+		assert.deepEqual(scenario1, [], `expected a clean Scenario 1, got: ${scenario1.join("; ")}`);
 	} finally {
 		fs.rmSync(fx.dir, { recursive: true, force: true });
 	}
