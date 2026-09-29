@@ -29,11 +29,12 @@
 
 <p align="center">
   For repositories already using coding agents in real delivery work.<br />
-  Plans, evidence, decisions, and handoffs stay inspectable beside the code.<br />
-  <b>Status:</b> Stable · <a href="./ROADMAP.md">Milestones & test status →</a>
+  Plans, evidence, decisions, and handoffs stay inspectable beside the code.
 </p>
 
 </div>
+
+**Version:** 2.0.0 · **Status:** Stable · [Milestones & test status →](./ROADMAP.md)
 
 ---
 
@@ -134,6 +135,28 @@ npm install
 node scripts/amber.js --version
 ```
 
+## Upgrading to 2.0.0
+
+2.0.0 is a **breaking release**: three command families that shipped in 1.6.0 — and were
+already marked deprecated in its help text — are now removed. Nothing else changed shape:
+plans, sessions, gates, approvals, evidence, and handoffs keep their contracts.
+
+| Removed in 2.0.0                                                                            | What to use instead                                                           |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `amber agent dispatch\|review\|status`                                                      | `amber harness` (the Contract → Run → Event spine); `amber governance report` |
+| `amber team inspect\|install\|pin\|update\|rollback`                                        | `amber maintenance` (scaffold drift, artifact drift); `amber doctor`          |
+| `amber adoption report\|list\|index\|validate\|compare\|gate\|status\|bundle\|next-actions` | `amber governance report`; the `amber-diagnosis-adoption` journey skill       |
+
+The disposition is recorded, not implied — the removed surfaces and their replacement routes
+stay readable from the tool itself:
+
+```bash
+amber harness legacy --target .    # every removed surface with its replacement route
+```
+
+If you pin `^1.6.0`, a `npm update` will not cross into 2.0.0 — that range deliberately stops
+short of the break. Move to `^2.0.0` once you are off the removed commands.
+
 ## Quick Start (about 10 minutes)
 
 Use one real task to test whether Amber creates Trusted Continuation. File generation alone is not activation.
@@ -157,14 +180,60 @@ Now open a fresh agent session or ask another maintainer to inspect the reposito
 
 `init` and `wiki` never overwrite existing files. Default help exposes seven fallback verbs: `audit`, `init`, `doctor`, `next`, `plan`, `handoff`, and `session`. `amber --all` keeps the expert and compatibility surface available. See the [CLI reference](./docs/CLI_REFERENCE.md).
 
-Expert path (not the homepage main line): read-only continuous-improvement discovery via `amber loop recommend` (see `amber --all`):
+Expert path (not the homepage main line): read-only continuous-improvement discovery via `amber loop recommend` — see the loop sections under "What It Won't Do" below.
+
+---
+
+## Command surface
+
+Default `amber --help` projects **seven primary verbs** — the whole journey fits in them:
+
+| Verb            | What it does                                                    |
+| --------------- | --------------------------------------------------------------- |
+| `amber audit`   | Read-only readiness inspection of a repository                  |
+| `amber init`    | Install the minimum repository-local surface (never overwrites) |
+| `amber doctor`  | Validate the Amber setup                                        |
+| `amber next`    | Deterministic route advice for a stated objective               |
+| `amber plan`    | Scaffold a feature plan                                         |
+| `amber handoff` | Produce the portable continuation bundle                        |
+| `amber session` | Inspect or manage the session lifecycle                         |
+
+Everything else is governance and platform surface, deliberately one flag away in
+`amber --all`:
+
+- **Context and knowledge** — `wiki`, `context request|ingest|verify|refresh|stats`, `memory`, `knowledge`
+- **Governed records** — `artifact`, `principal`, `evidence`, `approval`, `gate`, `policy`
+- **Control and assurance** — `projection`, `adapter`, `maintain`, `retention`, `external`, `breakglass`, `eval run`
+- **Delivery and reporting** — `sync session`, `governance report`, `loop recommend`, `learnings`, `break-loop`, `harness`
+
+Hiding a family from the default help changes discovery, never capability: every family is
+documented in the [CLI reference](./docs/CLI_REFERENCE.md), and `amber <family> --help` is
+authoritative for its flags.
+
+## Using it in DeepSeek Harness
+
+The overlay ships as a native [`dsh-plugin`](https://github.com/topics/dsh-plugin) bundle:
 
 ```bash
-amber loop recommend --target . --goal "continuous improvement" --json
-amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
+# Install once; dsh adds the Amber bundle layer to the profile
+dsh plugin --profile web add dsh-amber-protocol
+
+# Afterwards a normal start loads Amber (no repeated --patch)
+dsh --profile web
 ```
 
-`loop run` requires `--dry-run`; live scheduling stays out of product scope.
+On Windows the default port `3080` is often reserved; add `--port 13080` if the listener fails.
+
+**Unpublished-checkout fallback:** if you are developing Amber itself and the bundle is not
+published yet, use an overlay patch instead. Edit `dsh/amber-full.patch.yml`, replace
+`/path/to/amber-protocol` with this repository's path, and layer it at startup without touching
+the profile:
+
+```bash
+dsh --profile web --patch /path/to/amber-protocol/dsh/amber-full.patch.yml
+```
+
+Full notes: [dsh/README.md](./dsh/README.md).
 
 ---
 
@@ -221,6 +290,19 @@ amber governance standards --target .   # honest OWASP-ASI coverage of what this
 ```
 
 For the full boundary notes, see [SPEC.md](./SPEC.md).
+
+### `amber loop recommend` — the safe continuous-improvement entry
+
+`amber loop recommend` is read-only: it scans the local workflow-packs' loop contracts, scores
+them against a maintenance goal, and prints the dry-run command best suited to human review. It
+never schedules work, executes workflow steps, dispatches agents, or writes an external system.
+
+```bash
+amber loop recommend --target . --goal "continuous improvement" --json
+amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
+```
+
+Live scheduling stays outside the product boundary: `loop run` requires `--dry-run`.
 
 ### Governed trust layer (trusted-control contracts)
 

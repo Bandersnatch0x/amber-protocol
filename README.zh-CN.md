@@ -26,13 +26,16 @@
 
 <p align="center">
   面向已经把 Coding Agent 用于真实交付的项目。<br />
-  计划、证据、决策与交接和代码一起留在仓库里。<br />
-  <b>状态：</b>稳定版 · <a href="./ROADMAP.md">里程碑与测试状态 →</a>
+  计划、证据、决策与交接和代码一起留在仓库里。
 </p>
 
 </div>
 
+**Version:** 2.0.0 · **状态：**稳定版 · [里程碑与测试状态 →](./ROADMAP.md)
+
 ---
+
+## 它是什么？
 
 Amber Protocol 是面向 **Coding-Agent-Enabled Repository** 的仓库本地治理层：这类项目已经持续使用一个或多个 Coding Agent 做真实交付，并由人类承担审查责任。难点不再只是生成代码，而是换人、换 agent 或换会话后，后继者能否仅凭仓库状态判断发生了什么、什么已获批准、证据是否足够，以及下一步是什么。
 
@@ -128,6 +131,26 @@ npm install
 node scripts/amber.js --version
 ```
 
+## 升级到 2.0.0
+
+2.0.0 是**破坏性发布**：三个在 1.6.0 里已经发布、且当时 help 文本已标记 DEPRECATED 的
+命令族被移除。除此之外契约未变——计划、session、Gate、审批、证据与交接保持原有约定。
+
+| 2.0.0 移除                                                                                  | 改用                                                                      |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `amber agent dispatch\|review\|status`                                                      | `amber harness`（Contract → Run → Event 主干）；`amber governance report` |
+| `amber team inspect\|install\|pin\|update\|rollback`                                        | `amber maintenance`（scaffold 漂移、artifact 漂移）；`amber doctor`       |
+| `amber adoption report\|list\|index\|validate\|compare\|gate\|status\|bundle\|next-actions` | `amber governance report`；`amber-diagnosis-adoption` 旅程 skill          |
+
+处置记录是明文可查的，不靠推测——被移除的表面与其替代路径都留在工具里：
+
+```bash
+amber harness legacy --target .    # 列出每个被移除表面及其替代路径
+```
+
+若你锁的是 `^1.6.0`，`npm update` 不会跨入 2.0.0——该范围有意止步于破坏点。离开那些已移除命令后，
+再升到 `^2.0.0`。
+
 ## 快速开始（约 10 分钟）
 
 用一项真实工作验证 Amber 是否产生可信续接；只生成文件不算激活。
@@ -151,6 +174,30 @@ amber handoff --target my-project
 
 `init` 和 `wiki` 永不覆盖已有文件。默认帮助只展示七个回退动词：`audit`、`init`、`doctor`、`next`、`plan`、`handoff`、`session`；专家与兼容表面保留在 `amber --all`。完整命令面见 [CLI 参考](./docs/CLI_REFERENCE.md)。
 
+## 命令面
+
+默认 `amber --help` 只投影**七个主命令**——整条旅程都在里面：
+
+| 命令            | 作用                                     |
+| --------------- | ---------------------------------------- |
+| `amber audit`   | 只读的仓库就绪度检查                     |
+| `amber init`    | 安装最小仓库本地表面（永不覆盖已有文件） |
+| `amber doctor`  | 校验 Amber 安装                          |
+| `amber next`    | 针对给定目标做确定性路由建议             |
+| `amber plan`    | 生成 feature 计划骨架                    |
+| `amber handoff` | 生成可移植的续接材料                     |
+| `amber session` | 查看或管理 session 生命周期              |
+
+其余都是治理与平台表面，故意只隔一个开关（`amber --all`）：
+
+- **上下文与知识** —— `wiki`、`context request|ingest|verify|refresh|stats`、`memory`、`knowledge`
+- **受治理记录** —— `artifact`、`principal`、`evidence`、`approval`、`gate`、`policy`
+- **控制与保证** —— `projection`、`adapter`、`maintain`、`retention`、`external`、`breakglass`、`eval run`
+- **交付与报告** —— `sync session`、`governance report`、`loop recommend`、`learnings`、`break-loop`、`harness`
+
+把某个族从默认帮助里隐藏，只改变可发现性，不改变能力：每个族都写在
+[CLI 参考](./docs/CLI_REFERENCE.md)里，而 `amber <族> --help` 才是其参数权威。
+
 ## 在 DeepSeek Harness 里用
 
 Amber 挂在官方 [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic 下。以原生 dsh bundle 安装，无需手动改路径：
@@ -172,19 +219,6 @@ dsh --profile web --patch /path/to/amber-protocol/dsh/amber-full.patch.yml
 ```
 
 完整说明见 [dsh/README.md](./dsh/README.md)。
-
-### `amber loop recommend` —— 安全的持续改进入口
-
-`amber loop recommend` 是只读命令：它扫描本地 workflow-pack 里的 loop contract，
-按维护目标打分，并输出最适合人工审查的 dry-run 命令。它不会调度任务、执行 workflow
-步骤、派发 agent，也不会写外部系统。
-
-```bash
-amber loop recommend --target . --goal "continuous improvement" --json
-amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
-```
-
-当前产品边界仍不支持 live scheduling；`loop run` 必须带 `--dry-run`。
 
 ## 核心概念
 
@@ -225,6 +259,36 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 
 完整边界说明见 [SPEC.md](./SPEC.md)。
 
+### 受治理的循环执行（可选、门禁）
+
+自 [ADR-0003](./docs/adr/0003-governance-gated-execution.md) 起，Amber 可以运行 loop
+contract 声明的 `governed.command`——但必须穿过四道门：声明式策略检查
+（`.amber/governance/rules.json`，deny-wins / 默认拒绝）、一次显式 `amber loop approve`
+（一次授权只批一次运行）、隔离的 git worktree（你的主检出永不作为 cwd）、以及防篡改的
+哈希链 ledger。默认 `loop run` 仍是 dry-run；执行需要 `--execute`。
+
+```bash
+amber loop approve --file <pack> --contract <id> --reviewer <name>
+amber loop run --file <pack> --contract <id> --execute
+amber loop verify-ledger --contract <id>
+amber governance standards --target .   # 诚实的 OWASP-ASI 覆盖度：做了什么、没做什么
+```
+
+完整边界见 [SPEC.md](./SPEC.md)。
+
+### `amber loop recommend` —— 安全的持续改进入口
+
+`amber loop recommend` 是只读命令：它扫描本地 workflow-pack 里的 loop contract，
+按维护目标打分，并输出最适合人工审查的 dry-run 命令。它不会调度任务、执行 workflow
+步骤、派发 agent，也不会写外部系统。
+
+```bash
+amber loop recommend --target . --goal "continuous improvement" --json
+amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
+```
+
+当前产品边界仍不支持 live scheduling；`loop run` 必须带 `--dry-run`。
+
 ### 治理信任层（trusted-control contracts）
 
 旅程表面之外，Amber 还附带一层经过合同级测试的信任层（[四份 canonical contracts](./docs/specs/)，均已交付）：
@@ -251,6 +315,16 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 | 规格与路线图                    | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                                          |
 | DeepSeek Harness（`dsh`）叠加层 | [dsh/README.md](./dsh/README.md)                                                                                                                                                           |
 | 贡献指南                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                                       |
+
+公开文档站（`apps/docs`）提供面向读者的指南、概念与单一来源的权威 CLI 参考，并带 100% 离线本地搜索：
+
+```bash
+npm run docs:build      # 构建静态文档站
+npm run docs:verify     # 运行机械验证缝
+npm run docs:gen        # 从命令注册表生成 CLI 参考页
+npm run docs:gen:check  # 校验代码与 CLI 参考文档零漂移
+npm run docs:test       # 运行公开文档测试套件
+```
 
 可选 Web Viewer（`apps/web`）是旅程感知的判断表面：显示当前 J0–J5 阶段、下一条受治理动作、活跃 session、待处理 Gate 与仓库本地证据。它只反映 Amber 状态，不创建第二套流程，也不取代 Agent/CLI 权威表面。
 
