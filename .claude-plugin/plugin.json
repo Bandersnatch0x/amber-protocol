@@ -1,9 +1,11 @@
 {
 	"name": "amber-protocol",
-	"version": "1.6.0",
+	"version": "2.0.0",
 	"description": "Amber Protocol: repository-local governance kit for coding agents — init, audit, wiki, doctor, and handoff workflows.",
 	"author": {
 		"name": "Local developer"
 	},
-	"skills": ["./skills/"]
+	"skills": [
+		"./skills/"
+	]
 }

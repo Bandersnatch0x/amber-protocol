@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber session
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v1.6.0</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.0</strong><br />
   Tier: <code>core</code> • Classification: <code>Governed Command</code>
 </div>
 
