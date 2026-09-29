@@ -19,6 +19,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # History is required: this workflow runs `npm test`, and
+          # tests/unit/policy-ledger-bytes.test.js asserts that the pre-migration
+          # provenance commit 1204602430bc2c6d8b05624039fc0702852588f7 is present.
+          # A shallow clone (the default depth 1) has no history, so the suite
+          # failed here and the publish never ran. ci.yml already uses
+          # fetch-depth: 0 for the jobs that run tests; this workflow must match.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
