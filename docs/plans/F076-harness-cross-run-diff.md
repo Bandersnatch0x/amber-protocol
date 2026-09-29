@@ -1,7 +1,7 @@
 # F076 Plan: Harness Cross-Run Diff (the H5 Replay Lineage's Comparison Across Two Runs)
 
 **Feature:** F076
-**Status:** implementation-ready (spec `docs/specs/F076-harness-cross-run-diff.md`, accepted 2026-09-24 via `issues/0124`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F076-harness-cross-run-diff.md`, accepted 2026-09-24 via `issues/0124`)
 **User Confirmation:** confirmed (「先做2,3,4」, 2026-09-24 — standing directive, 0066 close-out follow-ups 按推荐)
 **Date:** 2026-09-24
 **Decision records:** Harness v2 §7/§20/§43; F073 as the staged foundation (its spec named this ticket explicitly); F072's recursive-canonicalization precedent

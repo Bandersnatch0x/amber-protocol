@@ -1,7 +1,7 @@
 # F069 Plan: Harness H3a — Context Firewall
 
 **Feature:** F069
-**Status:** implementation-ready (spec `docs/specs/F069-harness-context-firewall.md`, accepted 2026-09-22 via `issues/0094`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F069-harness-context-firewall.md`, accepted 2026-09-22 via `issues/0094`)
 **User Confirmation:** confirmed (「按推荐」, 2026-09-22)
 **Date:** 2026-09-22
 **Decision records:** Harness v2 §4.3/§11/§32; ADR-0102 (amended 2026-09-22: runId required only for run-scoped event kinds); F065/F066/F067/F068 as the foundation

@@ -1,7 +1,7 @@
 # F070 Plan: Harness H2b — Governed-Runner Wiring
 
 **Feature:** F070
-**Status:** implementation-ready (spec `docs/specs/F070-harness-h2b-execution-wiring.md`, accepted 2026-09-23 via `issues/0100`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F070-harness-h2b-execution-wiring.md`, accepted 2026-09-23 via `issues/0100`)
 **User Confirmation:** confirmed (「继续推进v2.2」, 2026-09-23 — standing directive per map `issues/0066` 执行带入)
 **Date:** 2026-09-23
 **Decision records:** Harness v2 §13/§24/§31/§40; F068 H2a as the staged foundation; G-9 row 11 seam

@@ -1,7 +1,7 @@
 # F074 Plan: Harness H6 — Control Plane (the Aggregated Surface over the Shared Core)
 
 **Feature:** F074
-**Status:** implementation-ready (spec `docs/specs/F074-harness-h6-control-plane.md`, accepted 2026-09-24 via `issues/0120`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F074-harness-h6-control-plane.md`, accepted 2026-09-24 via `issues/0120`)
 **User Confirmation:** confirmed (「继续」, 2026-09-24 — standing directive per map `issues/0066` 执行带入)
 **Date:** 2026-09-24
 **Decision records:** Harness v2 §20/§26/§35/§44; F063 tier mechanism; F065–F073 as the landed cores

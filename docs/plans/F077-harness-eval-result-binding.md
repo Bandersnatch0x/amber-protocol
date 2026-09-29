@@ -1,7 +1,7 @@
 # F077 Plan: Harness Eval-Result Binding (the First Eval-Prefixed Pointer Producer)
 
 **Feature:** F077
-**Status:** implementation-ready (spec `docs/specs/F077-harness-eval-result-binding.md`, accepted 2026-09-24 via `issues/0126`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F077-harness-eval-result-binding.md`, accepted 2026-09-24 via `issues/0126`)
 **User Confirmation:** confirmed (「全部按推荐」, 2026-09-24 — `issues/0126`; standing directive「继续剩余项」, 0066 close-out follow-ups)
 **Date:** 2026-09-24
 **Decision records:** Harness v2 §16/§17/§26/§35; F073 (the validator this binds onto), F074 (the disclosed pointer-leg gap this closes), F058 (the eval-result artifact shape), F054 (the pin grammar), ADR-0021 (the revision reference form)

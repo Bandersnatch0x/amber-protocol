@@ -1,7 +1,7 @@
 # F079 Plan: Bounded Live Runtime Charter Amendment
 
 **Feature:** F079
-**Status:** implementation-ready (spec `docs/specs/F079-bounded-live-runtime-charter-amendment.md`; accepted via `issues/0130`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F079-bounded-live-runtime-charter-amendment.md`; accepted via `issues/0130`)
 **User Confirmation:** confirmed (「全部按推荐」, 2026-09-24)
 **Date:** 2026-09-24
 **Decision records:** proposed ADR-0103; Harness v2 §27/§36/§51/§55; Charter §7

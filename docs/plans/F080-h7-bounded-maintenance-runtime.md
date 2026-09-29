@@ -1,7 +1,7 @@
 # F080 Plan: H7 Bounded Maintenance Runtime
 
 **Feature:** F080
-**Status:** implementation-ready (accepted via `issues/0132`, 「全部按推荐」)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (accepted via `issues/0132`, 「全部按推荐」)
 **Date:** 2026-09-24
 **Decision records:** ADR-0103; Harness v2 §27/§36/§47–§49; F079
 

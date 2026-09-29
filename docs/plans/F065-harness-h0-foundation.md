@@ -1,7 +1,7 @@
 # F065 Plan: Harness H0 Foundation — Contract, Run, Event
 
 **Feature:** F065
-**Status:** implementation-ready (spec `docs/specs/F065-harness-h0-foundation.md`; user confirmation pending in `issues/0069`)
+**Status:** implemented (feature_list: accepted); originally recorded implementation-ready (spec `docs/specs/F065-harness-h0-foundation.md`; user confirmation pending in `issues/0069`)
 **User Confirmation:** pending (HITL gate `issues/0069`)
 **Date:** 2026-09-22
 **Decision records:** ADR-0100, ADR-0101, ADR-0102

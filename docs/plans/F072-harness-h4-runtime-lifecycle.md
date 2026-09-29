@@ -1,7 +1,7 @@
 # F072 Plan: Harness H4 — Runtime Lifecycle (Attempts, Checkpoints, the Unified Mapping)
 
 **Feature:** F072
-**Status:** implementation-ready (spec `docs/specs/F072-harness-h4-runtime-lifecycle.md`, accepted 2026-09-23 via `issues/0110`)
+**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F072-harness-h4-runtime-lifecycle.md`, accepted 2026-09-23 via `issues/0110`)
 **User Confirmation:** confirmed (「继续推进v2.2」, 2026-09-23 — standing directive per map `issues/0066` 执行带入)
 **Date:** 2026-09-23
 **Decision records:** Harness v2 §4.4/§6/§14/§33/§42/§49; ADR-0101 (Run nine-state machine, loop↔run adapter); F068/F070 (execution boundary + governed-runner wiring)

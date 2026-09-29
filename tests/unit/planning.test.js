@@ -207,6 +207,19 @@ test("readPlanField escapes regex metacharacters in the field name", () => {
 	assert.equal(readPlanField("Result: with [brackets]", "Result"), "with [brackets]");
 });
 
+// Plan headers are recorded in two styles. The older plans use the bold one, and a
+// gate that only read the plain style would report them as missing every field.
+test("readPlanField reads the older bold header style", () => {
+	const content = [
+		"**Feature:** F066",
+		"**Status:** implementation-ready (spec `docs/specs/F066-x.md`)",
+		"**User Confirmation:** confirmed (「按推荐」, 2026-09-22)",
+	].join("\n");
+	assert.equal(readPlanField(content, "Feature"), "F066");
+	assert.match(readPlanField(content, "Status"), /^implementation-ready/);
+	assert.match(readPlanField(content, "User Confirmation"), /^confirmed/);
+});
+
 // ---- validatePlanContent: pure gate-validation core (fs injected away) ----
 
 test("validatePlanContent accepts a fully-valid plan with a found feature", () => {

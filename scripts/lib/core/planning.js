@@ -257,8 +257,16 @@ function scaffoldPlan(target, options = {}) {
 	};
 }
 
+// Plan headers are recorded in two styles: the current plain `Status: …` and the older
+// bold `**Status:** …`. Both are read, so a plan written before the style changed stays
+// governable instead of silently failing every gate that looks for a field.
+const PLAN_FIELD_MARKER = "\\*{0,2}";
+
 function readPlanField(content, field) {
-	const pattern = new RegExp(`^${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*(.+)$`, "im");
+	const pattern = new RegExp(
+		`^${PLAN_FIELD_MARKER}${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:${PLAN_FIELD_MARKER}\\s*(.+)$`,
+		"im",
+	);
 	const match = content.match(pattern);
 	return match ? match[1].trim() : "";
 }
@@ -895,9 +903,10 @@ function acceptPlan(target, planRelativePath, options = {}) {
 		}
 	}
 
-	// Update the plan's own Status field to reflect acceptance.
+	// Update the plan's own Status field to reflect acceptance, preserving the
+	// header's own markers (`Status:` stays plain, `**Status:**` stays bold).
 	try {
-		const updatedPlan = planContent.replace(/^Status:\s*.+$/m, "Status: accepted");
+		const updatedPlan = planContent.replace(/^(\*{0,2}Status:\*{0,2}\s*).+$/m, "$1accepted");
 		if (updatedPlan !== planContent) {
 			fs.writeFileSync(planPath, updatedPlan);
 		}

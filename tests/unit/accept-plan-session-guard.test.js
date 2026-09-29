@@ -100,6 +100,79 @@ test("accept without --session is unaffected by the guard", () => {
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// The older plans record their header in the bold style. `accept` must READ it — or such
+// a plan is invisible to every gate — and rewrite that line in place with its markers.
+test("accept reads and rewrites the older bold plan header style", () => {
+	const { dir, planRel } = setup({ planFeature: "F001", sessionFeature: "F001" });
+	const planPath = path.join(dir, planRel);
+	fs.writeFileSync(
+		planPath,
+		[
+			"# Plan: p",
+			"",
+			"**Feature:** F001",
+			"**Status:** implementation-ready",
+			"**User Confirmation:** confirmed",
+			"",
+			"## High Level Design",
+			"- approach",
+			"",
+			"## Context manifests",
+			"- implement: docs/specs/contract.md",
+			"- review: docs/adr/0001.md",
+			"",
+			"## Vertical Slices",
+			"- [ ] slice 1",
+			"",
+			"## Resume Checkpoint",
+			"- Resume Point: ready.",
+			"- Blockers: none.",
+			"- Next Action: verify.",
+			"- Recovery Instructions: reopen the plan.",
+			"",
+			"## Acceptance Criteria",
+			"- Guardrails: no new execution authority.",
+			"",
+			"## Verification",
+			"- npm test",
+			"",
+			"## Evidence Schema",
+			"- Command: npm test",
+			"- Result: pass",
+			"- Date: 2026-09-29",
+			"",
+		].join("\n"),
+	);
+	fs.mkdirSync(path.join(dir, "docs", "specs"), { recursive: true });
+	fs.mkdirSync(path.join(dir, "docs", "adr"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "docs", "specs", "contract.md"), "# contract\n");
+	fs.writeFileSync(path.join(dir, "docs", "adr", "0001.md"), "# adr\n");
+	fs.writeFileSync(
+		path.join(dir, "feature_list.json"),
+		`${JSON.stringify(
+			{
+				features: [
+					{
+						id: "F001",
+						title: "one",
+						status: "passing",
+						verification: ["x"],
+						evidence: ["npm test: green"],
+					},
+				],
+			},
+			null,
+			"\t",
+		)}\n`,
+	);
+
+	const { result } = dispatch("accept", { target: dir, plan: planRel });
+	assert.equal(result.accepted, true, (result.errors || []).join("; "));
+	const after = fs.readFileSync(planPath, "utf8");
+	assert.match(after, /^\*\*Status:\*\* accepted$/m, "the bold status line is rewritten in place");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
 // accept rewrites feature_list.json to record the status. It must edit that entry
 // and leave every other byte alone: JSON.stringify expands every array and cannot
 // know the file's own indentation, so recording one status used to rewrite the
