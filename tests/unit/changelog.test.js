@@ -157,6 +157,45 @@ test("groupCommits skips release-bookkeeping commits", () => {
 	assert.ok(g.Changed.some((e) => e.includes("refresh dev tools")));
 });
 
+// Internal handles are how this repository talks to itself, and an unlinked
+// `(F081)` is not something an outside reader can follow. Pull numbers are the
+// citation the changelog convention promises — and the only one a reader can
+// resolve without repository context — so they stay.
+test("groupCommits drops internal handles and keeps pull numbers", () => {
+	const commits = [
+		{ subject: "feat(harness): own governed-execution handles (F081)", body: "" },
+		{ subject: "fix(web): re-anchor the contract (F063 #128)", body: "" },
+		{ subject: "chore: migrate live state (issues/0156, closes 0153 D1)", body: "" },
+		{ subject: "docs(adr): record the boundary (ADR-0019 D4)", body: "" },
+		{ subject: "fix(cli): keep the sentence (not a citation)", body: "" },
+		{ subject: "feat(api): new endpoint (#52)", body: "" },
+	];
+	const g = groupCommits(commits);
+	const all = [...g.Added, ...g.Fixed, ...g.Changed, ...g.Other];
+	const joined = all.join("\n");
+
+	assert.ok(
+		all.some((e) => e.includes("own governed-execution handles") && !e.includes("F081")),
+		"a spec id is dropped",
+	);
+	assert.ok(
+		all.some(
+			(e) => e.includes("re-anchor the contract") && e.includes("#128") && !e.includes("F063"),
+		),
+		"the pull number survives while the spec id goes",
+	);
+	assert.ok(!/issues\/0156/.test(joined), "an issue path is dropped");
+	assert.ok(!/ADR-0019/.test(joined), "an ADR handle is dropped");
+	assert.ok(
+		all.some((e) => e.includes("keep the sentence (not a citation)")),
+		"a parenthetical that is not a citation is left alone",
+	);
+	assert.ok(
+		all.some((e) => e.includes("new endpoint") && e.includes("#52")),
+		"a pull-number citation is unchanged",
+	);
+});
+
 test("formatReleaseSection produces Keep a Changelog style", () => {
 	const groups = {
 		Added: ["governance lifecycle"],

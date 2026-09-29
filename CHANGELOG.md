@@ -9,25 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- docs-a11y: bring the light theme to axe serious/critical = 0 (issues/0157)
-- docs-verify: implement 0020 Layer-1 rows 7 & 10 as real browser gates (issues/0063)
-- docs-verify: make 0020 Layer-1 rows 8 & 9 real mechanical gates (issues/0063)
-- governance: migrate continuous-improvement live state to .amber/ (issues/0156, closes 0153 D1)
-- governance: structured governance ledger — schema, chain-hashed jsonl, gate (issues/0155)
-- harness: own governed-execution handles and cancel truthfully (F081)
-- harness: deliver the bounded H7 maintenance runtime (F080)
-- harness: make execution terminate an explicit refusal (F078)
-- harness: bind canonical eval results to validation receipts (F077)
-- harness: land §52 legacy dispositions + H5-lineage cross-run diff (F075, F076)
-- harness: land H6 control plane — five read-only subverbs over the shared core (F074)
-- harness: land H5 eval & replay — ValidationReceipt, drift detection, regression proposals (F073)
-- harness: land H4 runtime lifecycle — first-class attempts, run-scoped checkpoints, the unified lifecycle view (F072)
-- harness: wire the firewall verdict into the real context load — grants cited, denials excluded (F071 H3b)
-- harness: land H2b governed-runner wiring — prepared workspaces, per-mutation observation, growing fold (F070)
-- harness: land H3a context grants, the deterministic report-first firewall check, and context events (F069)
-- harness: land H2a execution contracts, boundary adapters, and comparable three-boundary records (F068)
-- harness: land H1 tool declarations, report-only checks, and run tool snapshots (F067)
-- harness: admit runs from real loop approvals and bind real outcomes (F066)
+- docs-a11y: bring the light theme to axe serious/critical = 0
+- docs-verify: implement 0020 Layer-1 rows 7 & 10 as real browser gates
+- docs-verify: make 0020 Layer-1 rows 8 & 9 real mechanical gates
+- governance: migrate continuous-improvement live state to .amber/
+- governance: structured governance ledger — schema, chain-hashed jsonl, gate
+- harness: own governed-execution handles and cancel truthfully
+- harness: deliver the bounded H7 maintenance runtime
+- harness: make execution terminate an explicit refusal
+- harness: bind canonical eval results to validation receipts
+- harness: land §52 legacy dispositions + H5-lineage cross-run diff
+- harness: land H6 control plane — five read-only subverbs over the shared core
+- harness: land H5 eval & replay — ValidationReceipt, drift detection, regression proposals
+- harness: land H4 runtime lifecycle — first-class attempts, run-scoped checkpoints, the unified lifecycle view
+- harness: wire the firewall verdict into the real context load — grants cited, denials excluded
+- harness: land H2b governed-runner wiring — prepared workspaces, per-mutation observation, growing fold
+- harness: land H3a context grants, the deterministic report-first firewall check, and context events
+- harness: land H2a execution contracts, boundary adapters, and comparable three-boundary records
+- harness: land H1 tool declarations, report-only checks, and run tool snapshots
+- harness: admit runs from real loop approvals and bind real outcomes
 - governance: measure the contract registry, validate it, and expose it as a command
 - governance: rebuild the distributed-governance contract registry
 - harness: land Harness H0 (Contract, Run, Event) behind an expert-tier CLI
@@ -46,20 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - F064: improvement suggestions from host transcript friction
 - F063: close the default product surface
 - add optional F049/F050 doctor integrity checks
-- F062 route stage verbs and named governed commands (ADR-0029)
+- F062 route stage verbs and named governed commands
 - docs: replace generic floral background with 3D Amber crystal and resin particles
 - docs: integrate AMBER // PROTOCOL full-screen hero and dynamic data flow card
 - docs: implement public documentation site and verification seam (ticket 0024)
 - knowledge: read-time document index with three planes (0009)
 - core: chainWording as a closed factory extension (#307)
 - core: preLink hook and per-ledger ceiling wording as closed factory extensions (#306)
-- core: register F061 as passing with landing evidence (F061 T4)
+- core: register F061 as passing with landing evidence
 - core: add the defineLedgerFamily factory skeleton (#299)
-- knowledge: register F060 as passing with landing evidence (F060 P5)
-- knowledge: folded-by-default map with per-feature expansion, shared-foundation super-node, pierce search, and analytics surfacing (F060 P4)
-- knowledge: deterministic read-time analytics — per-layer p99 god nodes, Louvain communities, two anomaly detectors (F060 P2)
-- knowledge: admit schema v2 through the web seam; the LLM layer stays document-scale (F060 P3a)
-- knowledge: schema v2 code layer — Code Nodes, imports/anchors verbs, deterministic TS extraction (F060 P1)
+- knowledge: register F060 as passing with landing evidence
+- knowledge: folded-by-default map with per-feature expansion, shared-foundation super-node, pierce search, and analytics surfacing
+- knowledge: deterministic read-time analytics — per-layer p99 god nodes, Louvain communities, two anomaly detectors
+- knowledge: admit schema v2 through the web seam; the LLM layer stays document-scale
+- knowledge: schema v2 code layer — Code Nodes, imports/anchors verbs, deterministic TS extraction
 - mcp: close full-scope review finding SP-2 — surface external/breakglass as approval-required
 - artifact: close full-scope review finding SP-1 — reject secrets before canonical storage
 - breakglass: no-force semantics, MCP non-execution & boundary integrity for F057 #295
@@ -84,23 +84,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - release: release candidate preparation for F053 #274
 - runner: execution settlement, receipts & assurance separation for F052 #258
 - runner: environment profiles & boundaries for F052 #257
-- web: warn before an unfocused question overflows the QA context (F059 #267)
+- web: warn before an unfocused question overflows the QA context (#267)
 - runner: execution requests & policy-derived risk for F052 #256
 - runner: controlled Runner & capability registry for F052 #255
 - adapter: explicit cutover and rollback for F051 #236
 - adapter: add shadow comparison coverage
 - adapter: add explicit migration candidate states
-- knowledge: unify graph through context projection (F059 #253)
-- eval: scan QA contract surface for model independence (F059 #252)
-- knowledge: add cited QA over deterministic graph (F059 #251)
+- knowledge: unify graph through context projection (#253)
+- eval: scan QA contract surface for model independence (#252)
+- knowledge: add cited QA over deterministic graph (#251)
 - adapter: add read-only Adapter registry for F051 #233
 - strict-query: add staleness receipts and strict projection reads for F050 #231
-- knowledge: add read-time semantic layer (F059 #250)
+- knowledge: add read-time semantic layer (#250)
 - eval: admit canonical Eval artifacts for F050 #232
-- knowledge: add recent drift feed with real links (F059 #249)
-- knowledge: wire web map to live graph data (F059 #248)
+- knowledge: add recent drift feed with real links (#249)
+- knowledge: wire web map to live graph data (#248)
 - policy: add deny-wins policy evaluation for F050 #230
-- knowledge: deterministic knowledge-graph parser + `knowledge graph` CLI (F059 #247)
+- knowledge: deterministic knowledge-graph parser + `knowledge graph` CLI (#247)
 - gates: add Gate Contracts and deterministic evaluation for F050 #228
 - web: knowledge map round-2 — real-data fixture, local jump links, context graph (#240)
 - approval: add Approval records with atomic consumption for F050 #229
@@ -109,21 +109,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - evidence: add Evidence receipts and Assurance levels for F050 #227
 - governance: add Principal registry and Decision artifacts for F050 #226
 - artifacts: add version negotiation, extension namespaces, and resource ceilings for F049 #223
-- eval: add instruction-surface Eval suite (F058 #224)
+- eval: add instruction-surface Eval suite (#224)
 - artifacts: governance graph projection of artifact revisions for F049 #222
 - artifacts: fail-closed integrity hardening for F049 #221
 - artifacts: add Spec/Plan types and typed trace lineage for F049 #220
 - artifacts: add compare-and-swap and idempotent admission for F049 #219
 - add Intent admission tracer bullet for Canonical Planning Artifacts
-- hooks: close the apps/web pre-commit prettier coverage gap (F048)
+- hooks: close the apps/web pre-commit prettier coverage gap
 - governance: accept F048 prettier pre-commit coverage fix
-- web: upgrade apps/web build chain (F046, issue #207 batch 4)
-- web: upgrade apps/web to React 19 (F045, issue #207 batch 3)
-- web: upgrade apps/web to tRPC 11 and TanStack Query 5 (F044, issue #207 batch 2)
-- web: upgrade apps/web eslint to 10 with a flat config (F043, issue #207 batch 1)
-- sync: governed local commit for sync transport, ADR-0020 Stage A (F041)
-- sync: publish the transport report as a structured schema-governed contract (F040)
-- cli: add defineCommand and migrate hooks to it (F039 S1)
+- web: upgrade apps/web build chain (#207)
+- web: upgrade apps/web to React 19 (#207)
+- web: upgrade apps/web to tRPC 11 and TanStack Query 5 (#207)
+- web: upgrade apps/web eslint to 10 with a flat config (#207)
+- sync: governed local commit for sync transport, ADR-0020 Stage A
+- sync: publish the transport report as a structured schema-governed contract
+- cli: add defineCommand and migrate hooks to it
 - state: add statePath/statePathForCreate path verbs to the resolver
 - governance: fixture runner exercises deployment profiles + adversarial refusal (issue #160)
 - nightly: host scenario with machine-judge Governance Console (issue #129) (#198)
@@ -137,7 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - sync: sync session orchestration — pull/validate/push pipeline (Stage 3) (#188)
 - sync: envelope pack/unpack/compat/validate — Team Hub transport (Stage 3) (#187)
 - profile: amber profile deployment — Personal Node profile (Stage 2) (#186)
-- identity: hybrid Personal Node identity bootstrap (ADR-0019 D4) (#185)
+- identity: hybrid Personal Node identity bootstrap (#185)
 - governance: Stage 1 ADR amendments + sync envelope + structural identity schemas (#184)
 - fixtures: team-hub + organization deployment profile tracers (#160 M2) (#182)
 - fixtures: runner integration + full fixture family (#160 M1) (#181)
@@ -148,11 +148,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - web: live activity feed for running sessions
 - web: complete governance closure, transcript timeline & format gate
 - learnings: add durable owner routing
-- planning: role-scoped context manifests and a memory usage creed (F027)
-- governance: finish-time dirty-path classification and scope-discipline review checks (F026)
-- break-loop: post-mortem scaffold for recurring defect classes (F025)
-- learnings: add post-accept learning write-back checkpoint (F023)
-- hooks: add opt-in per-turn workflow-state breadcrumb (F022)
+- planning: role-scoped context manifests and a memory usage creed
+- governance: finish-time dirty-path classification and scope-discipline review checks
+- break-loop: post-mortem scaffold for recurring defect classes
+- learnings: add post-accept learning write-back checkpoint
+- hooks: add opt-in per-turn workflow-state breadcrumb
 
 ### Fixed
 
@@ -162,16 +162,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - harness: read a defunct pid as gone, not alive
 - tests: scope the Scenario-1 seam test to Scenario 1 (the root test job has no build)
 - tests: restore the temp-fixture ownership migration (temp-leak-fix re-application)
-- harness: address the independent review of 3425a1c (F081 round-6 findings)
-- harness: require cancellation-record binding fields and check them unconditionally (F081 round-5 P1)
-- harness: verify cancellation records before citing them (F081 round-4 P1)
-- harness: make cancellation settle without the volatile handle and never delete a winner's record (F081 round-3 P1s)
-- harness: make a stranded cancellation request settleable (F081 review P1)
-- harness: close the four code-review findings (F081 cancellation + test-runner temp ownership)
-- docs: reconcile landing CSS, define command-block tokens, fix theme/footer/nature; add integrity gates (issues/0063, 0157)
-- cli: complete the agent/team/adoption removal on the surfaces the review found (issues/0068)
+- harness: address the independent review of 3425a1c
+- harness: require cancellation-record binding fields and check them unconditionally
+- harness: verify cancellation records before citing them
+- harness: make cancellation settle without the volatile handle and never delete a winner's record
+- harness: make a stranded cancellation request settleable
+- harness: close the four code-review findings
+- docs: reconcile landing CSS, define command-block tokens, fix theme/footer/nature; add integrity gates
+- cli: complete the agent/team/adoption removal on the surfaces the review found
 - tests: sweep leaked amber-* fixture dirs from Temp after each run
-- harness: contracts list re-hashes records and flags tombstones (T3 — aligned with the F067 tool-list semantics)
+- harness: contracts list re-hashes records and flags tombstones
 - governance: accepted-state short-circuit for next, git-narrative handoff, unified confirmation evidence (J7)
 - decide plan recency from the evolution log, not file mtimes
 - stop same-millisecond Propose runs overwriting a proposal record
@@ -216,33 +216,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - knowledge: close the review's three gaps in the #267 batch
 - profile: close review findings for the compliance fix batch (#268)
 - lint: clear pre-existing repo-lint errors blocking commits
-- web: status dots, cobalt accent, tooltip copy and dead code in the map (F059 #267)
+- web: status dots, cobalt accent, tooltip copy and dead code in the map (#267)
 - lint: clear the two errors blocking the repo-wide lint gate
-- knowledge: cite the line that names the target, keep every declaring site, digest by byte order (F059 #267)
+- knowledge: cite the line that names the target, keep every declaring site, digest by byte order (#267)
 - phase: align the profile gate with the profile validator (#270)
 - profile: fail closed on malformed deployment profile declarations (#269)
-- web: stop the layered layout from stacking layers, and cover the geometry (F059 #267)
+- web: stop the layered layout from stacking layers, and cover the geometry (#267)
 - web: make the typecheck gate real and clear the 46 errors it was hiding
-- web: P0 correctness batch for the knowledge map (F059 #267)
-- web: re-anchor home-visual contracts to the obsidian shell (F059 #254)
-- features: correct F059 evidence drift attribution note (F059 #254)
-- web: seed committed knowledge corpus into the e2e fixture root (F059 #254)
-- web: route knowledge surfaces through the web-adapter seam (F059 #253)
-- knowledge: allowlist committed corpus in IP-hygiene scan (F059 #253)
-- knowledge: fix git-archive test extraction on Windows (F059 #253)
-- knowledge: restore projection/tree parity on clean archive (F059 #253)
-- knowledge: close T7 review findings (F059 #253)
-- eval: close QA scan review findings (F059 #252)
-- knowledge: close T5 review findings (F059 #251)
+- web: P0 correctness batch for the knowledge map (#267)
+- web: re-anchor home-visual contracts to the obsidian shell (#254)
+- features: correct F059 evidence drift attribution note (#254)
+- web: seed committed knowledge corpus into the e2e fixture root (#254)
+- web: route knowledge surfaces through the web-adapter seam (#253)
+- knowledge: allowlist committed corpus in IP-hygiene scan (#253)
+- knowledge: fix git-archive test extraction on Windows (#253)
+- knowledge: restore projection/tree parity on clean archive (#253)
+- knowledge: close T7 review findings (#253)
+- eval: close QA scan review findings (#252)
+- knowledge: close T5 review findings (#251)
 - adapter: close F051 #233 review findings
 - strict-query: close F050 #231 review findings
-- knowledge: close T4 review findings (F059 #250)
+- knowledge: close T4 review findings (#250)
 - eval: close F050 #232 review findings
-- knowledge: close T3 review findings (F059 #249)
+- knowledge: close T3 review findings (#249)
 - policy: close F050 #230 review findings
-- knowledge: close T2 review findings (F059 #248)
+- knowledge: close T2 review findings (#248)
 - knowledge: preserve parallel F050 shared-file state
-- knowledge: resolve T1 review findings F-1..F-6 (F059 #247)
+- knowledge: resolve T1 review findings F-1..F-6 (#247)
 - gates: align version comparator registry semantics
 - gates: close F050 #228 review findings
 - approval: close F050 #229 review findings — dominating ceiling probe, window contract, fold fixtures
@@ -257,15 +257,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - hooks: complete F048 review fixes — catch-all web glob, metadata, guard test
 - web: re-anchor the dark-palette E2E contract to rendered sRGB channels
 - cli: fail loudly when the typed-mutation seam blocks a command
-- state: read sessions surfaces through the state-dir resolver (F036 S1)
+- state: read sessions surfaces through the state-dir resolver
 - catalog: register seven legacy error codes in the error catalog
 - catalog: register F035 ledger-corruption codes in the error catalog
-- sync: make transport preparation report-only (F035 S4)
-- sync: admit envelopes against structural identity (F035 S3)
-- web: remove resting shadow-sm from gate inputs (F035 S6)
-- knowledge: fail closed on corrupt ledgers with typed errors (F035 S5)
-- sync: make sync-envelope schema the single structural validator (F035 S2)
-- sync: enforce canonical artifact paths and admission allowlist (F035 S1)
+- sync: make transport preparation report-only
+- sync: admit envelopes against structural identity
+- web: remove resting shadow-sm from gate inputs
+- knowledge: fail closed on corrupt ledgers with typed errors
+- sync: make sync-envelope schema the single structural validator
+- sync: enforce canonical artifact paths and admission allowlist
 - review: close remaining judgement findings from second-pass review
 - review: close second-pass two-axis findings on refactor range
 - tests: harden amber-mcp RPC driver against full-suite load flakes
@@ -281,44 +281,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - plugin: use host-compatible skill paths
 - ci: validate GitHub merge commit identities safely
 - claude-settings: repair the breadcrumb hook entry to the loadable matcher+hooks shape
-- governance: dogfood friction batch #118/#119/#121 (F024)
+- governance: dogfood friction batch #118/#119/#121
 
 ### Changed
 
-- **BREAKING** cli: remove the agent, team, and adoption command families (issues/0068)
+- **BREAKING** cli: remove the agent, team, and adoption command families
+- release: refresh the 2.0.0 section for the CI and README work
 - readme: document 2.0.0, the command surface, and the version badge
 - restore prettier formatting in three files
 - packages: check out full history so the provenance suite can run
-- plans: bring the F081 plan up to the plan contract so it can be accepted (F081)
-- quality: promote the 0020 Layer-2 trial protocol and add a pilot intake brief (issues/0062, 0137)
-- docs: lock narrow-screen section navigation (issues/0063 O7)
-- search: prefer the matched heading path on suggestions (issues/0063 O5)
-- site: reconcile the two 5-step lifecycle models (issues/0063 R3)
-- docs: clear remaining UI/UX review items R6/O1/O6/O8 + stabilize the a11y gate (issues/0063)
-- docs: clear UI/UX review Optional/Nit findings (issues/0063)
-- docs-a11y: harden the browser gate — baseUrl + badge coverage (issues/0063, 0157)
-- review: address two-axis review findings (issues/0063, 0156)
-- specs: materialize the Public Documentation Site spec as a docs/specs file (issues/0024)
-- wiki: make glossary.md a local summary pointing at CONTEXT.md (issues/0152)
-- governance: settle physical-boundary dispositions D2-D5; defer the .workflow live-state move (issues/0153)
-- governance: drop the banned 'coding-harness' literal from a comment (issues/0155 follow-up)
-- spec: record the owner's early-execution waiver and HITL basis for the removal (issues/0068)
-- spec: record the two-axis verification of the removal completeness clause (issues/0068)
-- governance: sync branch-protection fact in governance contract (issues/0154)
-- governance: record confirmed master branch protection (issues/0154 item 4)
-- governance: land the adjudicated documentation governance contract, owner routes, and rule precedence (issues/0151, 0154)
-- sources: one canonical knowledge plan, a corpus freshness gate, and a registry-option gate for the CLI reference (issues/0150)
-- docs: make the wiki gate real and the doctor cover the product-repo wiki (issues/0149)
-- quality: record the T5 continuation measurement (issues/0141 stream)
-- policy: diagnose the pre-migration provenance prerequisite (issues/0140)
-- reference: document the phase command; guard top-level coverage (issues/0139)
+- plans: bring the F081 plan up to the plan contract so it can be accepted
+- quality: promote the 0020 Layer-2 trial protocol and add a pilot intake brief
+- docs: lock narrow-screen section navigation
+- search: prefer the matched heading path on suggestions
+- site: reconcile the two 5-step lifecycle models
+- docs: clear remaining UI/UX review items R6/O1/O6/O8 + stabilize the a11y gate
+- docs: clear UI/UX review Optional/Nit findings
+- docs-a11y: harden the browser gate — baseUrl + badge coverage
+- review: address two-axis review findings
+- specs: materialize the Public Documentation Site spec as a docs/specs file
+- wiki: make glossary.md a local summary pointing at CONTEXT.md
+- governance: settle physical-boundary dispositions D2-D5; defer the .workflow live-state move
+- governance: drop the banned 'coding-harness' literal from a comment
+- spec: record the owner's early-execution waiver and HITL basis for the removal
+- spec: record the two-axis verification of the removal completeness clause
+- governance: sync branch-protection fact in governance contract
+- governance: record confirmed master branch protection
+- governance: land the adjudicated documentation governance contract, owner routes, and rule precedence
+- sources: one canonical knowledge plan, a corpus freshness gate, and a registry-option gate for the CLI reference
+- docs: make the wiki gate real and the doctor cover the product-repo wiki
+- quality: record the T5 continuation measurement
+- policy: diagnose the pre-migration provenance prerequisite
+- reference: document the phase command; guard top-level coverage
 - product: correct the pilot's status after publishing
-- reference: document the F072-F081 harness surface; guard it (issues/0138)
-- product: add the external pilot protocol (issues/0137)
-- web: bound the vitest test timeout explicitly (issues/0136)
-- agents: require delivery evidence at stage 7; align the console title (F082 follow-up)
-- product: flip the first screen to Governed Agent Harness (F082)
-- governance: authorize bounded H7 maintenance runtime (F079)
+- reference: document the F072-F081 harness surface; guard it
+- product: add the external pilot protocol
+- web: bound the vitest test timeout explicitly
+- agents: require delivery evidence at stage 7; align the console title
+- product: flip the first screen to Governed Agent Harness
+- governance: authorize bounded H7 maintenance runtime
 - harness: graduate H6 — the F074 control-plane spec (accepted via 0120) and plan
 - harness: graduate H5 — the F073 eval & replay spec (accepted via 0115) and plan
 - harness: graduate H4 — the F072 runtime-lifecycle spec (accepted via 0110) and plan
@@ -332,13 +333,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - quality: record T1 — the first counted dogfood continuation attempt (2/4, new failure facets)
 - docs: regenerate the public CLI reference for F069
 - harness: accept the F069 context-firewall spec
-- harness: graduate H3a (F069 context-firewall spec draft; tickets 0093-0098)
+- harness: graduate H3a
 - harness: accept the F068 execution-boundary spec
 - docs: regenerate the public CLI reference for F068
-- harness: graduate H2a (F068 execution-boundary spec draft; tickets 0087-0092)
+- harness: graduate H2a
 - docs: regenerate the public CLI reference for F067
 - harness: accept the F067 tool/capability boundary spec
-- harness: graduate H1 (F067 tool/capability boundary spec draft; tickets 0081-0086)
+- harness: graduate H1
 - docs: regenerate the public CLI reference for F066
 - harness: accept the F066 vertical-slice spec
 - agents: require delivery evidence before closing an issue as complete
@@ -411,11 +412,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - core: assemble the maintain ledgers through defineLedgerFamily (#304)
 - core: assemble the external ledgers through defineLedgerFamily (#303)
 - features: accept F061 under the continued batch ruling (59/59 accepted)
-- name defineLedgerFamily as the family admission path (F061 T4)
+- name defineLedgerFamily as the family admission path
 - core: assemble the breakglass ledger through defineLedgerFamily (#300)
 - knowledge: admit ADR-0028 into the census count (47 rows)
 - core: single-source the Decision primitives (#298)
-- spec: F061 — ledger family factory & decision primitives (ADR-0028)
+- spec: F061 — ledger family factory & decision primitives
 - features: record the F060 learning write-back review (owner: command)
 - adr: precision note on the ADR-0019 D1 carrier claim (#273 deferral)
 - features: accept the 21-feature batch under the standing HITL ruling
@@ -425,7 +426,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - core: centralize the invalid-profile-declaration reading (#273)
 - features: register F049-F057 retroactively and close out F058 as passing
 - knowledge: close two-axis review findings ST-2/ST-4/ST-6 — one document-scale predicate, shared LAYER_ORDER, no dead toolchain fallback
-- knowledge: real-tree population invariants for the code layer (F060 P3b)
+- knowledge: real-tree population invariants for the code layer
 - close full-scope review findings ST-3/ST-4 — README examples, agents map, glossary admissions
 - tests: close full-scope review finding ST-9 — one harness for the four registry suites
 - specs: close full-scope review findings CP-3/CP-4/SP-4 — align spec text with the shipped contracts
@@ -441,15 +442,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - agents: add dev-workflow pipeline with post-test two-axis acceptance stage
 - visibility: internalize the research and design archives; GitHub tracker carries bugs only
 - web: let the mini graph consume its own viewBox constants
-- web: follow the subtitle's deterministic-edge wording in e2e (F059 #267)
+- web: follow the subtitle's deterministic-edge wording in e2e (#267)
 - lint: fix pre-existing errors blocking the pre-commit gate
 - governance: adjudicate transport attempt semantics and close audit drift (#271, #272)
 - knowledge: record the knowledge-map review, spec compliance and v2 decisions
-- web: dedupe e2e helpers and deepen zh /knowledge coverage (F059 #254)
-- web: cover /knowledge en/zh i18n and dual theme in e2e (F059 #254)
-- features: register F059 in feature_list.json (F059 #254)
+- web: dedupe e2e helpers and deepen zh /knowledge coverage (#254)
+- web: cover /knowledge en/zh i18n and dual theme in e2e (#254)
+- features: register F059 in feature_list.json (#254)
 - policy: clarify delegation boundaries in policy help
-- knowledge: strengthen F001 browser assertions (F059 #248)
+- knowledge: strengthen F001 browser assertions (#248)
 - specs: add F059 Knowledge & Decision Map spec and program registration (#246)
 - research: graph rendering library choice for Knowledge Map (#242)
 - design: v10 design-system upgrade — token frontmatter, refined prompts, showcase
@@ -458,30 +459,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - program: add F049-F057 specs and ADR-0021..0024 (program authority documents)
 - artifacts: document extension namespace, version negotiation, and ceilings for F049 #223
 - eval: fix prettier drift in F058 files
-- artifacts: pin projection status envelope code seam (F049 full-review finding 3)
+- artifacts: pin projection status envelope code seam
 - extend governance vocabulary for canonical artifacts and gating
 - isolate session-commands fixtures in per-test temp dirs
 - fix all second-round two-axis review findings
 - deps: bump eslint to 10.9.1 and globals to 17.11.0
 - make the legacy ledger auto-bundle fixture deterministic
 - web: prettier-format theme-provider after the F047 lazy-init change
-- web: clear the six deferred react-hooks production warnings (F047)
-- schema: generalize Ajv adapters into one schema-contract seam (F042)
+- web: clear the six deferred react-hooks production warnings
+- schema: generalize Ajv adapters into one schema-contract seam
 - memory: book the seam-adoption ritual pattern (T1 write-back)
 - governance: record the F039 evolution entry
 - adr: accept ADR-0020 and record the five transport adjudications
 - governance: accept F039 and close session 0893942b
-- cli: migrate context, feature, workflow-assessment, and governance to defineCommand (F039 S4)
-- cli: migrate projection and sync to defineCommand (F039 S3)
-- cli: migrate org-audit, knowledge, phase, and memory to defineCommand (F039 S2)
+- cli: migrate context, feature, workflow-assessment, and governance to defineCommand
+- cli: migrate projection and sync to defineCommand
+- cli: migrate org-audit, knowledge, phase, and memory to defineCommand
 - governance: accept F037/F038 records and close session 3f42529a
-- ledger: dedupe the fail-closed ritual and guard error-code literals (F038)
+- ledger: dedupe the fail-closed ritual and guard error-code literals
 - governance: accept F037 and close out session a4b43c97
-- git: unify git invocation behind the git-exec seam (F037)
+- git: unify git invocation behind the git-exec seam
 - governance: accept F036 and close out session 6916783e
 - governance: record F036 evidence and slice completion in the plan
 - lint: drop path imports left unused by the state-dir migration
-- state: migrate all hardcoded .amber joins behind the state-dir seam (F036 S2)
+- state: migrate all hardcoded .amber joins behind the state-dir seam
 - architecture: archive the deepening-opportunities survey
 - adr: propose ADR-0020 governed live git transport for the sync runtime
 - governance: name the sync envelope contract surface on the F035 learnings booking

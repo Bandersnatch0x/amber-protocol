@@ -165,9 +165,35 @@ function stripRef(text) {
 	return (text || "").replace(/\s*\(#\d+\)\s*$/, "").trim();
 }
 
+// Internal handles are how this repository talks to itself: spec ids (`F081`),
+// issue paths (`issues/0156`), ADRs, harness stages, spec sections. Every one of
+// them also sits in the commit that produced the entry, so a reader-facing
+// changelog does not need them — and an unlinked `(F081)` is not something an
+// outside reader can follow. Pull numbers survive: `#240` is the citation the
+// changelog convention promises, and the only one a reader can resolve without
+// repository context.
+const INTERNAL_HANDLE_RE = /(?:^|[^\w#])(?:F\d+|H\d+|§\d+|ADR-\d+|issues?\/\d+)/;
+const PULL_NUMBER_RE = /#\d+/g;
+
+//   `head (F081)`                        -> `head`
+//   `head (F081 #240)`                   -> `head (#240)`
+//   `head (issues/0156, closes 0153 D1)` -> `head`
+//   `head (a whole sentence)`            -> unchanged: the rule drops a
+//     parenthetical that cites something internal, not one that is part of the
+//     sentence the author wrote.
+function stripInternalHandle(text) {
+	const subject = String(text || "").trim();
+	const m = subject.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+	if (!m) return subject;
+	const [, head, inner] = m;
+	if (!INTERNAL_HANDLE_RE.test(inner)) return subject;
+	const pulls = inner.match(PULL_NUMBER_RE) || [];
+	return pulls.length ? `${head.trim()} (${pulls.join(", ")})` : head.trim();
+}
+
 function formatEntry(parsed, ref) {
 	const prefix = parsed.scope ? `${parsed.scope}: ` : "";
-	const cleanSubject = stripRef(parsed.subject);
+	const cleanSubject = stripInternalHandle(stripRef(parsed.subject));
 	const base = `${prefix}${cleanSubject}`;
 	return ref ? `${base} (${ref})` : base;
 }
