@@ -921,7 +921,7 @@ test("a resumed settlement never signals a second time", async () => {
 	});
 	try {
 		decisionFixture(target);
-		persistExecutionHandle({
+		const owned = persistExecutionHandle({
 			targetRoot: target,
 			runId: RUN_ID,
 			workspace: target,
@@ -935,6 +935,7 @@ test("a resumed settlement never signals a second time", async () => {
 			schemaVersion: 1,
 			at: new Date().toISOString(),
 			runId: RUN_ID,
+			inputHash: owned.snapshotHash,
 			reason: "stranded request",
 			pointers: [
 				`execution-cancel-request:${RUN_ID}#stranded`,
@@ -973,6 +974,7 @@ test("an unsettled request refuses a different authorization", async () => {
 			schemaVersion: 1,
 			at: new Date().toISOString(),
 			runId: RUN_ID,
+			inputHash: readExecutionHandle(target, RUN_ID).snapshotHash,
 			reason: "stranded request",
 			pointers: [
 				`execution-cancel-request:${RUN_ID}#stranded`,
@@ -1102,6 +1104,46 @@ test("a record unbound to the recorded request is refused even with a valid hash
 			(error) =>
 				error.amberCode === "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT" &&
 				/recorded request/.test(error.message),
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// Binding fields are REQUIRED: deleting them (and recomputing the content hash so
+// the record is self-consistent) must not make it acceptable — "absent" must
+// never read as "matches".
+test("a record whose binding fields are missing is refused", async () => {
+	const target = gitTarget("missing-binding", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+		const file = await strandWithRecord(target);
+
+		const record = JSON.parse(fs.readFileSync(file, "utf8"));
+		assert.equal(record.outcome, "already-exited");
+		delete record.decision;
+		delete record.handleSnapshotHash;
+		record.outcome = "terminated";
+		const { snapshotHash: _stale, ...body } = record;
+		record.snapshotHash = canonicalHashOf(body);
+		fs.writeFileSync(file, JSON.stringify(record));
+
+		await assert.rejects(
+			() =>
+				cancelExecution(target, {
+					runId: RUN_ID,
+					decision: { identity: "decision/cancel-1", revision: 1 },
+					reason: "missing binding fields",
+				}),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT" &&
+				/carries no decision/.test(error.message),
+		);
+		// Nothing was promoted.
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested"],
 		);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });

@@ -272,7 +272,19 @@ function cancellationRecordProblem(record, { runId, request, decision }) {
 		if (!CANCELLATION_RECORD_FIELDS.includes(field))
 			return `cancellation record carries unknown field ${JSON.stringify(field)}`;
 	}
-	for (const field of ["schemaVersion", "runId", "signal", "outcome", "requestPointer", "at"]) {
+	for (const field of [
+		"schemaVersion",
+		"runId",
+		"signal",
+		"outcome",
+		"requestPointer",
+		"at",
+		// Binding fields are REQUIRED, not optional: a record that omits what it
+		// was bound to is not verifiable evidence, and "absent" must never read as
+		// "matches" (the guard below is unconditional).
+		"decision",
+		"handleSnapshotHash",
+	]) {
 		if (record[field] === undefined || record[field] === null || record[field] === "")
 			return `cancellation record carries no ${field}`;
 	}
@@ -280,6 +292,14 @@ function cancellationRecordProblem(record, { runId, request, decision }) {
 		return `cancellation record declares unsupported schemaVersion ${JSON.stringify(record.schemaVersion)}`;
 	if (!OUTCOMES.includes(record.outcome))
 		return `cancellation record carries unknown outcome ${JSON.stringify(record.outcome)}`;
+	if (typeof record.handleSnapshotHash !== "string")
+		return "cancellation record handleSnapshotHash is not a string";
+	if (typeof record.decision !== "object" || Array.isArray(record.decision))
+		return "cancellation record decision is not an object";
+	if (typeof record.decision.identity !== "string" || record.decision.identity.length === 0)
+		return "cancellation record decision carries no identity";
+	if (!Number.isInteger(record.decision.revision))
+		return "cancellation record decision carries no integer revision";
 	const { snapshotHash, ...body } = record;
 	if (snapshotHash !== canonicalHashOf(body))
 		return "cancellation record no longer matches its Snapshot Hash";
@@ -287,17 +307,15 @@ function cancellationRecordProblem(record, { runId, request, decision }) {
 		return `cancellation record belongs to run ${JSON.stringify(record.runId)}`;
 	if (!requestCarriesPointer(request, record.requestPointer))
 		return "cancellation record does not match this run's recorded request";
-	if (
-		record.handleSnapshotHash &&
-		request.inputHash &&
-		record.handleSnapshotHash !== request.inputHash
-	)
+	if (typeof request.inputHash !== "string" || request.inputHash.length === 0)
+		return "this run's recorded request carries no handle snapshot hash";
+	if (record.handleSnapshotHash !== request.inputHash)
 		return "cancellation record was taken against a different handle than the recorded request";
+	if (!decision || typeof decision.identity !== "string")
+		return "no Decision to verify the cancellation record against";
 	if (
-		decision &&
-		record.decision &&
-		(record.decision.identity !== decision.identity ||
-			record.decision.revision !== decision.revision)
+		record.decision.identity !== decision.identity ||
+		record.decision.revision !== decision.revision
 	)
 		return "cancellation record was authorized by a different Decision";
 	return null;
@@ -426,6 +444,13 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 			(state.request.pointers || []).find((pointer) =>
 				pointer.startsWith(cancelRequestPointerPrefix(runId)),
 			) || null;
+		// The settlement this call produces is bound to the request's handle
+		// snapshot; a request carrying none cannot be settled as verified evidence.
+		if (typeof state.request.inputHash !== "string" || state.request.inputHash.length === 0)
+			throw typedError(
+				CODE_CORRUPT,
+				`the recorded cancellation request for run ${JSON.stringify(runId)} carries no handle snapshot hash; refusing to settle it`,
+			);
 		// Step 3 (resume): the authorization is already consumed, so this call
 		// finishes the settlement from whatever evidence survived — the attempt's
 		// own record when it landed, else the handle if it is still there, else
@@ -447,7 +472,7 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 					requestPointer,
 					resumed: true,
 					observationSource: "none",
-					handleSnapshotHash: state.request.inputHash ?? null,
+					handleSnapshotHash: state.request.inputHash,
 					note: "resumed without a surviving handle or record: the outcome is unknown, never a claimed termination",
 					reason,
 					at,
