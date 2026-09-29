@@ -285,3 +285,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/trusted-control-run-contract.md`
 - Review status: ready
 - Required user action: none
+
+## 2026-09-29 docs/plans/F081-governed-execution-cancellation.md
+
+- Plan: `docs/plans/F081-governed-execution-cancellation.md`
+- Review status: ready
+- Feature: F081 status → accepted in feature_list.json

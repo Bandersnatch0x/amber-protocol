@@ -3031,7 +3031,7 @@
 			],
 			"title": "Owned governed-execution handles and truthful cancellation",
 			"user_visible_behavior": "The shared governed-execution seam spawns asynchronously into its own process group and persists one owned handle per running command (pid, lease, fence, workspace, deadline, Snapshot Hash); all four consumers (loop run --execute, route command stages, session stages, harness execution run) await it with unchanged ledger records. amber harness execution handles shows observed live/stale ownership; amber harness execution cancel --run <id> --decision <identity>@<revision> --reason <text> consumes its OWN single-use human Decision, observes the pid, signals the tree, and reports what it observed (terminated | already-exited | unknown) with a Content-addressed cancellation record and one execution.cancelled event. Cancellation deletes no workspace, rewrites no terminal result, and grants no launch authority; harness execution terminate stays an explicit refusal that now points at cancel.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-execution-cancel.test.js",
 				"amber harness execution handles; amber harness execution cancel --run <id> --decision <identity>@<revision> --reason <text> against a real running governed command"
@@ -3054,7 +3054,8 @@
 				"Parity for the async conversion is mechanically verified: the consumer suites' diff is await/async only, with zero assertion changes.",
 				"Cancellation is asynchronous by necessity (a blocking wait would starve the settling continuation in the same process), and the seam settles on the child's exit with a bounded stdio drain because a cancelled tree can hold a pipe open.",
 				"The four gates (policy, approval, isolation, ledger) are untouched and still precede any effect."
-			]
+			],
+			"updated": "2026-09-29"
 		},
 		{
 			"id": "F082",

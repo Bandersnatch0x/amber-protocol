@@ -1,7 +1,7 @@
 # F081 Plan: Owned Governed-Execution Handles and Truthful Cancellation
 
 Feature: F081
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 Plan date: 2026-09-24 (acceptance inputs refreshed 2026-09-29)
 Spec: docs/specs/F081-governed-execution-cancellation.md
