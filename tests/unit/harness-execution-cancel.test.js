@@ -138,6 +138,42 @@ test("the closed cancellation outcome vocabulary is exactly what was observed", 
 	assert.deepEqual([...OUTCOMES], ["terminated", "already-exited", "unknown"]);
 });
 
+// The liveness probe must not read a ZOMBIE as alive. POSIX keeps an unreaped
+// process addressable — `kill(pid, 0)` SUCCEEDS on a defunct child — so a probe
+// that only asks "does this pid exist?" answers yes for a process that has
+// already ended. That is not hypothetical: on Linux CI the cancellation ran in a
+// `spawnSync` child whose parent was blocked for the entire settle bound, so the
+// child it had really killed sat defunct for every poll and the settlement
+// honestly — but wrongly — reported `unknown` for a kill it performed.
+function procState(pid) {
+	try {
+		const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+		return stat.slice(stat.lastIndexOf(")") + 2).trim()[0] || "?";
+	} catch {
+		return "gone";
+	}
+}
+
+test("a defunct child reads as gone, though its pid is still addressable", () => {
+	if (process.platform !== "linux") return; // /proc is how a zombie is named
+	const child = spawn(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" });
+	try {
+		// Block this process's event loop exactly as a `spawnSync` supervisor does,
+		// so the child cannot be reaped and is defunct when the loop resumes.
+		spawnSync(process.execPath, ["-e", "setTimeout(()=>{},1200)"], { stdio: "ignore" });
+		assert.equal(procState(child.pid), "Z", "the probe runs against a defunct child");
+		// The trap this asserts against: the pid is STILL addressable.
+		assert.doesNotThrow(() => process.kill(child.pid, 0), "the defunct pid answers signal 0");
+		assert.equal(isProcessAlive(child.pid), false, "a defunct child is not alive");
+	} finally {
+		try {
+			child.kill("SIGKILL");
+		} catch {
+			/* already gone */
+		}
+	}
+});
+
 test("cancelling a live governed execution reports terminated, retains the workspace, and spends its own Decision", async () => {
 	const target = gitTarget("live", allowRules(SLEEP_COMMAND));
 	// A prepared workspace is the case where retention is observable: the

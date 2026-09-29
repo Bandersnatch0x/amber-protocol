@@ -14,6 +14,11 @@ const { spawn } = require("node:child_process");
 
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { listArtifactRevisions } = require("../core/canonical-artifacts");
+// One liveness seam for the whole harness (F081 `isProcessAlive`). A pid that
+// has terminated but whose parent has not reaped it is a ZOMBIE, and POSIX
+// still answers signal 0 for it — probing locally read a stopped daemon as
+// still running and timed out the bounded stop in CI.
+const { isProcessAlive: isProcessRunning } = require("../core/execution-handles");
 const {
 	canonicalHashOf,
 	decisionPinProblem,
@@ -860,16 +865,6 @@ function tickRuntime(targetRoot, { scheduleId, now } = {}) {
 		results.push(tickOne(targetRoot, schedule, freshEvents, at));
 	}
 	return { ok: true, at, results, authority: AUTHORITY };
-}
-
-function isProcessRunning(pid) {
-	if (!Number.isInteger(pid) || pid < 1) return false;
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (_error) {
-		return false;
-	}
 }
 
 function readDaemonState(targetRoot) {

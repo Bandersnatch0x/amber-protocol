@@ -49,15 +49,47 @@ function fenceFile(targetRoot) {
 	return statePathForCreate(targetRoot, "harness", "executions", "fence.json");
 }
 
-/** Whether a pid currently exists (signal 0 probe; never signals the target). */
+/**
+ * Whether a pid is a ZOMBIE: it has terminated, but its parent has not reaped
+ * it yet. Linux keeps an unreaped process addressable — `kill(pid, 0)`
+ * SUCCEEDS, and the pid stays a member of its process group — so a bare
+ * liveness probe reads a process that has already ended as still running.
+ *
+ * This is not academic. A cancellation that signals the group from a process
+ * whose event loop is blocked (a `spawnSync` supervisor, for instance) really
+ * does kill the child, then polls a defunct pid for the whole settle bound and
+ * honestly — but wrongly — reports `unknown` for a kill it performed. That
+ * happened on Linux CI.
+ */
+function pidIsZombie(pid) {
+	if (process.platform !== "linux") return false;
+	try {
+		// Format: "<pid> (<comm>) <state> ...". `comm` may itself contain spaces
+		// and parentheses, so the state is the first field after the LAST ")".
+		const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+		return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z");
+	} catch {
+		// No /proc entry (or no /proc at all): the signal probe is the only
+		// evidence available, so a non-Linux POSIX host cannot tell a defunct pid
+		// from a live one. That residual is documented, never claimed away — a
+		// cancellation that cannot observe an exit still reports `unknown`, which
+		// is never success.
+		return false;
+	}
+}
+
+/** Whether a pid is a LIVE process (signal 0 probe; never signals the target). */
 function isProcessAlive(pid) {
 	if (!Number.isInteger(pid) || pid < 1) return false;
+	let addressable;
 	try {
 		process.kill(pid, 0);
-		return true;
+		addressable = true;
 	} catch (error) {
-		return Boolean(error && error.code === "EPERM");
+		addressable = Boolean(error && error.code === "EPERM");
 	}
+	// Addressable is not the same as alive: a zombie still answers signal 0.
+	return addressable && !pidIsZombie(pid);
 }
 
 /**
