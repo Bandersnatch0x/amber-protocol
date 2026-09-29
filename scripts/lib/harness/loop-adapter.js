@@ -15,6 +15,7 @@ const { latestUnconsumedApproval, readLedger } = require("../core/loop-ledger");
 const { statePath } = require("../state-dir-resolver");
 const { createRun, transitionRun, getRun } = require("./run-core");
 const { emitHarnessEvent } = require("./event-ledger");
+const { cancellationAttribution } = require("./execution-cancel");
 
 const CODE_LOOP_APPROVAL_MISSING = "AMBER_E_HARNESS_LOOP_APPROVAL_MISSING";
 const CODE_LOOP_OUTCOME_MISSING = "AMBER_E_HARNESS_LOOP_OUTCOME_MISSING";
@@ -197,12 +198,24 @@ function bindLoopOutcome(targetRoot, { runId, loopContractId, now } = {}) {
 		reason: `loop ${loopContractId} executed (exit ${exitCode}) at ${executedPointer}`,
 		now,
 	});
+	// §4.3: a signalled exit is recorded as a CANCELLED attempt here too, so neither
+	// consumer leaves a cancellation readable as an ordinary failure.
+	const cancellation = exitCode === 0 ? null : cancellationAttribution(targetRoot, runId);
 	emitHarnessEvent(targetRoot, {
 		kind: exitCode === 0 ? "execution.completed" : "execution.failed",
 		schemaVersion: 1,
 		at,
 		runId,
-		pointers: [executedPointer],
+		...(cancellation
+			? {
+					reason: `loop ${loopContractId} was CANCELLED (signal ${cancellation.signal}${
+						cancellation.outcome === null ? "" : `, observed ${cancellation.outcome}`
+					}) at ${executedPointer}`,
+					cancelled: true,
+					signal: cancellation.signal,
+				}
+			: {}),
+		pointers: [executedPointer, ...(cancellation ? cancellation.pointers : [])],
 	});
 	return { ok: true, run: final.run, exitCode, executedPointer };
 }

@@ -20,9 +20,16 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { codedError } = require("./error-catalog");
+
+// One handle per runId (see the catalog entry). Without the pre-check the duplicate
+// write fails only AFTER the spawn, leaving a running child with no handle and no
+// cancellation address, reported as an ordinary command failure.
+const CODE_HANDLE_TAKEN = "AMBER_E_HARNESS_EXEC_HANDLE_TAKEN";
 const {
 	persistExecutionHandle,
 	clearExecutionHandle,
+	readExecutionHandle,
 	signalPidTree,
 } = require("./execution-handles");
 
@@ -170,6 +177,21 @@ async function executeInPreparedWorkspace(
 	{ captureDigest = false, handle = null } = {},
 ) {
 	let result;
+	// Decide ownership BEFORE any effect: a live handle refuses, a stale one is
+	// reconciled away exactly as the reader treats it (restart reconciliation). The
+	// refusal is RETURNED in this adapter's error shape rather than thrown, so the
+	// caller reports a governed refusal instead of an uncaught exception.
+	if (handle) {
+		const existing = readExecutionHandle(handle.targetRoot, handle.runId);
+		if (existing !== null && existing.status === "live")
+			return {
+				error: codedError(
+					CODE_HANDLE_TAKEN,
+					`run ${JSON.stringify(handle.runId)} already owns a live governed execution (pid ${existing.pid}); one handle per run`,
+				),
+			};
+		if (existing !== null) clearExecutionHandle(existing);
+	}
 	const startedAt = new Date().toISOString();
 	const timeoutMs = budgetMinutes * 60_000;
 	let handleRecord = null;

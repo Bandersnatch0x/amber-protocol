@@ -30,6 +30,7 @@ const { getRun, transitionRun } = require("./run-core");
 const { emitHarnessEvent } = require("./event-ledger");
 const { runGovernedCommand } = require("../core/governed-runner");
 const { recordAttempt } = require("./attempt-core");
+const { cancellationAttribution } = require("./execution-cancel");
 
 const CODE_PREPARE_FAILED = "AMBER_E_HARNESS_EXEC_PREPARE_FAILED";
 const CODE_ALREADY_PREPARED = "AMBER_E_HARNESS_EXEC_ALREADY_PREPARED";
@@ -607,6 +608,13 @@ async function runPreparedExecution(
 		observedRef: `observed-entry:${safeId(runId)}#${attemptId}`,
 		now: at,
 	});
+	// §4.3: a signalled exit is recorded as a CANCELLED attempt, so it is never
+	// readable as an ordinary failure. Attribution is deterministic — it comes from
+	// the cancellation REQUEST, which is appended before the signal — and it rides
+	// the event's own `cancelled`/`signal` fields (F081 added them to the closed
+	// event schema) plus a citation of the cancellation on the chain.
+	const cancellation =
+		attemptState === "failed" ? cancellationAttribution(targetRoot, runId) : null;
 	emitHarnessEvent(targetRoot, {
 		kind: attemptState === "completed" ? "execution.completed" : "execution.failed",
 		schemaVersion: 1,
@@ -616,8 +624,16 @@ async function runPreparedExecution(
 		reason:
 			attemptState === "completed"
 				? `governed attempt ${attemptId} completed`
-				: `governed attempt ${attemptId} exited non-zero (${governedExitCode})`,
-		pointers: [`governed-ledger:${safeId(ledgerName)}#${attemptId}`],
+				: cancellation
+					? `governed attempt ${attemptId} was CANCELLED (signal ${cancellation.signal}${
+							cancellation.outcome === null ? "" : `, observed ${cancellation.outcome}`
+						}); exit ${governedExitCode}`
+					: `governed attempt ${attemptId} exited non-zero (${governedExitCode})`,
+		...(cancellation ? { cancelled: true, signal: cancellation.signal } : {}),
+		pointers: [
+			`governed-ledger:${safeId(ledgerName)}#${attemptId}`,
+			...(cancellation ? cancellation.pointers : []),
+		],
 	});
 	return {
 		ok: true,

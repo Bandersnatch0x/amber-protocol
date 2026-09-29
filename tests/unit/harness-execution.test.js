@@ -24,6 +24,9 @@ const {
 const { executeInPreparedWorkspace } = require("../../scripts/lib/core/execution-domain-adapter");
 const { createWorktree } = require("../../scripts/lib/worktree-manager");
 const { readRunEvents } = require("../../scripts/lib/harness/event-ledger");
+const { cancelExecution } = require("../../scripts/lib/harness/execution-cancel");
+const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 
 function tmpTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-harness-exec-${label}-`));
@@ -1260,6 +1263,126 @@ test("raw-CLI --command-id maps through FLAG_SPECS (missing flag vs unknown run)
 		);
 		assert.equal(withFlag.status, 1);
 		assert.match(withFlag.stdout, /no prepared execution for run/);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// F081 §4.3: a signalled exit is recorded as a CANCELLED attempt. The attempt's own
+// terminal event must say so — with the observed signal and a citation of the very
+// record it was marked from — or an auditor cannot tell it from an ordinary failure.
+test("a cancelled harness attempt is marked cancelled on its own terminal event", async () => {
+	const target = tmpTarget("f081-cancelled-marker");
+	try {
+		initRepo(target);
+		await executionContractAdmitted(target);
+		const contractForRun = path.join(target, "contract-f081.json");
+		fs.writeFileSync(
+			contractForRun,
+			JSON.stringify({
+				apiVersion: "amber.dev/v1",
+				kind: "HarnessContract",
+				metadata: { id: "harness-exec", version: "1" },
+				agent: { id: "worker", role: "implementation" },
+				governance: { policy: "default-safe" },
+			}),
+			"utf8",
+		);
+		await dispatch("harness", { target, file: contractForRun, json: true, _: ["admit"] });
+		await dispatch("harness", {
+			target,
+			json: true,
+			contract: "harness-exec",
+			agent: "worker",
+			run: "run-f081",
+			_: ["start"],
+		});
+		await dispatch("harness", {
+			target,
+			json: true,
+			contract: "exec-coding",
+			run: "run-f081",
+			_: ["execution", "prepare"],
+		});
+
+		const sleeping = `node -e "setTimeout(()=>{},60000)"`;
+		const rulesPath = path.join(target, ".amber", "governance", "rules.json");
+		fs.mkdirSync(path.dirname(rulesPath), { recursive: true });
+		fs.writeFileSync(
+			rulesPath,
+			JSON.stringify({
+				schemaVersion: 1,
+				defaultAction: "deny",
+				confidence_gating: {
+					enabled: true,
+					byRule: { "f081-sleep": "high" },
+					defaultConfidence: "low",
+				},
+				rules: [{ id: "f081-sleep", action: "allow", match: "exact", pattern: sleeping }],
+			}),
+			"utf8",
+		);
+		const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
+		appendLedgerRecord(path.join(target, ".amber", "loops", "run-f081", "ledger.jsonl"), {
+			kind: "approved",
+			approvalKey: "run-f081:approval",
+		});
+		// The cancellation carries its OWN human Decision — never the execution's.
+		registerPrincipal(target, { id: "alice@example.com", principalKind: "human" });
+		assert.equal(
+			admitArtifact(target, { type: "intent", identity: "intent/cancel", body: "# Cancel\n" }).ok,
+			true,
+		);
+		const decision = admitArtifact(target, {
+			type: "decision",
+			identity: "decision/cancel-1",
+			body: "# cancel\n",
+			decisionKind: "approval",
+			principal: "alice@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/cancel" } }],
+		});
+		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
+
+		// Start the governed attempt and cancel it while the child is still running.
+		const running = dispatch("harness", {
+			target,
+			json: true,
+			run: "run-f081",
+			commandId: "f081-sleep",
+			_: ["execution", "run"],
+		});
+		const handleFile = path.join(target, ".amber", "harness", "executions", "run-f081.handle.json");
+		const deadline = Date.now() + 10_000;
+		while (Date.now() < deadline && !fs.existsSync(handleFile))
+			await new Promise((resolve) => setTimeout(resolve, 25));
+		assert.ok(fs.existsSync(handleFile), "the harness execution owns a handle to cancel");
+
+		const cancelled = await cancelExecution(target, {
+			runId: "run-f081",
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "operator stopped the hung attempt",
+		});
+		assert.equal(cancelled.ok, true);
+		await running.catch(() => {});
+
+		const failed = readRunEvents(target, "run-f081").filter(
+			(event) => event.kind === "execution.failed",
+		);
+		assert.equal(failed.length, 1, "one terminal failure fact for the attempt");
+		assert.equal(failed[0].cancelled, true, "the attempt is marked cancelled");
+		assert.equal(failed[0].signal, "SIGTERM", "the signal the cancellation used is recorded");
+		assert.ok(
+			failed[0].pointers.some((pointer) => pointer.startsWith("execution-cancel")),
+			"the terminal fact cites the cancellation it was marked from",
+		);
+		assert.doesNotMatch(
+			failed[0].reason,
+			/exited non-zero/,
+			"a cancelled attempt is not readable as an ordinary failure",
+		);
+		assert.match(failed[0].reason, /was CANCELLED/);
+		// The control: an ordinary failure carries no such fields at all.
+		assert.equal(failed[0].action, undefined);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}

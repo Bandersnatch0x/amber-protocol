@@ -3170,6 +3170,15 @@ const CATALOG = {
 		layer: "Lifecycle",
 		related: ["AMBER_E_HARNESS_EXEC_HANDLE_CORRUPT", "AMBER_E_HARNESS_EXEC_RECORD_NOT_FOUND"],
 	},
+	AMBER_E_HARNESS_EXEC_HANDLE_TAKEN: {
+		title: "The run already owns a live governed execution",
+		cause:
+			"A governed attempt was requested for a runId whose owned handle is still live. One handle per runId: without this check the duplicate write fails only AFTER the child is spawned, leaving a process running with no handle and no cancellation address, reported as an ordinary command failure.",
+		remedy:
+			"Inspect the owned handles (amber harness execution handles) and either cancel the live attempt (amber harness execution cancel) or wait for it to settle; a STALE handle (its pid gone, or its process identity no longer matching) is reconciled automatically on the next attempt.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_HARNESS_EXEC_NO_HANDLE", "AMBER_E_HARNESS_EXEC_HANDLE_CORRUPT"],
+	},
 	AMBER_E_HARNESS_EXEC_CANCEL_CONFLICT: {
 		title: "Cancellation conflicts with recorded state",
 		cause:

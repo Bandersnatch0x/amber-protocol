@@ -78,6 +78,42 @@ function pidIsZombie(pid) {
 	}
 }
 
+/**
+ * The kernel's identity for a running process, or null when the platform cannot
+ * provide one. Linux exposes a start time (the 22nd field of /proc/<pid>/stat, in
+ * clock ticks since boot) that no other process can carry: a recycled pid belongs
+ * to a process with a different start time. Comparing it is how this seam knows
+ * the pid it is about to signal is still OURS.
+ */
+function processIdentity(pid) {
+	if (process.platform !== "linux" || !Number.isInteger(pid) || pid < 1) return null;
+	try {
+		const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+		const fields = stat
+			.slice(stat.lastIndexOf(")") + 2)
+			.trim()
+			.split(/\s+/);
+		// Field 3 (state) is fields[0], so starttime (field 22) is fields[19].
+		return fields[19] ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Whether the recorded pid still belongs to the process the handle recorded.
+ * Reports true when either side has no identity: a platform that cannot name one,
+ * or a handle written before identity was recorded, cannot FALSIFY ownership, and
+ * that residual is stated in the spec rather than guessed at here.
+ */
+function pidStillOwned(record) {
+	if (!record || !Number.isInteger(record.pid)) return false;
+	const recorded = typeof record.pidStartedAt === "string" ? record.pidStartedAt : null;
+	const live = processIdentity(record.pid);
+	if (recorded === null || live === null) return true;
+	return recorded === live;
+}
+
 /** Whether a pid is a LIVE process (signal 0 probe; never signals the target). */
 function isProcessAlive(pid) {
 	if (!Number.isInteger(pid) || pid < 1) return false;
@@ -158,6 +194,7 @@ function persistExecutionHandle(input) {
 		commandId: input.commandId ?? null,
 		workspace: input.workspace,
 		pid: input.pid,
+		pidStartedAt: processIdentity(input.pid),
 		leaseId: crypto.randomUUID(),
 		fence: nextFence(targetRoot),
 		startedAt: input.startedAt,
@@ -232,7 +269,9 @@ function readExecutionHandle(targetRoot, runId) {
 	return {
 		...record,
 		file,
-		status: isProcessAlive(record.pid) ? "live" : "stale",
+		// A live pid is not enough: a recycled pid means the recorded process is
+		// gone and an unrelated one holds its number, so the handle is stale.
+		status: isProcessAlive(record.pid) && pidStillOwned(record) ? "live" : "stale",
 	};
 }
 
@@ -256,6 +295,8 @@ module.exports = {
 	readExecutionHandle,
 	listExecutionHandles,
 	isProcessAlive,
+	pidStillOwned,
+	processIdentity,
 	signalPidTree,
 	handleFile,
 };

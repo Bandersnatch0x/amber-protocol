@@ -100,6 +100,17 @@ function memberPattern(key) {
 	);
 }
 
+/**
+ * Whether the object text carries the key at all, whatever its value. Used to
+ * refuse an INSERT when the key exists with a value `memberPattern` cannot
+ * rewrite: appending a second `"key": …` would duplicate it, and the guard could
+ * not tell, because JSON.parse keeps the LAST duplicate — the document would
+ * verify as the intended one while carrying a key twice.
+ */
+function hasKey(text, key) {
+	return new RegExp(`"${escapeRegExp(key)}"\\s*:`).test(text);
+}
+
 /** The last non-whitespace index in `text`, or -1. */
 function lastContentIndex(text) {
 	for (let i = text.length - 1; i >= 0; i -= 1) {
@@ -133,7 +144,9 @@ function patchObjectFields(text, { identityKey, identityValue, fields, expected 
 			inner = inner.replace(member, (_whole, prefix) => prefix + JSON.stringify(value));
 			continue;
 		}
-		// Insert after the last member, in the object's own layout.
+		// Insert after the last member, in the object's own layout — but never when the
+		// key is already there with a value this helper will not rewrite.
+		if (hasKey(inner, key)) return null;
 		const body = inner.slice(0, -1); // the object without its closing brace
 		const lastEnd = lastContentIndex(body);
 		if (lastEnd === -1) return null;

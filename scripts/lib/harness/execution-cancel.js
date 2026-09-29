@@ -30,6 +30,7 @@ const {
 	readExecutionHandle,
 	listExecutionHandles,
 	isProcessAlive,
+	pidStillOwned,
 	signalPidTree,
 	CODE_CORRUPT: CODE_HANDLE_CORRUPT,
 } = require("../core/execution-handles");
@@ -229,6 +230,72 @@ function readCancellationRecord(targetRoot, runId) {
 	}
 }
 
+// §4.2/§4.3: the cancellation a run's settlement event CITES, or null. One rule
+// with two readers — a lost race cites it in its refusal, and the attempt's own
+// terminal event is marked with it. The record is quoted only when it is the one
+// the tamper-evident chain cites, so an edited record is never promoted into a
+// terminal fact as though it had been observed.
+function recordedCancellation(targetRoot, runId) {
+	const settled = readCancellationState(targetRoot, runId).settled;
+	if (settled === null) return null;
+	const prefix = cancellationPointerPrefix(runId);
+	const cited = (settled.pointers || []).find((pointer) => pointer.startsWith(prefix));
+	if (!cited) return null;
+	const record = readCancellationRecord(targetRoot, runId);
+	if (record === null) return null;
+	const { snapshotHash, ...body } = record;
+	if (snapshotHash !== canonicalHashOf(body)) return null;
+	if (cited.slice(prefix.length) !== snapshotHash) return null;
+	return {
+		outcome: record.outcome,
+		signal: record.signal,
+		at: record.at,
+		pointer: cited,
+		hash: snapshotHash,
+	};
+}
+
+function settlementCitedOutcome(targetRoot, runId) {
+	const recorded = recordedCancellation(targetRoot, runId);
+	return recorded === null ? null : recorded.outcome;
+}
+
+/**
+ * The cancellation REQUESTED for a run, or null. The request is the deterministic
+ * evidence for attributing an exit to a cancellation: it is appended BEFORE the
+ * signal is sent (§3 step 3), so it is already on the chain when the attempt's own
+ * settle runs. The settlement record is written only after the process is observed
+ * dead, so waiting for it would make the attribution depend on which of two racing
+ * writers finished first — a cancelled attempt would sometimes read as an ordinary
+ * failure again, which is exactly what §4.3 forbids.
+ */
+function requestedCancellation(targetRoot, runId) {
+	const request = readCancellationState(targetRoot, runId).request;
+	if (request === null) return null;
+	const prefix = cancelRequestPointerPrefix(runId);
+	const pointer = (request.pointers || []).find((entry) => entry.startsWith(prefix)) || null;
+	return { signal: SIGNAL, pointer, at: request.at };
+}
+
+/**
+ * What a terminal event may say about a cancellation for this run, or null.
+ * Prefers the settled record (which carries the OBSERVED outcome) and falls back
+ * to the request, so the marker is deterministic while still naming the outcome
+ * whenever it is already known.
+ */
+function cancellationAttribution(targetRoot, runId) {
+	const recorded = recordedCancellation(targetRoot, runId);
+	if (recorded !== null)
+		return { outcome: recorded.outcome, signal: recorded.signal, pointers: [recorded.pointer] };
+	const requested = requestedCancellation(targetRoot, runId);
+	if (requested === null) return null;
+	return {
+		outcome: null,
+		signal: requested.signal,
+		pointers: requested.pointer === null ? [] : [requested.pointer],
+	};
+}
+
 // The record's own timestamp must be a real date-time, so a tampered `at` is
 // refused here as a corrupt record rather than surfacing later as an unrelated
 // event-schema error at the settlement append.
@@ -384,9 +451,33 @@ async function observeHandle(handle, { signal }) {
 			signalResult: { signalled: false, reason: "resumed-settlement" },
 			outcome: "unknown",
 		};
+	// Only ever signal a pid that is still OURS. A recycled pid belongs to an
+	// unrelated process, and signalling it would be exactly the "killed something
+	// else" failure this seam exists to prevent. The recorded attempt is gone, so
+	// the honest outcome is `already-exited` and nothing is sent.
+	if (!pidStillOwned(handle))
+		return {
+			aliveBefore,
+			signalResult: { signalled: false, reason: "pid-reused" },
+			outcome: "already-exited",
+		};
 	const signalResult = signalPidTree(handle.pid, SIGNAL);
 	const exited = await waitFor(() => !isProcessAlive(handle.pid));
-	return { aliveBefore, signalResult, outcome: exited ? "terminated" : "unknown" };
+	return {
+		aliveBefore,
+		signalResult,
+		outcome: classifyOutcome({ exited, signalled: signalResult.signalled }),
+	};
+}
+
+// The one place the outcome rule lives, so it can be asserted exhaustively.
+// §3 defines `terminated` as: the pid was alive, the signal WAS DELIVERED, and it
+// exited within the bound. When nothing was delivered and the pid is gone anyway,
+// the process exited on its own — reporting `terminated` there would claim a kill
+// that never happened, which this seam may never do.
+function classifyOutcome({ exited, signalled }) {
+	if (!exited) return "unknown";
+	return signalled ? "terminated" : "already-exited";
 }
 
 // One immutable record per attempt: the observation it settled on, plus what it
@@ -450,11 +541,17 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 	// layer clears that handle from its own settlement `finally`, so an
 	// authorized-but-unsettled cancellation must be completable without it.
 	const state = readCancellationState(targetRoot, runId);
-	if (state.settled)
+	if (state.settled) {
+		// §4.2: the loser reports the RECORDED OUTCOME, not merely that a record
+		// exists.
+		const outcome = settlementCitedOutcome(targetRoot, runId);
 		throw typedError(
 			CODE_CONFLICT,
-			`run ${JSON.stringify(runId)} already carries a recorded cancellation (${state.settled.at}); one cancellation per attempt`,
+			`run ${JSON.stringify(runId)} already carries a recorded cancellation (${
+				outcome === null ? "outcome unconfirmed" : `outcome ${outcome}`
+			}, settled ${state.settled.at}); one cancellation per attempt`,
 		);
+	}
 	const resuming = state.request !== null;
 
 	// Step 2: the cancellation's OWN human Decision (never the execution's).
@@ -591,6 +688,11 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 	// attempt would read it and fail identically — an unremovable poison, since
 	// records are never deleted. A concurrent attempt's record still stands: a
 	// racing loser never removes the winner's evidence.
+	//
+	// The bytes go to a temporary file and are LINKED into place. `link` is atomic
+	// and still fails with EEXIST when a racing attempt already won, so exclusivity
+	// survives while a crash mid-write can no longer leave a HALF-WRITTEN record
+	// behind — which would be the same unremovable poison by another route.
 	const file = cancellationFile(targetRoot, runId);
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	const settlementRequest = readCancellationState(targetRoot, runId).request;
@@ -604,15 +706,28 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 			CODE_CORRUPT,
 			`cancellation record for run ${JSON.stringify(runId)} fails verification before it is written: ${pendingProblem}`,
 		);
+	const body = `${JSON.stringify(record, null, "\t")}\n`;
+	const temp = `${file}.${process.pid}.tmp`;
 	try {
-		fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, {
-			encoding: "utf8",
-			flag: "wx",
-		});
-	} catch (error) {
-		// `EEXIST` means another attempt's record is already the authority. It is
-		// read back and verified below, at the moment it becomes authoritative.
-		if (!error || error.code !== "EEXIST") throw error;
+		fs.writeFileSync(temp, body, "utf8");
+		try {
+			fs.linkSync(temp, file);
+		} catch (error) {
+			// `EEXIST` means another attempt's record is already the authority. It is
+			// read back and verified below, at the moment it becomes authoritative.
+			const code = error && error.code;
+			if (code === "EEXIST") {
+				/* settled by the winner */
+			} else if (code === "ENOSYS" || code === "EPERM" || code === "ENOTSUP" || code === "EXDEV") {
+				// A filesystem without hard links loses the atomicity, never the
+				// exclusivity: fall back to the exclusive create.
+				fs.writeFileSync(file, body, { encoding: "utf8", flag: "wx" });
+			} else {
+				throw error;
+			}
+		}
+	} finally {
+		fs.rmSync(temp, { force: true });
 	}
 
 	// Step 6: the record becomes authoritative only now, so it is re-verified as
@@ -718,4 +833,7 @@ module.exports = {
 	CODE_HANDLE_CORRUPT,
 	cancelExecution,
 	handleView,
+	classifyOutcome,
+	recordedCancellation,
+	cancellationAttribution,
 };

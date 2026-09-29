@@ -121,6 +121,21 @@ test("patchObjectFields keeps a single-line object on one line", () => {
 	);
 });
 
+test("patchObjectFields refuses an insert when the key already exists with a shape it cannot rewrite", () => {
+	// `paths` holds an array: the helper will not rewrite it, so it must refuse the
+	// field rather than append a SECOND `"paths": …` that JSON.parse would hide by
+	// keeping the last one — the guard would still pass and the document would carry
+	// the key twice.
+	const text = '{ "features": [ { "id": "F001", "paths": ["a.js"] } ] }\n';
+	const patched = patchObjectFields(text, {
+		identityKey: "id",
+		identityValue: "F001",
+		fields: { paths: "b.js" },
+		expected: { features: [{ id: "F001", paths: "b.js" }] },
+	});
+	assert.equal(patched, null);
+});
+
 test("patchValuesByKey rewrites the changed value wherever the old one appears", () => {
 	const text =
 		'{\n\t"version": "1.0.0",\n\t"packages": {\n\t\t"": { "version": "1.0.0" }\n\t}\n}\n';

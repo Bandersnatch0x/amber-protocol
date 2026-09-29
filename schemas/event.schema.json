@@ -43,40 +43,84 @@
 				"runtime.no-progress.stopped"
 			]
 		},
-		"schemaVersion": { "const": 1 },
-		"at": { "type": "string", "format": "date-time" },
+		"schemaVersion": {
+			"const": 1
+		},
+		"at": {
+			"type": "string",
+			"format": "date-time"
+		},
 		"runId": {
 			"type": "string",
 			"minLength": 1,
 			"maxLength": 128,
 			"description": "Required for run-scoped kinds (run.*/execution.*/policy.*/validation.*/approval.*); context.* events carry actor/action instead (ADR-0102 amendment, F069)."
 		},
-		"actor": { "type": "string", "maxLength": 128 },
+		"actor": {
+			"type": "string",
+			"maxLength": 128
+		},
 		"action": {
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"tool": { "type": "string", "maxLength": 128 },
-				"resource": { "type": "string", "maxLength": 256 }
+				"tool": {
+					"type": "string",
+					"maxLength": 128
+				},
+				"resource": {
+					"type": "string",
+					"maxLength": 256
+				}
 			}
 		},
 		"decision": {
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"result": { "enum": ["allow", "deny", "ask"] },
-				"policy": { "type": "string", "maxLength": 256 },
-				"policyVersion": { "type": "string", "maxLength": 32 }
+				"result": {
+					"enum": ["allow", "deny", "ask"]
+				},
+				"policy": {
+					"type": "string",
+					"maxLength": 256
+				},
+				"policyVersion": {
+					"type": "string",
+					"maxLength": 32
+				}
 			}
 		},
-		"inputHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-		"outputHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-		"reason": { "type": "string", "maxLength": 2000 },
+		"inputHash": {
+			"type": "string",
+			"pattern": "^sha256:[0-9a-f]{64}$"
+		},
+		"outputHash": {
+			"type": "string",
+			"pattern": "^sha256:[0-9a-f]{64}$"
+		},
+		"reason": {
+			"type": "string",
+			"maxLength": 2000
+		},
 		"pointers": {
 			"description": "F066: optional additive field — the governed-artifact pointers this event witnessed (e.g. the six AdmissionReceipt pointers on run.admitted). Additive, never required.",
 			"type": "array",
-			"items": { "type": "string", "minLength": 1, "maxLength": 256 },
+			"items": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256
+			},
 			"maxItems": 16
+		},
+		"cancelled": {
+			"description": "F081 §4.3: true when the natural settle attributed this attempt's signalled exit to a recorded cancellation, so a cancelled attempt is never readable as an ordinary failure. Absent on every other event.",
+			"type": "boolean"
+		},
+		"signal": {
+			"description": "F081 §4.3: the signal the cancellation used to stop the attempt (the observed mechanism is named, never assumed from the exit code alone).",
+			"type": "string",
+			"maxLength": 32
 		}
 	}
 }

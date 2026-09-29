@@ -29,6 +29,7 @@ const {
 const {
 	cancelExecution,
 	handleView,
+	classifyOutcome,
 	CODE_NO_HANDLE,
 	CODE_CONFLICT,
 	OUTCOMES,
@@ -253,6 +254,296 @@ test("cancelling a live governed execution reports terminated, retains the works
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		fs.rmSync(preparedWorkspace, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// The outcome rule lives in one place so it can be asserted exhaustively —
+// including the case that used to claim a kill it never performed: the signal was
+// NOT delivered and the pid is gone anyway (the target died on its own), which is
+// `already-exited`, never `terminated`.
+test("classifyOutcome never reports a kill the seam did not perform", () => {
+	assert.equal(classifyOutcome({ exited: true, signalled: true }), "terminated");
+	assert.equal(classifyOutcome({ exited: true, signalled: false }), "already-exited");
+	assert.equal(classifyOutcome({ exited: false, signalled: true }), "unknown");
+	assert.equal(classifyOutcome({ exited: false, signalled: false }), "unknown");
+});
+
+// F3: a recycled pid belongs to an unrelated process, and signalling it would be
+// the one failure this seam exists to prevent. The handle records the process
+// identity (Linux start time); when the live pid carries a different identity the
+// seam sends nothing and records what it observed.
+test("a handle whose pid now belongs to another process is never signalled", async () => {
+	if (process.platform !== "linux") return; // the identity comes from /proc
+	const target = gitTarget("pid-reuse", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		const { promise, handle } = await startRunning(target);
+		try {
+			// Forge the recorded identity, recomputing the Snapshot Hash so the handle
+			// is internally valid: this is "the pid was reused", not "the handle is
+			// corrupt".
+			const stored = JSON.parse(fs.readFileSync(handle.file, "utf8"));
+			const { snapshotHash: _hash, file: _file, ...body } = stored;
+			body.pidStartedAt = "0";
+			fs.writeFileSync(
+				handle.file,
+				`${JSON.stringify({ ...body, snapshotHash: canonicalHashOf(body) }, null, "\t")}\n`,
+				"utf8",
+			);
+
+			const cancelled = await cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "the recorded pid no longer names our process",
+			});
+			assert.equal(cancelled.outcome, "already-exited", "an unowned pid is never a kill");
+			assert.equal(cancelled.signalResult.signalled, false);
+			assert.equal(cancelled.signalResult.reason, "pid-reused");
+			assert.equal(
+				isProcessAlive(handle.pid),
+				true,
+				"nothing was sent to the process holding that pid",
+			);
+			assert.ok(fs.existsSync(cancelled.cancellationFile), "the observation is still recorded");
+		} finally {
+			if (isProcessAlive(handle.pid)) {
+				try {
+					process.kill(handle.pid, "SIGKILL");
+				} catch (_error) {
+					/* already gone */
+				}
+			}
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// One handle per runId. A duplicate write used to fail only AFTER the spawn, leaving
+// a running child with no handle and no cancellation address, reported as an ordinary
+// command failure. The decision is now made before any effect.
+test("a live handle makes a second attempt for the same runId refuse before spawning", async () => {
+	const target = gitTarget("handle-live-conflict", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		const { promise, handle } = await startRunning(target);
+		try {
+			const second = await runGovernedCommand({
+				target,
+				commandId: "allow-cancel",
+				ledgerPath: ledgerPathOf(target),
+				label: "cancel-run",
+				subject: { runId: RUN_ID },
+				budgetMinutes: 5,
+			});
+			assert.notEqual(second.executed, true, "the second attempt never executed");
+			assert.ok(
+				(second.errors || []).some((e) => /already owns a live governed execution/.test(String(e))),
+				`the refusal names the live handle, got: ${(second.errors || []).join("; ")}`,
+			);
+			assert.equal(isProcessAlive(handle.pid), true, "the running process was untouched");
+		} finally {
+			// Stop the attempt through the seam: a bare kill leaves the grandchild
+			// holding the prepared workspace, which then cannot be removed.
+			if (isProcessAlive(handle.pid)) {
+				try {
+					await cancelExecution(target, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "test cleanup",
+					});
+				} catch (_error) {
+					try {
+						process.kill(handle.pid, "SIGKILL");
+					} catch (_inner) {
+						/* already gone */
+					}
+				}
+			}
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// A stale handle (its pid is gone) is reconciled on the next attempt instead of
+// blocking the runId forever — the reader already calls it stale, so the writer does
+// the same rather than failing on its own record.
+test("a stale handle is reconciled so the runId can be used again", async () => {
+	const target = gitTarget("handle-stale-reconcile", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		persistExecutionHandle({
+			targetRoot: target,
+			runId: RUN_ID,
+			attemptId: null,
+			label: "cancel-run",
+			commandId: "allow-cancel",
+			workspace: target,
+			pid: 999_999,
+			startedAt: new Date().toISOString(),
+		});
+		const promise = runGovernedCommand({
+			target,
+			commandId: "allow-cancel",
+			ledgerPath: ledgerPathOf(target),
+			label: "cancel-run",
+			subject: { runId: RUN_ID },
+			budgetMinutes: 5,
+		});
+		const handleFile = path.join(
+			target,
+			".amber",
+			"harness",
+			"executions",
+			`${RUN_ID}.handle.json`,
+		);
+		const deadline = Date.now() + 10_000;
+		while (Date.now() < deadline) {
+			if (fs.existsSync(handleFile)) {
+				const record = readExecutionHandle(target, RUN_ID);
+				if (record && record.status === "live" && record.pid !== 999_999) break;
+			}
+			await new Promise((resolve) => setTimeout(resolve, 25));
+		}
+		const record = readExecutionHandle(target, RUN_ID);
+		try {
+			assert.ok(record, "a handle exists for the attempt");
+			assert.notEqual(record.pid, 999_999, "the stale handle was replaced by the live one");
+			assert.equal(isProcessAlive(record.pid), true, "the attempt is running under its own handle");
+		} finally {
+			if (record && isProcessAlive(record.pid)) {
+				try {
+					await cancelExecution(target, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "test cleanup",
+					});
+				} catch (_error) {
+					try {
+						process.kill(record.pid, "SIGKILL");
+					} catch (_inner) {
+						/* already gone */
+					}
+				}
+			}
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// The handle view without --run lists every owned handle with its observed liveness —
+// §5's "lists live and stale handles" — which the run-scoped view never exercises.
+test("the handle view lists live and stale handles without --run", async () => {
+	const target = gitTarget("handle-list", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		persistExecutionHandle({
+			targetRoot: target,
+			runId: "run-stale-listed",
+			attemptId: null,
+			label: "cancel-run",
+			commandId: "allow-cancel",
+			workspace: target,
+			pid: 999_999,
+			startedAt: new Date().toISOString(),
+		});
+		const { promise, handle } = await startRunning(target);
+		try {
+			const view = handleView(target);
+			const byRun = new Map(view.handles.map((entry) => [entry.runId, entry]));
+			assert.deepEqual(
+				[...byRun.keys()].sort(),
+				["run-cancel-1", "run-stale-listed"],
+				"every handle is listed, not only the live one",
+			);
+			assert.equal(byRun.get("run-cancel-1").status, "live");
+			assert.equal(byRun.get("run-stale-listed").status, "stale");
+			assert.equal(byRun.get("run-stale-listed").pid, 999_999);
+		} finally {
+			if (isProcessAlive(handle.pid)) {
+				try {
+					await cancelExecution(target, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "test cleanup",
+					});
+				} catch (_error) {
+					try {
+						process.kill(handle.pid, "SIGKILL");
+					} catch (_inner) {
+						/* already gone */
+					}
+				}
+			}
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// §4.2: a lost race reports the RECORDED OUTCOME, not merely that a record
+// exists. The record is quoted only when it is the one the settlement event cites.
+test("a settled run refuses with the recorded outcome, and leaves no temp behind", async () => {
+	const target = gitTarget("settled-outcome", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		approve(target);
+		const { promise, handle } = await startRunning(target);
+		try {
+			const first = await cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "stop it",
+			});
+			assert.equal(first.ok, true);
+			await assert.rejects(
+				() =>
+					cancelExecution(target, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: "again",
+					}),
+				(error) => {
+					assert.equal(error.amberCode, CODE_CONFLICT);
+					assert.match(error.message, /already carries a recorded cancellation/);
+					assert.match(
+						error.message,
+						new RegExp(`outcome ${first.outcome}`),
+						"the refusal names the recorded outcome",
+					);
+					return true;
+				},
+			);
+			// The record is linked into place from a temporary file, so the temporary
+			// must never survive the write.
+			const dir = path.dirname(first.cancellationFile);
+			assert.deepEqual(
+				fs.readdirSync(dir).filter((name) => name.endsWith(".tmp")),
+				[],
+				"no temporary record file is left behind",
+			);
+		} finally {
+			if (isProcessAlive(handle.pid)) {
+				try {
+					process.kill(handle.pid, "SIGKILL");
+				} catch (_error) {
+					/* already gone */
+				}
+			}
+			await promise.catch(() => {});
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
