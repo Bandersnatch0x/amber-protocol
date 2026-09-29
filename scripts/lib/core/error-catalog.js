@@ -3180,11 +3180,11 @@ const CATALOG = {
 		related: ["AMBER_E_HARNESS_EXEC_NO_HANDLE"],
 	},
 	AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT: {
-		title: "Cancellation record failed its closed shape",
+		title: "Cancellation record failed its closed shape or its binding",
 		cause:
-			"A stored cancellation record under .amber/harness/executions/cancellations/ is not valid JSON or no longer matches its Snapshot Hash.",
+			"A stored cancellation record under .amber/harness/executions/cancellations/ is not valid JSON, carries an unknown or missing field, is missing a required field or type (including its Decision, handle snapshot hash, signalResult, observation or date-time), no longer matches its Snapshot Hash, or is not bound to this run's recorded request, handle snapshot and Decision. Verification binds identity and internal consistency; it cannot detect a rewrite of the observed outcome by an actor who can also recompute the hash.",
 		remedy:
-			"Investigate the named record; cancellation reads fail closed rather than reporting an invented outcome.",
+			"Investigate the named record; cancellation reads fail closed rather than reporting an invented outcome, and a record is never repaired in place.",
 		layer: "Verification",
 		related: ["AMBER_E_HARNESS_EXEC_HANDLE_CORRUPT"],
 	},

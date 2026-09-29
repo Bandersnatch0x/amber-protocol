@@ -229,6 +229,11 @@ function readCancellationRecord(targetRoot, runId) {
 	}
 }
 
+// The record's own timestamp must be a real date-time, so a tampered `at` is
+// refused here as a corrupt record rather than surfacing later as an unrelated
+// event-schema error at the settlement append.
+const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
 // The closed field set of one cancellation record.
 const CANCELLATION_RECORD_FIELDS = Object.freeze([
 	"schemaVersion",
@@ -263,8 +268,17 @@ function requestCarriesPointer(request, pointer) {
 // A cancellation record is EVIDENCE: it is what a terminal receipt cites. It is
 // therefore verified — closed field set, recomputed Snapshot Hash, and binding
 // to THIS run's recorded request, handle and Decision — before any caller may
-// reuse it. Unverified bytes are never promoted to a settled outcome: a
-// tampered or unbound record is refused, never repaired in place.
+// reuse it, and a record failing any check is refused rather than repaired.
+//
+// The scope of that guarantee, stated plainly: it binds IDENTITY and INTERNAL
+// CONSISTENCY. The Snapshot Hash is derived from the record body, so an actor who
+// can WRITE the record file can also rewrite the observed outcome and recompute a
+// consistent hash — no self-describing record can distinguish that. The residual
+// rests on (a) the record living inside the target's own `.amber/` state, whose
+// write access is the same grant that could already rewrite the ledger, and
+// (b) the settlement event citing `execution-cancel:<run>#<hash>`, so an edit
+// AFTER settlement is detectable against the tamper-evident chain. Never repair a
+// record in place.
 function cancellationRecordProblem(record, { runId, request, decision }) {
 	if (!record || typeof record !== "object" || Array.isArray(record))
 		return "cancellation record is not an object";
@@ -284,6 +298,11 @@ function cancellationRecordProblem(record, { runId, request, decision }) {
 		// "matches" (the guard below is unconditional).
 		"decision",
 		"handleSnapshotHash",
+		// Fields the settlement dereferences must be required and typed here, or a
+		// tampered record crashes the settlement with an untyped error instead of
+		// the governed refusal.
+		"signalResult",
+		"observation",
 	]) {
 		if (record[field] === undefined || record[field] === null || record[field] === "")
 			return `cancellation record carries no ${field}`;
@@ -292,6 +311,18 @@ function cancellationRecordProblem(record, { runId, request, decision }) {
 		return `cancellation record declares unsupported schemaVersion ${JSON.stringify(record.schemaVersion)}`;
 	if (!OUTCOMES.includes(record.outcome))
 		return `cancellation record carries unknown outcome ${JSON.stringify(record.outcome)}`;
+	if (typeof record.at !== "string" || !ISO_DATE_TIME.test(record.at))
+		return `cancellation record carries no valid date-time at (${JSON.stringify(record.at)})`;
+	if (
+		typeof record.signalResult !== "object" ||
+		record.signalResult === null ||
+		Array.isArray(record.signalResult)
+	)
+		return "cancellation record signalResult is not an object";
+	if (typeof record.signalResult.signalled !== "boolean")
+		return "cancellation record signalResult carries no boolean signalled";
+	if (typeof record.observation !== "string")
+		return "cancellation record observation is not a string";
 	if (typeof record.handleSnapshotHash !== "string")
 		return "cancellation record handleSnapshotHash is not a string";
 	if (typeof record.decision !== "object" || Array.isArray(record.decision))
@@ -554,12 +585,25 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 		});
 	}
 
-	// Step 5: the record is written ONCE (exclusive create) and is NEVER deleted.
-	// It is the immutable observation of an authorized attempt, and the settlement
-	// event is what makes it authoritative; if a concurrent attempt already wrote
-	// it, that record stands — a racing loser never removes the winner's evidence.
+	// Step 5: verify the record BEFORE writing it, then write ONCE (exclusive
+	// create); the record is never deleted. Verifying first matters: a record that
+	// cannot pass verification must never reach the disk, because every later
+	// attempt would read it and fail identically — an unremovable poison, since
+	// records are never deleted. A concurrent attempt's record still stands: a
+	// racing loser never removes the winner's evidence.
 	const file = cancellationFile(targetRoot, runId);
 	fs.mkdirSync(path.dirname(file), { recursive: true });
+	const settlementRequest = readCancellationState(targetRoot, runId).request;
+	const pendingProblem = cancellationRecordProblem(record, {
+		runId,
+		request: settlementRequest,
+		decision,
+	});
+	if (pendingProblem !== null)
+		throw typedError(
+			CODE_CORRUPT,
+			`cancellation record for run ${JSON.stringify(runId)} fails verification before it is written: ${pendingProblem}`,
+		);
 	try {
 		fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, {
 			encoding: "utf8",
@@ -571,10 +615,9 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 		if (!error || error.code !== "EEXIST") throw error;
 	}
 
-	// Step 6: the record becomes authoritative only now, so it is re-verified at
-	// that moment: a record changed (or gone) between read and settle is refused
-	// rather than cited, and the cited hash is always the hash on disk.
-	const settlementRequest = readCancellationState(targetRoot, runId).request;
+	// Step 6: the record becomes authoritative only now, so it is re-verified as
+	// it stands on disk: a record changed (or gone) between write and settle is
+	// refused rather than cited, and the cited hash is always the hash on disk.
 	const settledRecord = verifiedCancellationRecord(targetRoot, runId, {
 		request: settlementRequest,
 		decision,

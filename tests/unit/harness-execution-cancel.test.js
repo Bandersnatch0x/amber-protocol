@@ -677,7 +677,7 @@ test("a handle issued for another target is refused before any signal", async ()
 
 // A handle whose recorded pid is already gone: no real process is involved, so
 // these cases isolate the SETTLEMENT path.
-function staleHandle(target, { runId = RUN_ID } = {}) {
+function staleHandle(target, { runId = RUN_ID, overrides = {} } = {}) {
 	const file = path.join(target, ".amber", "harness", "executions", `${runId}.handle.json`);
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	const record = {
@@ -693,6 +693,7 @@ function staleHandle(target, { runId = RUN_ID } = {}) {
 		startedAt: "2026-09-24T00:00:00.000Z",
 		deadlineAt: "2026-09-24T00:05:00.000Z",
 		target: path.resolve(target),
+		...overrides,
 	};
 	record.snapshotHash = canonicalHashOf(record);
 	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
@@ -1145,6 +1146,120 @@ test("a record whose binding fields are missing is refused", async () => {
 			readHarnessEvents(target).map((event) => event.kind),
 			["execution.cancel.requested"],
 		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// Fields the settlement dereferences, and the record's own timestamp, must be
+// required and typed: otherwise a tampered record crashes the settlement with an
+// untyped error, or leaks an unrelated code, instead of the governed refusal.
+test("a record with a mistyped or missing dereferenced field is refused", async () => {
+	const mutations = [
+		["signalResult removed", (record) => delete record.signalResult, /carries no signalResult/],
+		[
+			"signalResult not an object",
+			(record) => {
+				record.signalResult = "terminated";
+			},
+			/signalResult is not an object/,
+		],
+		[
+			"observation not a string",
+			(record) => {
+				record.observation = { nested: true };
+			},
+			/observation is not a string/,
+		],
+		[
+			"at not a date-time",
+			(record) => {
+				record.at = "not-a-date";
+			},
+			/valid date-time/,
+		],
+	];
+	for (const [label, mutate, pattern] of mutations) {
+		const target = gitTarget(`mistyped-${label.replace(/\W+/g, "-")}`, allowRules(SLEEP_COMMAND));
+		try {
+			decisionFixture(target);
+			staleHandle(target);
+			const file = await strandWithRecord(target);
+			const record = JSON.parse(fs.readFileSync(file, "utf8"));
+			mutate(record);
+			const { snapshotHash: _stale, ...body } = record;
+			record.snapshotHash = canonicalHashOf(body);
+			fs.writeFileSync(file, JSON.stringify(record));
+
+			await assert.rejects(
+				() =>
+					cancelExecution(target, {
+						runId: RUN_ID,
+						decision: { identity: "decision/cancel-1", revision: 1 },
+						reason: label,
+					}),
+				(error) =>
+					error.amberCode === "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT" && pattern.test(error.message),
+				`${label} must be refused as a corrupt record, not crash or settle`,
+			);
+		} finally {
+			fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		}
+	}
+});
+
+// A record that cannot pass verification must never reach the disk: records are
+// never deleted, so a persisted bad one would fail every later attempt too.
+test("a record that cannot pass verification is never written", async () => {
+	const target = gitTarget("no-poison", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+		const first = readExecutionHandle(target, RUN_ID);
+		// A stranded request that names the FIRST handle's snapshot.
+		emitHarnessEvent(target, {
+			kind: "execution.cancel.requested",
+			schemaVersion: 1,
+			at: new Date().toISOString(),
+			runId: RUN_ID,
+			inputHash: first.snapshotHash,
+			reason: "stranded request",
+			pointers: [
+				`execution-cancel-request:${RUN_ID}#stranded`,
+				"execution-cancel-decision:decision/cancel-1@1",
+			],
+		});
+		// The execution restarts and persists a NEW handle (new lease, new fence),
+		// so any record built now is bound to a different snapshot than the request.
+		fs.rmSync(first.file, { force: true });
+		staleHandle(target, { overrides: { leaseId: "restarted-lease", fence: 2 } });
+		const second = readExecutionHandle(target, RUN_ID);
+		assert.notEqual(
+			second.snapshotHash,
+			first.snapshotHash,
+			"a restarted attempt carries a new handle snapshot",
+		);
+		const file = path.join(
+			target,
+			".amber",
+			"harness",
+			"executions",
+			"cancellations",
+			`${RUN_ID}.json`,
+		);
+
+		await assert.rejects(
+			() =>
+				cancelExecution(target, {
+					runId: RUN_ID,
+					decision: { identity: "decision/cancel-1", revision: 1 },
+					reason: "restarted execution",
+				}),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT" &&
+				/before it is written/.test(error.message),
+		);
+		assert.equal(fs.existsSync(file), false, "an unverifiable record must never reach the disk");
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}

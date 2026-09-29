@@ -143,14 +143,29 @@ stale handles with the observed liveness, and `cancel` on a stale handle records
   `unknown` — never a claimed termination. The record is written once, never
   deleted, so a racing loser reports `already-settled` and cannot remove the
   winner's evidence.
-- A record is EVIDENCE, so it is verified before it is ever cited: closed field
-  set, recomputed Snapshot Hash, and binding to this run's recorded request,
-  handle snapshot and Decision. A tampered or unbound record is refused
+- A record is EVIDENCE, so it is verified before it is ever cited and again at
+  the moment it becomes authoritative. Verification binds IDENTITY and INTERNAL
+  CONSISTENCY: a closed field set; the required fields present with their types
+  (Decision, handle snapshot hash, signalResult, observation and a real
+  date-time); a recomputed Snapshot Hash; and binding to this run's recorded
+  request, handle snapshot and Decision. A record failing any of those is refused
   (`AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT`) instead of being promoted to a settled
   outcome, and it is re-verified at the moment it becomes authoritative. The
   binding fields are REQUIRED and their checks are unconditional: a record that
   omits its Decision or its handle snapshot is refused, so an absent binding
-  never reads as a matching one.
+  never reads as a matching one. A record that cannot pass verification is
+  refused BEFORE it is written, so a bad record is never persisted.
+- The residual, stated plainly: the Snapshot Hash is derived from the record
+  body, so an actor who can WRITE the record file can also rewrite the observed
+  outcome (`outcome`, `observation`) and recompute a consistent hash, and no
+  self-describing record can distinguish that — verification is not
+  authentication. Two properties bound the exposure: the record lives inside the
+  target's own `.amber/` state, whose write access is the same grant that could
+  already rewrite the ledger, and the settlement event cites
+  `execution-cancel:<run>#<hash>`, so an edit AFTER settlement is detectable
+  against the tamper-evident chain. A first-attempt record is therefore
+  authoritative by construction; a resumed record is trusted as the only
+  surviving observation of an attempt whose settlement had failed.
 
 - A cancellation is **asynchronous** by necessity: the settling execution can run in the
   same process as the cancel caller, so a blocking wait would prevent the very continuation
