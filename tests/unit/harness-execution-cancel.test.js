@@ -1003,3 +1003,107 @@ test("an unsettled request refuses a different authorization", async () => {
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
+
+// Leave the state a transient terminal-append failure leaves: a spent request
+// plus a real record whose settlement never landed.
+async function strandWithRecord(target) {
+	const ledger = require("../../scripts/lib/harness/event-ledger");
+	const cancelPath = require.resolve("../../scripts/lib/harness/execution-cancel");
+	const realEmit = ledger.emitHarnessEvent;
+	let injected = false;
+	ledger.emitHarnessEvent = (t, body, guard) => {
+		if (!injected && body.kind === "execution.cancelled") {
+			injected = true;
+			return {
+				ok: false,
+				code: "AMBER_E_HARNESS_LEDGER_LOCKED",
+				errors: ["injected transient settlement failure"],
+			};
+		}
+		return realEmit(t, body, guard);
+	};
+	let error;
+	try {
+		delete require.cache[cancelPath];
+		const patched = require(cancelPath);
+		await patched.cancelExecution(target, {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "first attempt",
+		});
+	} catch (caught) {
+		error = caught;
+	} finally {
+		ledger.emitHarnessEvent = realEmit;
+		delete require.cache[cancelPath];
+	}
+	assert.equal(error && error.amberCode, "AMBER_E_HARNESS_LEDGER_LOCKED");
+	return path.join(target, ".amber", "harness", "executions", "cancellations", `${RUN_ID}.json`);
+}
+
+// A record is EVIDENCE: a tampered one must be refused, not promoted to a
+// terminal receipt that claims a kill nobody observed (F081 §3.5, §6).
+test("a tampered cancellation record is refused, never settled", async () => {
+	const target = gitTarget("tampered-record", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+		const file = await strandWithRecord(target);
+
+		const record = JSON.parse(fs.readFileSync(file, "utf8"));
+		assert.equal(record.outcome, "already-exited");
+		// Rewrite the outcome and keep the stale Snapshot Hash.
+		record.outcome = "terminated";
+		fs.writeFileSync(file, JSON.stringify(record));
+
+		await assert.rejects(
+			() =>
+				cancelExecution(target, {
+					runId: RUN_ID,
+					decision: { identity: "decision/cancel-1", revision: 1 },
+					reason: "tampered record",
+				}),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT" &&
+				/Snapshot Hash/.test(error.message),
+		);
+		// Nothing was promoted: the ledger is still unsettled.
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested"],
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// A record whose hash is consistent but which is not bound to this run's
+// recorded request is refused too — a valid hash is not authenticity.
+test("a record unbound to the recorded request is refused even with a valid hash", async () => {
+	const target = gitTarget("unbound-record", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+		const file = await strandWithRecord(target);
+
+		const record = JSON.parse(fs.readFileSync(file, "utf8"));
+		record.requestPointer = `execution-cancel-request:${RUN_ID}#not-my-request`;
+		const { snapshotHash: _stale, ...body } = record;
+		record.snapshotHash = canonicalHashOf(body);
+		fs.writeFileSync(file, JSON.stringify(record));
+
+		await assert.rejects(
+			() =>
+				cancelExecution(target, {
+					runId: RUN_ID,
+					decision: { identity: "decision/cancel-1", revision: 1 },
+					reason: "unbound record",
+				}),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT" &&
+				/recorded request/.test(error.message),
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});

@@ -218,7 +218,7 @@ function readCancellationState(targetRoot, runId) {
 	};
 }
 
-/** Read the immutable cancellation record for a run, or null when absent. */
+/** Raw read of the cancellation record for a run, or null when absent. */
 function readCancellationRecord(targetRoot, runId) {
 	const file = cancellationFile(targetRoot, runId);
 	if (!fs.existsSync(file)) return null;
@@ -227,6 +227,95 @@ function readCancellationRecord(targetRoot, runId) {
 	} catch (error) {
 		throw typedError(CODE_CORRUPT, `cancellation record is not valid JSON: ${error.message}`);
 	}
+}
+
+// The closed field set of one cancellation record.
+const CANCELLATION_RECORD_FIELDS = Object.freeze([
+	"schemaVersion",
+	"runId",
+	"attemptId",
+	"label",
+	"commandId",
+	"handlePid",
+	"handleLeaseId",
+	"handleFence",
+	"handleSnapshotHash",
+	"workspace",
+	"aliveBefore",
+	"signal",
+	"signalResult",
+	"outcome",
+	"handleCleared",
+	"decision",
+	"requestPointer",
+	"resumed",
+	"observation",
+	"note",
+	"reason",
+	"at",
+	"snapshotHash",
+]);
+
+function requestCarriesPointer(request, pointer) {
+	return Boolean(request) && Array.isArray(request.pointers) && request.pointers.includes(pointer);
+}
+
+// A cancellation record is EVIDENCE: it is what a terminal receipt cites. It is
+// therefore verified — closed field set, recomputed Snapshot Hash, and binding
+// to THIS run's recorded request, handle and Decision — before any caller may
+// reuse it. Unverified bytes are never promoted to a settled outcome: a
+// tampered or unbound record is refused, never repaired in place.
+function cancellationRecordProblem(record, { runId, request, decision }) {
+	if (!record || typeof record !== "object" || Array.isArray(record))
+		return "cancellation record is not an object";
+	for (const field of Object.keys(record)) {
+		if (!CANCELLATION_RECORD_FIELDS.includes(field))
+			return `cancellation record carries unknown field ${JSON.stringify(field)}`;
+	}
+	for (const field of ["schemaVersion", "runId", "signal", "outcome", "requestPointer", "at"]) {
+		if (record[field] === undefined || record[field] === null || record[field] === "")
+			return `cancellation record carries no ${field}`;
+	}
+	if (record.schemaVersion !== SCHEMA_VERSION)
+		return `cancellation record declares unsupported schemaVersion ${JSON.stringify(record.schemaVersion)}`;
+	if (!OUTCOMES.includes(record.outcome))
+		return `cancellation record carries unknown outcome ${JSON.stringify(record.outcome)}`;
+	const { snapshotHash, ...body } = record;
+	if (snapshotHash !== canonicalHashOf(body))
+		return "cancellation record no longer matches its Snapshot Hash";
+	if (record.runId !== runId)
+		return `cancellation record belongs to run ${JSON.stringify(record.runId)}`;
+	if (!requestCarriesPointer(request, record.requestPointer))
+		return "cancellation record does not match this run's recorded request";
+	if (
+		record.handleSnapshotHash &&
+		request.inputHash &&
+		record.handleSnapshotHash !== request.inputHash
+	)
+		return "cancellation record was taken against a different handle than the recorded request";
+	if (
+		decision &&
+		record.decision &&
+		(record.decision.identity !== decision.identity ||
+			record.decision.revision !== decision.revision)
+	)
+		return "cancellation record was authorized by a different Decision";
+	return null;
+}
+
+// The shared read boundary for cancellation records: a verified record, or a
+// refusal. Every reuse path (recovery, EEXIST adoption, pre-settlement) goes
+// through here, so none of them can cite evidence this one would not accept.
+function verifiedCancellationRecord(targetRoot, runId, { request, decision }) {
+	const record = readCancellationRecord(targetRoot, runId);
+	if (record === null) return null;
+	const problem = cancellationRecordProblem(record, { runId, request, decision });
+	if (problem !== null)
+		throw typedError(
+			CODE_CORRUPT,
+			`cancellation record for run ${JSON.stringify(runId)} fails verification: ${problem}`,
+		);
+	return record;
 }
 
 // Observe one addressable handle and classify the outcome honestly. A FIRST
@@ -341,7 +430,7 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 		// finishes the settlement from whatever evidence survived — the attempt's
 		// own record when it landed, else the handle if it is still there, else
 		// nothing observable (reported `unknown`, never a claimed termination).
-		record = readCancellationRecord(targetRoot, runId);
+		record = verifiedCancellationRecord(targetRoot, runId, { request: state.request, decision });
 		if (record === null) {
 			handle = readExecutionHandle(targetRoot, runId);
 			if (handle === null) {
@@ -452,10 +541,25 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 			flag: "wx",
 		});
 	} catch (error) {
+		// `EEXIST` means another attempt's record is already the authority. It is
+		// read back and verified below, at the moment it becomes authoritative.
 		if (!error || error.code !== "EEXIST") throw error;
-		const existing = readCancellationRecord(targetRoot, runId);
-		if (existing) record = existing;
 	}
+
+	// Step 6: the record becomes authoritative only now, so it is re-verified at
+	// that moment: a record changed (or gone) between read and settle is refused
+	// rather than cited, and the cited hash is always the hash on disk.
+	const settlementRequest = readCancellationState(targetRoot, runId).request;
+	const settledRecord = verifiedCancellationRecord(targetRoot, runId, {
+		request: settlementRequest,
+		decision,
+	});
+	if (settledRecord === null)
+		throw typedError(
+			CODE_CORRUPT,
+			`cancellation record for run ${JSON.stringify(runId)} is missing at settlement time; refusing to cite evidence that is not on disk`,
+		);
+	record = settledRecord;
 
 	const pointers = [
 		`${cancellationPointerPrefix(runId)}${record.snapshotHash}`,

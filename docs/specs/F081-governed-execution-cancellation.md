@@ -143,6 +143,11 @@ stale handles with the observed liveness, and `cancel` on a stale handle records
   `unknown` — never a claimed termination. The record is written once, never
   deleted, so a racing loser reports `already-settled` and cannot remove the
   winner's evidence.
+- A record is EVIDENCE, so it is verified before it is ever cited: closed field
+  set, recomputed Snapshot Hash, and binding to this run's recorded request,
+  handle snapshot and Decision. A tampered or unbound record is refused
+  (`AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT`) instead of being promoted to a settled
+  outcome, and it is re-verified at the moment it becomes authoritative.
 
 - A cancellation is **asynchronous** by necessity: the settling execution can run in the
   same process as the cancel caller, so a blocking wait would prevent the very continuation
