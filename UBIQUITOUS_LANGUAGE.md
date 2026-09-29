@@ -71,7 +71,7 @@
 | Adoption report      | Reviewable trial artifact summarizing audit, init dry-run, team status, and maintenance inspection for a target repository.      | migration report, onboarding report |
 | Adoption gate        | Conservative decision artifact that says whether a target repository should wait, proceed, or address risks.                     | go/no-go, migration gate            |
 | Team distribution    | Local metadata for installing, pinning, updating, rolling back, and inspecting Amber versions and presets.                       | marketplace, release channel        |
-| Maintenance proposal | Reviewable proposal for stale knowledge, scaffold and artifact drift, repeated findings, or regression candidates.                   | auto-fix, cleanup task              |
+| Maintenance proposal | Reviewable proposal for stale knowledge, scaffold and artifact drift, repeated findings, or regression candidates.               | auto-fix, cleanup task              |
 | Amber evolution      | Record of accepted lessons that may later update Wiki, standards, rule packs, or workflow-pack candidates.                       | changelog, retrospective            |
 | Regression proposal  | Reviewable suggestion to turn a real failure into a repeatable assertion or test without modifying the test suite automatically. | regression test, bug fix            |
 

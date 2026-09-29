@@ -79,9 +79,7 @@ test.describe('Governed Agent Harness Console visual contracts', () => {
     });
 
     await page.goto('/');
-    await expect(
-      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_TITLE })).toBeVisible();
     await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
     await expect(page.getByText('Current: Unavailable')).toBeVisible();
 
@@ -105,9 +103,7 @@ test.describe('Governed Agent Harness Console visual contracts', () => {
     });
 
     await page.goto('/');
-    await expect(
-      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_TITLE })).toBeVisible();
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(3);
     await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
   });
@@ -137,9 +133,7 @@ test.describe('Governed Agent Harness Console visual contracts', () => {
     });
 
     await page.goto('/');
-    await expect(
-      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_TITLE })).toBeVisible();
     await expect(page.getByRole('status')).toHaveCount(2);
     await expect(page.getByRole('status').first()).toHaveText('No action required');
     await expect(page.getByRole('status').last()).toHaveText('No action required');
@@ -175,9 +169,7 @@ test.describe('Governed Agent Harness Console visual contracts', () => {
     });
 
     await page.goto('/');
-    await expect(
-      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_TITLE })).toBeVisible();
     await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
     await expect(page.getByText('Current: Unavailable')).toBeVisible();
     await expect(page.getByText('No action required').first()).toBeVisible();
