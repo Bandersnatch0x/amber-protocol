@@ -12,7 +12,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFileSync, spawnSync } = require("node:child_process");
+const { execFileSync, spawnSync, spawn } = require("node:child_process");
 
 const { runGovernedCommand } = require("../../scripts/lib/core/governed-runner");
 const { appendLedgerRecord, readLedger } = require("../../scripts/lib/core/loop-ledger");
@@ -20,7 +20,12 @@ const { registerPrincipal } = require("../../scripts/lib/core/principal-registry
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { readHarnessEvents, emitHarnessEvent } = require("../../scripts/lib/harness/event-ledger");
 const { canonicalHashOf } = require("../../scripts/lib/core/registry-ledger");
-const { readExecutionHandle, isProcessAlive } = require("../../scripts/lib/core/execution-handles");
+const {
+	readExecutionHandle,
+	persistExecutionHandle,
+	clearExecutionHandle,
+	isProcessAlive,
+} = require("../../scripts/lib/core/execution-handles");
 const {
 	cancelExecution,
 	handleView,
@@ -754,12 +759,8 @@ test("a transient terminal-append failure is recoverable with the same authoriza
 			reason: "recovery",
 		});
 		assert.equal(recovered.outcome, "already-exited");
-		assert.equal(recovered.cancellation.resumed, true);
-		assert.equal(
-			recovered.signalResult.signalled,
-			false,
-			"a resumed settlement never signals twice",
-		);
+		assert.equal(recovered.resumed, true, "the original authorization completed the settlement");
+		assert.equal(recovered.signalResult.signalled, false);
 		assert.deepEqual(
 			readHarnessEvents(target).map((event) => event.kind),
 			["execution.cancel.requested", "execution.cancelled"],
@@ -783,7 +784,183 @@ test("a transient terminal-append failure is recoverable with the same authoriza
 	}
 });
 
-// While a request is unsettled, only the authorization that made it may finish
+// Two callers with the same authorization can both see the unsettled state
+// outside the ledger lock. The loser must report the conflict WITHOUT deleting
+// the winner's committed record (F081 §3.5: one immutable cancellation record).
+test("a racing loser never removes the winner's settlement record", async () => {
+	const target = gitTarget("race", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+		const options = {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "concurrent cancellation",
+		};
+		const results = await Promise.allSettled([
+			cancelExecution(target, options),
+			cancelExecution(target, options),
+		]);
+		assert.equal(
+			results.filter((result) => result.status === "fulfilled").length,
+			1,
+			"exactly one caller settles",
+		);
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested", "execution.cancelled"],
+			"one request, one terminal fact",
+		);
+		const recordFile = path.join(
+			target,
+			".amber",
+			"harness",
+			"executions",
+			"cancellations",
+			`${RUN_ID}.json`,
+		);
+		assert.equal(
+			fs.existsSync(recordFile),
+			true,
+			"the winner's immutable record must survive the loser's failure",
+		);
+		assert.equal(JSON.parse(fs.readFileSync(recordFile, "utf8")).runId, RUN_ID);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// The shared execution layer clears the handle from its own settlement
+// `finally`, so a settlement must not depend on that volatile handle.
+test("a settlement survives the shared layer clearing the handle", async () => {
+	const target = gitTarget("handle-cleared", allowRules(SLEEP_COMMAND));
+	const child = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], {
+		detached: true,
+		windowsHide: true,
+		stdio: "ignore",
+	});
+	try {
+		decisionFixture(target);
+		approve(target);
+		const owned = persistExecutionHandle({
+			targetRoot: target,
+			runId: RUN_ID,
+			workspace: target,
+			pid: child.pid,
+			startedAt: new Date().toISOString(),
+		});
+
+		const ledger = require("../../scripts/lib/harness/event-ledger");
+		const cancelPath = require.resolve("../../scripts/lib/harness/execution-cancel");
+		const realEmit = ledger.emitHarnessEvent;
+		let injected = false;
+		ledger.emitHarnessEvent = (t, body, guard) => {
+			if (!injected && body.kind === "execution.cancelled") {
+				injected = true;
+				return {
+					ok: false,
+					code: "AMBER_E_HARNESS_LEDGER_LOCKED",
+					errors: ["injected transient settlement failure"],
+				};
+			}
+			return realEmit(t, body, guard);
+		};
+		let firstError;
+		try {
+			delete require.cache[cancelPath];
+			const patched = require(cancelPath);
+			await patched.cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "first attempt",
+			});
+		} catch (error) {
+			firstError = error;
+		} finally {
+			ledger.emitHarnessEvent = realEmit;
+			delete require.cache[cancelPath];
+		}
+		assert.equal(firstError && firstError.amberCode, "AMBER_E_HARNESS_LEDGER_LOCKED");
+
+		// The settling execution clears its handle from its own `finally`.
+		clearExecutionHandle(owned);
+		assert.equal(readExecutionHandle(target, RUN_ID), null, "the handle is gone");
+
+		// Recovery must NOT depend on that volatile handle.
+		const recovered = await cancelExecution(target, {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "recovery after the handle was cleared",
+		});
+		assert.equal(recovered.resumed, true);
+		assert.equal(recovered.outcome, "terminated", "the first attempt observed the kill");
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested", "execution.cancelled"],
+		);
+		assert.equal(isProcessAlive(child.pid), false);
+	} finally {
+		if (isProcessAlive(child.pid)) {
+			try {
+				process.kill(child.pid, "SIGKILL");
+			} catch (_error) {
+				/* already gone */
+			}
+		}
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// A resumed settlement finishes the ledger; it must not signal again.
+test("a resumed settlement never signals a second time", async () => {
+	const target = gitTarget("resume-no-signal", allowRules(SLEEP_COMMAND));
+	const child = spawn(process.execPath, ["-e", "setTimeout(()=>{},20000)"], {
+		detached: true,
+		windowsHide: true,
+		stdio: "ignore",
+	});
+	try {
+		decisionFixture(target);
+		persistExecutionHandle({
+			targetRoot: target,
+			runId: RUN_ID,
+			workspace: target,
+			pid: child.pid,
+			startedAt: new Date().toISOString(),
+		});
+		// A stranded request with no record: the settlement has no observation to
+		// reuse, and must still not signal.
+		emitHarnessEvent(target, {
+			kind: "execution.cancel.requested",
+			schemaVersion: 1,
+			at: new Date().toISOString(),
+			runId: RUN_ID,
+			reason: "stranded request",
+			pointers: [
+				`execution-cancel-request:${RUN_ID}#stranded`,
+				"execution-cancel-decision:decision/cancel-1@1",
+			],
+		});
+		const recovered = await cancelExecution(target, {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "resume without signalling",
+		});
+		assert.equal(recovered.resumed, true);
+		assert.equal(recovered.signalResult.signalled, false);
+		assert.equal(recovered.outcome, "unknown", "an unresignalled live pid is never a claimed kill");
+		assert.equal(isProcessAlive(child.pid), true, "the resumed settlement must not signal");
+	} finally {
+		if (isProcessAlive(child.pid)) {
+			try {
+				process.kill(child.pid, "SIGKILL");
+			} catch (_error) {
+				/* already gone */
+			}
+		}
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
 // it — a second human Decision must not be able to adopt a stranded request.
 test("an unsettled request refuses a different authorization", async () => {
 	const target = gitTarget("unsettled-other", allowRules(SLEEP_COMMAND));

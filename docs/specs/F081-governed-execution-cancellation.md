@@ -137,6 +137,12 @@ stale handles with the observed liveness, and `cancel` on a stale handle records
   settlement: it never re-consumes the authorization and never signals a second
   time, and a different Decision is refused while the request is unsettled. A
   consumed-but-unsettled request is a recoverable state, never an audit dead end.
+- That recovery does NOT depend on the execution handle: the shared seam clears
+  the handle from its own settlement `finally`, so recovery settles from the
+  attempt's own immutable record, or (with no surviving evidence) records
+  `unknown` — never a claimed termination. The record is written once, never
+  deleted, so a racing loser reports `already-settled` and cannot remove the
+  winner's evidence.
 
 - A cancellation is **asynchronous** by necessity: the settling execution can run in the
   same process as the cancel caller, so a blocking wait would prevent the very continuation

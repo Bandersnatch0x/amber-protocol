@@ -218,6 +218,83 @@ function readCancellationState(targetRoot, runId) {
 	};
 }
 
+/** Read the immutable cancellation record for a run, or null when absent. */
+function readCancellationRecord(targetRoot, runId) {
+	const file = cancellationFile(targetRoot, runId);
+	if (!fs.existsSync(file)) return null;
+	try {
+		return JSON.parse(fs.readFileSync(file, "utf8"));
+	} catch (error) {
+		throw typedError(CODE_CORRUPT, `cancellation record is not valid JSON: ${error.message}`);
+	}
+}
+
+// Observe one addressable handle and classify the outcome honestly. A FIRST
+// attempt signals; a RESUMED settlement never signals a second time — the
+// original authorization already did.
+async function observeHandle(handle, { signal }) {
+	const aliveBefore = isProcessAlive(handle.pid);
+	if (!aliveBefore)
+		return {
+			aliveBefore,
+			signalResult: { signalled: false, reason: "not-needed" },
+			outcome: "already-exited",
+		};
+	if (!signal)
+		return {
+			aliveBefore,
+			signalResult: { signalled: false, reason: "resumed-settlement" },
+			outcome: "unknown",
+		};
+	const signalResult = signalPidTree(handle.pid, SIGNAL);
+	const exited = await waitFor(() => !isProcessAlive(handle.pid));
+	return { aliveBefore, signalResult, outcome: exited ? "terminated" : "unknown" };
+}
+
+// One immutable record per attempt: the observation it settled on, plus what it
+// was authorized by. `observation` states WHERE that observation came from, so a
+// settlement recovered without a handle is never readable as an observed kill.
+function cancellationRecordFor({
+	runId,
+	handle,
+	observation,
+	decision,
+	requestPointer,
+	resumed,
+	observationSource,
+	handleSnapshotHash,
+	note,
+	reason,
+	at,
+}) {
+	const record = {
+		schemaVersion: SCHEMA_VERSION,
+		runId,
+		attemptId: handle ? (handle.attemptId ?? null) : null,
+		label: handle ? (handle.label ?? null) : null,
+		commandId: handle ? (handle.commandId ?? null) : null,
+		handlePid: handle ? handle.pid : null,
+		handleLeaseId: handle ? handle.leaseId : null,
+		handleFence: handle ? handle.fence : null,
+		handleSnapshotHash: handle ? handle.snapshotHash : (handleSnapshotHash ?? null),
+		workspace: handle ? handle.workspace : null,
+		aliveBefore: observation.aliveBefore,
+		signal: SIGNAL,
+		signalResult: observation.signalResult,
+		outcome: observation.outcome,
+		handleCleared: observation.handleCleared ?? false,
+		decision,
+		requestPointer,
+		resumed,
+		observation: observationSource,
+		note: note ?? null,
+		reason,
+		at,
+	};
+	record.snapshotHash = canonicalHashOf(record);
+	return record;
+}
+
 /**
  * Cancel one live governed execution.
  *
@@ -230,27 +307,10 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 		throw typedError(CODE_INVALID, "--reason <text> is required");
 	const at = now || new Date().toISOString();
 
-	// Step 1: an owned handle must exist. No handle is NOT "nothing running" —
-	// it is the absence of the only object a cancellation may address.
-	const handle = readExecutionHandle(targetRoot, runId);
-	if (handle === null)
-		throw typedError(
-			CODE_NO_HANDLE,
-			`run ${JSON.stringify(runId)} has no live execution handle; nothing is running under F081 ownership (inspect the recorded execution with amber harness execution inspect --run ${runId})`,
-		);
-
-	// Step 2: the cancellation's OWN human Decision (never the execution's).
-	const decision = resolveCancellationDecision(targetRoot, pin);
-	const decisionPointer = cancellationDecisionPointer(decision);
-
-	// Step 3: the authorization is consumed exactly once, BEFORE any effect
-	// (F081 §3.3). The `execution.cancel.requested` append is the in-lock spend
-	// point, so a reused Decision — or a second cancellation — is refused here,
-	// before the pid is signalled. If a previous attempt already consumed the
-	// authorization and failed before its settlement landed, this call RESUMES
-	// that settlement instead of spending again: never twice, never a second
-	// signal, and never an authorization stranded by a transient failure
-	// (F081 §3.5 — one record, one requested/cancelled pair).
+	// Step 1: what does this run ALREADY carry? Read the cancellation state and
+	// any record BEFORE reaching for the execution handle. The shared execution
+	// layer clears that handle from its own settlement `finally`, so an
+	// authorized-but-unsettled cancellation must be completable without it.
 	const state = readCancellationState(targetRoot, runId);
 	if (state.settled)
 		throw typedError(
@@ -258,14 +318,80 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 			`run ${JSON.stringify(runId)} already carries a recorded cancellation (${state.settled.at}); one cancellation per attempt`,
 		);
 	const resuming = state.request !== null;
+
+	// Step 2: the cancellation's OWN human Decision (never the execution's).
+	const decision = resolveCancellationDecision(targetRoot, pin);
+	const decisionPointer = cancellationDecisionPointer(decision);
+
+	let handle = null;
+	let record;
+	let requestPointer;
+
 	if (resuming) {
 		if (!requestAuthorizedBy(state.request, decisionPointer))
 			throw typedError(
 				CODE_CONFLICT,
 				`run ${JSON.stringify(runId)} already carries a cancellation request authorized by a different Decision (${state.request.at}); a cancellation authorization is single-use`,
 			);
+		requestPointer =
+			(state.request.pointers || []).find((pointer) =>
+				pointer.startsWith(cancelRequestPointerPrefix(runId)),
+			) || null;
+		// Step 3 (resume): the authorization is already consumed, so this call
+		// finishes the settlement from whatever evidence survived — the attempt's
+		// own record when it landed, else the handle if it is still there, else
+		// nothing observable (reported `unknown`, never a claimed termination).
+		record = readCancellationRecord(targetRoot, runId);
+		if (record === null) {
+			handle = readExecutionHandle(targetRoot, runId);
+			if (handle === null) {
+				record = cancellationRecordFor({
+					runId,
+					handle: null,
+					observation: {
+						aliveBefore: null,
+						signalResult: { signalled: false, reason: "no-handle" },
+						outcome: "unknown",
+						handleCleared: true,
+					},
+					decision,
+					requestPointer,
+					resumed: true,
+					observationSource: "none",
+					handleSnapshotHash: state.request.inputHash ?? null,
+					note: "resumed without a surviving handle or record: the outcome is unknown, never a claimed termination",
+					reason,
+					at,
+				});
+			} else {
+				const observation = await observeHandle(handle, { signal: false });
+				observation.handleCleared = await waitFor(() => !fs.existsSync(handle.file), 0);
+				record = cancellationRecordFor({
+					runId,
+					handle,
+					observation,
+					decision,
+					requestPointer,
+					resumed: true,
+					observationSource: "handle",
+					reason,
+					at,
+				});
+			}
+		}
 	} else {
-		const requestPointer = `${cancelRequestPointerPrefix(runId)}${canonicalHashOf({
+		// Step 3 (first attempt): a cancellation addresses only an owned handle,
+		// and spends its authorization BEFORE any effect (F081 §3.3). The
+		// `execution.cancel.requested` append is the in-lock spend point, so a
+		// reused Decision — or a second cancellation — is refused here, before the
+		// pid is signalled.
+		handle = readExecutionHandle(targetRoot, runId);
+		if (handle === null)
+			throw typedError(
+				CODE_NO_HANDLE,
+				`run ${JSON.stringify(runId)} has no live execution handle; nothing is running under F081 ownership (inspect the recorded execution with amber harness execution inspect --run ${runId})`,
+			);
+		requestPointer = `${cancelRequestPointerPrefix(runId)}${canonicalHashOf({
 			runId,
 			at,
 			handle: handle.snapshotHash,
@@ -294,97 +420,66 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 				(request && request.errors && request.errors[0]) || "cancellation refused",
 			);
 		}
+		// Step 4: observe BEFORE signalling. A pid that is already gone is a stale
+		// handle — a cancellation never claims a kill it did not perform.
+		const observation = await observeHandle(handle, { signal: true });
+		observation.handleCleared = await waitFor(
+			() => !fs.existsSync(handle.file),
+			observation.outcome === "terminated" ? 5_000 : 0,
+		);
+		record = cancellationRecordFor({
+			runId,
+			handle,
+			observation,
+			decision,
+			requestPointer,
+			resumed: false,
+			observationSource: "handle",
+			reason,
+			at,
+		});
 	}
 
-	// Step 4: observe BEFORE signalling. A pid that is already gone is a stale
-	// handle — a cancellation can never claim a kill it did not perform. A
-	// resumed settlement never signals a second time: the original authorization
-	// already did, so recovery settles only what it can observe.
-	const aliveBefore = isProcessAlive(handle.pid);
-	let outcome;
-	let signalResult = { signalled: false, reason: "not-needed" };
-	if (!aliveBefore) {
-		outcome = "already-exited";
-	} else if (resuming) {
-		signalResult = { signalled: false, reason: "resumed-settlement" };
-		outcome = "unknown";
-	} else {
-		signalResult = signalPidTree(handle.pid, SIGNAL);
-		const exited = await waitFor(() => !isProcessAlive(handle.pid));
-		outcome = exited ? "terminated" : "unknown";
-	}
-	// The settling process removes the handle; its absence is the second
-	// observation that the attempt really stopped.
-	const handleCleared = await waitFor(
-		() => !fs.existsSync(handle.file),
-		outcome === "terminated" ? 5_000 : 0,
-	);
-
-	const record = {
-		schemaVersion: SCHEMA_VERSION,
-		runId,
-		attemptId: handle.attemptId ?? null,
-		label: handle.label ?? null,
-		commandId: handle.commandId ?? null,
-		handlePid: handle.pid,
-		handleLeaseId: handle.leaseId,
-		handleFence: handle.fence,
-		workspace: handle.workspace,
-		aliveBefore,
-		signal: SIGNAL,
-		signalResult,
-		outcome,
-		handleCleared,
-		decision,
-		requestPointer: resuming
-			? (state.request.pointers || []).find((p) => p.startsWith(cancelRequestPointerPrefix(runId)))
-			: null,
-		resumed: resuming,
-		reason,
-		at,
-	};
-	record.snapshotHash = canonicalHashOf(record);
+	// Step 5: the record is written ONCE (exclusive create) and is NEVER deleted.
+	// It is the immutable observation of an authorized attempt, and the settlement
+	// event is what makes it authoritative; if a concurrent attempt already wrote
+	// it, that record stands — a racing loser never removes the winner's evidence.
 	const file = cancellationFile(targetRoot, runId);
-	// No settled run reaches this point (refused above), so any record already on
-	// disk is a leftover from an UNSETTLED attempt: a record only becomes
-	// authoritative once its settlement event lands, so it is replaced here.
-	if (fs.existsSync(file)) fs.rmSync(file, { force: true });
 	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, {
-		encoding: "utf8",
-		flag: "wx",
-	});
+	try {
+		fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, {
+			encoding: "utf8",
+			flag: "wx",
+		});
+	} catch (error) {
+		if (!error || error.code !== "EEXIST") throw error;
+		const existing = readCancellationRecord(targetRoot, runId);
+		if (existing) record = existing;
+	}
 
 	const pointers = [
 		`${cancellationPointerPrefix(runId)}${record.snapshotHash}`,
 		cancellationDecisionPointer(decision),
 	];
-	let appended;
-	try {
-		appended = emitHarnessEvent(
-			targetRoot,
-			{
-				kind: "execution.cancelled",
-				schemaVersion: SCHEMA_VERSION,
-				at,
-				runId,
-				actor: decision.principal,
-				inputHash: handle.snapshotHash,
-				reason:
-					`governed execution cancelled: ${outcome} (pid ${handle.pid}; ${signalResult.mechanism || signalResult.reason}); ${reason}`.slice(
-						0,
-						2000,
-					),
-				pointers,
-			},
-			cancellationSettlementGuard(runId),
-		);
-	} catch (error) {
-		fs.rmSync(file, { force: true });
-		throw error;
-	}
+	const appended = emitHarnessEvent(
+		targetRoot,
+		{
+			kind: "execution.cancelled",
+			schemaVersion: SCHEMA_VERSION,
+			at: record.at,
+			runId,
+			actor: decision.principal,
+			inputHash: record.handleSnapshotHash || record.snapshotHash,
+			reason:
+				`governed execution cancelled: ${record.outcome} (pid ${record.handlePid ?? "unknown"}; ${record.signalResult.mechanism || record.signalResult.reason}); ${reason}`.slice(
+					0,
+					2000,
+				),
+			pointers,
+		},
+		cancellationSettlementGuard(runId),
+	);
 	if (!appended || appended.ok !== true) {
-		fs.rmSync(file, { force: true });
 		throw typedError(
 			(appended && appended.code) || CODE_CONFLICT,
 			(appended && appended.errors && appended.errors[0]) || "cancellation refused",
@@ -393,13 +488,14 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 	return {
 		ok: true,
 		runId,
-		outcome,
-		aliveBefore,
-		handleCleared,
-		signalResult,
+		outcome: record.outcome,
+		aliveBefore: record.aliveBefore,
+		handleCleared: record.handleCleared,
+		signalResult: record.signalResult,
+		resumed: resuming,
 		cancellation: record,
 		cancellationFile: file,
-		workspaceRetained: fs.existsSync(handle.workspace),
+		workspaceRetained: record.workspace ? fs.existsSync(record.workspace) : false,
 		authority: {
 			launchAuthority: false,
 			deletedWorkspace: false,
