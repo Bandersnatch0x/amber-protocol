@@ -131,6 +131,13 @@ stale handles with the observed liveness, and `cancel` on a stale handle records
 
 ## Known behaviors worth stating plainly
 
+- Cancellation consumes its authorization BEFORE it signals, so a transient
+  failure of the terminal append can leave a recorded request with no
+  settlement. Re-running the same command with the SAME Decision finishes that
+  settlement: it never re-consumes the authorization and never signals a second
+  time, and a different Decision is refused while the request is unsettled. A
+  consumed-but-unsettled request is a recoverable state, never an audit dead end.
+
 - A cancellation is **asynchronous** by necessity: the settling execution can run in the
   same process as the cancel caller, so a blocking wait would prevent the very continuation
   that clears the handle from running.

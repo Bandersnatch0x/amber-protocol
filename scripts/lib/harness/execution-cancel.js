@@ -33,7 +33,7 @@ const {
 	signalPidTree,
 	CODE_CORRUPT: CODE_HANDLE_CORRUPT,
 } = require("../core/execution-handles");
-const { emitHarnessEvent } = require("./event-ledger");
+const { emitHarnessEvent, readHarnessEvents } = require("./event-ledger");
 
 const SCHEMA_VERSION = 1;
 const DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
@@ -64,15 +64,6 @@ function cancellationDirCreate(targetRoot) {
 
 function cancellationFile(targetRoot, runId) {
 	return path.join(cancellationDirCreate(targetRoot), `${safeId(runId)}.json`);
-}
-
-function readJsonOrNull(file) {
-	if (!fs.existsSync(file)) return null;
-	try {
-		return JSON.parse(fs.readFileSync(file, "utf8"));
-	} catch (error) {
-		throw typedError(CODE_CORRUPT, `cancellation record is not valid JSON: ${error.message}`);
-	}
 }
 
 function sleep(ms) {
@@ -207,6 +198,26 @@ function cancellationSettlementGuard(runId) {
 	};
 }
 
+function requestAuthorizedBy(event, decisionPointer) {
+	return (event.pointers || []).includes(decisionPointer);
+}
+
+// The recorded state of one run's cancellation: its (single) request and its
+// (single) settlement, if the settlement landed. A request WITHOUT a settlement
+// is an authorization that was consumed but never settled — exactly the state a
+// transient terminal-append failure leaves behind, and the state a retry must be
+// able to finish rather than strand.
+function readCancellationState(targetRoot, runId) {
+	const events = readHarnessEvents(targetRoot);
+	const requestPrefix = cancelRequestPointerPrefix(runId);
+	const settlePrefix = cancellationPointerPrefix(runId);
+	const carries = (event, prefix) => (event.pointers || []).some((p) => p.startsWith(prefix));
+	return {
+		request: events.find((event) => carries(event, requestPrefix)) || null,
+		settled: events.find((event) => carries(event, settlePrefix)) || null,
+	};
+}
+
 /**
  * Cancel one live governed execution.
  *
@@ -232,47 +243,71 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 	const decision = resolveCancellationDecision(targetRoot, pin);
 	const decisionPointer = cancellationDecisionPointer(decision);
 
-	// Step 3: SPEND the authorization BEFORE any effect (F081 §3.3). The
-	// `execution.cancel.requested` append is the in-lock spend point, so a
-	// reused Decision — or a second cancellation — is refused HERE, before the
-	// pid is signalled, instead of after the process is already dead.
-	const requestPointer = `${cancelRequestPointerPrefix(runId)}${canonicalHashOf({
-		runId,
-		at,
-		handle: handle.snapshotHash,
-		decision: decisionPointer,
-	})}`;
-	const request = emitHarnessEvent(
-		targetRoot,
-		{
-			kind: "execution.cancel.requested",
-			schemaVersion: SCHEMA_VERSION,
-			at,
-			runId,
-			actor: decision.principal,
-			inputHash: handle.snapshotHash,
-			reason: `governed execution cancellation requested (pid ${handle.pid}); ${reason}`.slice(
-				0,
-				2000,
-			),
-			pointers: [requestPointer, decisionPointer],
-		},
-		cancellationSpendGuard(runId, decision),
-	);
-	if (!request || request.ok !== true) {
+	// Step 3: the authorization is consumed exactly once, BEFORE any effect
+	// (F081 §3.3). The `execution.cancel.requested` append is the in-lock spend
+	// point, so a reused Decision — or a second cancellation — is refused here,
+	// before the pid is signalled. If a previous attempt already consumed the
+	// authorization and failed before its settlement landed, this call RESUMES
+	// that settlement instead of spending again: never twice, never a second
+	// signal, and never an authorization stranded by a transient failure
+	// (F081 §3.5 — one record, one requested/cancelled pair).
+	const state = readCancellationState(targetRoot, runId);
+	if (state.settled)
 		throw typedError(
-			(request && request.code) || CODE_CONFLICT,
-			(request && request.errors && request.errors[0]) || "cancellation refused",
+			CODE_CONFLICT,
+			`run ${JSON.stringify(runId)} already carries a recorded cancellation (${state.settled.at}); one cancellation per attempt`,
 		);
+	const resuming = state.request !== null;
+	if (resuming) {
+		if (!requestAuthorizedBy(state.request, decisionPointer))
+			throw typedError(
+				CODE_CONFLICT,
+				`run ${JSON.stringify(runId)} already carries a cancellation request authorized by a different Decision (${state.request.at}); a cancellation authorization is single-use`,
+			);
+	} else {
+		const requestPointer = `${cancelRequestPointerPrefix(runId)}${canonicalHashOf({
+			runId,
+			at,
+			handle: handle.snapshotHash,
+			decision: decisionPointer,
+		})}`;
+		const request = emitHarnessEvent(
+			targetRoot,
+			{
+				kind: "execution.cancel.requested",
+				schemaVersion: SCHEMA_VERSION,
+				at,
+				runId,
+				actor: decision.principal,
+				inputHash: handle.snapshotHash,
+				reason: `governed execution cancellation requested (pid ${handle.pid}); ${reason}`.slice(
+					0,
+					2000,
+				),
+				pointers: [requestPointer, decisionPointer],
+			},
+			cancellationSpendGuard(runId, decision),
+		);
+		if (!request || request.ok !== true) {
+			throw typedError(
+				(request && request.code) || CODE_CONFLICT,
+				(request && request.errors && request.errors[0]) || "cancellation refused",
+			);
+		}
 	}
 
 	// Step 4: observe BEFORE signalling. A pid that is already gone is a stale
-	// handle — a cancellation can never claim a kill it did not perform.
+	// handle — a cancellation can never claim a kill it did not perform. A
+	// resumed settlement never signals a second time: the original authorization
+	// already did, so recovery settles only what it can observe.
 	const aliveBefore = isProcessAlive(handle.pid);
 	let outcome;
 	let signalResult = { signalled: false, reason: "not-needed" };
 	if (!aliveBefore) {
 		outcome = "already-exited";
+	} else if (resuming) {
+		signalResult = { signalled: false, reason: "resumed-settlement" };
+		outcome = "unknown";
 	} else {
 		signalResult = signalPidTree(handle.pid, SIGNAL);
 		const exited = await waitFor(() => !isProcessAlive(handle.pid));
@@ -301,20 +336,19 @@ async function cancelExecution(targetRoot, { runId, decision: pin, reason, now }
 		outcome,
 		handleCleared,
 		decision,
-		requestPointer,
+		requestPointer: resuming
+			? (state.request.pointers || []).find((p) => p.startsWith(cancelRequestPointerPrefix(runId)))
+			: null,
+		resumed: resuming,
 		reason,
 		at,
 	};
 	record.snapshotHash = canonicalHashOf(record);
 	const file = cancellationFile(targetRoot, runId);
-	if (fs.existsSync(file)) {
-		const existing = readJsonOrNull(file);
-		if (existing && existing.at !== at)
-			throw typedError(
-				CODE_CONFLICT,
-				`run ${JSON.stringify(runId)} already carries a cancellation record (${existing.at}); one cancellation per attempt`,
-			);
-	}
+	// No settled run reaches this point (refused above), so any record already on
+	// disk is a leftover from an UNSETTLED attempt: a record only becomes
+	// authoritative once its settlement event lands, so it is replaced here.
+	if (fs.existsSync(file)) fs.rmSync(file, { force: true });
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, {
 		encoding: "utf8",

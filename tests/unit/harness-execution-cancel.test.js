@@ -18,7 +18,8 @@ const { runGovernedCommand } = require("../../scripts/lib/core/governed-runner")
 const { appendLedgerRecord, readLedger } = require("../../scripts/lib/core/loop-ledger");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
-const { readHarnessEvents } = require("../../scripts/lib/harness/event-ledger");
+const { readHarnessEvents, emitHarnessEvent } = require("../../scripts/lib/harness/event-ledger");
+const { canonicalHashOf } = require("../../scripts/lib/core/registry-ledger");
 const { readExecutionHandle, isProcessAlive } = require("../../scripts/lib/core/execution-handles");
 const {
 	cancelExecution,
@@ -666,5 +667,162 @@ test("a handle issued for another target is refused before any signal", async ()
 	} finally {
 		fs.rmSync(a, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		fs.rmSync(b, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// A handle whose recorded pid is already gone: no real process is involved, so
+// these cases isolate the SETTLEMENT path.
+function staleHandle(target, { runId = RUN_ID } = {}) {
+	const file = path.join(target, ".amber", "harness", "executions", `${runId}.handle.json`);
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	const record = {
+		schemaVersion: 1,
+		runId,
+		attemptId: "att-recover",
+		label: "recover-run",
+		commandId: "allow-cancel",
+		workspace: target,
+		pid: 999_999,
+		leaseId: "recover-lease",
+		fence: 1,
+		startedAt: "2026-09-24T00:00:00.000Z",
+		deadlineAt: "2026-09-24T00:05:00.000Z",
+		target: path.resolve(target),
+	};
+	record.snapshotHash = canonicalHashOf(record);
+	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
+	return file;
+}
+
+// F081 §3.5. A transient terminal-append failure must not strand the run: the
+// authorization is already consumed, so the SAME authorization must be able to
+// finish the settlement — without spending again and without signalling twice.
+test("a transient terminal-append failure is recoverable with the same authorization", async () => {
+	const target = gitTarget("recover", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+
+		// Inject ONE failure on the first terminal append (the review's probe):
+		// the request lands, the settlement does not.
+		const ledger = require("../../scripts/lib/harness/event-ledger");
+		const cancelPath = require.resolve("../../scripts/lib/harness/execution-cancel");
+		const realEmit = ledger.emitHarnessEvent;
+		let injected = false;
+		ledger.emitHarnessEvent = (t, body, guard) => {
+			if (!injected && body.kind === "execution.cancelled") {
+				injected = true;
+				return {
+					ok: false,
+					code: "AMBER_E_HARNESS_LEDGER_LOCKED",
+					errors: ["injected transient settlement failure"],
+				};
+			}
+			return realEmit(t, body, guard);
+		};
+		let firstError;
+		try {
+			delete require.cache[cancelPath];
+			const patched = require(cancelPath);
+			await patched.cancelExecution(target, {
+				runId: RUN_ID,
+				decision: { identity: "decision/cancel-1", revision: 1 },
+				reason: "first attempt",
+			});
+		} catch (error) {
+			firstError = error;
+		} finally {
+			ledger.emitHarnessEvent = realEmit;
+			delete require.cache[cancelPath];
+		}
+
+		assert.equal(
+			firstError && firstError.amberCode,
+			"AMBER_E_HARNESS_LEDGER_LOCKED",
+			`the injected settlement failure must surface, got: ${firstError && firstError.message}`,
+		);
+		// The strand the review found: authorization spent, nothing settled.
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested"],
+		);
+
+		// Recovery with the SAME authorization: no second spend, no second signal.
+		const recovered = await cancelExecution(target, {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "recovery",
+		});
+		assert.equal(recovered.outcome, "already-exited");
+		assert.equal(recovered.cancellation.resumed, true);
+		assert.equal(
+			recovered.signalResult.signalled,
+			false,
+			"a resumed settlement never signals twice",
+		);
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested", "execution.cancelled"],
+		);
+		assert.ok(fs.existsSync(recovered.cancellationFile), "the settlement record exists");
+
+		// And the settled run still refuses a second authorization.
+		await assert.rejects(
+			() =>
+				cancelExecution(target, {
+					runId: RUN_ID,
+					decision: { identity: "decision/cancel-2", revision: 1 },
+					reason: "one too many",
+				}),
+			(error) =>
+				error.amberCode === CODE_CONFLICT &&
+				/already carries a recorded cancellation/.test(error.message),
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+// While a request is unsettled, only the authorization that made it may finish
+// it — a second human Decision must not be able to adopt a stranded request.
+test("an unsettled request refuses a different authorization", async () => {
+	const target = gitTarget("unsettled-other", allowRules(SLEEP_COMMAND));
+	try {
+		decisionFixture(target);
+		staleHandle(target);
+		// The post-failure state, constructed directly.
+		emitHarnessEvent(target, {
+			kind: "execution.cancel.requested",
+			schemaVersion: 1,
+			at: new Date().toISOString(),
+			runId: RUN_ID,
+			reason: "stranded request",
+			pointers: [
+				`execution-cancel-request:${RUN_ID}#stranded`,
+				"execution-cancel-decision:decision/cancel-1@1",
+			],
+		});
+		await assert.rejects(
+			() =>
+				cancelExecution(target, {
+					runId: RUN_ID,
+					decision: { identity: "decision/cancel-2", revision: 1 },
+					reason: "different authorization",
+				}),
+			(error) => error.amberCode === CODE_CONFLICT && /different Decision/.test(error.message),
+		);
+		// The original authorization still finishes it.
+		const recovered = await cancelExecution(target, {
+			runId: RUN_ID,
+			decision: { identity: "decision/cancel-1", revision: 1 },
+			reason: "recovery by the original authorization",
+		});
+		assert.equal(recovered.outcome, "already-exited");
+		assert.deepEqual(
+			readHarnessEvents(target).map((event) => event.kind),
+			["execution.cancel.requested", "execution.cancelled"],
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
