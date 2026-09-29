@@ -1,13 +1,25 @@
 import { expect, test, type Page } from '@playwright/test';
 import { capture } from './lib/artifacts';
 
+// The console's h1 is the product title from the app's i18n catalogue
+// (`home.title`). It was renamed "Trusted Continuation Console" -> "Governed
+// Agent Harness Console" by the F082 positioning lift (49b94eb, ADR-0030); that
+// commit updated i18n.tsx and the ADR but not this contract, so the viewer's own
+// E2E gate has been asserting a heading the product no longer renders. Rename
+// both together: the point of this contract is that the surface a reader sees is
+// the surface the product claims.
+const HOME_TITLE = 'Governed Agent Harness Console';
+// The same rename applies to the Chinese catalogue (`home.title`), which moved
+// 可信续接控制台 -> 受治理 Agent Harness 控制台 in the same commit.
+const HOME_TITLE_ZH = '受治理 Agent Harness 控制台';
+
 async function openStableHome(page: Page): Promise<void> {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Trusted Continuation' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: HOME_TITLE })).toBeVisible();
   await expect(page.getByText('E2E fixture session', { exact: true }).first()).toBeVisible();
 }
 
-test.describe('Trusted Continuation Console visual contracts', () => {
+test.describe('Governed Agent Harness Console visual contracts', () => {
   test('desktop keeps the product shell and the journey-first decision surface', async ({
     page,
   }) => {
@@ -68,7 +80,7 @@ test.describe('Trusted Continuation Console visual contracts', () => {
 
     await page.goto('/');
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
     ).toBeVisible();
     await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
     await expect(page.getByText('Current: Unavailable')).toBeVisible();
@@ -94,7 +106,7 @@ test.describe('Trusted Continuation Console visual contracts', () => {
 
     await page.goto('/');
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
     ).toBeVisible();
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(3);
     await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
@@ -126,7 +138,7 @@ test.describe('Trusted Continuation Console visual contracts', () => {
 
     await page.goto('/');
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
     ).toBeVisible();
     await expect(page.getByRole('status')).toHaveCount(2);
     await expect(page.getByRole('status').first()).toHaveText('No action required');
@@ -164,7 +176,7 @@ test.describe('Trusted Continuation Console visual contracts', () => {
 
     await page.goto('/');
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+      page.getByRole('heading', { level: 1, name: HOME_TITLE }),
     ).toBeVisible();
     await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
     await expect(page.getByText('Current: Unavailable')).toBeVisible();
@@ -177,7 +189,7 @@ test.describe('Trusted Continuation Console visual contracts', () => {
 
     await page.getByRole('button', { name: 'Switch language' }).click();
 
-    await expect(page.getByRole('heading', { level: 1, name: '可信续接控制台' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: HOME_TITLE_ZH })).toBeVisible();
     await expect(page.getByRole('heading', { name: '核心用户旅程' })).toBeVisible();
     await expect(page.locator('[aria-current="step"]')).toContainText('安全接入');
     await expect(page.getByText('Agent 与 CLI 仍是受治理工作的权威入口。')).toBeVisible();
