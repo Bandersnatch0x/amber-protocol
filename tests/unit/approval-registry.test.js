@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F050 ticket 4 (#229) — Approval records: atomicity & lifecycle (unit seam).
 //
@@ -36,7 +37,7 @@ const { admitArtifact, showArtifact } = require("../../scripts/lib/core/canonica
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-approval-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-approval-${label}-`)));
 }
 
 function ledgerPathOf(dir) {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -24,7 +25,7 @@ async function runQuiet(argv) {
 }
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-okf-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-okf-${name}-`)));
 }
 
 function writeFile(root, relativePath, content) {

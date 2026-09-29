@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F054 T1 (#279), T2 (#280), T3 (#281) — `amber maintain` CLI seam:
 // governed detector registration, deterministic detection, trigger
@@ -29,7 +30,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-maintain-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-maintain-${label}-`)));
 }
 
 function payload(r) {

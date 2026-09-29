@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -145,7 +146,7 @@ test("blocked features without notes warn instead of fail", () => {
 });
 
 test("invalid json file reports a readable error", () => {
-	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-invalid-feature-"));
+	const target = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-invalid-feature-")));
 	const filePath = path.join(target, "feature_list.json");
 	fs.writeFileSync(filePath, "{ invalid json");
 

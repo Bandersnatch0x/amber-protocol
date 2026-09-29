@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F049 ticket 06 (#223) — unit coverage for the Canonical Artifact
 // version-negotiation, extension-namespace, and size-ceiling contracts, plus
@@ -39,7 +40,7 @@ const {
 const { findTraceCycle } = require("../../scripts/lib/core/canonical-artifact-verify");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-t06-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-t06-${label}-`)));
 }
 
 function homeOf(dir, identity) {

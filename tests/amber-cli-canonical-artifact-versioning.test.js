@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F049 ticket 06 (#223) — public CLI seam coverage for version negotiation,
 // extension namespaces, size ceilings, and projection resource ceilings:
@@ -37,7 +38,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-t06-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-t06-${label}-`)));
 }
 
 function payload(r) {

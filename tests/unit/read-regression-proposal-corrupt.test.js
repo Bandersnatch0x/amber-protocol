@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Unit tests for readRegressionProposal's corrupt-file hardening. Its try/catch
 // only guards JSON *syntax* errors; a file whose contents are a valid JSON
@@ -18,7 +19,7 @@ const {
 } = require("../../scripts/lib/core/maintenance");
 
 function tempTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "regression-corrupt-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "regression-corrupt-")));
 }
 
 function writeEvidence(targetRoot, taskId, contents) {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F050 ticket 2 (#227) — public CLI seam coverage for Evidence receipts and
 // the Assurance contract: `amber evidence record/verify/show/list`, always
@@ -25,7 +26,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t2-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t2-${label}-`)));
 }
 
 function payload(r) {

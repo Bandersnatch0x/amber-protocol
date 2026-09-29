@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Tests for readWorkflowPackFile (the extracted read-and-parse prelude) plus
 // characterization of the error path that previously had no coverage. These
@@ -17,7 +18,7 @@ const {
 } = require("../../scripts/lib/core/workflow-packs");
 
 function tempFile(name, content) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `wf-${name}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `wf-${name}-`)));
 	const file = path.join(dir, "pack.json");
 	fs.writeFileSync(file, content);
 	return file;

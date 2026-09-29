@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F050 ticket 3 (#228) — Gate Contracts & deterministic evaluation (unit seam).
 //
@@ -46,7 +47,7 @@ const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-gate-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-gate-${label}-`)));
 }
 
 function outcomeLedgerPath(dir) {

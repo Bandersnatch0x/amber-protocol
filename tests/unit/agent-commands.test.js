@@ -1,3 +1,4 @@
+const { trackTempDir } = require("../helpers/harness");
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const fs = require("node:fs");
@@ -14,7 +15,7 @@ const {
 } = require("../../scripts/lib/core/agent-commands");
 
 function makeTempSkills(entries) {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-skills-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-skills-")));
 	for (const [dir, contents] of Object.entries(entries)) {
 		const skillDir = path.join(root, dir);
 		fs.mkdirSync(skillDir, { recursive: true });
@@ -171,7 +172,7 @@ describe("generateAgentCommands", () => {
 		const skillsRoot = makeTempSkills({
 			"amber-init": skillMd("amber-init", "node scripts/amber.js init --target {{target}}"),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 		return { skillsRoot, repoRoot };
 	}
 
@@ -209,7 +210,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js loop schedule --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.deepStrictEqual(result.errors, [
@@ -226,7 +227,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js journey --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.deepStrictEqual(result.errors, [
@@ -242,7 +243,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js next --objective {{objective}} --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.deepStrictEqual(result.errors, [
@@ -259,7 +260,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js loop recommend --stale {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /loop recommend.*unknown option "--stale"/i);
@@ -270,7 +271,7 @@ describe("generateAgentCommands", () => {
 		const skillsRoot = makeTempSkills({
 			"amber-next": skillMd("amber-next", "node scripts/amber.js next --goal {{target}}"),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /next.*unknown option "--goal"/i);
@@ -284,7 +285,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js context load --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /context load.*requires option "--route"/i);
@@ -295,7 +296,7 @@ describe("generateAgentCommands", () => {
 		const skillsRoot = makeTempSkills({
 			"amber-audit": skillMd("amber-audit", "node scripts/amber.js audit --target"),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /option "--target" without a value/i);
@@ -309,7 +310,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js context benchmark --fixture fixture.json --mode bogus --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /option "--mode".*unknown value "bogus"/i);
@@ -323,7 +324,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js workflow findings --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /workflow findings.*requires option "--report"/i);
@@ -337,7 +338,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js workflow findings --report report.json --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.strictEqual(result.valid, true);
@@ -355,7 +356,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js break-loop --issue 1 --title defect --recurrence 2 --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.strictEqual(result.valid, true);
@@ -373,7 +374,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js context projection status --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.strictEqual(result.valid, true);
@@ -391,7 +392,7 @@ describe("generateAgentCommands", () => {
 				"node scripts/amber.js context delete --page page-id --target {{target}}",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.strictEqual(result.valid, true);
@@ -404,7 +405,7 @@ describe("generateAgentCommands", () => {
 			"node scripts/amber.js next --target {{target}}",
 		).replace('"args":[{"name":"target"}]', '"args":[{"name":"target"},{"name":"objective"}]');
 		const skillsRoot = makeTempSkills({ "amber-next": markdown });
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.match(result.errors.join("\n"), /declares unused command argument "objective"/i);
@@ -428,7 +429,7 @@ describe("generateAgentCommands", () => {
 				"../../evil",
 			),
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 		const result = generateAgentCommands({ skillsRoot, repoRoot });
 		for (const relativePath of result.paths) {
 			assert.ok(!relativePath.includes(".."), `path escaped: ${relativePath}`);
@@ -452,7 +453,9 @@ describe("generateAgentCommands", () => {
 	});
 
 	it("removes stale generated skill mirrors but preserves user-authored mirrors", () => {
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-agent-stale-mirror-"));
+		const repoRoot = trackTempDir(
+			fs.mkdtempSync(path.join(os.tmpdir(), "amber-agent-stale-mirror-")),
+		);
 		const skillsRoot = makeTempSkills({
 			current: skillMd("current", "node scripts/amber.js audit --target {{target}}"),
 		});
@@ -591,7 +594,7 @@ describe("listSkillDirs + .agents/skills mirror", () => {
 			"amber-init": skillMd("amber-init", "node scripts/amber.js init --target {{target}}"),
 			"plain-skill": "---\nname: plain-skill\ndescription: plain.\n---\n",
 		});
-		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const repoRoot = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-")));
 		generateAgentCommands({ skillsRoot, repoRoot });
 		const mirrored = path.join(repoRoot, ".agents/skills/amber-init/SKILL.md");
 		assert.ok(fs.existsSync(mirrored));

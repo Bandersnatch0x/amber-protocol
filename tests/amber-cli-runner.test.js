@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F052 T1/T2 (#255, #256) — `amber runner` CLI seam: governed registration
 // and execution-request lifecycles, fail-closed refusals with stable codes,
@@ -29,7 +30,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-runner-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-runner-${label}-`)));
 }
 
 function payload(r) {

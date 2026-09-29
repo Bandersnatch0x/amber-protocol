@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -11,7 +12,7 @@ const {
 } = require("../../scripts/lib/distill-candidates");
 
 function tempRoot() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-distill-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-distill-")));
 }
 
 function writeFile(root, relativePath, content) {

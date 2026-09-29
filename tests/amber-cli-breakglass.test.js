@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F057 T1 (#292) — `amber breakglass` CLI seam: governed grant and
 // revocation, read-only listing with the injected clock, fail-closed
@@ -35,7 +36,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-breakglass-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-breakglass-${label}-`)));
 }
 
 function payload(r) {

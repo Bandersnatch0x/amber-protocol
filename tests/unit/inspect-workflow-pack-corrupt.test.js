@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Unit tests for the workflow-pack inspectors' corrupt-file hardening. readJson
 // returns a literal `null`/scalar/array unchanged, so validateWorkflowPackData
@@ -18,7 +19,7 @@ const {
 } = require("../../scripts/lib/core/workflow-packs");
 
 function tempPack(contents) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wp-corrupt-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "wp-corrupt-")));
 	const filePath = path.join(dir, "x.pack.json");
 	fs.writeFileSync(filePath, contents);
 	return filePath;

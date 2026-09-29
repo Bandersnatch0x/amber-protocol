@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Characterization tests for checkExecutionReadiness: this function had zero
 // coverage, so these pin its current behavior as a safety net before the
@@ -12,7 +13,7 @@ const path = require("node:path");
 const { checkExecutionReadiness } = require("../../scripts/lib/core/execution-validator");
 
 function tempProject() {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "readiness-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "readiness-")));
 	return root;
 }
 

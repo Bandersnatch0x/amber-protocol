@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F050 ticket 1 (#226) — Principal registry (unit seam).
 //
@@ -33,7 +34,7 @@ const {
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-principal-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-principal-${label}-`)));
 }
 
 function registryPathOf(dir) {

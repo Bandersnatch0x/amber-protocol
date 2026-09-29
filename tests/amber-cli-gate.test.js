@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F050 ticket 3 (#228) — public CLI seam coverage for Gate evaluation:
 // `amber gate evaluate/show/list`, always asserted through the JSON result
@@ -29,7 +30,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t3-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t3-${label}-`)));
 }
 
 function payload(r) {

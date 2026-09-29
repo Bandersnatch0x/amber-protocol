@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F074 H6 — the Control Plane: five read-only subverbs over the shared cores.
 // Conformance at the real path: trace = the run record + ordered trail (the
@@ -19,7 +20,7 @@ const path = require("node:path");
 const { dispatch } = require("../../scripts/lib/command-dispatcher");
 
 function tmpTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-h6-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-h6-")));
 }
 
 function admitAndStart(target, runId) {

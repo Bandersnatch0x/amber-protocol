@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // Maintenance proposal surface (survived the agent/team/adoption removal —
 // issues/0068). The team-distribution scaffolding that used to set this fixture
@@ -15,7 +16,7 @@ const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-v5-5-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-v5-5-${name}-`)));
 }
 
 function runHarness(args) {

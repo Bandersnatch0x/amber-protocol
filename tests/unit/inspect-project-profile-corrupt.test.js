@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Unit tests for inspectProjectProfile's corrupt-file hardening. readJson
 // returns whatever the file parses to, so a profile whose contents are a valid
@@ -15,7 +16,7 @@ const path = require("node:path");
 const { inspectProjectProfile } = require("../../scripts/lib/core/profiles");
 
 function tempProfile(contents) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "profile-corrupt-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "profile-corrupt-")));
 	const filePath = path.join(dir, "default.profile.json");
 	fs.writeFileSync(filePath, contents);
 	return filePath;

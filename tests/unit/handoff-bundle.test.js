@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -14,7 +15,7 @@ const {
 } = require("../../scripts/lib/core/handoff-bundle");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-bundle-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-bundle-${name}-`)));
 }
 
 test("writeHandoffBundle creates the complete continuation artifact set", () => {

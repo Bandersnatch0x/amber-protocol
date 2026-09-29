@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const { execSync } = require("node:child_process");
 const { gitExec, isRepository, configGet } = require("../../scripts/lib/core/git-exec");
 
 function mkGit() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-exec-seam-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-exec-seam-")));
 	execSync("git init -q", { cwd: dir });
 	execSync('git config user.email "t@t.t" && git config user.name "t"', { cwd: dir });
 	fs.writeFileSync(path.join(dir, "x"), "1");
@@ -18,7 +19,7 @@ function mkGit() {
 }
 
 function mkPlainDir() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-exec-seam-plain-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-exec-seam-plain-")));
 }
 
 /**
@@ -27,7 +28,7 @@ function mkPlainDir() {
  */
 function withoutGitOnPath(fn) {
 	const prev = process.env.PATH;
-	process.env.PATH = fs.mkdtempSync(path.join(os.tmpdir(), "amber-no-git-"));
+	process.env.PATH = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-no-git-")));
 	try {
 		return fn();
 	} finally {

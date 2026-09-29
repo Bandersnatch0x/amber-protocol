@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -18,7 +19,7 @@ const {
 const { appendSessionEvent } = require("../../scripts/lib/session-timeline");
 
 function tmpRepo() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-lifecycle-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-lifecycle-")));
 }
 
 function writeFeatureList(dir, features) {

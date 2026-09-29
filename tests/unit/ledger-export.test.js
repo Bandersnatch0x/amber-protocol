@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const L = require("../../scripts/lib/core/loop-ledger");
 const { exportLedger } = require("../../scripts/lib/core/ledger-export");
 
 function mkStateWithLedger(home, sub, records) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-exp-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-exp-")));
 	const ledgerDir = path.join(dir, ".amber", home, sub);
 	fs.mkdirSync(ledgerDir, { recursive: true });
 	const ledgerPath = path.join(ledgerDir, "ledger.jsonl");
@@ -58,7 +59,7 @@ test("broken chain: intact=false and brokenCount counts it", () => {
 });
 
 test("--home filter limits the walk", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-exp-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-exp-")));
 	const lp = path.join(dir, ".amber", "sessions", "S1", "ledger.jsonl");
 	fs.mkdirSync(path.dirname(lp), { recursive: true });
 	L.appendLedgerRecord(lp, { kind: "approved", approvalKey: "a1" });

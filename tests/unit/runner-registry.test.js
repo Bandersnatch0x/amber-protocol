@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F052 T1 (#255) — controlled Runner & capability registry (unit seam).
 //
@@ -66,7 +67,7 @@ const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-runner-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-runner-${label}-`)));
 }
 
 const DIGEST = `sha256:${"a".repeat(64)}`;

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F039 slice 2: pin knowledgeDispatch envelopes so the defineCommand migration
 // stays byte-compatible with the hand-rolled envelopes it replaced.
@@ -11,7 +12,7 @@ const path = require("node:path");
 const { knowledgeDispatch } = require("../../scripts/lib/knowledge-commands");
 
 function tmpRoot(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-knowledge-dispatch-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-knowledge-dispatch-${label}-`)));
 }
 
 test("known action envelope: target, text, defaulted errors/warnings, exit 0, bypassPrint", () => {

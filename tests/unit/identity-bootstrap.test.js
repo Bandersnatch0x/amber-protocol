@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -16,7 +17,7 @@ const {
 } = require("../../scripts/lib/core/identity");
 
 function mkGitTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-identity-${label}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-identity-${label}-`)));
 	execSync("git init", { cwd: dir, encoding: "utf8" });
 	execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
 	execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });
@@ -24,7 +25,7 @@ function mkGitTarget(label) {
 }
 
 function mkNoGitTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-identity-nogit-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-identity-nogit-${label}-`)));
 }
 
 /**
@@ -32,7 +33,7 @@ function mkNoGitTarget(label) {
  * so tests are immune to the machine's git identity.
  */
 function withIsolatedGitConfig(fn) {
-	const home = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-home-"));
+	const home = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-home-")));
 	const prev = {
 		HOME: process.env.HOME,
 		USERPROFILE: process.env.USERPROFILE,
@@ -89,7 +90,7 @@ test("inferFromGit returns personId from git config in a git repo", () => {
 
 test("inferFromGit returns null when git config is empty", () => {
 	withIsolatedGitConfig(() => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-empty-"));
+		const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-empty-")));
 		execSync("git init", { cwd: dir, encoding: "utf8" });
 		// Don't set user.name/email anywhere
 		const inferred = inferFromGit(dir);
@@ -101,7 +102,7 @@ test("inferFromGit falls back to global config when local is unset (ADR-0019 D4)
 	withIsolatedGitConfig(() => {
 		execSync('git config --global user.email "global@example.com"', { encoding: "utf8" });
 		execSync('git config --global user.name "Global User"', { encoding: "utf8" });
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-global-"));
+		const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-global-")));
 		execSync("git init", { cwd: dir, encoding: "utf8" });
 		// no local user.name/email — effective config resolves from global
 		const inferred = inferFromGit(dir);
@@ -284,7 +285,7 @@ test("resolveIdentity derives repositoryId from the git remote origin URL", () =
 });
 
 test("resolveIdentity repositoryId is stable across clones of the same remote", () => {
-	const base = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-clones-"));
+	const base = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-clones-")));
 	const bare = path.join(base, "hub.git");
 	execSync(`git init --bare "${bare}"`, { encoding: "utf8" });
 	const first = path.join(base, "clone-alpha");

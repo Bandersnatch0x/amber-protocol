@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F049 ticket 05 (#222) — Governance Graph projection of Canonical Artifact
 // revisions, at the PUBLIC rebuild + query seam: `amber artifact admit`
@@ -21,7 +22,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-t05-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-t05-${label}-`)));
 }
 
 function payload(r) {

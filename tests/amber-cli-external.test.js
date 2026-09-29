@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F056 — `amber external` CLI seam: governed effect contract
 // registration (T1 #288), request proposals with drift-bound
@@ -34,7 +35,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-external-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-external-${label}-`)));
 }
 
 function payload(r) {

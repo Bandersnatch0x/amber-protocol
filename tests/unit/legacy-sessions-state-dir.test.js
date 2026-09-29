@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F036-S1 regression: sessions surfaces must read through
 // resolveStateDirForRead so legacy .harness state is visible. Previously
@@ -18,7 +19,7 @@ const { bundleSources } = require("../../scripts/lib/core/context-request");
 const { resetWarnings } = require("../../scripts/lib/state-dir-resolver");
 
 function tempDir(prefix) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`)));
 }
 
 function writeLegacySession(targetRoot, id, events) {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F055 T1 (#283) — `amber retention` CLI seam: governed classification,
 // deterministic read-only evaluation, fail-closed refusals with stable
@@ -32,7 +33,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-retention-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-retention-${label}-`)));
 }
 
 function payload(r) {

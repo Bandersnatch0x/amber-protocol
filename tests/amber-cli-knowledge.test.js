@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -15,7 +16,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-kb-${label}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-kb-${label}-`)));
 	return dir;
 }
 

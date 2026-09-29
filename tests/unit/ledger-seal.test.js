@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -10,7 +11,7 @@ const L = require("../../scripts/lib/core/loop-ledger");
 const { sealLedger, verifyAnchoring } = require("../../scripts/lib/core/ledger-seal");
 
 function mkHarnessWithLedger() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-seal-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-seal-")));
 	execSync("git init -q", { cwd: dir });
 	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
 	const ledgerDir = path.join(dir, ".amber", "sessions", "S1");
@@ -55,7 +56,7 @@ test("verify on a repo with no seal reports anchored:false", () => {
 });
 
 test("seal refuses on a non-git repo", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-seal-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-seal-")));
 	fs.mkdirSync(path.join(dir, ".amber", "sessions", "S1"), { recursive: true });
 	const seal = sealLedger(dir);
 	assert.strictEqual(seal.sealed, false);

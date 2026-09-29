@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Unit tests for countEvolutionFindings — the shared evolution-counting core
 // extracted from extractEvolutionFindings and rollupEvolutionFindings. Pins
@@ -16,7 +17,7 @@ const {
 } = require("../../scripts/lib/core/maintenance");
 
 function tempTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "evo-count-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "evo-count-")));
 }
 
 function writeEvolution(targetRoot, content) {

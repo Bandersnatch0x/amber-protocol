@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F050 ticket 4 (#229) — public CLI seam coverage for Approval records:
 // `amber approval grant/revoke/consume/show/list`, always asserted through
@@ -27,7 +28,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t4-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t4-${label}-`)));
 }
 
 function payload(r) {

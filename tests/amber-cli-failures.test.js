@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -10,7 +11,7 @@ const test = require("node:test");
 const ROOT = path.resolve(__dirname, "..");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-fail-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-fail-${name}-`)));
 }
 
 function copyFixture(name) {

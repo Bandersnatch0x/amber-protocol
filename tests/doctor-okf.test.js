@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -10,7 +11,7 @@ const { doctor } = require("../scripts/lib/core/doctor");
 const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-doctor-okf-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-doctor-okf-${name}-`)));
 }
 
 test("doctor with okf option flags a non-conformant wiki page", () => {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Regression tests for tests/helpers/mcp-rpc.js — the RPC driver that
 // replaced the integration tests' raw spawnSync of the MCP server.
@@ -35,7 +36,7 @@ function runHelper({ serverJs, input = "", timeoutMs = 2000, retries = 0 }) {
 }
 
 function mkDir(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `mcp-rpc-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `mcp-rpc-${label}-`)));
 }
 
 function isAlive(pid) {

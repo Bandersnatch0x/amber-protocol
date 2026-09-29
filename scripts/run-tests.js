@@ -70,22 +70,13 @@ const sessionsBefore = new Set(listRootSessions());
 // and the post-run sweep can only ever remove directories this run created.
 // Prefer new fixtures via harness.js trackTempDir, which needs no sweep at all.
 const RUN_TEMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-run-"));
-function listRunTempFixtures() {
-	let entries;
-	try {
-		entries = fs.readdirSync(RUN_TEMP_ROOT, { withFileTypes: true });
-	} catch {
-		return [];
-	}
-	return entries
-		.filter((e) => e.isDirectory() && e.name.startsWith("amber-"))
-		.map((e) => path.join(RUN_TEMP_ROOT, e.name));
-}
 function removeRunTempRoot() {
 	try {
 		fs.rmSync(RUN_TEMP_ROOT, { recursive: true, force: true, maxRetries: 3 });
-	} catch {
-		// ponytail: best-effort — a locked fixture must never mask a test result.
+		return true;
+	} catch (error) {
+		console.error(`[amber] test-run cleanup failed: ${RUN_TEMP_ROOT}: ${error.message}`);
+		return false;
 	}
 }
 
@@ -117,24 +108,16 @@ if (result.error) {
 	process.exit(1);
 }
 
-// Warn-only, unlike the sessions guard: hundreds of sites still hand out raw
-// mkdtemp fixtures by design; this sweep is the safety net until they migrate
-// to harness.js trackTempDir. It only ever descends into the run-owned root.
-const leakedFixtures = listRunTempFixtures();
-let fixturesFailed = 0;
-for (const p of leakedFixtures) {
-	try {
-		fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 });
-	} catch {
-		fixturesFailed++;
-	}
+// The run-owned root is removed WHOLE: it holds every fixture this run created
+// (amber-* and any other prefix), so no prefix scanning is needed and nothing
+// outside the root is ever touched. A cleanup failure stays visible and fails an
+// otherwise-successful run, without replacing an existing failure code — a
+// failing test run keeps its own status.
+const tempCleaned = removeRunTempRoot();
+if (!tempCleaned && (result.status ?? 1) === 0) {
+	console.error("[amber] temp cleanup failed; failing an otherwise successful run.");
+	process.exit(1);
 }
-if (leakedFixtures.length > 0) {
-	console.error(
-		`[amber] temp sweep: removed ${leakedFixtures.length - fixturesFailed}/${leakedFixtures.length} leaked amber-* fixture dir(s) from the run-owned Temp root.`,
-	);
-}
-removeRunTempRoot();
 
 const leaked = listRootSessions().filter((id) => !sessionsBefore.has(id));
 if (leaked.length > 0) {

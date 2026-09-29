@@ -1,3 +1,4 @@
+const { trackTempDir } = require("../helpers/harness");
 const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -27,7 +28,7 @@ const TOKEN_HASH = crypto.createHash("sha256").update("opaque-token").digest("he
 
 // Each test gets its own mkdtemp root: shared fixtures made earlier suites flaky.
 function makeTarget({ stages, status = "executing", lease = true } = {}) {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-t4-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-t4-")));
 
 	registerPrincipal(root, { id: "alice@example.com", principalKind: "human" });
 	admitArtifact(root, { type: "intent", identity: "intent/runner", body: "# Runner\n" });

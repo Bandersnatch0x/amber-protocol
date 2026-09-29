@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Shared fail-closed ledger ritual (architecture survey Finding 5): the typed
 // corruption contract (F035-S5, decision D4) that knowledge-base,
@@ -24,7 +25,7 @@ const KB_CODE = "AMBER_E_KB_CORRUPT";
 const ORG_CODE = "AMBER_E_ORG_CORRUPT";
 
 function mkFile(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-ledger-${label}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-ledger-${label}-`)));
 	return path.join(dir, "ledger.jsonl");
 }
 

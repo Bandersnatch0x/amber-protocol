@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -10,7 +11,7 @@ const { doctor } = require("../../scripts/lib/core/doctor");
 const { remedyFor } = require("../../scripts/lib/core/lifecycle");
 
 function tmpRepo() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-doctor-remedy-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-doctor-remedy-")));
 }
 
 describe("doctor remedies", () => {

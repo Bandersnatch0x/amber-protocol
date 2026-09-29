@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F058 public seam: the instruction-surface suite result
 // (`runInstructionSurfaceEvals` / `amber eval run`). Detector functions are
@@ -19,7 +20,7 @@ const {
 } = require("../../scripts/lib/core/instruction-surface-evals");
 
 function tempDir(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-eval-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-eval-${label}-`)));
 }
 
 function findingCodes(suite, evalId) {

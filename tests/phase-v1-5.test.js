@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -16,7 +17,7 @@ const { inspectWorkflowPack } = require("../scripts/lib/core/workflow-packs");
 const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-v1-5-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-v1-5-${name}-`)));
 }
 
 function runHarness(args) {

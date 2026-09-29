@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F053 T1 (#274) — `amber release` CLI seam: governed candidate
 // preparation, fail-closed refusals with stable codes, and help
@@ -30,7 +31,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-release-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-release-${label}-`)));
 }
 
 function payload(r) {

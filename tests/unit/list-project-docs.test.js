@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Integration coverage for listProjectDocs — composes a filesystem walk with
 // the ignore-list and documentation heuristics, then sorts. isLikelyDocumentation
@@ -13,7 +14,7 @@ const path = require("node:path");
 const { listProjectDocs } = require("../../scripts/lib/core/audit");
 
 function tempTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "list-docs-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "list-docs-")));
 }
 
 function write(root, relativePath, content = "x\n") {

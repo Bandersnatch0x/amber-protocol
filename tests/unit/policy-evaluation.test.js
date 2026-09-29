@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F050 ticket 5 (#230) — Policy ceiling and separation of duties (unit seam).
 // Fixtures use the real governed seams end to end: principal registry,
@@ -42,7 +43,7 @@ const SUBJECT = "spec/login@2";
 const EVAL_NOW = new Date("2026-08-10T00:00:00.000Z");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-policy-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-policy-${label}-`)));
 }
 
 function outcomeLedgerPath(dir) {

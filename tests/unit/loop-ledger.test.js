@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -7,7 +8,7 @@ const path = require("node:path");
 const L = require("../../scripts/lib/core/loop-ledger");
 
 function tmpLedger() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-led-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-led-")));
 	return path.join(dir, "ledger.jsonl");
 }
 

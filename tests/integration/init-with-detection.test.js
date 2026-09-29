@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -21,7 +22,7 @@ function gitAvailable() {
 const GIT_OK = gitAvailable();
 
 function tmp(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-init-detect-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-init-detect-${name}-`)));
 }
 
 function git(cwd, args) {

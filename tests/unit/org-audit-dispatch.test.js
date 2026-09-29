@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F039 slice 2: pin orgAuditDispatch envelopes so the defineCommand migration
 // stays byte-compatible with the hand-rolled envelopes it replaced.
@@ -11,7 +12,7 @@ const path = require("node:path");
 const { orgAuditDispatch } = require("../../scripts/lib/org-audit-commands");
 
 function tmpRoot(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-org-dispatch-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-org-dispatch-${label}-`)));
 }
 
 test("known action envelope: target, text, defaulted errors/warnings, exit 0, bypassPrint", () => {

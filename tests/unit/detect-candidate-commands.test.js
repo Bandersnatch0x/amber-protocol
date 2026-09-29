@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Integration coverage for detectCandidateCommands — the filesystem-coupled
 // evidence gatherer whose pure decision core (buildPythonCandidates) is unit
@@ -16,7 +17,7 @@ const { detectCandidateCommands } = require("../../scripts/lib/core/audit");
 const PYTHON_EVIDENCE = [{ source: "pyproject.toml", name: "python" }];
 
 function tempTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "candidate-cmd-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "candidate-cmd-")));
 }
 
 function write(root, relativePath, content) {

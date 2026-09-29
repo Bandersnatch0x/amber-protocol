@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -446,7 +447,7 @@ test("resolveSyncArtifact rejects a path that escapes through an outside symlink
 
 test("resolveSyncArtifact rejects missing descendants beneath an outside symlinked directory", (t) => {
 	const dir = mkTarget("resolve-symlink-dir", { git: true });
-	const outsideDir = fs.mkdtempSync(path.join(dir, "..", "outside-dir-"));
+	const outsideDir = trackTempDir(fs.mkdtempSync(path.join(dir, "..", "outside-dir-")));
 	fs.writeFileSync(path.join(outsideDir, "real.json"), "{}");
 	const linkDir = path.join(dir, ".amber", "context", "pages");
 	fs.mkdirSync(path.dirname(linkDir), { recursive: true });
@@ -661,7 +662,7 @@ test("envelopeFromArtifact stamps the governed repositoryId, never the directory
 });
 
 test("envelopeFromArtifact repositoryId is stable across clones of one remote", () => {
-	const base = fs.mkdtempSync(path.join(os.tmpdir(), "amber-admit-clones-"));
+	const base = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-admit-clones-")));
 	const bare = path.join(base, "hub.git");
 	spawnSync("git", ["init", "--bare", bare]);
 	const ids = [];

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F050 ticket 5 (#230) — public CLI seam coverage for deny-wins Policy
 // evaluation. Policy Contracts are admitted through the canonical artifact
@@ -25,7 +26,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t5-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t5-${label}-`)));
 }
 
 function envelope(r) {

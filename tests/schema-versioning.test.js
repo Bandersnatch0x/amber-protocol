@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -221,7 +222,7 @@ describe("execution_mode validation", () => {
 // ---- (c) Doctor version drift ----
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-schema-versioning-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-schema-versioning-${name}-`)));
 }
 
 describe("doctor version drift", () => {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -10,7 +11,7 @@ const { buildOkfGraph, exportOkfBundle } = require("../scripts/lib/core/okf-expo
 const { OKF_VERSION } = require("../scripts/lib/core/okf-frontmatter");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-okfx-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-okfx-${name}-`)));
 }
 
 function writeFile(root, relativePath, content) {

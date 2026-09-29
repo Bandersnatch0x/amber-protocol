@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -10,7 +11,7 @@ const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 const { validateWiki } = require("../scripts/lib/core/validators");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-wiki-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-wiki-${name}-`)));
 }
 
 function writeFile(root, relativePath, content) {

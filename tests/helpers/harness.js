@@ -48,8 +48,9 @@ function trackTempDir(dir) {
 			for (const temp of tempDirs) {
 				try {
 					fs.rmSync(temp, { recursive: true, force: true, maxRetries: 3 });
-				} catch {
-					// ponytail: best-effort — a locked fixture must never mask a test result.
+				} catch (error) {
+					console.error(`[amber] fixture cleanup failed: ${temp}: ${error.message}`);
+					process.exitCode = process.exitCode || 1;
 				}
 			}
 		});

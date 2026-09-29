@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F039 slice 2: pin memoryDispatch envelopes so the defineCommand migration
 // stays byte-compatible with the ok()/fail() envelopes it replaced.
@@ -16,7 +17,9 @@ const {
 } = require("../../scripts/lib/memory-commands");
 
 function tmpRoot(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-memory-dispatch-${label}-`));
+	const dir = trackTempDir(
+		fs.mkdtempSync(path.join(os.tmpdir(), `amber-memory-dispatch-${label}-`)),
+	);
 	fs.writeFileSync(path.join(dir, "MEMORY.md"), MEMORY_MD_FIXTURE);
 	return dir;
 }

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const path = require("node:path");
 const { scaffoldPlan, validatePlanGate, reviewPlan } = require("../../scripts/lib/core/planning");
 
 function tmpRepo() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-error-remedy-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-error-remedy-")));
 }
 
 function setupPendingPlan(dir) {

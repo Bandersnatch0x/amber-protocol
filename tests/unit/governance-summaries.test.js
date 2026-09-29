@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const path = require("node:path");
 const { summarizeSessions, summarizeExecutions } = require("../../scripts/lib/core/governance");
 
 function tempDir(prefix) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`)));
 }
 
 function writeSession(sessionsDir, id, events) {

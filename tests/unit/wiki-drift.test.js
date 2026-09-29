@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -8,7 +9,7 @@ const { detectWikiDrift } = require("../../scripts/lib/core/wiki-drift");
 const { REQUIRED_HARNESS_FILES } = require("../../scripts/lib/core/constants");
 
 function mkWikiDir() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-")));
 	fs.mkdirSync(path.join(dir, "docs", "wiki", "product"), { recursive: true });
 	fs.mkdirSync(path.join(dir, "docs", "wiki", "engineering"), { recursive: true });
 	return dir;
@@ -23,7 +24,7 @@ function seedRequired(dir) {
 }
 
 test("no wiki dir -> available:false with note", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-")));
 	const r = detectWikiDrift(dir);
 	assert.strictEqual(r.available, false);
 	assert.match(r.note, /wiki/);

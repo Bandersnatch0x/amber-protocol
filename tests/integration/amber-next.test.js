@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
@@ -10,7 +11,7 @@ const { spawnSync } = require("node:child_process");
 const AMBER = path.join(__dirname, "..", "..", "scripts", "amber.js");
 
 function tmpRepo() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-next-int-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-next-int-")));
 }
 
 function amber(dir, args) {

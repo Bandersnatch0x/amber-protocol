@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Structured governance ledger gates (issues/0155, adopted under the 0141
 // consistency review D-4).
@@ -27,7 +28,7 @@ const {
 const { compileSchema } = require("../../scripts/lib/core/schema-contract");
 
 function tmpLedger() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gov-ledger-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "gov-ledger-")));
 	return path.join(dir, "governance-ledger.jsonl");
 }
 

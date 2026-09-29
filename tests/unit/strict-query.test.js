@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F050 ticket 6 (#231) — strict query and staleness propagation unit seam.
 
@@ -22,7 +23,7 @@ const { strictGovernanceGraphQuery } = require("../../scripts/lib/core/strict-qu
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-strict-query-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-strict-query-${label}-`)));
 }
 
 function admitIntent(dir, identity) {

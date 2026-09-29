@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -12,7 +13,7 @@ const { addFeature, recordFeatureEvidence } = require("../../scripts/lib/feature
 const { writeHandoff } = require("../../scripts/lib/handoff-command");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-writer-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-writer-${name}-`)));
 }
 
 test("writeHandoff regenerates session-handoff.md from live state (not the template)", () => {

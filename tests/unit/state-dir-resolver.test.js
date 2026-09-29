@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -15,7 +16,7 @@ const {
 const { installTargetRoutes } = require("../helpers/target-routes");
 
 function tmpRoot() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-resolver-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-resolver-")));
 }
 
 test("no state exists: both read and create resolve to .amber", () => {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Regression for #60: governance audit / evidence-export must read session +
 // execution evidence through resolveStateDirForRead, so legacy .harness state
@@ -14,7 +15,7 @@ const path = require("node:path");
 const { generateAuditReport, exportSessionEvidence } = require("../../scripts/lib/core/governance");
 
 function tempDir(prefix) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`)));
 }
 
 // Write a session under the LEGACY .harness state dir with NO .amber present,

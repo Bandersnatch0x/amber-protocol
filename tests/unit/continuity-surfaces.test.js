@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -11,7 +12,7 @@ const {
 } = require("../../scripts/lib/continuity-surfaces");
 
 function tempRoot() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-continuity-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-continuity-")));
 }
 
 test("ensureContinuitySurfaces creates stable repo-local paths idempotently", () => {

@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -21,7 +22,7 @@ function cliPayload(r) {
 }
 
 function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-profile-${label}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-profile-${label}-`)));
 	execSync("git init", { cwd: dir, encoding: "utf8" });
 	execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
 	execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });

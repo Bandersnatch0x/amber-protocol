@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 // F050 ticket 1 (#226) — public CLI seam coverage for the Principal registry
 // and Decision artifacts: `amber principal register/show/list/revoke` and
@@ -27,7 +28,7 @@ function runCli(args, cwd) {
 }
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t1-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-f050t1-${label}-`)));
 }
 
 function payload(r) {

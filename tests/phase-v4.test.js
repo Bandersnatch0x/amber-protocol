@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -12,7 +13,7 @@ const CLI = path.join(ROOT, "scripts", "amber.js");
 const { buildGovernanceReport } = require("../scripts/lib/core/governance-report");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-v4-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-v4-${name}-`)));
 }
 
 function runHarness(args) {

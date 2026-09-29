@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Unit tests for loadAllSessionManifests — the batch enumerator extracted
 // from findMostRecentSession and listSessions. Pins "newest first" ordering
@@ -12,7 +13,7 @@ const path = require("node:path");
 const { loadAllSessionManifests } = require("../../scripts/lib/session-commands");
 
 function tempProject() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "session-all-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "session-all-")));
 }
 
 function writeManifest(projectRoot, sessionId, createdAt) {

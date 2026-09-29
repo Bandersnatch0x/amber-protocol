@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -10,7 +11,7 @@ const { runDrift, renderDrift } = require("../../scripts/lib/drift-command");
 
 // Build a minimal harnessed git repo with .amber state dir (detectors need git + feature_list).
 function mkHarnessRepo() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-drift-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-drift-")));
 	execSync("git init -q", { cwd: dir });
 	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
 	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
@@ -54,7 +55,7 @@ test("--no-fail forces exitCode 0 even with drift", () => {
 });
 
 test("non-git repo: scopes unavailable, exitCode 0", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-drift-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-drift-")));
 	fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify({ features: [] }));
 	const r = runDrift(dir);
 	assert.strictEqual(r.exitCode, 0);

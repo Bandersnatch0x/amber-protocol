@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F076 — Cross-run diff (§20, H5 lineage). Conformance at the real path:
 // the SAME six-axis derivation the replay engine uses (composed verbatim —
@@ -18,7 +19,7 @@ const { diffRuns, replayRun } = require("../../scripts/lib/harness/replay-core")
 const { dispatch } = require("../../scripts/lib/command-dispatcher");
 
 function tmpTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-diff-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-diff-")));
 }
 
 function admitAndStart(target, runId, task) {

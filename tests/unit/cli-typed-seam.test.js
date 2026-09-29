@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -68,7 +69,7 @@ test("CLI typed seam gates only mutating Context Action variants", () => {
 });
 
 test("CLI typed seam fails closed when an Action contract is corrupt", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-seam-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-seam-")));
 	fs.writeFileSync(path.join(dir, "bad.json"), JSON.stringify({ actionTypeId: "amber.bad" }));
 	assert.throws(() => validateTypedSeam(dir), /CLI typed seam is invalid/);
 });

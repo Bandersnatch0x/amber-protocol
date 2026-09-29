@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F072 H4 tickets 0112 + 0113 — Run-scoped checkpoints and the unified
 // lifecycle view. Conformance at the real path: capture (non-final only,
@@ -27,7 +28,7 @@ const { lifecycleView } = require("../../scripts/lib/harness/lifecycle-view");
 const { recordAttempt } = require("../../scripts/lib/harness/attempt-core");
 
 function tmpTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-ckpt-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-harness-ckpt-")));
 }
 
 function admitAndStart(target, runId) {

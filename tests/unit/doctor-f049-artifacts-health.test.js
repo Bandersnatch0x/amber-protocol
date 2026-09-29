@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Optional F049/F050 doctor health: when `.amber/artifacts|gates|approvals`
 // exist, doctor runs fail-closed read-only integrity through the existing
@@ -22,7 +23,7 @@ const GOVERNED_CHECKS = [ARTIFACTS_CHECK, GATES_CHECK, APPROVALS_CHECK];
 const FIXTURES = path.join(__dirname, "..", "fixtures");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-doctor-f049-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-doctor-f049-${label}-`)));
 }
 
 function checkNamed(result, name) {

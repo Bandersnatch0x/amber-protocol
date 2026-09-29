@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const { execSync } = require("node:child_process");
 const { gitRun, gitOutput } = require("../../scripts/lib/core/git-exec");
 
 function mkGit() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-")));
 	execSync("git init -q", { cwd: dir });
 	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
 	fs.writeFileSync(path.join(dir, "x"), "1");

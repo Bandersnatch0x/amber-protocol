@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Behavior-surface deriver units (trusted-control evolution contract §5/§7;
 // plan Slice 5). Cover: per-destination determinism (same findings → same
@@ -24,7 +25,7 @@ const {
 const { EVOLUTION_FINDING_MIN_COUNT } = require("../../scripts/lib/core/evolution-findings");
 
 function makeTarget(label) {
-	const target = fs.mkdtempSync(path.join(os.tmpdir(), `evo-deriver-${label}-`));
+	const target = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `evo-deriver-${label}-`)));
 	const evidenceFile = path.join(target, "docs", "wiki", "runbook.md");
 	fs.mkdirSync(path.dirname(evidenceFile), { recursive: true });
 	fs.writeFileSync(evidenceFile, "# Runbook\nline two\n");

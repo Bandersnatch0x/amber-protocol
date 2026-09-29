@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // F041 Slice 1 (red-first): the AMBER_E_SYNC_TRANSPORT_* catalog family and the
 // transport approval primitive — a hash-chained `approved` record on
@@ -25,7 +26,7 @@ const {
 } = require("../../scripts/lib/core/loop-ledger");
 
 function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-transport-${label}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-transport-${label}-`)));
 }
 
 function mkRepo(label) {
@@ -313,7 +314,7 @@ test("confinement gate: symlinked envelopes dir resolving outside the repo refus
 	const dir = mkRepo("symlink-dir");
 	seedEnvelope(dir);
 	const envDir = path.join(dir, ".amber", "sync", "envelopes");
-	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-outside-"));
+	const outside = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-outside-")));
 	fs.renameSync(envDir, path.join(outside, "envelopes"));
 	fs.symlinkSync(
 		path.join(outside, "envelopes"),
@@ -475,7 +476,7 @@ test("adversarial: a symlinked FILE inside envelopes resolving outside the repo 
 	const envelope = seedEnvelope(dir);
 	const envDir = path.join(dir, ".amber", "sync", "envelopes");
 	const envFile = path.join(envDir, `${envelope.envelopeId}.json`);
-	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-outside-file-"));
+	const outside = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-outside-file-")));
 	fs.renameSync(envFile, path.join(outside, "stolen.json"));
 	fs.symlinkSync(
 		path.join(outside, "stolen.json"),

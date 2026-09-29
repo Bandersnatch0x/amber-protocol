@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -9,7 +10,7 @@ const path = require("node:path");
 const { readJSONL, appendJSONL, writeJSONL, foldJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkFile(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-jsonl-${label}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-jsonl-${label}-`)));
 	return path.join(dir, "data.jsonl");
 }
 

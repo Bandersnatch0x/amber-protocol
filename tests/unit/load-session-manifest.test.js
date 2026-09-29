@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Unit tests for loadSessionManifest — the centralized session-manifest
 // reader extracted from statusSession/abortSession/continueSession. Pins its
@@ -12,7 +13,7 @@ const path = require("node:path");
 const { loadSessionManifest } = require("../../scripts/lib/session-commands");
 
 function tempProject() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "session-load-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "session-load-")));
 }
 
 function writeManifest(projectRoot, sessionId, manifest) {

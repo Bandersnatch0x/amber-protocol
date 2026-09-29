@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("./helpers/harness");
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -10,7 +11,7 @@ const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 const { validateHandoff } = require("../scripts/lib/core/audit");
 
 function tempDir(name) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-${name}-`));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-${name}-`)));
 }
 
 test("scaffolded handoff file is valid", () => {

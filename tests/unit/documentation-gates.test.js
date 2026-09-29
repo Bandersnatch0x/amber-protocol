@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Documentation-governance gates (issues/0149, adjudicated under issues/0141):
 // the wiki validator is a real CI step, the inert drift step is gone, and
@@ -18,7 +19,7 @@ const CODEOWNERS = path.join(REPO_ROOT, ".github", "CODEOWNERS");
 const GOVERNANCE_DOC = path.join(REPO_ROOT, "docs", "agents", "documentation-governance.md");
 
 function tmpProductRepo() {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-doc-gate-"));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-doc-gate-")));
 	// Product-repo signature: SPEC.md + ROADMAP.md + scripts/amber.js + templates/
 	fs.writeFileSync(path.join(dir, "SPEC.md"), "# spec");
 	fs.writeFileSync(path.join(dir, "ROADMAP.md"), "# roadmap");

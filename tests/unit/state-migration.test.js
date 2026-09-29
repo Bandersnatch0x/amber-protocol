@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -7,7 +8,7 @@ const os = require("node:os");
 const { migrateState, migrateWiki } = require("../../scripts/lib/state-migration");
 
 function rootWithLegacyState() {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-migrate-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-migrate-")));
 	const sess = path.join(root, ".harness", "sessions", "s1");
 	fs.mkdirSync(sess, { recursive: true });
 	fs.writeFileSync(path.join(sess, "manifest.json"), JSON.stringify({ sessionId: "s1" }));
@@ -48,7 +49,7 @@ test("migrateState merges into an existing .amber without overwriting files", ()
 });
 
 test("migrateState is a no-op when legacy state is already archived", () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-migrate-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-migrate-")));
 	fs.mkdirSync(path.join(root, ".amber"), { recursive: true });
 	const result = migrateState(root, { archiveLegacy: true });
 	assert.equal(result.errors.length, 0);
@@ -94,7 +95,7 @@ test("migrateState reports corrupt manifests as failed validation, still copies"
 });
 
 test("migrateWiki renames harness.md to amber.md and updates index links", () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-")));
 	const agentDir = path.join(root, "docs", "wiki", "agent");
 	fs.mkdirSync(agentDir, { recursive: true });
 	fs.writeFileSync(path.join(agentDir, "harness.md"), "# Harness\n");
@@ -110,7 +111,7 @@ test("migrateWiki renames harness.md to amber.md and updates index links", () =>
 });
 
 test("migrateWiki is a no-op when amber.md already exists", () => {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-"));
+	const root = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-wiki-")));
 	const agentDir = path.join(root, "docs", "wiki", "agent");
 	fs.mkdirSync(agentDir, { recursive: true });
 	fs.writeFileSync(path.join(agentDir, "amber.md"), "# Amber\n");

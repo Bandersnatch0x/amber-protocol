@@ -1,4 +1,5 @@
 "use strict";
+const { trackTempDir } = require("../helpers/harness");
 
 // Behavioral coverage for detectCommands — extracts verification commands from a
 // project's package.json scripts and Makefile. Only the negative case (no
@@ -13,7 +14,7 @@ const path = require("node:path");
 const { detectCommands } = require("../../scripts/lib/core/audit");
 
 function tempTarget() {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "detect-commands-"));
+	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "detect-commands-")));
 }
 
 test("extracts package.json scripts as package.json-sourced commands", () => {
