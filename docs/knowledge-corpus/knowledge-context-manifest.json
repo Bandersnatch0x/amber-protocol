@@ -40,7 +40,7 @@
       "sourcePath": "docs/adr/0003-governance-gated-execution.md",
       "title": "Governance-Gated Execution (L2)",
       "source": {
-        "rawHash": "sha256:d4db9792f9a3938e5d5795df225239d5a8b8077c9c6c663a1df79ad23bae64b9",
+        "rawHash": "sha256:f4e946c16223539fadd79dd0a6d1a26c065c34f0cbfc60bd67fe2c9514f48839",
         "normHash": "sha256:4db27de732aa049eccb7cfe34700973e1689abdcce75da91c916ecd89ebb6135"
       }
     },
@@ -52,7 +52,7 @@
       "sourcePath": "docs/adr/0004-evidence-grade-verification.md",
       "title": "Evidence-Grade Verification",
       "source": {
-        "rawHash": "sha256:e438514914992244ba0414e16ec6eecf34311a36a7527f86e8c9bc2f5d6f1816",
+        "rawHash": "sha256:bbd1eea3f27876926b96f2de1e40893629bb78092524ef91d7b7054768acbf5e",
         "normHash": "sha256:2d4952d4d4ece96d9f5970a7f8b61116b98bf0df1b9aaea57322cd6768b4002c"
       }
     },
@@ -64,7 +64,7 @@
       "sourcePath": "docs/adr/0005-experimental-execution-removal.md",
       "title": "Experimental Execution Removal — Supersedes ADR-0002 Preservation",
       "source": {
-        "rawHash": "sha256:ac451bb96d51fe096900d13ffba5d14cfb8fb767751a93f6b8c30fd176cecd33",
+        "rawHash": "sha256:eeebd768d2d5f4ff3e896cdea52f9c60334b9f6e00ef671d37a1cbfb5c1ae69a",
         "normHash": "sha256:3181fd3a3f56f0935da0c499083e6a757133b730902fdbd1b0834b3b91aa4372"
       }
     },
@@ -208,7 +208,7 @@
       "sourcePath": "docs/adr/0017-live-observability-artifact-polling.md",
       "title": "Live observability via artifact polling and SSE invalidation",
       "source": {
-        "rawHash": "sha256:1e995c732f66454116f618d2e14fe27a4613e1bd7653e02167a266c09dd2ee65",
+        "rawHash": "sha256:1d7532101953ab831f64740227aef5ba8fbc66ef97dadfe1dee320395e0176d4",
         "normHash": "sha256:b60fb7e598ed620fbd57987edf3b4227d6e91ca34e5a9a7ec0c8fdc4553d899a"
       }
     },
@@ -472,7 +472,7 @@
       "sourcePath": "docs/architecture/governance-model.md",
       "title": "Governance Model Architecture",
       "source": {
-        "rawHash": "sha256:e83880fed42b48d1581924fd7b944189f66cec18c6b4e2d76ee4265d6c24688c",
+        "rawHash": "sha256:285707a30839ead98ebb3eebcce88abacd57109ebeb558149effd72a3ff6d39e",
         "normHash": "sha256:8208bf5610733151d146de66d40f2f26ad490b50d37312fbaef569c4f210c78e"
       }
     },
@@ -604,7 +604,7 @@
       "sourcePath": "docs/wiki/knowledge/session-lifecycle-management/session-lifecycle-management.md",
       "title": "Session & Lifecycle Management",
       "source": {
-        "rawHash": "sha256:61653f1c0e434bdf8a076820bcd72b8715836721346fa17e260d5958de3f2ac0",
+        "rawHash": "sha256:b0d21f48e7ba5b7a8b88b90c8d100c286739d4b798e4f11fd0b1a470561cc25c",
         "normHash": "sha256:a9fe6442865cd3e8b63b1ece101fa9203d921fbc7997410e8b0ea590f5e7cf3d"
       }
     },
@@ -616,7 +616,7 @@
       "sourcePath": "docs/wiki/knowledge/skills-platform-generation/skills-platform-generation.md",
       "title": "Skills & Platform Generation",
       "source": {
-        "rawHash": "sha256:40e4dcd5f8320953a167f7b7a61e9149e7a188086fa62de3b6dd2bcb4e129f5d",
+        "rawHash": "sha256:0d807511ddfaa12d99e46721473cd6453978175e971281a0f5d18438a44e771f",
         "normHash": "sha256:8df1f3daa95412200c5b72f05e5f47f82854c8fb7680d10731c01afaf101515c"
       }
     },
@@ -628,10 +628,10 @@
       "sourcePath": "docs/wiki/knowledge/web-dashboard/web-dashboard.md",
       "title": "Web Dashboard",
       "source": {
-        "rawHash": "sha256:ee25d7b393bac2265ec1e59931fac0725a47c91504df691b5e6b038d65e1151b",
+        "rawHash": "sha256:60a1bf32f1f3f9555893bfe4e7977dedc58681cc47869a3058eb6902225bf771",
         "normHash": "sha256:893f8c4c1225f3310234cbaf3a042a1c9d1de0eab41d5f79f2bc1de2bb76fe2e"
       }
     }
   ],
-  "manifestHash": "sha256:ecebf1a50e3dca7651b15480b59936c9fe281c0bcffd9e389ce9c979a730d1e5"
+  "manifestHash": "sha256:361e4c28f2994345f7b5d508dcc7be413c09fd8aa8e795ea51db0201829ac0fc"
 }
