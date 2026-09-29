@@ -28,6 +28,18 @@
  *   9. (CI: tests + npmjs lockstep publish)
  *  10. npm run release:verify
  *
+ * Two traps worth knowing before you re-run this script:
+ *   - The base tag is the newest `v*` tag (see getLatestStableTag), so once the
+ *     release tag exists, a re-run generates the new section from that tag
+ *     onwards and REPLACES the release section with a near-empty one (a 2.0.0
+ *     section that had 527 lines collapsed to 18). Re-run before tagging, or
+ *     delete the local tag first.
+ *   - A few historical subjects name external tools or authors, which the
+ *     external-reference-ip-hygiene gate forbids on the product surface. Those
+ *     entries are reworded by hand after generating (see CONTRIBUTING on
+ *     changelog edits); regenerate and the rewordings come back. `npm test`
+ *     catches it, so the trap is loud, never silent.
+ *
  * The script is safe to re-run for the same version (replaces the section).
  */
 
@@ -252,12 +264,12 @@ function updateChangelogFile(version, sectionText, changelogPath) {
 		const afterHeader = existingIdx + header.length;
 		let nextSection = content.indexOf("\n## [", afterHeader);
 		if (nextSection === -1) nextSection = content.length;
-		// include the trailing blank lines before next if any
-		content =
-			content.slice(0, existingIdx) +
-			sectionText.trimEnd() +
-			"\n\n" +
-			content.slice(nextSection).trimStart();
+		// include the trailing blank lines before next if any. The head is
+		// normalized for the same reason as the insert path: the bytes before the
+		// section already carry the blank line that separates it, and a second one
+		// is the formatting defect prettier rejects.
+		const head = content.slice(0, existingIdx).replace(/\n+$/, "\n\n");
+		content = head + sectionText.trimEnd() + "\n\n" + content.slice(nextSection).trimStart();
 	} else {
 		// Insert as the new top release section, right after the file header + intro
 		const firstRelease = content.indexOf("\n## [");
@@ -265,8 +277,13 @@ function updateChangelogFile(version, sectionText, changelogPath) {
 			// legacy or minimal file
 			content = content.trimEnd() + "\n\n" + sectionText;
 		} else {
-			content =
-				content.slice(0, firstRelease + 1) + "\n" + sectionText + content.slice(firstRelease + 1);
+			// `firstRelease` points at the newline that OPENS the blank line before
+			// the previous release, so the slice already ends with one. Adding
+			// another left two blank lines, which prettier (and therefore
+			// `npm run format:check`) rejects. Normalize the head to exactly one
+			// blank line before the new section.
+			const head = `${content.slice(0, firstRelease + 1).replace(/\n+$/, "\n")}\n`;
+			content = head + sectionText + content.slice(firstRelease + 1);
 		}
 	}
 

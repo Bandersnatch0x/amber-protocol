@@ -5,7 +5,6 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [2.0.0] - 2026-09-29
 
 ### Added
@@ -157,6 +156,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- web: re-anchor the home-visual contract to the renamed console title
+- knowledge: re-sync the corpus from LF line endings
+- harness: read a defunct pid as gone, not alive
+- tests: scope the Scenario-1 seam test to Scenario 1 (the root test job has no build)
 - tests: restore the temp-fixture ownership migration (temp-leak-fix re-application)
 - harness: address the independent review of 3425a1c (F081 round-6 findings)
 - harness: require cancellation-record binding fields and check them unconditionally (F081 round-5 P1)
@@ -282,6 +285,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **BREAKING** cli: remove the agent, team, and adoption command families (issues/0068)
+- packages: check out full history so the provenance suite can run
 - plans: bring the F081 plan up to the plan contract so it can be accepted (F081)
 - quality: promote the 0020 Layer-2 trial protocol and add a pilot intake brief (issues/0062, 0137)
 - docs: lock narrow-screen section navigation (issues/0063 O7)
