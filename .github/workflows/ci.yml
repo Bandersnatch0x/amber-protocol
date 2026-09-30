@@ -43,29 +43,33 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
         run: |
           zero_sha="0000000000000000000000000000000000000000"
+          # Validate a range — but never an EMPTY one. `git log <range>` prints nothing for
+          # an empty range, so the validator filters an empty list and exits 0: a silent
+          # PASS over zero commits, which is worse than a loud failure. Whenever a range
+          # turns out to be empty, the head commit is checked instead, so every path checks
+          # at least one commit.
+          check_range() {
+            if [ "$(git rev-list --count "$1")" = "0" ]; then
+              node scripts/validate-git-identity.js --commit "$HEAD_SHA"
+            else
+              node scripts/validate-git-identity.js --range "$1"
+            fi
+          }
           # A tag push reports BEFORE_SHA as the PREVIOUS tag OBJECT, not a commit.
           # Force-moving a tag leaves that object unreachable in the checkout, so
           # "$BEFORE_SHA..$HEAD_SHA" becomes an invalid revision range and the gate
           # fails on a perfectly valid release tag ("fatal: Invalid revision range").
           # The commit a release tag points at was already validated when it reached
-          # the branch, so the tagged commit is the unit to check here. The
-          # resolvability test below keeps the same failure from reaching any other
-          # event whose BEFORE_SHA cannot be resolved.
+          # the branch, so the tagged commit is the unit to check there, and the
+          # resolvability test below keeps that failure from reaching any other event.
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            node scripts/validate-git-identity.js --range "$BASE_SHA..$HEAD_SHA"
+            check_range "$BASE_SHA..$HEAD_SHA"
           elif [ "$REF_TYPE" = "tag" ]; then
             node scripts/validate-git-identity.js --commit "$HEAD_SHA"
           elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "$zero_sha" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
-            node scripts/validate-git-identity.js --range "$BEFORE_SHA..$HEAD_SHA"
+            check_range "$BEFORE_SHA..$HEAD_SHA"
           elif [ "$REF_TYPE" = "branch" ]; then
-            merge_base="$(git merge-base "origin/$DEFAULT_BRANCH" "$HEAD_SHA")"
-            # A merge base equal to HEAD would validate an EMPTY range, so the gate
-            # would pass without checking anything. Fall back to the head commit.
-            if [ "$merge_base" = "$HEAD_SHA" ]; then
-              node scripts/validate-git-identity.js --commit "$HEAD_SHA"
-            else
-              node scripts/validate-git-identity.js --range "$merge_base..$HEAD_SHA"
-            fi
+            check_range "$(git merge-base "origin/$DEFAULT_BRANCH" "$HEAD_SHA")..$HEAD_SHA"
           else
             node scripts/validate-git-identity.js --commit "$HEAD_SHA"
           fi
