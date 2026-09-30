@@ -11,14 +11,29 @@ Amber Protocol is positioned as an **operational-ontology governance layer**: co
 
 ## Action Types
 
-Amber defines machine-readable Action Types under `action-types/*.json`. Each action represents an atomic verb operating on governance objects:
+Amber defines 21 machine-readable Action Types under `action-types/*.json` (listed here from their own `actionTypeId`). Each action represents an atomic verb operating on governance objects:
 
+- `amber.breakglass.grant`
+- `amber.context.ingest`
+- `amber.contracts.validate`
+- `amber.eval.admit`
+- `amber.eval.run`
+- `amber.external.propose`
+- `amber.governance.report`
+- `amber.memory.abandon`
+- `amber.memory.approve`
+- `amber.memory.status`
+- `amber.object.query`
+- `amber.route.test`
+- `amber.runner.request`
+- `amber.runner.settle`
+- `amber.session.approve`
+- `amber.session.lease`
+- `amber.session.run`
+- `amber.session.settle`
 - `amber.session.start`
 - `amber.session.status`
-- `amber.evidence.record`
-- `amber.gate.evaluate`
-- `amber.handoff.bundle`
-- `amber.object.query`
+- `amber.session.verify`
 
 ## Model Context Protocol (MCP) Server
 

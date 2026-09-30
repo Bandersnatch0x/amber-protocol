@@ -156,13 +156,19 @@ function parseConventional(subject, body = "") {
 }
 
 function extractReference(text) {
-	// Look for (#123) style PR / issue reference
-	const m = (text || "").match(/\(#(\d+)\)/);
-	return m ? `#${m[1]}` : null;
+	// A subject can carry MORE than one pull citation. Taking only the first while
+	// stripping only the trailing one duplicated it and dropped the rest: the real
+	// subject `… fixture family M0 (#160) (#180)` was rendered `… (#160) (#160)`.
+	const refs = [...String(text || "").matchAll(/\(#(\d+)\)/g)].map((m) => `#${m[1]}`);
+	return refs.length ? [...new Set(refs)].join(", ") : null;
 }
 
 function stripRef(text) {
-	return (text || "").replace(/\s*\(#\d+\)\s*$/, "").trim();
+	// Remove every parenthetical pull citation, wherever it sits in the subject.
+	return String(text || "")
+		.replace(/\s*\(#\d+\)/g, "")
+		.replace(/\s{2,}/g, " ")
+		.trim();
 }
 
 // Internal handles are how this repository talks to itself: spec ids (`F081`),
@@ -181,6 +187,11 @@ const PULL_NUMBER_RE = /#\d+/g;
 //   `head (a whole sentence)`            -> unchanged: the rule drops a
 //     parenthetical that cites something internal, not one that is part of the
 //     sentence the author wrote.
+//
+// Stated precisely, because the rule is coarser than "remove the handle": a
+// parenthetical that cites anything internal is dropped WHOLE, including any prose it
+// carries, and a nested parenthetical (`head (see (F081))`) is left alone because the
+// pattern refuses to guess at nesting.
 function stripInternalHandle(text) {
 	const subject = String(text || "").trim();
 	const m = subject.match(/^(.*?)\s*\(([^()]*)\)\s*$/);

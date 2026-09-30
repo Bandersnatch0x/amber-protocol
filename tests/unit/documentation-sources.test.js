@@ -20,6 +20,44 @@ const WIKI_DIR = path.join(REPO_ROOT, "docs", "wiki");
 const CORPUS_DIR = path.join(REPO_ROOT, "docs", "knowledge-corpus");
 const MANIFEST = path.join(CORPUS_DIR, "knowledge-context-manifest.json");
 
+// The committed corpus is TWO files, and a reader sees a different hash for one source
+// depending on which it opens: the manifest's rows, and the projection's per-source
+// `rawHash`. They must agree, and neither may record a CR. The 2.0.0 corpus shipped one
+// artifact generated from a CRLF working tree and one from an LF checkout, and nothing
+// noticed — the freshness gate above only hashes the working tree.
+describe("committed corpus self-consistency", () => {
+	it("records the same raw hash for every source in both corpus files", () => {
+		const projection = JSON.parse(
+			fs.readFileSync(path.join(CORPUS_DIR, "knowledge-base.output.json"), "utf8"),
+		);
+		const manifest = JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
+		const byRef = new Map();
+		for (const page of projection.pages) {
+			const source = page.sources && page.sources.source;
+			if (source && typeof source.ref === "string") byRef.set(source.ref, source.rawHash);
+		}
+		for (const row of manifest.rows) {
+			assert.equal(
+				byRef.get(row.sourcePath),
+				row.source.rawHash,
+				`${row.sourcePath} carries two different hashes across the corpus files`,
+			);
+		}
+	});
+
+	it("records no CR in either corpus file, so an LF checkout reproduces them", () => {
+		for (const file of ["knowledge-base.output.json", "knowledge-context-manifest.json"]) {
+			const text = fs.readFileSync(path.join(CORPUS_DIR, file), "utf8");
+			assert.equal(
+				text.includes("\\r\\n"),
+				false,
+				`${file} records a CRLF-escaped excerpt — regenerate the corpus on an LF checkout`,
+			);
+			assert.equal(text.includes("\r"), false, `${file} carries a literal CR`);
+		}
+	});
+});
+
 function planFiles() {
 	return fs.readdirSync(WIKI_DIR).filter((name) => /^knowledge-plan\./.test(name));
 }

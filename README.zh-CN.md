@@ -174,6 +174,8 @@ amber handoff --target my-project
 
 `init` 和 `wiki` 永不覆盖已有文件。默认帮助只展示七个回退动词：`audit`、`init`、`doctor`、`next`、`plan`、`handoff`、`session`；专家与兼容表面保留在 `amber --all`。完整命令面见 [CLI 参考](./docs/CLI_REFERENCE.md)。
 
+专家路径（不是首页主线）：只读的持续改进发现通过 `amber loop recommend` —— 见下方「它不会做什么」里的循环两节。
+
 ## 命令面
 
 默认 `amber --help` 只投影**七个主命令**——整条旅程都在里面：
@@ -253,6 +255,7 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 - 不执行 Dynamic Workflow
 - 不调用真实 subagent runner
 - 不自动执行目标项目命令
+- 不写外部系统（PR、issue tracker、通知），也不拦截 agent 的工具调用
 - 不自动重写已有项目文档
 - 当前产品不执行 scheduled loop
 - 原生安装不执行任何受治理的 verb 阶段：实现拥有的 adapter 表出厂为**空**（无回退），`session run` 的 stage 一律 fail-closed，直到注册 capability——而注册是一次经过评审的代码变更，不是配置修改

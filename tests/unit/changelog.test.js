@@ -161,6 +161,41 @@ test("groupCommits skips release-bookkeeping commits", () => {
 // `(F081)` is not something an outside reader can follow. Pull numbers are the
 // citation the changelog convention promises — and the only one a reader can
 // resolve without repository context — so they stay.
+// A subject can carry more than one pull citation. Taking the first and stripping only
+// the trailing one duplicated it and dropped the rest — the real subject
+// `… fixture family M0 (#160) (#180)` rendered as `(#160) (#160)` (CHANGELOG.md:144).
+test("groupCommits keeps every pull number and never duplicates one", () => {
+	const g = groupCommits([
+		{
+			subject: "feat(fixtures): deterministic governance fixture family M0 (#160) (#180)",
+			body: "",
+		},
+		{ subject: "fix(cli): a citation mid-sentence (#42) and prose after it", body: "" },
+	]);
+	const all = [...g.Added, ...g.Fixed, ...g.Changed, ...g.Other];
+	const first = all.find((e) => e.includes("fixture family M0"));
+	assert.match(first, /#160/);
+	assert.match(first, /#180/, "the second citation survives");
+	assert.equal((first.match(/#160/g) || []).length, 1, "the first is not duplicated");
+	const second = all.find((e) => e.includes("citation mid-sentence"));
+	assert.match(second, /#42/);
+	assert.doesNotMatch(second, /\(#42\) and/, "the citation is not left inside the sentence");
+});
+
+// The two boundaries the rule is honest about rather than clever about.
+test("groupCommits documents its handle-rule boundaries", () => {
+	const g = groupCommits([
+		{ subject: "fix(x): a nested parenthetical (see (F081)) stays", body: "" },
+		{ subject: "fix(y): mixed (F081; the prose goes too)", body: "" },
+	]);
+	const all = [...g.Added, ...g.Fixed, ...g.Changed, ...g.Other].join("\n");
+	assert.match(all, /nested parenthetical \(see \(F081\)\) stays/, "nesting is not guessed at");
+	assert.ok(
+		/\(F081; the prose goes too\)/.test(all) === false,
+		"a handle-bearing parenthetical is dropped whole",
+	);
+});
+
 test("groupCommits drops internal handles and keeps pull numbers", () => {
 	const commits = [
 		{ subject: "feat(harness): own governed-execution handles (F081)", body: "" },

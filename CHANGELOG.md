@@ -141,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - governance: Stage 1 ADR amendments + sync envelope + structural identity schemas (#184)
 - fixtures: team-hub + organization deployment profile tracers (#160 M2) (#182)
 - fixtures: runner integration + full fixture family (#160 M1) (#181)
-- fixtures: deterministic governance fixture family M0 (#160) (#160)
+- fixtures: deterministic governance fixture family M0 (#160, #180)
 - e2e: promote governance-loop verify to a failing command (#178)
 - memory: F034 T1/T2 write-back trigger mounting — nomination contracts at completion and accept
 - memory: F033 Governed Memory Layer batch A — five-verb surface, registry, doctor rules
