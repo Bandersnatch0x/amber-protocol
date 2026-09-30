@@ -4,6 +4,7 @@ title: User Scenarios
 description: Core, conditional, and expert journeys for Coding-Agent-Enabled Repositories.
 tags: [product, journey, trusted-continuation]
 updated: 2026-09-04
+Last Reviewed: 2026-09-29
 ---
 
 # User Scenarios

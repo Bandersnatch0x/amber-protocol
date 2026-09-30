@@ -4,6 +4,7 @@ title: Glossary
 description: Local summary of a few key terms; the authoritative terminology source is CONTEXT.md.
 tags: [glossary]
 updated: 2026-09-28
+Last Reviewed: 2026-09-29
 ---
 
 # Glossary

@@ -4,14 +4,15 @@ title: Runbook
 description: How to run, operate, and recover the system.
 tags: [engineering]
 updated: 2026-08-28
+Last Reviewed: 2026-09-29
 ---
 
 # Runbook
 
 ## Startup
 
-1. Install dependencies using the repository's documented package manager.
-2. Run the command in [verification](verification.md).
+1. `npm install` (root; `apps/web` and `apps/docs` have their own installs).
+2. Run the commands in [verification](verification.md) — `npm test` is the one that matters.
 3. Read `PROGRESS.md` before changing code.
 
 ## Optional Knowledge Semantic Analysis
@@ -44,8 +45,20 @@ are not returned to the browser.
 
 ## Common Tasks
 
-- Add task-specific steps here.
+- **Full test suite**: `npm test` (the run-owned temp root and its cleanup contract live in
+  `scripts/run-tests.js`).
+- **Repository gates**: `npm run manifests`, `node scripts/amber.js doctor --target .`,
+  `npm run format:check`, `node scripts/gen-docs-cli.js --check`,
+  `node scripts/gen-agent-commands.js --check`.
+- **Documentation site**: `npm run docs:build`, `npm run docs:verify`,
+  `npm run docs:gen:check`, `npm run docs:test`.
+- **Readiness and routing**: `node scripts/amber.js audit --target .`,
+  `node scripts/amber.js next --objective "<goal>" --target .`,
+  `node scripts/amber.js governance report --target .`.
+- **Release**: `npm run version:sync`, `npm run changelog`, then the tag push described in
+  `CONTRIBUTING.md`; `npm run release:verify` is the terminal gate afterwards.
 
 ## Unknowns / Needs Confirmation
 
-- Confirm the real startup steps, common maintenance tasks, and project-specific operational checks.
+- None at this revision: the startup steps, the gate list and the release flow are the
+  repository's own commands, and the test suite or CI exercises each one above.

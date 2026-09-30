@@ -13,7 +13,7 @@
 | 产品行为、协议要求、规范契约 | `docs/specs/` | draft/proposed → accepted → 显式 superseded/retired | ADR rationale、计划、feature 状态、票据正文 |
 | 已裁决架构选择及理由 | `docs/adr/` | 新 ADR 或显式 amendment，保留原决策 | 行为规范正文 |
 | 实施顺序、切片、验证安排 | `docs/plans/` | 实施期间更新，与票据互链 | 规范正文（plan 不重定义 normative spec） |
-| 稳定操作知识与 agent 约束 | `docs/wiki/`；agent 工作流规则另在 `docs/agents/` | 随稳定知识变化审查 | 临时状态、当前账本、handoff |
+| 稳定操作知识与 agent 约束 | `docs/wiki/`；agent 工作流规则另在 `docs/agents/` | 随稳定知识变化审查；每页以独立的 `Last Reviewed: YYYY-MM-DD` 行声明审阅时间（工具生成的页面在正文自述 machine-maintained，免除此要求） | 临时状态、当前账本、handoff |
 | 仓库级文档治理规则 | 本文件（`docs/agents/documentation-governance.md`） | 裁决变更时更新 | 各入口文档不得另行定义 |
 | 研究、问题、map、review 工作 | `issues/`（本地、gitignored） | append-only Log，关闭时记结论 | 规范正文；关闭 ≠ spec accepted ≠ 代码已交付 |
 | 审计、迁移、provenance、评审结论 | `docs/agents/` 或 `docs/quality/reviews/`；有长期价值的报告经阶段 7 晋升 `docs/quality/` | 保留来源、范围、结论 | 不因详尽而升格为 spec/ADR |
