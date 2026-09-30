@@ -1,6 +1,6 @@
 # F057: Break-glass Authorization
 
-**Status:** proposed
+**Status:** proposed (implementation shipped; spec acceptance pending)
 **Depends on:** F053, F056  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#217](https://github.com/Bandersnatch0x/amber-protocol/issues/217)

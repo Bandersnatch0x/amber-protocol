@@ -1,6 +1,6 @@
 # F058: Instruction-Surface Adversarial Evals
 
-**Status:** proposed
+**Status:** proposed (implementation shipped; spec acceptance pending)
 **Depends on:** F050  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#224](https://github.com/Bandersnatch0x/amber-protocol/issues/224)

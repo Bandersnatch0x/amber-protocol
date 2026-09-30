@@ -1,7 +1,7 @@
 # Trusted Control Run Contract (0050)
 
 **Spec ID:** `trusted-control-run-contract`
-**Status:** proposed
+**Status:** proposed (implementation shipped; coordinator re-review pending)
 **Updated:** 2026-09-16
 **Review:** coordinator contract-review-01 findings (ST-01, A-SP-01..03, cross-ticket context constraint) repaired on 2026-09-16; re-review pending. This status records the authority lifecycle only — it is not acceptance, and runtime implementation has not started.
 **Adoption authority:** Goal packet `.scratch/orchestration/all-tickets-0044-0060-2026-09-16-5HXix4` (user-approved objective); this spec converts the verified 0050 rereview proposal into canonical text. It is not a fabricated per-decision human ratification; residual choices are recorded as implementation choices in §7.

@@ -1,6 +1,6 @@
 # F051: Read-only Adapters & Explicit Cutover
 
-**Status:** proposed
+**Status:** proposed (implementation shipped; spec acceptance pending)
 **Depends on:** F049  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#211](https://github.com/Bandersnatch0x/amber-protocol/issues/211)

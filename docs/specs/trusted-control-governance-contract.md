@@ -1,7 +1,7 @@
 # Trusted Control Governance Contract (0044 · 0045 · 0046 · 0049 · 0051 · 0052 · 0054 · 0055 · 0056 · 0060)
 
 **Spec ID:** `trusted-control-governance-contract`
-**Status:** proposed
+**Status:** proposed (implementation shipped; coordinator re-review pending)
 **Updated:** 2026-09-16
 **Review:** not yet reviewed by the coordinator. This status records the authority lifecycle only — it is not acceptance, and runtime implementation has not started.
 **Adoption authority:** Goal packet `.scratch/orchestration/all-tickets-0044-0060-2026-09-16-5HXix4` (user-approved objective); this spec consolidates the ten listed tickets' recorded rulings into canonical text. It is not a fabricated per-decision human ratification; residuals and unresolved facts are named inline.

@@ -1,7 +1,7 @@
 # Trusted Control Evolution Contract (0048/0057)
 
 **Spec ID:** `trusted-control-evolution-contract`
-**Status:** proposed
+**Status:** proposed (implementation not started; coordinator re-review pending)
 **Updated:** 2026-09-19
 **Review:** coordinator contract-review-01 findings (ST-01, B-SP-01..04) repaired on 2026-09-16; re-review pending. This status records the authority lifecycle only — it is not acceptance. Slices 1–6 of the implementation plan are delivered (2026-09-18); the 2026-09-19 post-land close-out (plan `docs/plans/F064-suggestion-review-closeout.md`, Slice 7 of the implementation plan) amended §5/§6/§8 from the dual-axis review backlog so the delivered code and this contract agree explicitly: the tightened §6 V1 reading, the two §8.6 write shapes, and §8.2 proposal rounds.
 **Adoption authority:** Goal packet `.scratch/orchestration/all-tickets-0044-0060-2026-09-16-5HXix4` (user-approved objective). This spec converts the 0048/0057 rulings — corrected per audit P1-07 — into canonical text. It is not a fabricated per-decision human ratification; residual choices are recorded as implementation choices in `docs/plans/trusted-control-evolution.md`.

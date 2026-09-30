@@ -1,6 +1,6 @@
 # F055: Retention, Coordinated Deletion & Proof
 
-**Status:** proposed
+**Status:** proposed (implementation shipped; spec acceptance pending)
 **Depends on:** F051  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#215](https://github.com/Bandersnatch0x/amber-protocol/issues/215)
