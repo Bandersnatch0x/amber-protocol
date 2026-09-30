@@ -5,6 +5,26 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-09-30
+
+### Fixed
+
+- maintenance,docs: review the six wiki pages, and stop asking a generated page for a review
+- knowledge,changelog,docs: clear the four findings the cross-cutting review raised
+- ci: refuse an empty identity range on EVERY path, not just the branch one
+- harness: close the round-7 review findings on F081
+- accept: edit the accepted entry instead of rewriting feature_list.json
+
+### Changed
+
+- specs: make the 18 proposed specs say what is actually true about them
+- specs: give the spec lifecycle a closed vocabulary and a gate
+- quality,tests,readme: document the passing-feature decision and close three P2s
+- quality: certify the 2.0.0 release scope, and reconcile the plan headers
+- harness: cover the branches round 7 named, and bound the identity claim honestly
+- F081: make the spec and plan match the delivered behaviour
+- F081: accept the plan (user-directed)
+
 ## [2.0.0] - 2026-09-29
 
 ### Added

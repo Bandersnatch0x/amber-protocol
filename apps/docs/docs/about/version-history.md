@@ -9,9 +9,11 @@ description: "Curated version history, breaking changes, support matrix, and not
 
 This page provides the canonical version identity, environment support matrix, and migration guidance for Amber Protocol releases.
 
-## Current Release: `v1.6.0`
+## Current Release: `v2.0.1`
 
-The current release line is **v1.6.0**.
+The current release line is **v2.0.1** — a patch release on the 2.0 line (2.0.0 was the breaking
+release: it removed the `agent`, `team`, and `adoption` command families; see the upgrade table
+in the repository README).
 
 ### Environment Compatibility Matrix
 
@@ -40,7 +42,7 @@ amber <command> --target <repo>
 Legacy prefix `amber-protocol` has been deprecated.
 
 ### Deprecated Commands (v1 Compatibility)
-The following commands are marked deprecated and scheduled for removal in v2.0.0:
-- `amber adoption` → Use [`amber audit`](/reference/cli/audit) and [`amber governance`](/reference/cli/governance). **Removed in v1.6** (`amber harness legacy` carries the disposition row).
+The following commands were deprecated in the v1 line and are now **removed in v2.0.0**:
+- `amber adoption` → Use [`amber audit`](/reference/cli/audit) and [`amber governance`](/reference/cli/governance). **Removed in v2.0.0** (`amber harness legacy` carries the disposition row).
 - `amber profile inspect` → Use [`amber governance`](/reference/cli/governance). Note that `amber profile deployment` remains active and supported.
 - `amber task`, `amber result` → Replaced by core session and canonical artifact commands. `amber agent`, `amber team` → **removed in v1.6** (same disposition table).

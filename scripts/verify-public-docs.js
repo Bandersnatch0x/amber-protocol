@@ -577,9 +577,17 @@ function verifyVersionSync() {
 	if (fs.existsSync(versionHistoryPath)) {
 		const rawContent = fs.readFileSync(versionHistoryPath, "utf8");
 		const content = rawContent.replace(/\\\|/g, "|");
-		if (!content.includes(`v${expectedVersion}`) && !content.includes(expectedVersion)) {
+		// The page must NAME the current release, not merely contain the version string somewhere:
+		// `scheduled for removal in v2.0.0` satisfied the old substring test while the page still
+		// announced `Current Release: v1.6.0`, so the 2.0.0 release passed this gate by accident.
+		const declared = content.match(/^## Current Release:\s*`?v?(\d+\.\d+\.\d+)`?\s*$/m);
+		if (!declared) {
 			errors.push(
-				`Version sync check: about/version-history.md does not contain current package version v${expectedVersion}.`,
+				"Version sync check: about/version-history.md has no `## Current Release: `vX.Y.Z`` heading.",
+			);
+		} else if (declared[1] !== expectedVersion) {
+			errors.push(
+				`Version sync check: about/version-history.md announces v${declared[1]} while package.json is v${expectedVersion}.`,
 			);
 		}
 		if (expectedNode && !content.includes(expectedNode)) {

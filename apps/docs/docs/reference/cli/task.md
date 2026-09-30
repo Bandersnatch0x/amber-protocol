@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber task
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.0</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.1</strong><br />
   Tier: <code>deprecated</code> • Classification: <code>Standard Command</code>
 </div>
 

@@ -10,7 +10,7 @@ description: "Complete reference for all 54 Amber Protocol CLI commands generate
 # CLI Command Reference
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.0</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.1</strong><br />
   Authoritative command vocabulary: 54 commands
 </div>
 
