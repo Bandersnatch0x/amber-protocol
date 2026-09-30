@@ -1,7 +1,7 @@
 # F064: Improvement Suggestions (Web, Multi-Host)
 
 **Spec ID:** F064
-**Status:** Proposed
+**Status:** proposed
 **Updated:** 2026-09-03
 **Depends on:** Session Lens transcript reads (web), F023 learning write-back (knowledge surfaces), F025 break-loop recurrence threshold, F054 fingerprint/cooldown vocabulary, ADR-0001 (governance-first boundary), ADR-0014 (`next` is not an LLM router)
 **Provenance:** Operator decision 2026-09-03: mount the suggestion surface on the web viewer; cluster friction across multiple coding-agent hosts; Apply may touch only agent-facing knowledge files.

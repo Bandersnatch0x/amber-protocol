@@ -1,5 +1,7 @@
 # JSON.parse Consolidation — Design
 
+**Status:** superseded
+
 > **⚠ SUPERSEDED (2026-07-05) — premise invalidated by code-reading.**
 > This spec was written from the `JSON.parse(fs.readFileSync(...))` *grep pattern*,
 > but reading every site revealed all 19 shipped-CLI call sites are already wrapped

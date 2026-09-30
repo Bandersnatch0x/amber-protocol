@@ -1,5 +1,7 @@
 # Deployment Profile Declaration Contract
 
+**Status:** accepted
+
 > Runtime contract for the deployment-profile declaration mechanism
 > (#158 Stage 2; adjudicated by #269/#270/#273). A repository declares one of
 > three deployment profiles — `personal-node` | `team-hub` | `organization` —

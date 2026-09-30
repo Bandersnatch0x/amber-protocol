@@ -1,6 +1,6 @@
 # F059: Knowledge & Decision Map
 
-**Status:** Proposed  
+**Status:** proposed
 **Depends on:** F049, F058  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#246](https://github.com/Bandersnatch0x/amber-protocol/issues/246)

@@ -2,7 +2,7 @@
 type: spec
 title: Session 可观测性 与 OKF 知识层
 description: Amber Protocol 下一步特性的 Spec + Plan：将 Claude Code 会话转录纳入治理证据，并把 wiki 对齐 Google Open Knowledge Format。
-status: draft-v1
+status: draft
 date: 2026-06-17
 method: research → synthesis → 严格 review → 五角色圆桌辩论 → 修订
 tags: [observability, governance, wiki, okf, session, evidence]

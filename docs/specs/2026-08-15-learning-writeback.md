@@ -1,5 +1,7 @@
 # Learning Write-Back Checkpoint Contract (F023)
 
+**Status:** accepted
+
 > Runtime contract for the post-accept knowledge checkpoint. When a feature's
 > plan is accepted, Amber classifies the feature's booked `paths` with fixed,
 > path-based rules into mandatory write-back triggers (schema / contract /

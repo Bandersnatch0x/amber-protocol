@@ -1,7 +1,7 @@
 # F063: Product Closeout — Seven-Verb Default Surface, Verb Skills, Spec Status Header, Directory Consolidation
 
 **Spec ID:** F063
-**Status:** Reconciliation required
+**Status:** accepted
 **Updated:** 2026-09-03
 **Provenance:** `docs/quality/product-review-2026-09-02.md` §2/§5, reconciled with the
 approved product map (2026-09-03) and the measured repository baseline. The product map is the

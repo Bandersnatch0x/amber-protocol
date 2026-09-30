@@ -26,6 +26,13 @@
 **互不提升原则：** `feature_list.json` 的交付状态与 spec 的规范生命周期是两个独立维度，任何一方
 都不能机械推断另一方；handoff 是快照，路线图是方向，三者都不是状态权威。
 
+**规范生命周期状态词表（closed）：** `draft` | `proposed` | `accepted` | `superseded` | `retired`。
+每份 `docs/specs/*.md` 必须在头部声明其中之一（token 原样小写，其后可跟一个括号或冒号说明，例如
+`accepted (2026-08-30)`；token 本身不接受变体）。链路是 `draft`/`proposed` → `accepted` → 显式
+`superseded`/`retired`；写 `superseded` 时必须点名取代它的那份文档，写 `retired` 时必须写明为何不再适用。
+与上表的互不提升原则一致：改写 spec 状态要基于该 spec 自身的正文与已交付证据，不以 `feature_list.json`
+为依据。门禁见 `tests/unit/documentation-gates.test.js`：每份 spec 都得有该字段，且 token 在词表内。
+
 **范围声明：** `0012`、`0013–0022` 一类公共文档站票据归 public documentation site 范围，
 不计入本仓库内部文档治理的验收面。
 

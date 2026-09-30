@@ -1,6 +1,6 @@
 # F054: Deterministic Maintain & Intent Re-entry
 
-**Status:** Proposed  
+**Status:** proposed
 **Depends on:** F050  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#214](https://github.com/Bandersnatch0x/amber-protocol/issues/214)

@@ -1,6 +1,6 @@
 # F060: Knowledge Map v2 — Code Graph & Interaction Upgrade
 
-**Status:** Accepted (2026-08-30)
+**Status:** accepted (2026-08-30)
 **Depends on:** F059, ADR-0025, the F059 fix batch (#267)
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)
 **Wayfinder map:** [#260](https://github.com/Bandersnatch0x/amber-protocol/issues/260) — every

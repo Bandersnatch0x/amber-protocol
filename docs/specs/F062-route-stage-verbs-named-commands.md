@@ -1,7 +1,7 @@
 # F062: Route Stage Verbs & Named Governed Commands
 
 **Spec ID:** F062
-**Status:** Proposed
+**Status:** proposed
 **Updated:** 2026-09-02
 **Provenance:** `issues/0025-amber-native-stage-orchestration.md` and
 [ADR-0029](../adr/0029-named-governed-commands-and-stage-verbs.md), reconciled against the

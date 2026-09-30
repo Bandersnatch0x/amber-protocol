@@ -18,6 +18,35 @@ const CI_WORKFLOW = path.join(REPO_ROOT, ".github", "workflows", "ci.yml");
 const CODEOWNERS = path.join(REPO_ROOT, ".github", "CODEOWNERS");
 const GOVERNANCE_DOC = path.join(REPO_ROOT, "docs", "agents", "documentation-governance.md");
 
+// Every spec must declare a lifecycle status from the closed vocabulary stated in
+// docs/agents/documentation-governance.md. Before this gate, 45 specs carried five spellings
+// of three states plus one phrase that was not a status at all ("Reconciliation required"),
+// and five files had no status line: a reader could not tell a delivered spec from a planned
+// one without opening it, and nothing noticed a new spelling.
+const SPEC_STATUS_VOCABULARY = ["draft", "proposed", "accepted", "superseded", "retired"];
+const SPEC_STATUS_RE = /^\*{0,2}Status:\*{0,2}\s*(.+)$/im;
+
+it("every spec declares a lifecycle status from the closed vocabulary", () => {
+	const dir = path.join(REPO_ROOT, "docs", "specs");
+	const offenders = [];
+	for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".md"))) {
+		const head = fs.readFileSync(path.join(dir, file), "utf8").split("\n").slice(0, 18).join("\n");
+		const match = head.match(SPEC_STATUS_RE);
+		if (!match) {
+			offenders.push(`${file}: no Status line`);
+			continue;
+		}
+		// The token may be followed by a parenthetical or note (`accepted (2026-08-30)`), but
+		// the token itself is exact: case variants are how the drift started.
+		const token = match[1].trim().split(/[\s(:]/)[0];
+		if (!SPEC_STATUS_VOCABULARY.includes(token))
+			offenders.push(
+				`${file}: ${JSON.stringify(match[1].trim())} is not one of ${SPEC_STATUS_VOCABULARY.join(" | ")}`,
+			);
+	}
+	assert.deepEqual(offenders, []);
+});
+
 function tmpProductRepo() {
 	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-doc-gate-")));
 	// Product-repo signature: SPEC.md + ROADMAP.md + scripts/amber.js + templates/

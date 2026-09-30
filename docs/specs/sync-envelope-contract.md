@@ -1,5 +1,7 @@
 # Sync Envelope Contract (F035)
 
+**Status:** accepted
+
 > Runtime contract for the distributed sync admission pipeline hardened by
 > F035. A sync envelope wraps exactly one governed artifact
 > (`schemas/sync-envelope.schema.json`) and never carries source code,

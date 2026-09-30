@@ -1,6 +1,6 @@
 # F061: Ledger Family Factory & Decision Primitives
 
-**Status:** Proposed
+**Status:** proposed
 **Depends on:** F050 (Decisions & Evidence), F054–F057 (the four newest registry families),
 ADR-0028 (factory & primitives decision record)
 **Grill record:** two-round design interview, 2026-08-30 — eleven adjudications, all listed

@@ -1,5 +1,7 @@
 # Workflow-State Breadcrumb Contract (F022)
 
+**Status:** accepted
+
 > Runtime contract for the per-turn workflow-state channel. When a host agent
 > fires its prompt hook (default: Claude Code `UserPromptSubmit`, wired via an
 > Amber-managed entry in `.claude/settings.json`), `amber hooks breadcrumb print`
