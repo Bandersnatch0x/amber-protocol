@@ -172,12 +172,12 @@ function stripRef(text) {
 }
 
 // Internal handles are how this repository talks to itself: spec ids (`F081`),
-// issue paths (`issues/0156`), ADRs, harness stages, spec sections. Every one of
-// them also sits in the commit that produced the entry, so a reader-facing
-// changelog does not need them — and an unlinked `(F081)` is not something an
-// outside reader can follow. Pull numbers survive: `#240` is the citation the
-// changelog convention promises, and the only one a reader can resolve without
-// repository context.
+// issue paths (`issues/0156`), ADRs, harness stages, spec sections. The rule is NARROW: it
+// drops a parenthetical that cites something internal, and nothing else. A handle used as a
+// commit SCOPE survives verbatim (`fix(F064): …` renders as `F064: …`), and a handle in the
+// middle of a subject survives too — 132 of the 567 release entries do, by design. Pull numbers
+// do survive everywhere: `#240` is the citation the changelog convention promises, and the only
+// one a reader can resolve without repository context.
 const INTERNAL_HANDLE_RE = /(?:^|[^\w#])(?:F\d+|H\d+|§\d+|ADR-\d+|issues?\/\d+)/;
 const PULL_NUMBER_RE = /#\d+/g;
 

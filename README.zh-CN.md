@@ -300,7 +300,7 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 - **带保证级别的证据** —— 回执携带 `unavailable / observed / replayable / verified`；replay 包（`amber handoff bundle --replay-scope`）可离线重建授权链。
 - **受治理 memory** —— 可持续教训经 `amber memory`（request → ingest → 人工 approve → book）流转；`MEMORY.md` 保持人工策展并哈希注册。
 - **指令面 evals** —— `amber eval run` 重放确定性的、与模型无关的 agent 面检查。
-- **MCP Action Types** —— 20 个受治理动词的薄投影；变更类动作返回 `approvalRequired`，MCP 面从不执行。
+- **MCP Action Types** —— 21 个受治理动词的薄投影；变更类动作返回 `approvalRequired`，MCP 面从不执行。
 
 这些面是协议的参考实现：受治理 verb 阶段当前**fail-closed**（未注册 capability——见"它不会做什么"），canonical specs 在等待协调者复评。
 

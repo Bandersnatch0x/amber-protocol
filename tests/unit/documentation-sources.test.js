@@ -10,6 +10,7 @@
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -55,6 +56,28 @@ describe("committed corpus self-consistency", () => {
 			);
 			assert.equal(text.includes("\r"), false, `${file} carries a literal CR`);
 		}
+	});
+
+	// Agreement between the two files is not enough on its own: a projection whose excerpt and
+	// recorded hash were edited TOGETHER stays internally consistent while no longer describing
+	// the source. Every committed excerpt carries its own seal, so verify it.
+	it("verifies every committed excerpt against its own seal", () => {
+		const projection = JSON.parse(
+			fs.readFileSync(path.join(CORPUS_DIR, "knowledge-base.output.json"), "utf8"),
+		);
+		let sealed = 0;
+		for (const page of projection.pages) {
+			const source = page.sources && page.sources.source;
+			if (!source || typeof source.excerpt !== "string" || typeof source.excerptHash !== "string")
+				continue;
+			sealed += 1;
+			assert.equal(
+				`sha256:${crypto.createHash("sha256").update(source.excerpt, "utf8").digest("hex")}`,
+				source.excerptHash,
+				`${source.ref} excerpt no longer matches its seal`,
+			);
+		}
+		assert.ok(sealed > 0, "the committed projection carries excerpt seals to verify");
 	});
 });
 

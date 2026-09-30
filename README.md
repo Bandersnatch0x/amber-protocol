@@ -312,7 +312,7 @@ Beyond the journey surface, Amber ships a contract-tested trust layer ([four can
 - **Evidence with assurance levels** — receipts carry `unavailable / observed / replayable / verified`, and a replay bundle (`amber handoff bundle --replay-scope`) rebuilds the authorization chain offline.
 - **Governed memory** — durable lessons flow through `amber memory` (request → ingest → human approve → book); `MEMORY.md` stays human-curated and hash-registered.
 - **Instruction-surface evals** — `amber eval run` replays deterministic model-independent checks of the agent-facing surfaces.
-- **MCP Action Types** — 20 thin projections of the governed verbs; mutating actions return `approvalRequired` and are never executed by the MCP surface.
+- **MCP Action Types** — 21 thin projections of the governed verbs; mutating actions return `approvalRequired` and are never executed by the MCP surface.
 
 These surfaces are the protocol's reference implementation: governed verb stages currently **fail closed** (no capability is registered — see "What It Won't Do") and the canonical specs are awaiting their coordinator re-review.
 
