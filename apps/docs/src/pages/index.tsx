@@ -3,6 +3,7 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/core/lib/client/exports/useDocusaurusContext';
 import styles from './index.module.css';
+import { COMMAND_COUNT } from '../generated/command-count';
 
 const PILLARS = [
   {
@@ -123,7 +124,7 @@ export default function Home(): React.JSX.Element {
                 Core Concepts
               </Link>
               <Link className={styles.secondaryBtn} to="/reference/cli">
-                CLI Reference (54 commands)
+                CLI Reference ({COMMAND_COUNT} commands)
               </Link>
             </div>
           </div>

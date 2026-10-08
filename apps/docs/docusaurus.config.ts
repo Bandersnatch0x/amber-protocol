@@ -3,6 +3,7 @@ import path from 'path';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import { themes as prismThemes } from 'prism-react-renderer';
+import { COMMAND_COUNT } from './src/generated/command-count';
 
 // Load version & environment assumptions directly from repository release metadata
 const rootPkgPath = path.resolve(__dirname, '../../package.json');
@@ -173,7 +174,7 @@ const config: Config = {
           title: 'Reference',
           items: [
             {
-              label: 'CLI Commands (54)',
+              label: `CLI Commands (${COMMAND_COUNT})`,
               to: '/reference/cli',
             },
             {

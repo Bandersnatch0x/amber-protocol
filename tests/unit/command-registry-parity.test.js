@@ -103,9 +103,17 @@ test("one Command registry drives help, policy, dispatch, and the public command
 
 test("Command tiers are the single visibility source", () => {
 	assert.deepEqual(Object.keys(COMMAND_TIERS), COMMANDS);
+	// The default surface is the registry's real projection: stability `core` AND a
+	// `journey`/`core` tier. A tier-only filter diverges the moment an experimental
+	// command lands in a default tier, and reports that as a tier fault rather than
+	// the stability exclusion it is.
 	assert.deepEqual(
 		DEFAULT_COMMANDS,
-		COMMANDS.filter((name) => ["journey", "core"].includes(COMMAND_TIERS[name])),
+		COMMANDS.filter(
+			(name) =>
+				COMMAND_DEFINITIONS[name].stability === "core" &&
+				["journey", "core"].includes(COMMAND_DEFINITIONS[name].tier),
+		),
 	);
 	assert.deepEqual(
 		new Set(COMMANDS.filter((name) => COMMAND_TIERS[name] === "deprecated")),
