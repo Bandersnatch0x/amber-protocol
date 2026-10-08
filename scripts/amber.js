@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 "use strict";
 
-const { parseArgs, printResult } = require("./lib/core/cli-output");
 const {
 	COMMANDS,
 	DEFAULT_COMMANDS,
 	commandSummary,
 	commandUsageLine,
 } = require("./lib/command-registry");
-const { dispatch } = require("./lib/command-dispatcher");
 
 const PRODUCT_LINE =
 	"Amber puts governance files in your repo so your AI coding session leaves an inspectable trail and the next session knows exactly where to pick up.";
@@ -62,6 +60,10 @@ function usage(command, options = {}) {
 async function run(argv = process.argv.slice(2)) {
 	const [command, ...rest] = argv;
 
+	if (command === "--version" || command === "-v") {
+		console.log(require("../package.json").version);
+		return 0;
+	}
 	if (command === "--all") {
 		console.log(usage(null, { all: true }));
 		return 0;
@@ -81,17 +83,13 @@ async function run(argv = process.argv.slice(2)) {
 		return 0;
 	}
 
-	if (command === "--version" || command === "-v") {
-		console.log(require("../package.json").version);
-		return 0;
-	}
-
 	if (!COMMANDS.includes(command)) {
 		console.error(`Unknown command: ${command}`);
 		console.error(`Expected one of: ${COMMANDS.join(", ")}`);
 		return 1;
 	}
 
+	const { parseArgs, printResult } = require("./lib/core/cli-output");
 	const args = parseArgs(rest);
 	if (args.help) {
 		console.log(usage(command));
@@ -99,6 +97,7 @@ async function run(argv = process.argv.slice(2)) {
 	}
 
 	// Dispatch to registered handler — may return a Promise for async commands
+	const { dispatch } = require("./lib/command-dispatcher");
 	const dispatchResult = await dispatch(command, args);
 	const { result: resolved, exitCode, bypassPrint, onBypass } = dispatchResult;
 
