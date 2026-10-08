@@ -515,6 +515,9 @@ const harnessDispatch = defineCliCommand({
 			const sub = args._?.[1];
 			const op = args._?.[2];
 			const target = resolveTarget(args);
+			process.stderr.write(
+				"[experimental] amber harness runtime (scheduler and daemon) may change or be removed in a minor release.\n",
+			);
 			const {
 				admitSchedule,
 				revokeSchedule,
