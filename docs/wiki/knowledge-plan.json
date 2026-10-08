@@ -70,7 +70,7 @@
         "title": "CLI Architecture & Command Dispatch",
         "goal": "Document how scripts/amber.js dispatches commands through command-dispatcher.js to handler modules and the core engine in scripts/lib/core/.",
         "parent": "",
-        "hints": "Cover Command definitions in scripts/lib/command-help.js, runtime binding in scripts/lib/command-dispatcher.js, how scripts/lib/*-commands.js files wrap core logic, and the separation between CLI surface and scripts/lib/core/."
+        "hints": "Cover Command definitions in scripts/lib/command-registry.js, runtime binding in scripts/lib/command-dispatcher.js, how scripts/lib/*-commands.js files wrap core logic, and the separation between CLI surface and scripts/lib/core/."
       },
       {
         "title": "Governance Model & Seven Layers",

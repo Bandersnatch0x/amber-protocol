@@ -147,7 +147,7 @@ never invent architecture, commands, or business rules — mark unknowns as "nee
   `node scripts/validate-wiki.js --target .`. CI runs the wiki step unconditionally; the same command
   also covers the documented "wiki changes" condition. `amber drift` is inert on a `product-repo`
   target (`n/a` for artifact/wiki/scaffold) and is never a gate.
-- New CLI command -> one definition in `scripts/lib/command-help.js` plus its handler binding in
+- New CLI command -> one definition in `scripts/lib/command-registry.js` plus its handler binding in
   `scripts/lib/command-dispatcher.js`; startup rejects missing or orphaned handlers. Schema change ->
   sync `schemas/*.schema.json` with `scripts/validate-*.js`. New template -> `templates/` +
   `scripts/lib/core/scaffold.js`. New route -> `routes/*.route.json` per `schemas/route.schema.json`.

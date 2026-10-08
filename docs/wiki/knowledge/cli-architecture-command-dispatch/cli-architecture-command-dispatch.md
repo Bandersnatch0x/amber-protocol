@@ -26,7 +26,7 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
   generation consume this same registry. `knownSubcommands()` derives family
   invocations from registered capabilities plus documented help verbs, while
   `commandInvocationContract()` projects command-specific allowed and required
-  options from the Command help/usage definitions. `scripts/lib/command-help.js` is
+  options from the Command help/usage definitions. `scripts/lib/command-registry.js` is
   a compatibility re-export of that module.
 - `scripts/lib/command-dispatcher.js` owns handler implementation, the bound runtime
   registry, family argument mapping, and deprecation warnings.
