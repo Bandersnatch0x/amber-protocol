@@ -57,7 +57,7 @@ built against.
 ```
 scripts/amber.js              -> Unified CLI entry point
 scripts/amber-mcp.js           -> P1 stdio MCP server exposing governed Action Types (see docs/wiki/amber-ontology-mcp.md)
-scripts/lib/command-help.js -> Command definitions, help, output policy, and stable public order
+scripts/lib/command-registry.js -> Command definitions, help, output policy, and stable public order
 scripts/lib/command-dispatcher.js -> Command handlers, startup registry binding, and dispatch
 scripts/lib/cli-typed-seam.js -> CLI projection of the shared Action capability registry
 scripts/lib/context/          -> Public Context Interface and command adapter boundary
@@ -316,7 +316,7 @@ See `docs/product/LOOP.md` for the operational description of Amber's loops (dai
 
 ### When Working on This Codebase
 
-- **Adding new commands**: Add the Command definition (identity, tier, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes only `journey` and `core`; `--all` is the complete compatibility projection.
+- **Adding new commands**: Add the Command definition (identity, tier, help, output policy, public order) in `scripts/lib/command-registry.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes only `journey` and `core`; `--all` is the complete compatibility projection.
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
 - **Schema validation**: compile every JSON Schema through `scripts/lib/core/schema-contract.js` (`compileSchema`/`compileInline`/`validate`); never instantiate Ajv elsewhere — `tests/unit/schema-contract-guard.test.js` fails the suite otherwise
 - **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffold.js`

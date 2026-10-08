@@ -487,6 +487,18 @@ describe("knowledge-plan facade: plan", () => {
 			cleanup(tmp);
 		}
 	});
+	it("inspect reads back the proposal that plan wrote", () => {
+		const tmp = makeTempTarget();
+		try {
+			plan(tmp, { dryRun: false });
+			const loaded = inspect(tmp);
+			assert.equal(loaded.found, true);
+			assert.deepEqual(loaded.errors, []);
+			assert.ok(String(loaded.source).endsWith("knowledge-plan.yaml"));
+		} finally {
+			cleanup(tmp);
+		}
+	});
 });
 
 describe("knowledge-plan facade: no console I/O", () => {

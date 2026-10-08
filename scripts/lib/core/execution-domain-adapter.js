@@ -10,10 +10,7 @@
 // adapter (register/readReceipt/shadowCompare/cutover) with different
 // semantics; the two share the ledger-family factory base and nothing else.
 //
-// First implementation: the Coding domain (worktree + git-exec). The
-// ResearchProcess boundary (context-runtime contract §6) is the second
-// consumer, implemented in `research-adapter.js` — the precondition §5.2
-// records for any physical `src/` relocation, which stays deferred.
+// First implementation: the Coding domain (worktree + git-exec).
 
 const fs = require("node:fs");
 const path = require("node:path");

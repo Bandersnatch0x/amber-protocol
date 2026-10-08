@@ -2,9 +2,8 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { JOURNEYS } = require("../../scripts/lib/journey-router");
+const { JOURNEYS, decideRouteJourney } = require("../../scripts/lib/route-journey-decision");
 const { loadRoutes } = require("../../scripts/lib/route-loader");
-const { decideRouteJourney } = require("../../scripts/lib/route-journey-decision");
 
 const routes = loadRoutes(require("node:path").join(__dirname, "../../routes")).routes;
 
