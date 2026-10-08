@@ -305,7 +305,7 @@ test("a takeover chain deeper than the bound is refused with the files to remove
 		.replace(/\s*\[AMBER_E_LEDGER_LOCK_CHAIN\][\s\S]*$/, "")
 		.split("; remove ")
 		.pop()
-		.split(" and ");
+		.split(", ");
 	assert.deepEqual(named, [`${lp}.lock`, `${lp}.lock.takeover`, `${lp}.lock.takeover.takeover`]);
 });
 
@@ -350,6 +350,31 @@ test("the lock is still claimed when hard links are unavailable", () => {
 	} finally {
 		fs.linkSync = realLink;
 	}
+
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 1 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false);
+});
+
+// The bound is on depth, never on path length. An earlier revision compared the
+// guard path against a fixed length, so on an ordinary long repository path it
+// refused at depth zero and a single crash stopped being self-healing. This pins
+// recovery on a lock path long enough to have tripped that bound.
+test("a long lock path does not change whether a stale lock is reclaimed", () => {
+	const base = fs.mkdtempSync(path.join(os.tmpdir(), "amber-anchor-longpath-"));
+	dirs.push(base);
+	let dir = base;
+	while (path.join(dir, "ledger.jsonl.lock").length <= 200) {
+		dir = path.join(dir, "a-directory-name-of-some-length");
+		fs.mkdirSync(dir, { recursive: true });
+	}
+	const lp = path.join(dir, "ledger.jsonl");
+	assert.ok(
+		`${lp}.lock`.length > 191,
+		"the lock path must be long enough to have tripped the old bound",
+	);
+	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+
+	L.appendLedgerRecord(lp, { kind: "note", i: 1 });
 
 	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 1 });
 	assert.equal(fs.existsSync(`${lp}.lock`), false);

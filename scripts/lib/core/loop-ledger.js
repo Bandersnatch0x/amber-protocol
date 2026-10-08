@@ -191,7 +191,7 @@ function takeoverChainTooDeep(lockPath, depth) {
 	return new Error(
 		codedError(
 			"AMBER_E_LEDGER_LOCK_CHAIN",
-			`${root} has a takeover chain ${depth} deep after repeated crashes; remove ${files.join(" and ")}`,
+			`${root} has a takeover chain ${depth} deep after repeated crashes; remove ${files.join(", ")}`,
 		),
 	);
 }
