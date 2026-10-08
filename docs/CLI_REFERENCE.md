@@ -458,11 +458,14 @@ node scripts/amber.js governance rules check --target . --command "rm -rf /tmp/x
 ```
 
 `rules check` uses the **same policy surface as `governed-runner`** (`evaluateGovernedPolicy`):
-un-removable built-in denies for destructive commands and shell composition (`&&`, `|`, `;`,
-file redirects, etc.) run **before** user `rules.json` allows. A prefix allow cannot smuggle a
-composite tail past the dry-run check — the verdict matches what `--execute` would enforce.
-Pure FD-to-FD redirects (`2>&1`, `1>&2`) are allowed; they rebind streams of the same process
-and are not a second command.
+un-removable built-in denies for destructive commands and for anything that needs a shell run
+**before** user `rules.json` allows. Governed and verification commands are parsed into argv and
+spawned with no shell, so a command containing `$`, a backtick, `;`, `|`, `&`, `>`, `<`, or a
+newline outside single quotes is refused with `AMBER_E_POLICY_SHELL_META` (redirects such as
+`2>&1` included). Single quotes keep their contents literal; double quotes may hold any literal
+except `$` and backticks. `exact` rules compare argv word for word; `deny` rules also match the
+unquoted argv, so quoting cannot hide a denied word. The verdict matches what `--execute` would
+enforce.
 
 **Per-context rules:** a loop contract's `governed` block and a route `command` stage may each
 declare an extra `rules` array (same `{ id, action, match, pattern }` shape). These compose with
