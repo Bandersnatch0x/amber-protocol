@@ -277,6 +277,46 @@ test("a guard left by a dead reclaimer does not wedge the ledger", () => {
 	assert.equal(fs.existsSync(`${lp}.lock`), false);
 });
 
+// A reclaimer can die holding the guard, and a reclaimer of that guard can die too.
+// A depth counter would make the last level unreclaimable and wedge the ledger for
+// good, so the chain has to keep unwinding however deep it goes.
+test("a takeover chain left by repeated crashes is reclaimed", () => {
+	const lp = raceDir("amber-anchor-deepchain-");
+	L.appendLedgerRecord(lp, { kind: "note", i: 0 });
+	for (const suffix of ["", ".takeover", ".takeover.takeover", ".takeover.takeover.takeover"]) {
+		fs.writeFileSync(`${lp}.lock${suffix}`, String(deadPid()));
+	}
+
+	L.appendLedgerRecord(lp, { kind: "note", i: 1 });
+
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false);
+	assert.equal(fs.existsSync(`${lp}.lock.takeover`), false);
+});
+
+// The race the guard exists for: two writers find the same stale lock and both try
+// to reclaim it. Exactly one may remove it, and the other must not remove the lock
+// the first one created.
+test("two writers reclaiming one stale lock both append and leave one chain", async () => {
+	const lp = raceDir("amber-anchor-reclaimrace-");
+	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+	const script = `
+		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", pid: process.pid });
+	`;
+	const exits = await Promise.all(
+		[1, 2].map(
+			() =>
+				new Promise((resolve) => {
+					spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
+				}),
+		),
+	);
+
+	assert.deepEqual(exits, [0, 0]);
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+});
+
 test(
 	"a lock holding no pid stays owned while fresh and is reclaimed once it is old",
 	{ timeout: 60000 },

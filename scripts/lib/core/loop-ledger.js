@@ -124,17 +124,36 @@ function holderIsReclaimable(raw, lockPath) {
 // pid, find that other process dead, and steal a lock a live holder is inside;
 // two writers then append from the same tail and the chain breaks for good.
 // link(2) publishes an already-written file, so a reader never sees a partial pid.
+// A filesystem without hard links falls back to an exclusive create, which can
+// publish the file empty; that window is why an unparseable lock is not reclaimed
+// until it is older than the grace period.
 function claimLock(lockPath) {
 	const tmp = `${lockPath}.${process.pid}.claim`;
-	fs.writeFileSync(tmp, String(process.pid));
+	try {
+		fs.writeFileSync(tmp, String(process.pid));
+	} catch {
+		return claimExclusive(lockPath);
+	}
 	try {
 		fs.linkSync(tmp, lockPath);
 		return true;
 	} catch (err) {
 		if (err.code === "EEXIST") return false;
-		throw err;
+		return claimExclusive(lockPath);
 	} finally {
 		fs.rmSync(tmp, { force: true });
+	}
+}
+
+function claimExclusive(lockPath) {
+	try {
+		const fd = fs.openSync(lockPath, "wx");
+		fs.writeSync(fd, String(process.pid));
+		fs.closeSync(fd);
+		return true;
+	} catch (err) {
+		if (err.code === "EEXIST") return false;
+		throw err;
 	}
 }
 
@@ -154,11 +173,12 @@ function removeLock(lockPath) {
 }
 
 // A reclaimer can itself die holding the guard, so the guard is reclaimed the same
-// way. The chain is bounded rather than open ended: a guard left by a crashed
-// reclaimer is taken over through one more guard, and no deeper, which is the same
-// bound the session lock uses. Without the bound, a crash at depth n would need a
-// human to clear the directory.
-const MAX_TAKEOVER_DEPTH = 2;
+// way, one level deeper. The chain is deliberately NOT bounded by a depth counter:
+// a bound makes the last level unreclaimable, and a crash there then wedges the
+// ledger forever, which is the exact failure this path exists to prevent. It is
+// bounded by path length instead, a limit only a long run of repeated crashes can
+// reach, and reaching it reports the files to remove rather than waiting silently.
+const MAX_TAKEOVER_PATH = 200;
 
 // Reclaiming a crashed holder's lock is a read-then-remove, and two reclaimers can
 // read the same stale lock. Without a guard the slower one removes the lock the
@@ -173,8 +193,15 @@ function acquireLock(lockPath, depth = 0) {
 		const raw = readLockRaw(lockPath);
 		if (raw === null) continue;
 		if (!holderIsReclaimable(raw, lockPath)) return false;
-		if (depth >= MAX_TAKEOVER_DEPTH) return false;
 		const guardPath = `${lockPath}.takeover`;
+		if (guardPath.length > MAX_TAKEOVER_PATH) {
+			throw new Error(
+				codedError(
+					"AMBER_E_LEDGER_LOCKED",
+					`${lockPath} has a takeover chain ${depth} deep, which means repeated crashes; remove the ${lockPath}.takeover* files by hand`,
+				),
+			);
+		}
 		if (!acquireLock(guardPath, depth + 1)) return false;
 		try {
 			if (readLockRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
@@ -195,7 +222,7 @@ function withLedgerLock(ledgerPath, fn) {
 			throw new Error(
 				codedError(
 					"AMBER_E_LEDGER_LOCKED",
-					`${lockPath} is held by a live process after ${LOCK_WAIT_MS} ms`,
+					`${lockPath} is still held after ${LOCK_WAIT_MS} ms; if no writer is running, remove ${lockPath} and any ${lockPath}.takeover* files`,
 				),
 			);
 		}
