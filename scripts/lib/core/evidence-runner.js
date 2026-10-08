@@ -9,7 +9,7 @@
 // loop-policy + loop-ledger with governed-runner.
 const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
-const { evaluateVerifyPolicy, loadVerifyPolicyRules } = require("./loop-policy");
+const { evaluateVerifyPolicy, loadVerifyPolicyRules, parseGovernedArgv } = require("./loop-policy");
 const { appendLedgerRecord } = require("./loop-ledger");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const { typedError } = require("./error-catalog");
@@ -57,9 +57,9 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	// Gate — verification policy (verify-rules.json; deny-wins, default-deny). Only
 	// allow-listed verification commands run, so `verify --execute --command "rm -rf /"`
 	// is refused even if the global governance rules.json has been relaxed. Built-in
-	// denies (destructive patterns + shell composition) are enforced BEFORE user
+	// denies (destructive argv, anything that needs a shell) are enforced BEFORE user
 	// rules, so a custom verify-rules.json can neither drop destructive protection nor
-	// be defeated by chaining a second command through the shell (`pytest && rm -rf`).
+	// chain a second command (`pytest && rm -rf`); the command then runs as argv.
 	const verdict = evaluateVerifyPolicy(command, loadVerifyPolicyRules(targetRoot));
 	if (!verdict.allowed) {
 		const record = appendLedgerRecord(ledgerPath, {
@@ -83,8 +83,9 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	const startedAt = Date.now();
 	let exec;
 	try {
-		const res = spawnSync(command, {
-			shell: true,
+		const argv = parseGovernedArgv(command);
+		const res = spawnSync(argv[0], argv.slice(1), {
+			shell: false,
 			cwd: targetRoot,
 			encoding: "utf8",
 			timeout: resolveBudgetMinutes(budgetMinutes) * 60_000,
