@@ -97,11 +97,20 @@ function readLockRaw(lockPath) {
 	}
 }
 
-// A holder whose pid no longer exists. An empty or unreadable lock is undecidable
-// and stays owned, so a half-published lock is never reclaimed.
-function holderIsDead(raw) {
+// A holder whose pid no longer exists, or a lock that has held no pid for longer
+// than any live writer could need. An unparseable lock is otherwise left owned, so
+// a lock that is mid-publish is never reclaimed; the grace period is what keeps a
+// foreign or truncated leftover from wedging the ledger forever.
+const UNDECIDABLE_GRACE_MS = 30000;
+function holderIsReclaimable(raw, lockPath) {
 	const pid = Number(raw);
-	if (!Number.isInteger(pid) || pid <= 0) return false;
+	if (!Number.isInteger(pid) || pid <= 0) {
+		try {
+			return Date.now() - fs.statSync(lockPath).mtimeMs > UNDECIDABLE_GRACE_MS;
+		} catch {
+			return false;
+		}
+	}
 	try {
 		process.kill(pid, 0);
 		return false;
@@ -144,19 +153,36 @@ function removeLock(lockPath) {
 	}
 }
 
+// A reclaimer can itself die holding the guard, so the guard is reclaimed the same
+// way. The chain is bounded rather than open ended: a guard left by a crashed
+// reclaimer is taken over through one more guard, and no deeper, which is the same
+// bound the session lock uses. Without the bound, a crash at depth n would need a
+// human to clear the directory.
+const MAX_TAKEOVER_DEPTH = 2;
+
 // Reclaiming a crashed holder's lock is a read-then-remove, and two reclaimers can
 // read the same stale lock. Without a guard the slower one removes the lock the
 // faster one has already created, so both append from the same tail and the chain
-// breaks for good. Only the winner of a guard keyed by the stale bytes may remove
-// them, and only while the file still holds exactly those bytes.
-function removeStale(lockPath, raw) {
-	const guardPath = `${lockPath}.takeover`;
-	if (!claimLock(guardPath)) return;
-	try {
-		if (readLockRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
-	} finally {
-		removeLock(guardPath);
+// breaks for good. Only the winner of the guard may remove the stale lock, and only
+// while the file still holds exactly the bytes it read.
+function acquireLock(lockPath, depth = 0) {
+	// Bounded so a lock that is repeatedly created and released under us cannot spin
+	// here forever; the caller's deadline owns the waiting.
+	for (let spin = 0; spin < 100; spin++) {
+		if (claimLock(lockPath)) return true;
+		const raw = readLockRaw(lockPath);
+		if (raw === null) continue;
+		if (!holderIsReclaimable(raw, lockPath)) return false;
+		if (depth >= MAX_TAKEOVER_DEPTH) return false;
+		const guardPath = `${lockPath}.takeover`;
+		if (!acquireLock(guardPath, depth + 1)) return false;
+		try {
+			if (readLockRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
+		} finally {
+			removeLock(guardPath);
+		}
 	}
+	return false;
 }
 
 function withLedgerLock(ledgerPath, fn) {
@@ -164,12 +190,7 @@ function withLedgerLock(ledgerPath, fn) {
 	fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
 	const deadline = Date.now() + LOCK_WAIT_MS;
 	for (let delay = 1; ; delay = Math.min(delay * 2, 50)) {
-		if (claimLock(lockPath)) break;
-		const raw = readLockRaw(lockPath);
-		if (raw !== null && holderIsDead(raw)) {
-			removeStale(lockPath, raw);
-			continue;
-		}
+		if (acquireLock(lockPath)) break;
 		if (Date.now() > deadline) {
 			throw new Error(
 				codedError(

@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execSync, spawn } = require("node:child_process");
+const { execSync, spawn, spawnSync } = require("node:child_process");
 const {
 	approveLoopContract,
 	executeLoopContract,
@@ -238,6 +238,63 @@ test(
 
 		assert.deepEqual(exits, [0, 0, 0, 0]);
 		assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 160 });
+	},
+);
+
+function deadPid() {
+	return spawnSync(process.execPath, ["-e", ""]).pid;
+}
+
+function raceDir(prefix) {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+	dirs.push(dir);
+	return path.join(dir, "ledger.jsonl");
+}
+
+// A holder that dies leaves its lock behind. Reclaiming it is a read-then-remove,
+// so two reclaimers can read the same stale lock and the slower one would remove
+// the lock the faster one just created. The guard prevents that, and these cases
+// pin that the guard cannot itself become a wedge.
+test("a lock left by a dead holder is reclaimed", () => {
+	const lp = raceDir("amber-anchor-deadlock-");
+	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+
+	L.appendLedgerRecord(lp, { kind: "note", i: 1 });
+
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 1 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false);
+});
+
+test("a guard left by a dead reclaimer does not wedge the ledger", () => {
+	const lp = raceDir("amber-anchor-deadguard-");
+	L.appendLedgerRecord(lp, { kind: "note", i: 0 });
+	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+	fs.writeFileSync(`${lp}.lock.takeover`, String(deadPid()));
+
+	L.appendLedgerRecord(lp, { kind: "note", i: 2 });
+
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false);
+});
+
+test(
+	"a lock holding no pid stays owned while fresh and is reclaimed once it is old",
+	{ timeout: 60000 },
+	() => {
+		const lp = raceDir("amber-anchor-nopid-");
+		fs.writeFileSync(`${lp}.lock`, "");
+
+		// Fresh: a writer could be mid-publish, so it must not be stolen.
+		assert.throws(() => L.appendLedgerRecord(lp, { kind: "note", i: 1 }), /AMBER_E_LEDGER_LOCKED/);
+		assert.equal(fs.existsSync(`${lp}.lock`), true);
+
+		// Old: no live writer could still be inside, so it must not wedge the ledger.
+		const old = (Date.now() - 60000) / 1000;
+		fs.utimesSync(`${lp}.lock`, old, old);
+		L.appendLedgerRecord(lp, { kind: "note", i: 2 });
+
+		assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 1 });
+		assert.equal(fs.existsSync(`${lp}.lock`), false);
 	},
 );
 
