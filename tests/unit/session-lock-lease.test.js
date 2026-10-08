@@ -84,7 +84,13 @@ describe("session lock lease", () => {
 		assert.strictEqual(fs.existsSync(lockPath), false);
 	});
 
-	it("treats a live pid with a different start identity as a reused pid and takes over", () => {
+	// Windows deliberately has no process-identity probe (see processIdentity in
+	// core/execution-handles.js): a platform that cannot name a start identity
+	// cannot FALSIFY ownership, so a live pid with a mismatched recorded start
+	// time is still treated as the holder and the lock is refused rather than
+	// taken over. Both branches are asserted, so the residual is covered on every
+	// platform instead of being skipped on one.
+	it("handles a live pid whose recorded start identity cannot be verified", () => {
 		writeLock({
 			leaseId: "old",
 			pid: process.pid,
@@ -94,6 +100,12 @@ describe("session lock lease", () => {
 
 		const next = acquireLock(root, SESSION);
 
+		if (process.platform === "win32") {
+			assert.strictEqual(next.success, false);
+			assert.strictEqual(next.code, "AMBER_E_SESSION_LOCKED");
+			assert.strictEqual(JSON.parse(fs.readFileSync(lockPath, "utf8")).leaseId, "old");
+			return;
+		}
 		assert.strictEqual(next.success, true);
 		assert.notStrictEqual(next.leaseId, "old");
 	});
