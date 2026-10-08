@@ -319,6 +319,14 @@ function isPlainObject(value) {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// Also rejects class instances and inherited-only carriers such as
+// Object.create(validBlock), whose fields are not own properties.
+function isStrictPlainObject(value) {
+	if (!isPlainObject(value)) return false;
+	const proto = Object.getPrototypeOf(value);
+	return proto === Object.prototype || proto === null;
+}
+
 function isNonEmptyString(value) {
 	return typeof value === "string" && value.trim().length > 0;
 }
@@ -473,6 +481,7 @@ module.exports = {
 	isCredentialLeakProblem,
 	chainLinkProblem,
 	isPlainObject,
+	isStrictPlainObject,
 	isNonEmptyString,
 	quotedList,
 	closedFieldProblem,

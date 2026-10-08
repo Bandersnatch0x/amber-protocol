@@ -11,7 +11,7 @@
 // completed policy outcome is appended to its own tamper-evident ledger.
 
 const { typedError } = require("./error-catalog");
-const { GENESIS_HASH, chainHash } = require("./registry-ledger");
+const { GENESIS_HASH, chainHash, isPlainObject } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { hashText, canonicalJson } = require("./context-hash");
 const { parseTimestamp, resolveActivePrincipal } = require("./principal-registry");
@@ -100,10 +100,6 @@ const VERDICTS = Object.freeze(["pass", "deny"]);
 
 function outcomeCorrupt(message) {
 	return typedError(OUTCOME_REGISTRY_CORRUPT_CODE, message);
-}
-
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function isNonEmptyString(value) {

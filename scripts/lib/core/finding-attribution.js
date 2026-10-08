@@ -14,6 +14,8 @@
 // imports from apps/web/server). A thin TS typing mirror may exist beside it,
 // but validation and vocabulary always resolve here.
 
+const { isStrictPlainObject } = require("./registry-ledger");
+
 // Closed enum sets (spec §3 — extensions require a spec change, not an
 // implementation-side addition). Frozen so no consumer can widen them.
 const ENTRY_SURFACES = Object.freeze([
@@ -47,15 +49,6 @@ const ENUM_BY_FIELD = Object.freeze({
 	responsibleArtifact: RESPONSIBLE_ARTIFACTS,
 });
 
-// A valid block must be a plain object whose four fields are OWN, serializable
-// properties. An inherited-only carrier (Object.create(validBlock)) has none of
-// the fields on itself, serializes to {}, and must not impersonate a block.
-function isPlainObject(value) {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-	const proto = Object.getPrototypeOf(value);
-	return proto === Object.prototype || proto === null;
-}
-
 // Describe a rejected value for an error message by TYPE ONLY. Rejected
 // free-text values and untrusted property names are never echoed: an invalid
 // block may carry credential material in any string position (a short token
@@ -81,7 +74,7 @@ function describeValue(value) {
  *   block cannot leak through the error path either.
  */
 function attributionProblem(value) {
-	if (!isPlainObject(value)) {
+	if (!isStrictPlainObject(value)) {
 		return `findingAttribution must be a plain object carrying the four fields (${FIELDS.join(", ")}) as its own properties; got ${describeValue(value)}`;
 	}
 	const own = FIELDS.filter((field) => Object.hasOwn(value, field));

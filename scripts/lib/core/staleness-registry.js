@@ -15,6 +15,8 @@ const {
 	chainHash,
 	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	isPlainObject,
+	isNonEmptyString,
 } = require("./registry-ledger");
 
 const STALENESS_SCHEMA_VERSION = 1;
@@ -45,14 +47,6 @@ function ledgerPath(cwd) {
 
 function corrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
-}
-
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
 }
 
 function quotedList(values) {

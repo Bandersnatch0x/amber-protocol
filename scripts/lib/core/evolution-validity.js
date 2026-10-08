@@ -29,6 +29,7 @@ const path = require("node:path");
 
 const { pathExists, resolvePathWithin } = require("./fs-utils");
 const { showEvidence } = require("./evidence-receipts");
+const { isStrictPlainObject } = require("./registry-ledger");
 
 // The closed reason-code set (spec §11). Rejection records carry exactly one.
 const VALIDITY_REASON_CODES = Object.freeze([
@@ -107,12 +108,6 @@ const EVAL_ONLY_WORDS = new Set([
 
 const EXPECTED_EFFECT_FIELDS = Object.freeze(["readiness", "effectiveness"]);
 
-function isPlainObject(value) {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-	const proto = Object.getPrototypeOf(value);
-	return proto === Object.prototype || proto === null;
-}
-
 /**
  * Deterministic eval-only detector: a statement is solely an eval reference
  * when, after removing eval-vocabulary words, feature ids, digits, and
@@ -186,7 +181,7 @@ function resolveReceiptReference(targetRoot, ref) {
 }
 
 function resolveEvidenceReference(targetRoot, ref) {
-	if (!isPlainObject(ref)) return "malformed-shape";
+	if (!isStrictPlainObject(ref)) return "malformed-shape";
 	if (ref.kind === "path") {
 		return closedFieldProblem(ref, PATH_REFERENCE_FIELDS, ["kind", "path"])
 			? "malformed-shape"
@@ -248,7 +243,7 @@ function checkCapabilityReduction(operations) {
 	}
 	for (let index = 0; index < operations.length; index += 1) {
 		const operation = operations[index];
-		if (!isPlainObject(operation)) {
+		if (!isStrictPlainObject(operation)) {
 			return `operation #${index + 1} is not a well-formed operation object`;
 		}
 		if (typeof operation.verb !== "string" || !OPERATION_VERBS.includes(operation.verb)) {
@@ -282,7 +277,7 @@ function checkCapabilityReduction(operations) {
  * spec E4). Presence is proven, soundness is not (spec E5).
  */
 function checkExpectedEffect(expectedEffect) {
-	if (!isPlainObject(expectedEffect)) {
+	if (!isStrictPlainObject(expectedEffect)) {
 		return "the dual-axis effect statement is absent or malformed (expected { readiness, effectiveness })";
 	}
 	if (closedFieldProblem(expectedEffect, EXPECTED_EFFECT_FIELDS, EXPECTED_EFFECT_FIELDS)) {

@@ -28,6 +28,7 @@ const {
 	GENESIS_HASH,
 	chainHash,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	isPlainObject,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { resolveActivePrincipal } = require("./principal-registry");
@@ -155,10 +156,6 @@ function evidenceCorrupt(message) {
 
 function isNullableNonEmptyString(value) {
 	return value === null || (typeof value === "string" && value.length > 0);
-}
-
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**

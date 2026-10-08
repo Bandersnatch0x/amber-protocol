@@ -65,7 +65,7 @@
 
 const { typedError } = require("./error-catalog");
 const { deletionTombstones } = require("./retention-registry");
-const { GENESIS_HASH, chainHash } = require("./registry-ledger");
+const { GENESIS_HASH, chainHash, isPlainObject } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { parseTimestamp } = require("./principal-registry");
 const { ASSURANCE_LEVELS, listEvidence } = require("./evidence-receipts");
@@ -197,10 +197,6 @@ const DECIMAL_NUMBER_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
 
 function outcomeCorrupt(message) {
 	return typedError(OUTCOME_REGISTRY_CORRUPT_CODE, message);
-}
-
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function isNonEmptyString(value) {

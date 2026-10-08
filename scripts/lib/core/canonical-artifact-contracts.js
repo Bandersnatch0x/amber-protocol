@@ -77,6 +77,8 @@
  * registry only declares the per-admission contract.
  */
 
+const { isPlainObject } = require("./registry-ledger");
+
 const TYPE_REGISTRY = Object.freeze({
 	intent: Object.freeze({
 		dir: "intents",
@@ -380,10 +382,6 @@ function envelopeUnknownFieldProblem(envelope) {
 		code: "AMBER_E_ARTIFACT_UNKNOWN_FIELD",
 		message: `the Envelope for "${envelope.identity}" revision ${envelope.revision} carries the unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}, which this reader does not know; unknown Envelope fields are rejected rather than silently dropped — the Envelope was written by a newer writer or hand-edited, and extension data belongs in the reserved "${EXTENSION_CARRIER_FIELD}" carrier`,
 	};
-}
-
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**

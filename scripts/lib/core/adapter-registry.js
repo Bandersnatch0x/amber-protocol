@@ -18,7 +18,14 @@ const { ARTIFACT_TYPES, bodyHash, listArtifactRevisions } = require("./canonical
 const { resolveActivePrincipal } = require("./principal-registry");
 const { showEvidence } = require("./evidence-receipts");
 const { canonicalJson } = require("./context-hash");
-const { GENESIS_HASH, chainHash, findDecisionSpend } = require("./registry-ledger");
+const {
+	GENESIS_HASH,
+	chainHash,
+	findDecisionSpend,
+	isPlainObject,
+	isNonEmptyString,
+	unknownFieldProblem,
+} = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 
 const ADAPTER_SCHEMA_VERSION = 1;
@@ -308,14 +315,6 @@ function cutoverCorrupt(message) {
 	return typedError(CUTOVER_CORRUPT_CODE, message);
 }
 
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
-}
-
 function isPositiveInt(value) {
 	return Number.isInteger(value) && value > 0;
 }
@@ -336,14 +335,6 @@ function closedFieldProblem(value, fields, label) {
 		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
 	}
 	return null;
-}
-
-function unknownFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length === 0) return null;
-	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
 }
 
 function stringArrayProblem(value, label) {

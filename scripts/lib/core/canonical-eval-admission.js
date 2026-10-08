@@ -23,6 +23,7 @@ const {
 	runInstructionSurfaceEvals,
 	listInstructionSurfaceEvals,
 } = require("./instruction-surface-evals");
+const { isNonEmptyString } = require("./registry-ledger");
 
 const EVAL_DEFINITION_SCHEMA_VERSION = 1;
 const EVAL_RESULT_SCHEMA_VERSION = 1;
@@ -31,10 +32,6 @@ const DEFAULT_EVIDENCE_SUBJECT = "eval.instruction-surface";
 
 function fail(code, errors) {
 	return { ok: false, code, definition: null, outcome: null, evidence: null, suite: null, errors };
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
 }
 
 function canonicalEqual(left, right) {
