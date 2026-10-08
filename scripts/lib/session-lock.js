@@ -81,6 +81,34 @@ function removeStale(lockPath, raw, depth) {
 	}
 }
 
+// The chain is bounded, so a crash inside a guard of a guard leaves files nothing
+// can reclaim. Naming them is the whole remedy: the code cannot clear them itself,
+// and "locked by pid N" would name a process that is already dead. The walk is
+// rooted at the real lock, because the guard names are hashes of the bytes they
+// guard and cannot be derived by appending.
+function takeoverChainTooDeep(lockPath) {
+	const root = lockPath.replace(/\.takeover-.*$/, "");
+	const dir = path.dirname(root);
+	const base = path.basename(root);
+	let guards = [];
+	try {
+		guards = fs
+			.readdirSync(dir)
+			.filter((name) => name.startsWith(`${base}.takeover-`))
+			.sort()
+			.map((name) => path.join(dir, name));
+	} catch {
+		/* the directory is gone, so there is nothing to name */
+	}
+	// The count is deliberately not reported: the caller may be an inner level whose
+	// own depth is not the chain's depth, and a wrong number is worse than none.
+	return {
+		success: false,
+		code: "AMBER_E_SESSION_LOCK_CHAIN",
+		error: `Session lock ${root} cannot be reclaimed after repeated crashes; remove ${[root, ...guards].join(", ")}`,
+	};
+}
+
 function acquireAt(lockPath, depth) {
 	fs.mkdirSync(path.dirname(lockPath), { recursive: true });
 	const lease = {
@@ -102,10 +130,16 @@ function acquireAt(lockPath, depth) {
 				error: `Session lock ${lockPath} does not name a holder`,
 			};
 		}
-		if (state === "live" || depth >= MAX_TAKEOVER_DEPTH) return locked(holder);
+		if (state === "live") return locked(holder);
+		if (depth >= MAX_TAKEOVER_DEPTH) return takeoverChainTooDeep(lockPath);
 		removeStale(lockPath, raw, depth);
 	}
-	return locked(parseLease(readRaw(lockPath)));
+	// The attempts ran out with the holder still stale, which means the takeover chain
+	// could not be unwound. Naming the files is the only useful answer; a generic
+	// "locked by pid N" would name a process that is already dead.
+	const remaining = parseLease(readRaw(lockPath));
+	if (holderState(remaining) === "stale") return takeoverChainTooDeep(lockPath);
+	return locked(remaining);
 }
 
 function releaseAt(lockPath, leaseId) {

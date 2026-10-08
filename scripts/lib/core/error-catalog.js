@@ -55,6 +55,15 @@ const CATALOG = {
 		layer: "Lifecycle",
 		related: ["AMBER_E_SESSION_LOCK_CORRUPT"],
 	},
+	AMBER_E_SESSION_LOCK_CHAIN: {
+		title: "Session lock needs manual removal",
+		cause:
+			"A process died taking over a dead holder's session lock, and then a process died taking over that takeover, which is as deep as the chain goes. Nothing can reclaim the leftovers by itself.",
+		remedy:
+			"Check no amber session command is running for this session, then delete the .lock and .lock.takeover-* files the error names.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_SESSION_LOCKED"],
+	},
 	AMBER_E_SESSION_LOCK_CORRUPT: {
 		title: "Session lock does not name a holder",
 		cause:

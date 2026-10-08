@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
+const crypto = require("node:crypto");
 
 const LOCK_MODULE = require.resolve("../../scripts/lib/session-lock");
 const { acquireLock, releaseLock } = require(LOCK_MODULE);
@@ -174,5 +175,38 @@ describe("session lock lease", () => {
 		const results = await Promise.all(outputs);
 
 		assert.strictEqual(results.filter((r) => r.success).length, 1, JSON.stringify(results));
+	});
+
+	// The takeover chain is bounded, so a crash inside a guard of a guard leaves files
+	// nothing can reclaim. The refusal has to name them: the code cannot clear them
+	// itself, and "locked by pid N" would name a process that is already dead.
+	it("names the files when the takeover chain is too deep to unwind", () => {
+		const lease = (id) => ({
+			leaseId: id,
+			pid: deadPid(),
+			startTime: "1",
+			acquiredAt: new Date(HOUR_AGO).toISOString(),
+		});
+		const guardName = (of) =>
+			`.lock.takeover-${crypto.createHash("sha256").update(of).digest("hex").slice(0, 16)}`;
+
+		const lockRaw = JSON.stringify(lease("old"));
+		writeLock(lockRaw);
+		const dir = path.dirname(lockPath);
+		const guardOne = path.join(dir, guardName(lockRaw));
+		const guardOneRaw = JSON.stringify(lease("taker"));
+		fs.writeFileSync(guardOne, guardOneRaw);
+		const guardTwo = path.join(
+			dir,
+			`${path.basename(guardOne)}.takeover-${crypto.createHash("sha256").update(guardOneRaw).digest("hex").slice(0, 16)}`,
+		);
+		fs.writeFileSync(guardTwo, JSON.stringify(lease("taker of the taker")));
+
+		const result = acquireLock(root, SESSION);
+
+		assert.strictEqual(result.success, false);
+		assert.strictEqual(result.code, "AMBER_E_SESSION_LOCK_CHAIN");
+		const named = result.error.split("; remove ").pop().split(", ");
+		assert.deepStrictEqual(named, [lockPath, guardOne, guardTwo]);
 	});
 });
