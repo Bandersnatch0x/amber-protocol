@@ -11,6 +11,7 @@ const { resolveTarget } = require("./fs-utils");
 const { evaluateGovernedPolicy, loadPolicyRules } = require("./loop-policy");
 const {
 	appendLedgerRecord,
+	consumeApproval,
 	readLedger,
 	verifyLedgerChain,
 	latestUnconsumedApproval,
@@ -246,8 +247,8 @@ function frozenAdmissionProblem(targetRoot, frozen, resolvedCommand, globalRules
 
 /**
  * R-AU-3: consumption eligibility in order, each refusal explicit. Single-use
- * (check 1) holds by construction — the candidate grant came from
- * `latestUnconsumedApproval`, which only returns unconsumed grants. Binding
+ * (check 1) is enforced after these checks by `consumeApproval`, right before
+ * the spawn, so a refusal here leaves the grant unspent. Binding
  * fields a legacy grant never carried are recorded absences: the dimension is
  * not checkable and is skipped, never fabricated (compat boundary, spec §8).
  *
@@ -860,6 +861,26 @@ async function runGovernedCommand({
 			target: targetRoot,
 			...(namedCommand ? { commandId, matchedRule } : {}),
 			errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")],
+			warnings: [],
+		};
+	}
+	if (!consumeApproval(lp, approval.approvalKey)) {
+		const reason = `approval ${approval.approvalKey} was already used for ${label}`;
+		appendLedgerRecord(lp, {
+			schemaVersion: 2,
+			kind: "denied",
+			gate: "approval-consumed",
+			approvalKey: approval.approvalKey,
+			...(namedCommand ? { commandId } : {}),
+			reason,
+			recordedAt: new Date().toISOString(),
+			executesAnything: false,
+			...subject,
+		});
+		return {
+			target: targetRoot,
+			...(namedCommand ? { commandId, matchedRule } : {}),
+			errors: [codedError("AMBER_E_LOOP_APPROVAL_CONSUMED", reason)],
 			warnings: [],
 		};
 	}

@@ -1,9 +1,12 @@
 "use strict";
 
 // GLX tamper-evident ledger (C). Append-only JSONL where each record carries the
-// previous record's hash, so an edit anywhere breaks the chain on verify. This
-// detects accidental/single-record tampering — not an attacker who rewrites the
-// whole file and recomputes every hash (that needs external anchoring; see spec).
+// previous record's hash, so an edit anywhere breaks the chain on verify. The
+// head {count, headHash} is anchored in `<ledger>.anchor/head.json`, so cutting
+// records off the end also fails verify. Approval use is recorded there too, as
+// one `wx`-created marker per approvalKey, so a spent approval stays spent
+// whatever the ledger says. Deleting the anchor store refuses the ledger (fail
+// closed). Rewriting ledger and anchor together still needs `amber ledger seal`.
 const fs = require("node:fs");
 const path = require("node:path");
 const { codedError } = require("./error-catalog");
@@ -39,13 +42,109 @@ function readLedger(ledgerPath) {
 	return readJSONL(ledgerPath, { onCorrupt: "mark" });
 }
 
+const LOCK_WAIT_MS = 10000;
+
+const anchorDirOf = (ledgerPath) => `${ledgerPath}.anchor`;
+const headPathOf = (ledgerPath) => path.join(anchorDirOf(ledgerPath), "head.json");
+
+function readAnchor(ledgerPath) {
+	try {
+		return JSON.parse(fs.readFileSync(headPathOf(ledgerPath), "utf8"));
+	} catch {
+		return null;
+	}
+}
+
+function writeAnchor(ledgerPath, anchor) {
+	const file = headPathOf(ledgerPath);
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	const tmp = `${file}.${process.pid}.tmp`;
+	fs.writeFileSync(tmp, JSON.stringify(anchor));
+	fs.renameSync(tmp, file);
+}
+
+// The anchor may lag the file by the one record a crash interrupted between the
+// line append and the anchor write; a longer chain whose anchored record still
+// matches is a valid extension.
+function headProblem(records, anchor) {
+	if (!anchor) return records.length === 0 ? null : { reason: "anchor-missing", brokenAt: 0 };
+	if (records.length < anchor.count) return { reason: "head-truncated", brokenAt: records.length };
+	if (records[anchor.count - 1]?.hash !== anchor.headHash)
+		return { reason: "head-mismatch", brokenAt: anchor.count - 1 };
+	return null;
+}
+
+function sleepSync(ms) {
+	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function lockHolderIsDead(lockPath) {
+	let holder;
+	try {
+		holder = fs.readFileSync(lockPath, "utf8");
+	} catch {
+		return false;
+	}
+	const pid = Number(holder);
+	if (!Number.isInteger(pid) || pid <= 0) return false;
+	try {
+		process.kill(pid, 0);
+		return false;
+	} catch (err) {
+		return err.code === "ESRCH";
+	}
+}
+
+function withLedgerLock(ledgerPath, fn) {
+	const lockPath = `${ledgerPath}.lock`;
+	fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+	const deadline = Date.now() + LOCK_WAIT_MS;
+	for (let delay = 1; ; delay = Math.min(delay * 2, 50)) {
+		try {
+			const fd = fs.openSync(lockPath, "wx");
+			fs.writeSync(fd, String(process.pid));
+			fs.closeSync(fd);
+			break;
+		} catch (err) {
+			if (err.code !== "EEXIST") throw err;
+		}
+		if (lockHolderIsDead(lockPath)) {
+			fs.rmSync(lockPath, { force: true });
+			continue;
+		}
+		if (Date.now() > deadline) {
+			throw new Error(
+				codedError(
+					"AMBER_E_LEDGER_LOCKED",
+					`${lockPath} is held by a live process after ${LOCK_WAIT_MS} ms`,
+				),
+			);
+		}
+		sleepSync(delay);
+	}
+	try {
+		return fn();
+	} finally {
+		fs.rmSync(lockPath, { force: true });
+	}
+}
+
 function appendLedgerRecord(ledgerPath, record) {
-	const existing = readLedger(ledgerPath);
-	const prevHash = existing.length ? existing[existing.length - 1].hash || GENESIS : GENESIS;
-	const body = { ...record, prevHash };
-	const full = { ...body, hash: hashRecord(body, prevHash) };
-	appendJSONL(ledgerPath, full);
-	return full;
+	return withLedgerLock(ledgerPath, () => {
+		const existing = readLedger(ledgerPath);
+		const problem = headProblem(existing, readAnchor(ledgerPath));
+		if (problem) {
+			throw new Error(
+				codedError("AMBER_E_LEDGER_TAMPERED", `refusing to append: ${problem.reason}`),
+			);
+		}
+		const prevHash = existing.length ? existing[existing.length - 1].hash || GENESIS : GENESIS;
+		const body = { ...record, prevHash };
+		const full = { ...body, hash: hashRecord(body, prevHash) };
+		appendJSONL(ledgerPath, full);
+		writeAnchor(ledgerPath, { count: existing.length + 1, headHash: full.hash });
+		return full;
+	});
 }
 
 function verifyLedgerChain(ledgerPath) {
@@ -61,10 +160,29 @@ function verifyLedgerChain(ledgerPath) {
 			return { intact: false, brokenAt: i, reason: "hash mismatch" };
 		prev = hash;
 	}
+	const problem = headProblem(records, readAnchor(ledgerPath));
+	if (problem) return { intact: false, ...problem };
 	return { intact: true, brokenAt: null, records: records.length };
 }
 
-// An approval is consumable until an `executed` record references its approvalKey.
+// Consume-then-run: the marker is created before the governed command spawns,
+// so a crash after it leaves the approval spent and a retry is refused.
+function consumeApproval(ledgerPath, approvalKey) {
+	const dir = path.join(anchorDirOf(ledgerPath), "consumed");
+	fs.mkdirSync(dir, { recursive: true });
+	try {
+		const fd = fs.openSync(path.join(dir, sha256Hex(approvalKey)), "wx");
+		fs.writeSync(fd, JSON.stringify({ approvalKey, consumedAt: new Date().toISOString() }));
+		fs.closeSync(fd);
+		return true;
+	} catch (err) {
+		if (err.code === "EEXIST") return false;
+		throw err;
+	}
+}
+
+// The ledger view of consumption: an `executed` record references the
+// approvalKey. The single-use guarantee is consumeApproval, not this view.
 function latestUnconsumedApproval(records) {
 	return latestUnconsumedApprovalFor(records, null);
 }
@@ -125,6 +243,7 @@ module.exports = {
 	hashRecord,
 	readLedger,
 	appendLedgerRecord,
+	consumeApproval,
 	verifyLedgerChain,
 	verifyLedgerOutcome,
 	latestUnconsumedApproval,

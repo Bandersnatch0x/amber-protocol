@@ -28,7 +28,20 @@ const { statePathForCreate } = require("../state-dir-resolver");
 // Loop execution ledgers (post-rename state kind, 2026-06-30): they never
 // existed under .harness, so reads and creates both target the canonical dir
 // (see the note in organization-audit.js).
+const CONTRACT_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+function assertContractId(contractId) {
+	if (typeof contractId === "string" && CONTRACT_ID.test(contractId)) return;
+	throw new Error(
+		codedError(
+			"AMBER_E_LOOP_CONTRACT_ID_INVALID",
+			`loop contract id ${JSON.stringify(contractId)} must match ${CONTRACT_ID.source}`,
+		),
+	);
+}
+
 function ledgerPath(targetRoot, contractId) {
+	assertContractId(contractId);
 	return statePathForCreate(resolveTarget(targetRoot), "loops", contractId, "ledger.jsonl");
 }
 
@@ -39,6 +52,7 @@ function loadContract(file, contractId) {
 		throw new Error(`Workflow pack file is not a valid object: ${file}`);
 	}
 	const contract = findLoopContract(data, contractId);
+	assertContractId(contract.id);
 	const packProblem = packAllowRuleProblem(contract.governed?.rules);
 	if (packProblem) throw new Error(packProblem);
 	return contract;
@@ -70,27 +84,27 @@ function approvalBindingOf(targetRoot, contractId, contract) {
 
 function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 	const targetRoot = resolveTarget(target);
-	let contract;
+	const approvalKey = crypto.randomUUID();
+	let record;
 	try {
-		contract = loadContract(file, contractId);
+		const contract = loadContract(file, contractId);
+		const binding = approvalBindingOf(targetRoot, contractId, contract);
+		record = appendLedgerRecord(ledgerPath(targetRoot, contractId), {
+			schemaVersion: 2,
+			kind: "approved",
+			approvalState: "approved",
+			contractId,
+			approvalKey,
+			reviewer: reviewer || "unknown",
+			scopeHash: binding.scopeHash,
+			policyVersion: binding.policyHash,
+			capabilityHash: binding.capabilityHash,
+			recordedAt: new Date().toISOString(),
+			executesAnything: false,
+		});
 	} catch (e) {
 		return { target: targetRoot, errors: [e.message], warnings: [] };
 	}
-	const approvalKey = crypto.randomUUID();
-	const binding = approvalBindingOf(targetRoot, contractId, contract);
-	const record = appendLedgerRecord(ledgerPath(targetRoot, contractId), {
-		schemaVersion: 2,
-		kind: "approved",
-		approvalState: "approved",
-		contractId,
-		approvalKey,
-		reviewer: reviewer || "unknown",
-		scopeHash: binding.scopeHash,
-		policyVersion: binding.policyHash,
-		capabilityHash: binding.capabilityHash,
-		recordedAt: new Date().toISOString(),
-		executesAnything: false,
-	});
 	return {
 		target: targetRoot,
 		approvalKey,
@@ -187,7 +201,12 @@ async function executeLoopContract({
 
 function verifyLoopLedger({ target, contract: contractId }) {
 	const targetRoot = resolveTarget(target);
-	const o = verifyLedgerOutcome(ledgerPath(targetRoot, contractId));
+	let o;
+	try {
+		o = verifyLedgerOutcome(ledgerPath(targetRoot, contractId));
+	} catch (e) {
+		return { target: targetRoot, errors: [e.message], warnings: [] };
+	}
 	if (!o.found) {
 		return {
 			target: targetRoot,

@@ -155,6 +155,23 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_LOOP_NOT_APPROVED", "AMBER_E_POLICY_DENY"],
 	},
+	AMBER_E_LOOP_APPROVAL_CONSUMED: {
+		title: "Approval already used",
+		cause:
+			"The approval's use marker already exists in the ledger's anchor store (<ledger>.anchor/consumed/). Use is recorded before the command spawns, so an approval whose run crashed is spent too.",
+		remedy:
+			"Record a fresh approval: amber loop approve --file <pack> --contract <id> --reviewer <name>",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_LOOP_CONTRACT_ID_INVALID: {
+		title: "Loop contract id is not a safe path segment",
+		cause:
+			"A loop contract id names its ledger directory, so it must match ^[a-z0-9][a-z0-9-]{0,63}$.",
+		remedy: "Rename the contract in the pack to lowercase letters, digits, and hyphens.",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED"],
+	},
 	AMBER_E_PACK_ALLOW_RULE: {
 		title: "Pack rules may only narrow the governance policy",
 		cause:
@@ -166,10 +183,29 @@ const CATALOG = {
 	},
 	AMBER_E_LEDGER_TAMPERED: {
 		title: "Loop ledger hash chain is broken",
-		cause: "verify-ledger recomputed a record hash that does not match the stored chain.",
-		remedy: "Investigate the flagged record; restore it from version control if it was edited.",
+		cause:
+			"verify-ledger recomputed a record hash that does not match the stored chain, or the ledger no longer reaches the head anchored in <ledger>.anchor/head.json (head-truncated, head-mismatch), or that anchor is gone (anchor-missing).",
+		remedy:
+			"Investigate the flagged record; restore the ledger and its .anchor store from version control or backup. A ledger without its anchor stays refused by design.",
 		layer: "Observability",
-		related: ["AMBER_E_KB_CORRUPT"],
+		related: ["AMBER_E_KB_CORRUPT", "AMBER_E_LOOP_APPROVAL_CONSUMED"],
+	},
+	AMBER_E_LEDGER_LOCKED: {
+		title: "Ledger append lock is held",
+		cause:
+			"Another live process held <ledger>.lock for the whole wait. A lock left by a dead process is reclaimed automatically.",
+		remedy: "Retry once the other Amber command finishes.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_LEDGER_RESEAL_REFUSED: {
+		title: "Ledger seal refused",
+		cause:
+			"A seal tag already exists for HEAD, or a ledger is broken or no longer extends the latest seal. Sealing never overwrites a tag or anchors a rewritten chain.",
+		remedy:
+			"amber ledger verify-anchoring to see which ledger drifted; restore it, or commit and seal at a new HEAD once the chain extends the old seal.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED"],
 	},
 	AMBER_E_RUN_EVENTS_CORRUPT: {
 		title: "Session timeline chain is broken",
