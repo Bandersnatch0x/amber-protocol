@@ -193,9 +193,24 @@ const DEFAULT_CONTRACT_CONSTRAINTS = Object.freeze({
 	treatSourcesAsQuotedEvidence: true,
 });
 
-function makeRequestId() {
-	const ymd = localIsoDate();
-	return `kd-${ymd}-${crypto.randomBytes(3).toString("hex")}`;
+// The seq in a request id orders requests; file mtimes tie within a
+// millisecond and change on touch or copy.
+const SEQUENCED_REQUEST_FILE = /^kd-\d{4}-\d{2}-\d{2}-(\d+)-[0-9a-f]{6}\.json$/;
+
+function requestSeq(fileName) {
+	const match = SEQUENCED_REQUEST_FILE.exec(fileName);
+	return match ? Number(match[1]) : 0;
+}
+
+function requestFileNames(targetRoot) {
+	const dir = requestsDir(targetRoot);
+	if (!fs.existsSync(dir)) return [];
+	return fs.readdirSync(dir).filter((f) => f.endsWith(".json"));
+}
+
+function makeRequestId(targetRoot) {
+	const seq = Math.max(0, ...requestFileNames(targetRoot).map(requestSeq)) + 1;
+	return `kd-${localIsoDate()}-${seq}-${crypto.randomBytes(3).toString("hex")}`;
 }
 
 /**
@@ -251,7 +266,7 @@ function validateRequestInput(targetRoot, opts) {
 	return { pageId, title: opts.title || pageId, sources: bundled.sources, errors };
 }
 
-function buildRequest(opts, input) {
+function buildRequest(targetRoot, opts, input) {
 	const scope = normalizeScope(opts.scope);
 	const target = {
 		pageId: input.pageId,
@@ -264,7 +279,7 @@ function buildRequest(opts, input) {
 	if (supersedes.length > 0) target.supersedes = supersedes;
 	return {
 		schemaVersion: SCHEMA_VERSION,
-		requestId: makeRequestId(),
+		requestId: makeRequestId(targetRoot),
 		createdAt: new Date().toISOString(),
 		target,
 		sources: input.sources,
@@ -305,7 +320,7 @@ function createRequest(targetRoot, opts = {}) {
 	if (input.errors.length > 0) {
 		return { requestId: null, requestPath: null, errors: input.errors, warnings: [] };
 	}
-	const request = buildRequest(opts, input);
+	const request = buildRequest(targetRoot, opts, input);
 	const requestValidation = validateRequestSchema(request);
 	if (requestValidation.errors.length > 0) {
 		return { requestId: null, requestPath: null, errors: requestValidation.errors, warnings: [] };
@@ -329,22 +344,32 @@ function loadRequest(targetRoot, requestId) {
 /** Newest open request targeting a page (requests are never deleted on ingest). */
 function latestRequestForPage(targetRoot, pageId) {
 	const dir = requestsDir(targetRoot);
-	if (!fs.existsSync(dir)) return null;
-	const files = fs
-		.readdirSync(dir)
-		.filter((f) => f.endsWith(".json"))
-		.map((f) => ({ name: f, mtimeMs: fs.statSync(path.join(dir, f)).mtimeMs }))
-		.sort((a, b) => b.mtimeMs - a.mtimeMs) // newest first
-		.map((f) => f.name);
-	for (const f of files) {
+	const names = requestFileNames(targetRoot);
+	const readForPage = (name) => {
 		try {
-			const req = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-			if (req.target && req.target.pageId === pageId) return req;
+			const req = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+			return req.target && req.target.pageId === pageId ? req : null;
 		} catch {
-			/* skip malformed */
+			return null;
 		}
+	};
+	const sequenced = names
+		.filter((name) => requestSeq(name) > 0)
+		.sort((a, b) => requestSeq(b) - requestSeq(a) || b.localeCompare(a));
+	for (const name of sequenced) {
+		const req = readForPage(name);
+		if (req) return req;
 	}
-	return null;
+	const legacy = names
+		.filter((name) => requestSeq(name) === 0)
+		.map((name) => ({ name, req: readForPage(name) }))
+		.filter((entry) => entry.req)
+		.sort(
+			(a, b) =>
+				String(b.req.createdAt || "").localeCompare(String(a.req.createdAt || "")) ||
+				b.name.localeCompare(a.name),
+		);
+	return legacy.length > 0 ? legacy[0].req : null;
 }
 
 module.exports = {
