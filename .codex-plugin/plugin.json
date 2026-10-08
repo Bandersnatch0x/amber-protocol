@@ -1,7 +1,7 @@
 {
   "name": "amber-protocol",
   "version": "2.0.1",
-  "description": "Amber Protocol: repository-local governance kit for coding agents — init, audit, wiki, doctor, and handoff workflows.",
+  "description": "Amber Protocol: the governed execution boundary between AI agents and real systems — init, audit, doctor, plans, approvals, evidence, and handoff.",
   "author": {
     "name": "Local developer"
   },

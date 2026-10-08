@@ -48,11 +48,11 @@ Amber makes that state explicit through plans, sessions, evidence, decisions, an
 
 It sits under your existing coding engine and adds governance plus evidence. It is not another agent runtime, and not an org-scale platform.
 
-| Amber is                                        | Amber is not                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------ |
-| In-repo governance and evidence protocol        | Org-scale Skill marketplace / plugin store                   |
-| Reviewable plans / gates / approvals / handoffs | Cross-repo gateway or cross-machine control dashboard        |
-| Local conventions a team can replicate          | Always-on scheduler / daemon that runs your project commands |
+| Amber is                                        | Amber is not                                          |
+| ----------------------------------------------- | ----------------------------------------------------- |
+| In-repo governance and evidence protocol        | Org-scale Skill marketplace / plugin store            |
+| Reviewable plans / gates / approvals / handoffs | Cross-repo gateway or cross-machine control dashboard |
+| Local conventions a team can replicate          | A scheduler / daemon that runs your project commands  |
 
 ---
 
@@ -72,7 +72,7 @@ These are product boundaries, not TODOs:
 
 1. Not a replacement for the coding engine / not a general agent runtime
 2. No Dynamic Workflow execution, no live subagent dispatch, no automatic execution of your project commands
-3. No org-scale marketplace, cross-repo gateway, cross-machine dashboard, or always-on scheduler
+3. No org-scale marketplace, cross-repo gateway, or cross-machine dashboard. The only scheduler is the experimental `amber harness runtime` (schedule, tick, daemon), which runs a closed set of Amber-internal proposal jobs and never your project commands
 4. No overwrite of existing project docs (`init` / `wiki` only create missing files)
 
 Full boundaries: [Team Replication Charter](./docs/TEAM_REPLICATION_CHARTER.md) and [SPEC.md](./SPEC.md).
@@ -186,7 +186,7 @@ Expert path (not the homepage main line): read-only continuous-improvement disco
 
 ## Command surface
 
-Default `amber --help` projects **seven primary verbs** — the whole journey fits in them:
+Default `amber --help` projects **seven primary verbs** — the whole journey fits in them. `amber --all` lists the full surface: expert command families, deprecated `profile` / `task` / `result`, and the experimental `harness runtime` scheduler:
 
 | Verb            | What it does                                                    |
 | --------------- | --------------------------------------------------------------- |

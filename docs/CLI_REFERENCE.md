@@ -1933,7 +1933,7 @@ node scripts/amber.js execution readiness \
 
 ## Daemon Boundary
 
-Amber V1 has no daemon command surface. Do not use Amber as a background autonomous worker. Use explicit, human-triggered commands such as:
+The only daemon is the experimental `amber harness runtime daemon start|stop|status`, together with `harness runtime schedule` and `harness runtime tick`. It runs a closed registry of Amber-internal proposal jobs (`executesAnything=false`), never a project command, and prints an `[experimental]` notice on stderr. It may change or be removed in a minor release. Do not use Amber as a background autonomous worker. For project work, use explicit, human-triggered commands such as:
 
 ```bash
 node scripts/amber.js doctor --target .
@@ -3026,7 +3026,7 @@ cancellation can address exactly that handle.
   surface, naming its mapping onto the harness spine; `profile inspect` declares NO
   correspondence. The view reads frozen legacy artifacts and writes nothing.
 - `harness runtime jobs` / `schedule admit --file <schedule.json>` / `schedule list|show|revoke`
-  / `tick [--schedule <id>] [--now <iso>]` / `daemon start [--poll-ms <n>]|stop|status` — the
+  / `tick [--schedule <id>] [--now <iso>]` / `daemon start [--poll-ms <n>]|stop|status` — **experimental**: the
   bounded H7 maintenance runtime: a repository-local scheduler for a CLOSED registry of
   deterministic Amber-internal proposal jobs. The authority tuple is fixed at
   `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`,
