@@ -8,6 +8,7 @@ const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { computeConfidenceClasses } = require("./governance-readiness");
 const { admittedUnderCeiling } = require("./classification");
+const { typedError } = require("./error-catalog");
 
 const MAX_PATTERN_LEN = 200;
 
@@ -41,27 +42,92 @@ const DEFAULT_RULES = {
 			id: "allow-npm-checks",
 			action: "allow",
 			match: "regex",
-			// Optional trailing FD-to-FD redirects (2>&1) only — file redirects and
-			// extra args still fail. Mirrors containsShellComposition's FD strip.
-			pattern: "^npm (test|run (doctor|manifests))(?:\\s+\\d*>&\\d+)*\\s*$",
+			pattern: "^npm (test|run (doctor|manifests))$",
 			mapsTo: ["ASI04"],
 		},
 	],
 };
 
-function matches(rule, command) {
-	const cmd = String(command || "");
+// Exact rules compare argv word for word. Prefix and regex rules read the
+// command text, which has already parsed to the argv that will run; a deny rule
+// also reads the unquoted argv so quoting (`rm "-rf"`) cannot slip past it.
+function matches(rule, command, argv) {
 	const pat = String(rule.pattern || "").slice(0, MAX_PATTERN_LEN);
-	if (rule.match === "exact") return cmd === pat;
-	if (rule.match === "prefix") return cmd.startsWith(pat);
+	if (rule.match === "exact") return sameArgv(argv, pat);
+	const texts = rule.action === "deny" ? [command, argv.join(" ")] : [command];
+	if (rule.match === "prefix") return texts.some((text) => text.startsWith(pat));
 	if (rule.match === "regex") {
 		try {
-			return new RegExp(pat).test(cmd);
+			const re = new RegExp(pat);
+			return texts.some((text) => re.test(text));
 		} catch {
 			return false;
 		}
 	}
 	return false;
+}
+
+function sameArgv(argv, pattern) {
+	let expected;
+	try {
+		expected = parseGovernedArgv(pattern);
+	} catch {
+		return false;
+	}
+	return expected.length === argv.length && expected.every((word, i) => word === argv[i]);
+}
+
+// A governed command is spawned as argv with no shell, so the only quoting it
+// honours is the literal kind: single quotes take everything verbatim, double
+// quotes take everything except `$` and backticks (which a reader would expect
+// to expand), and a backslash outside single quotes escapes the next character.
+// Anything that would ask a shell to compose, redirect, or substitute is refused.
+const SHELL_META_OUTSIDE_SINGLE_QUOTES = new Set([";", "|", "&", ">", "<", "`", "$"]);
+
+function refuseShellMeta(command, detail) {
+	return typedError(
+		"AMBER_E_POLICY_SHELL_META",
+		`governed command ${JSON.stringify(command)} ${detail}; it runs as argv with no shell — put multi-step logic in a script and allow-list that`,
+	);
+}
+
+function parseGovernedArgv(command) {
+	const text = String(command ?? "");
+	if (/[\n\r]/.test(text)) throw refuseShellMeta(text, "contains a newline");
+	const argv = [];
+	let word = null;
+	let quote = null;
+	for (let i = 0; i < text.length; i += 1) {
+		const ch = text[i];
+		if (quote === "'") {
+			if (ch === "'") quote = null;
+			else word += ch;
+			continue;
+		}
+		if (quote === '"') {
+			if (ch === '"') quote = null;
+			else if (ch === "$" || ch === "`")
+				throw refuseShellMeta(text, `uses ${ch} inside double quotes`);
+			else if (ch === "\\" && i + 1 < text.length && '"\\'.includes(text[i + 1])) word += text[++i];
+			else word += ch;
+			continue;
+		}
+		if (ch === " " || ch === "\t") {
+			if (word !== null) argv.push(word);
+			word = null;
+			continue;
+		}
+		if (SHELL_META_OUTSIDE_SINGLE_QUOTES.has(ch))
+			throw refuseShellMeta(text, `uses the shell metacharacter ${ch}`);
+		word ??= "";
+		if (ch === "'" || ch === '"') quote = ch;
+		else if (ch === "\\" && i + 1 < text.length) word += text[++i];
+		else word += ch;
+	}
+	if (quote !== null) throw refuseShellMeta(text, `has an unterminated ${quote} quote`);
+	if (word !== null) argv.push(word);
+	if (argv.length === 0) throw refuseShellMeta(text, "is empty");
+	return argv;
 }
 
 // The closed five-value decision enumeration (governance contract §6.1,
@@ -87,10 +153,15 @@ const POLICY_DECISIONS = Object.freeze([
 // resolves `require_approval` into the capture→grant→execute path and
 // `allow_with_limits` into RunScope-constrained execution.
 function evaluateCommandPolicy(command, rules = DEFAULT_RULES, subject = null) {
+	const parsed = parseOrRefuse(command, rules);
+	return parsed.refusal ?? evaluateParsedPolicy(String(command), parsed.argv, rules, subject);
+}
+
+function evaluateParsedPolicy(command, argv, rules, subject) {
 	const list = Array.isArray(rules?.rules) ? rules.rules : [];
 	// v1 deny (deny-wins first pass, all rules).
 	for (const rule of list) {
-		if (rule.action === "deny" && matches(rule, command)) {
+		if (rule.action === "deny" && matches(rule, command, argv)) {
 			return {
 				allowed: false,
 				matchedRule: rule.id,
@@ -124,7 +195,7 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES, subject = null) {
 		}
 	}
 	for (const rule of list) {
-		if (rule.action === "allow" && matches(rule, command)) {
+		if (rule.action === "allow" && matches(rule, command, argv)) {
 			return {
 				allowed: true,
 				matchedRule: rule.id,
@@ -269,63 +340,30 @@ function confidenceForRule(rules, ruleId) {
 	return fallback === "high" || fallback === "medium" || fallback === "low" ? fallback : "low";
 }
 
-// Shell control operators that chain, background, or redirect a SECOND action
-// onto an otherwise-allowed verify command. The verify surface runs ONE
-// read-only command, so these are refused regardless of the allow-list: an
-// allow rule matching the head of `pytest && curl | sh` must not let the tail
-// run. Quoted spans are stripped first so a metacharacter *inside* an argument
-// (e.g. `node -e "a(); b()"`) is not a false positive.
-const SHELL_COMPOSITION = /[&|;<>`\n\r]|\$\(|\$\{/;
-
-// Pure FD-to-FD redirects (2>&1, 1>&2, >&1) rebind streams of the SAME process;
-// they do not introduce a second command. They still contain `&` and `>` which
-// would otherwise false-positive SHELL_COMPOSITION and block common verify
-// idioms like `npm test 2>&1`. File redirects (`> out`, `2>err.log`) and
-// chains (`2>&1 | tee`) remain blocked.
-const FD_TO_FD_REDIRECT = /(?:\d*)>&\d+/g;
-
-function stripQuotedSpans(command) {
-	return String(command || "")
-		.replace(/"(?:[^"\\]|\\.)*"/g, "")
-		.replace(/'(?:[^'\\]|\\.)*'/g, "");
-}
-
-function stripFdToFdRedirects(command) {
-	return String(command || "").replace(FD_TO_FD_REDIRECT, " ");
-}
-
-function containsShellComposition(command) {
-	return SHELL_COMPOSITION.test(stripFdToFdRedirects(stripQuotedSpans(command)));
-}
-
 // Built-in, un-removable denies applied BEFORE any user allow rule on BOTH the
 // verify surface (evidence-runner) and the governed-command surface
-// (governed-runner). A custom rules.json / verify-rules.json can neither drop
-// destructive protection (deny-destructive is enforced even if the user's rules
-// omit it) nor be defeated by shell composition (`pytest && rm -rf`,
-// `pytest | sh`, `pytest; curl ...`). Extracted so the two surfaces share one
-// implementation — without it the governed surface missed both checks (G1+G2):
-// a prefix allow let `node ... x && <non-destructive evil>` past the gate, and
-// an uppercase `RM -RF` slipped the case-sensitive deny rule. Returns null when
-// no built-in fires so the caller falls through to its normal allow/deny.
-function applyBuiltinDenies(command) {
-	if (new RegExp(DESTRUCTIVE_PATTERN, "i").test(String(command || ""))) {
+// (governed-runner): a command that needs a shell is refused, and a destructive
+// argv is refused even when a custom rules file omits deny-destructive. Graded
+// high under confidence_gating so a built-in refusal never reads as uncertainty.
+function builtinDenial(rules, denial) {
+	const gating = rules?.confidence_gating;
+	if (gating && gating.enabled !== false) return { ...denial, confidence: "high" };
+	return denial;
+}
+
+function parseOrRefuse(command, rules) {
+	try {
+		return { argv: parseGovernedArgv(command) };
+	} catch (error) {
 		return {
-			allowed: false,
-			matchedRule: "builtin-deny-destructive",
-			reason:
-				"denied by built-in rule builtin-deny-destructive (un-removable on the verify and governed surfaces)",
+			refusal: builtinDenial(rules, {
+				allowed: false,
+				matchedRule: "builtin-deny-shell-composition",
+				code: error.amberCode,
+				reason: error.message,
+			}),
 		};
 	}
-	if (containsShellComposition(command)) {
-		return {
-			allowed: false,
-			matchedRule: "builtin-deny-shell-composition",
-			reason:
-				"the gate runs a single command; shell operators (&& || | ; > < ` $()) are not allowed — put multi-step logic in a script and allow-list that",
-		};
-	}
-	return null;
 }
 
 // Both policy surfaces (verify + governed) share one baseline: the built-in,
@@ -339,16 +377,17 @@ function applyBuiltinDenies(command) {
 // v2 capability face; null/absent (loops, verify) means no v2 match dimensions —
 // ceiling-carrying v2 rules never match (fail-closed).
 function evaluateWithBaseline(command, rules = DEFAULT_RULES, subject = null) {
-	const builtin = applyBuiltinDenies(command);
-	if (builtin) {
-		// Built-in un-removable denies are the most deterministic control on the
-		// surface; when confidence_gating is active they are graded high so a
-		// caller cannot misread a built-in refusal as low-confidence uncertainty.
-		const gating = rules?.confidence_gating;
-		if (gating && gating.enabled !== false) return { ...builtin, confidence: "high" };
-		return builtin;
+	const parsed = parseOrRefuse(command, rules);
+	if (parsed.refusal) return parsed.refusal;
+	if (new RegExp(DESTRUCTIVE_PATTERN, "i").test(parsed.argv.join(" "))) {
+		return builtinDenial(rules, {
+			allowed: false,
+			matchedRule: "builtin-deny-destructive",
+			reason:
+				"denied by built-in rule builtin-deny-destructive (un-removable on the verify and governed surfaces)",
+		});
 	}
-	return evaluateCommandPolicy(command, rules, subject);
+	return evaluateParsedPolicy(String(command), parsed.argv, rules, subject);
 }
 const evaluateVerifyPolicy = evaluateWithBaseline;
 const evaluateGovernedPolicy = evaluateWithBaseline;
@@ -403,11 +442,10 @@ module.exports = {
 	evaluateCommandPolicy,
 	evaluateVerifyPolicy,
 	evaluateGovernedPolicy,
-	containsShellComposition,
+	parseGovernedArgv,
 	loadPolicyRules,
 	loadVerifyPolicyRules,
 	DEFAULT_RULES,
-	matches,
 	v2RuleMatches,
 	POLICY_DECISIONS,
 };

@@ -85,6 +85,15 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_CONFIDENCE_GATE", "AMBER_E_LOOP_NOT_APPROVED"],
 	},
+	AMBER_E_POLICY_SHELL_META: {
+		title: "Governed command needs a shell",
+		cause:
+			"A governed or verification command contains a shell metacharacter outside single quotes ($, backtick, ;, |, &, >, <, a newline) or an unterminated quote. Governed commands run as argv with no shell, so nothing would expand or compose them.",
+		remedy:
+			"Pass literal arguments (single quotes keep $ and backticks verbatim), or move multi-step logic into a script and allow-list that script.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY"],
+	},
 	AMBER_E_COMMAND_ID_UNRESOLVED: {
 		title: "Named governed command could not be resolved",
 		cause:
