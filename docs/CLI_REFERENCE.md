@@ -469,9 +469,14 @@ enforce.
 
 **Per-context rules:** a loop contract's `governed` block and a route `command` stage may each
 declare an extra `rules` array (same `{ id, action, match, pattern }` shape). These compose with
-the global `rules.json` for that one command only — a context `allow` can supplement the global
-policy, but **deny-wins is absolute**: no context `allow` can override a global or context `deny`
-(or a built-in deny).
+the global `rules.json` for that one command only and may only narrow it: a context rule must be a
+`deny` (or a v2 `deny` / `require_approval` decision). A context `allow` is refused when the pack
+is read (`AMBER_E_PACK_ALLOW_RULE`); only `rules.json` can allow a command.
+
+**Approval pinning:** `loop approve` records the hash of the contract's `governed.command`,
+`governed.rules`, and the current `rules.json`. `loop run --execute` recomputes them and refuses
+with `AMBER_E_LOOP_CONTRACT_DRIFT` when any changed; `loop run --dry-run` reports the same drift as
+a warning.
 
 ### artifact admit / show / list
 
