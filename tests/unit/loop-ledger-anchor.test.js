@@ -278,25 +278,41 @@ test("a guard left by a dead reclaimer does not wedge the ledger", () => {
 });
 
 // A reclaimer can die holding the guard, and a reclaimer of that guard can die too.
-// A depth counter would make the last level unreclaimable and wedge the ledger for
-// good, so the chain has to keep unwinding however deep it goes.
-test("a takeover chain left by repeated crashes is reclaimed", () => {
+// The chain unwinds to one level below the bound; past it, nothing can reclaim the
+// leftovers, so the refusal has to name every file a human must remove. An
+// instruction naming files that are not there leaves the operator with nothing to do
+// and the same refusal on the next run.
+test("a takeover chain deeper than the bound is refused with the files to remove", () => {
 	const lp = raceDir("amber-anchor-deepchain-");
 	L.appendLedgerRecord(lp, { kind: "note", i: 0 });
-	for (const suffix of ["", ".takeover", ".takeover.takeover", ".takeover.takeover.takeover"]) {
+	for (const suffix of ["", ".takeover", ".takeover.takeover"]) {
 		fs.writeFileSync(`${lp}.lock${suffix}`, String(deadPid()));
 	}
 
-	L.appendLedgerRecord(lp, { kind: "note", i: 1 });
+	let error;
+	try {
+		L.appendLedgerRecord(lp, { kind: "note", i: 1 });
+	} catch (thrown) {
+		error = thrown;
+	}
 
-	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
-	assert.equal(fs.existsSync(`${lp}.lock`), false);
-	assert.equal(fs.existsSync(`${lp}.lock.takeover`), false);
+	assert.ok(error, "the append must be refused when the chain cannot unwind");
+	assert.match(error.message, /AMBER_E_LEDGER_LOCK_CHAIN/);
+	// Every leftover is named, not just the deepest one, and named as its own entry.
+	// Substring checks would pass on a message that names only the deepest file, since
+	// a longer path contains the shorter ones.
+	const named = error.message
+		.replace(/\s*\[AMBER_E_LEDGER_LOCK_CHAIN\][\s\S]*$/, "")
+		.split("; remove ")
+		.pop()
+		.split(" and ");
+	assert.deepEqual(named, [`${lp}.lock`, `${lp}.lock.takeover`, `${lp}.lock.takeover.takeover`]);
 });
 
 // The race the guard exists for: two writers find the same stale lock and both try
 // to reclaim it. Exactly one may remove it, and the other must not remove the lock
-// the first one created.
+// the first one created. This one guards the guard itself, added when the reclaim
+// was first serialized, not the depth change that followed it.
 test("two writers reclaiming one stale lock both append and leave one chain", async () => {
 	const lp = raceDir("amber-anchor-reclaimrace-");
 	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
@@ -315,6 +331,28 @@ test("two writers reclaiming one stale lock both append and leave one chain", as
 
 	assert.deepEqual(exits, [0, 0]);
 	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+});
+
+// Hard links are what publish a lock file with its pid already inside. A filesystem
+// without them must fall back to an exclusive create rather than failing every
+// append, and the grace period on an unparseable lock is what keeps that fallback's
+// empty-file window from being mistaken for a dead holder.
+test("the lock is still claimed when hard links are unavailable", () => {
+	const lp = raceDir("amber-anchor-nolink-");
+	const realLink = fs.linkSync;
+	fs.linkSync = () => {
+		const error = new Error("hard links unsupported");
+		error.code = "EPERM";
+		throw error;
+	};
+	try {
+		L.appendLedgerRecord(lp, { kind: "note", i: 1 });
+	} finally {
+		fs.linkSync = realLink;
+	}
+
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 1 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false);
 });
 
 test(

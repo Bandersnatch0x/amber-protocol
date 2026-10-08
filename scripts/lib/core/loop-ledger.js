@@ -173,12 +173,28 @@ function removeLock(lockPath) {
 }
 
 // A reclaimer can itself die holding the guard, so the guard is reclaimed the same
-// way, one level deeper. The chain is deliberately NOT bounded by a depth counter:
-// a bound makes the last level unreclaimable, and a crash there then wedges the
-// ledger forever, which is the exact failure this path exists to prevent. It is
-// bounded by path length instead, a limit only a long run of repeated crashes can
-// reach, and reaching it reports the files to remove rather than waiting silently.
-const MAX_TAKEOVER_PATH = 200;
+// way, one level deeper. The chain stops at two levels, the same bound the session
+// lock uses. The bound is on depth and never on path length: a length bound turns a
+// long repository path into a refusal for an ordinary single crash, which is worse
+// than the wedge it was meant to avoid. Reaching the bound takes a crash inside a
+// guard of a guard, and it throws an error naming the files a human must remove.
+const MAX_TAKEOVER_DEPTH = 2;
+
+// The error names every file that actually exists, walked from the real lock outward.
+// Naming only the level the walk stopped at would list one file and leave the rest,
+// and an instruction to remove files that are not there leaves the operator with the
+// same refusal on the next run.
+function takeoverChainTooDeep(lockPath, depth) {
+	const root = lockPath.replace(/(?:\.takeover)+$/, "");
+	const files = [root];
+	for (let p = `${root}.takeover`; fs.existsSync(p); p += ".takeover") files.push(p);
+	return new Error(
+		codedError(
+			"AMBER_E_LEDGER_LOCK_CHAIN",
+			`${root} has a takeover chain ${depth} deep after repeated crashes; remove ${files.join(" and ")}`,
+		),
+	);
+}
 
 // Reclaiming a crashed holder's lock is a read-then-remove, and two reclaimers can
 // read the same stale lock. Without a guard the slower one removes the lock the
@@ -193,15 +209,8 @@ function acquireLock(lockPath, depth = 0) {
 		const raw = readLockRaw(lockPath);
 		if (raw === null) continue;
 		if (!holderIsReclaimable(raw, lockPath)) return false;
+		if (depth >= MAX_TAKEOVER_DEPTH) throw takeoverChainTooDeep(lockPath, depth);
 		const guardPath = `${lockPath}.takeover`;
-		if (guardPath.length > MAX_TAKEOVER_PATH) {
-			throw new Error(
-				codedError(
-					"AMBER_E_LEDGER_LOCKED",
-					`${lockPath} has a takeover chain ${depth} deep, which means repeated crashes; remove the ${lockPath}.takeover* files by hand`,
-				),
-			);
-		}
 		if (!acquireLock(guardPath, depth + 1)) return false;
 		try {
 			if (readLockRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
@@ -220,10 +229,7 @@ function withLedgerLock(ledgerPath, fn) {
 		if (acquireLock(lockPath)) break;
 		if (Date.now() > deadline) {
 			throw new Error(
-				codedError(
-					"AMBER_E_LEDGER_LOCKED",
-					`${lockPath} is still held after ${LOCK_WAIT_MS} ms; if no writer is running, remove ${lockPath} and any ${lockPath}.takeover* files`,
-				),
+				codedError("AMBER_E_LEDGER_LOCKED", `${lockPath} is still held after ${LOCK_WAIT_MS} ms`),
 			);
 		}
 		sleepSync(delay);

@@ -216,6 +216,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_LEDGER_TAMPERED"],
 	},
+	AMBER_E_LEDGER_LOCK_CHAIN: {
+		title: "Ledger append lock needs manual removal",
+		cause:
+			"A process died while reclaiming a dead holder's lock, and then a process died reclaiming that reclaim, which is as deep as the takeover chain goes. Nothing can reclaim the leftover by itself.",
+		remedy:
+			"Check no Amber command is running, then delete the <ledger>.lock and <ledger>.lock.takeover* files the error names.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_LOCKED"],
+	},
 	AMBER_E_LEDGER_RESEAL_REFUSED: {
 		title: "Ledger seal refused",
 		cause:
