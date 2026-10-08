@@ -478,6 +478,17 @@ is read (`AMBER_E_PACK_ALLOW_RULE`); only `rules.json` can allow a command.
 with `AMBER_E_LOOP_CONTRACT_DRIFT` when any changed; `loop run --dry-run` reports the same drift as
 a warning.
 
+**Single use and the ledger anchor:** loop contract ids must match `^[a-z0-9][a-z0-9-]{0,63}$`
+(`AMBER_E_LOOP_CONTRACT_ID_INVALID`), since the id names `.amber/loops/<id>/`. Once every gate
+passes, `loop run --execute` creates a use marker for the approval in
+`.amber/loops/<id>/ledger.jsonl.anchor/consumed/` *before* the command spawns, so an approval is
+spent even if the run crashes, and a second use is refused with `AMBER_E_LOOP_APPROVAL_CONSUMED`
+whatever the ledger says. The same store holds the ledger head (`head.json`: record count and head
+hash); `verify-ledger` reports `head-truncated`, `head-mismatch`, or `anchor-missing` as
+`AMBER_E_LEDGER_TAMPERED`. Deleting the `.anchor` store refuses that ledger for every run and
+append: this is fail-closed by design. Ledgers written before the anchor existed are refused the
+same way; archive them and approve again.
+
 ### artifact admit / show / list
 
 Admit and read Canonical Planning Artifacts (F049; ADR-0023). Each revision binds a human-readable
@@ -2630,12 +2641,15 @@ node scripts/amber.js ledger export --target . --home sessions                # 
 
 # Git-anchor ledger tail hashes (closes the ADR-0003 full-rewrite gap)
 node scripts/amber.js ledger seal --target . --reviewer <name>
-node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if any ledger changed since the last seal
+node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if a sealed record changed
 ```
 
 `export` emits a broken chain as `intact:false` (data, not refusal) and counts it in `brokenCount`.
 `seal` writes an annotated git tag `amber-ledger-seal-<head-sha>` carrying each ledger's tail hash,
-so forging a ledger then requires rewriting git tag history. No Ed25519 signing yet — deferred per
+so forging a ledger then requires rewriting git tag history. A seal anchors a prefix: records
+appended after it are a valid extension (`extended` in `--json`), and only a changed or removed
+sealed record is drift. `seal` never overwrites a tag and refuses (`AMBER_E_LEDGER_RESEAL_REFUSED`)
+while any ledger is broken or no longer extends the latest seal. No Ed25519 signing yet — deferred per
 the Phase 1 spec until key management (HSM / OS keystore) is a real capability rather than a key in
 the repo.
 
