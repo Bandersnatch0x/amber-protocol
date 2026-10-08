@@ -14,7 +14,7 @@ Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acce
 
 ## Project Overview
 
-Amber Protocol is a repository-local governance toolkit for agent-assisted engineering, with experimental runtime and external-effect capabilities.
+**Amber Protocol** (formerly Coding Harness) is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
 
 Command stability is `core` or `experimental`, independently of the existing visibility tiers.
 The `harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` families are
