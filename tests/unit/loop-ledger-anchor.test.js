@@ -195,15 +195,18 @@ test("a traversal contractId is refused and writes nothing outside the target", 
 // The retry loop below tolerates the documented lock refusal, and the internal wait
 // bound means a pathological hang would otherwise take tens of minutes to surface.
 // This ceiling turns that into a failure instead.
-test("concurrent appends from separate processes keep one unbroken chain", { timeout: 120000 }, async () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-anchor-race-"));
-	dirs.push(dir);
-	const lp = path.join(dir, "ledger.jsonl");
-	// A concurrent writer is refused once the lock wait budget expires, and the
-	// caller retries; that is the documented contract, not a failure. Retrying here
-	// keeps this test about the chain, which is what it is for, instead of about how
-	// quickly a loaded machine hands the lock over. Any other error still exits 1.
-	const script = `
+test(
+	"concurrent appends from separate processes keep one unbroken chain",
+	{ timeout: 120000 },
+	async () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-anchor-race-"));
+		dirs.push(dir);
+		const lp = path.join(dir, "ledger.jsonl");
+		// A concurrent writer is refused once the lock wait budget expires, and the
+		// caller retries; that is the documented contract, not a failure. Retrying here
+		// keeps this test about the chain, which is what it is for, instead of about how
+		// quickly a loaded machine hands the lock over. Any other error still exits 1.
+		const script = `
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
 		const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		(async () => {
@@ -224,18 +227,19 @@ test("concurrent appends from separate processes keep one unbroken chain", { tim
 			process.exit(1);
 		});
 	`;
-	const exits = await Promise.all(
-		[1, 2, 3, 4].map(
-			() =>
-				new Promise((resolve) => {
-					spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
-				}),
-		),
-	);
+		const exits = await Promise.all(
+			[1, 2, 3, 4].map(
+				() =>
+					new Promise((resolve) => {
+						spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
+					}),
+			),
+		);
 
-	assert.deepEqual(exits, [0, 0, 0, 0]);
-	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 160 });
-});
+		assert.deepEqual(exits, [0, 0, 0, 0]);
+		assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 160 });
+	},
+);
 
 function sealedRepo() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-anchor-seal-"));

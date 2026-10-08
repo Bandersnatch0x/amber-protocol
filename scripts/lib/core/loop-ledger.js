@@ -60,7 +60,18 @@ function writeAnchor(ledgerPath, anchor) {
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	const tmp = `${file}.${process.pid}.tmp`;
 	fs.writeFileSync(tmp, JSON.stringify(anchor));
-	fs.renameSync(tmp, file);
+	// Windows can refuse the rename for a moment after the write, which would
+	// report a successful append as a failure and leave the anchor behind the
+	// ledger. Retry briefly instead.
+	for (let attempt = 0; ; attempt++) {
+		try {
+			fs.renameSync(tmp, file);
+			return;
+		} catch (err) {
+			if (attempt >= 20) throw err;
+			sleepSync(5);
+		}
+	}
 }
 
 // The anchor may lag the file by the one record a crash interrupted between the
@@ -78,14 +89,18 @@ function sleepSync(ms) {
 	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function lockHolderIsDead(lockPath) {
-	let holder;
+function readLockRaw(lockPath) {
 	try {
-		holder = fs.readFileSync(lockPath, "utf8");
+		return fs.readFileSync(lockPath, "utf8");
 	} catch {
-		return false;
+		return null;
 	}
-	const pid = Number(holder);
+}
+
+// A holder whose pid no longer exists. An empty or unreadable lock is undecidable
+// and stays owned, so a half-published lock is never reclaimed.
+function holderIsDead(raw) {
+	const pid = Number(raw);
 	if (!Number.isInteger(pid) || pid <= 0) return false;
 	try {
 		process.kill(pid, 0);
@@ -95,21 +110,64 @@ function lockHolderIsDead(lockPath) {
 	}
 }
 
+// The pid must be complete before the lock becomes visible. Creating the lock
+// empty and writing the pid afterwards lets a concurrent writer read a partial
+// pid, find that other process dead, and steal a lock a live holder is inside;
+// two writers then append from the same tail and the chain breaks for good.
+// link(2) publishes an already-written file, so a reader never sees a partial pid.
+function claimLock(lockPath) {
+	const tmp = `${lockPath}.${process.pid}.claim`;
+	fs.writeFileSync(tmp, String(process.pid));
+	try {
+		fs.linkSync(tmp, lockPath);
+		return true;
+	} catch (err) {
+		if (err.code === "EEXIST") return false;
+		throw err;
+	} finally {
+		fs.rmSync(tmp, { force: true });
+	}
+}
+
+// Windows can refuse a rename or an unlink for a moment after the file is closed,
+// so retry briefly. A release that still fails is not fatal: the next writer reads
+// the holder's pid and reclaims the lock as a crashed holder's once it is gone.
+function removeLock(lockPath) {
+	for (let attempt = 0; ; attempt++) {
+		try {
+			fs.rmSync(lockPath, { force: true });
+			return;
+		} catch {
+			if (attempt >= 20) return;
+			sleepSync(5);
+		}
+	}
+}
+
+// Reclaiming a crashed holder's lock is a read-then-remove, and two reclaimers can
+// read the same stale lock. Without a guard the slower one removes the lock the
+// faster one has already created, so both append from the same tail and the chain
+// breaks for good. Only the winner of a guard keyed by the stale bytes may remove
+// them, and only while the file still holds exactly those bytes.
+function removeStale(lockPath, raw) {
+	const guardPath = `${lockPath}.takeover`;
+	if (!claimLock(guardPath)) return;
+	try {
+		if (readLockRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
+	} finally {
+		removeLock(guardPath);
+	}
+}
+
 function withLedgerLock(ledgerPath, fn) {
 	const lockPath = `${ledgerPath}.lock`;
 	fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
 	const deadline = Date.now() + LOCK_WAIT_MS;
 	for (let delay = 1; ; delay = Math.min(delay * 2, 50)) {
-		try {
-			const fd = fs.openSync(lockPath, "wx");
-			fs.writeSync(fd, String(process.pid));
-			fs.closeSync(fd);
-			break;
-		} catch (err) {
-			if (err.code !== "EEXIST") throw err;
-		}
-		if (lockHolderIsDead(lockPath)) {
-			fs.rmSync(lockPath, { force: true });
+		if (claimLock(lockPath)) break;
+		const raw = readLockRaw(lockPath);
+		if (raw !== null && holderIsDead(raw)) {
+			removeStale(lockPath, raw);
 			continue;
 		}
 		if (Date.now() > deadline) {
@@ -125,7 +183,7 @@ function withLedgerLock(ledgerPath, fn) {
 	try {
 		return fn();
 	} finally {
-		fs.rmSync(lockPath, { force: true });
+		removeLock(lockPath);
 	}
 }
 
