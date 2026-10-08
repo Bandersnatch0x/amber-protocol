@@ -4,6 +4,7 @@
 const {
 	COMMANDS,
 	DEFAULT_COMMANDS,
+	COMMAND_STABILITIES,
 	commandSummary,
 	commandUsageLine,
 } = require("./lib/command-registry");
@@ -19,6 +20,14 @@ function usage(command, options = {}) {
 	}
 
 	const visibleCommands = options.all ? COMMANDS : DEFAULT_COMMANDS;
+	// F083: `--all` is the only surface that names an experimental family, and it
+	// marks each one inline. Default help keeps the bare comma list so the
+	// seven-verb projection stays byte-stable.
+	const commandList = visibleCommands
+		.map((name) =>
+			options.all && COMMAND_STABILITIES[name] === "experimental" ? `${name} (experimental)` : name,
+		)
+		.join(", ");
 	const coreExamples = [
 		"  amber audit --target path/to/repo",
 		"  amber init --target path/to/repo",
@@ -45,9 +54,9 @@ function usage(command, options = {}) {
 		"",
 		PRODUCT_LINE,
 		"",
-		`Commands: ${visibleCommands.join(", ")}`,
+		`Commands: ${commandList}`,
 		options.all
-			? "All commands are shown."
+			? "All commands are shown; (experimental) families may change or be removed in a minor release."
 			: "Run `amber --all` to show every governance and platform command.",
 		"Run `amber <command> --help` for command-specific options.",
 		"",

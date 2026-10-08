@@ -14,6 +14,16 @@ invoke the `amber` router skill or the thin verb skills (`amber-start`,
 `amber-check`, `amber-done`); the four deep journey skills remain for the full
 process.
 
+Stability is a separate registry field with values `core` and `experimental`. The
+`harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` families are
+**EXPERIMENTAL**. They remain callable and appear in the top-level list only under
+`--all`, with an `(experimental)` marker. Existing visibility tiers remain unchanged.
+
+The experimental bounded H7 maintenance scheduler is `amber harness runtime`. It schedules
+only closed-registry deterministic Amber maintenance jobs; existing Loop/Workflow contracts
+remain unscheduled. Repository-local state does not imply filesystem containment. Absolute-path
+writes can escape a worktree; filesystem containment requires OS sandboxing.
+
 ## Global Options
 
 ```bash
@@ -21,6 +31,7 @@ process.
 --json            # Output JSON format
 --dry-run         # Preview without making changes where supported (init, wiki, plan, team install/update, loop run)
 --help            # Show command help
+--all             # List every command, marking experimental families
 ```
 
 Text-mode bypass output writes payload text to stdout and prefixes blocking diagnostics as

@@ -1,7 +1,7 @@
 {
 	"name": "amber-protocol",
 	"version": "2.0.1",
-	"description": "Amber Protocol: the governed execution boundary between AI agents and real systems — repository-local plans, gates, approvals, evidence, and handoff.",
+	"description": "Amber Protocol is a repository-local governance toolkit for agent-assisted engineering, with experimental runtime and external-effect capabilities.",
 	"type": "commonjs",
 	"bin": {
 		"amber": "scripts/amber.js",

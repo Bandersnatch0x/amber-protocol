@@ -14,6 +14,7 @@ import CommandBlock from '@site/src/components/command-block';
 <div className="amber-generated-banner">
   <strong>Reference generated from Amber Protocol v2.0.1</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
+  Stability: <code>EXPERIMENTAL</code>
 </div>
 
 ## Summary
@@ -167,9 +168,10 @@ Subcommands:
                       OBSERVED (terminated | already-exited | unknown),
                       retains the workspace, and never rewrites the run's
                       terminal result.
-  runtime             Bounded H7 maintenance runtime (F080, ADR-0103): a
-                      repository-local scheduler for a CLOSED registry of
-                      deterministic Amber-internal proposal jobs. Jobs may
+  runtime             EXPERIMENTAL. Bounded H7 maintenance runtime (F080,
+                      ADR-0103): a repository-local scheduler for a CLOSED
+                      registry of deterministic Amber-internal proposal
+                      jobs. Jobs may
                       read the repository and append proposal/evidence/runtime
                       records under .amber/harness/runtime/ only; they never
                       run a target command, dispatch an agent, execute a
@@ -324,6 +326,6 @@ amber harness status --run run-abc --target path/to/repo --json
 
 ## Boundaries & Safety
 
-- **Target Repository Scoping**: All mutations and reads are confined to `--target <path>`.
+- `--target <path>` selects repository state; it does not provide filesystem containment. Absolute-path writes can escape a worktree without OS sandboxing.
 - **Fail-Closed Behavior**: Corrupt governance state or invalid schema parameters immediately halt execution with non-zero exit codes.
-- **No Dynamic Spawning**: Command executes locally within the current process; it does not spawn unmonitored background daemons.
+- The experimental bounded H7 maintenance scheduler, `amber harness runtime`, runs only closed-registry deterministic Amber maintenance jobs; it never runs a target command, dispatches an agent, or writes an external system.

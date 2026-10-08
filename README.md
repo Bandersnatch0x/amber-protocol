@@ -74,6 +74,12 @@ These are product boundaries, not TODOs:
 2. No Dynamic Workflow execution, no live subagent dispatch, no automatic execution of your project commands
 3. No org-scale marketplace, cross-repo gateway, or cross-machine dashboard. The only scheduler is the experimental `amber harness runtime` (schedule, tick, daemon), which runs a closed set of Amber-internal proposal jobs and never your project commands
 4. No overwrite of existing project docs (`init` / `wiki` only create missing files)
+5. No filesystem containment: a worktree separates checkout state, but absolute-path writes can still escape it. Containing writes requires OS sandboxing.
+
+The `harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` command families
+are **EXPERIMENTAL**. They remain callable and are listed with a marker only under
+`amber --all`. Default help keeps `audit`, `init`, `doctor`, `next`, `plan`, `handoff`, and
+`session`. Stability is separate from visibility tier.
 
 Full boundaries: [Team Replication Charter](./docs/TEAM_REPLICATION_CHARTER.md) and [SPEC.md](./SPEC.md).
 
@@ -186,7 +192,7 @@ Expert path (not the homepage main line): read-only continuous-improvement disco
 
 ## Command surface
 
-Default `amber --help` projects **seven primary verbs** — the whole journey fits in them. `amber --all` lists the full surface: expert command families, deprecated `profile` / `task` / `result`, and the experimental `harness runtime` scheduler:
+Default `amber --help` projects **seven primary verbs** — the whole journey fits in them. `amber --all` lists the full surface: expert command families, deprecated `profile` / `task` / `result`, and the six experimental families (`harness`, `runner`, `retention`, `external`, `breakglass`, `sync`), each marked `(experimental)`:
 
 | Verb            | What it does                                                    |
 | --------------- | --------------------------------------------------------------- |
@@ -268,9 +274,9 @@ All starter files are safe defaults. `init` and `wiki` skip existing files and r
 These boundaries are part of the product, not TODOs:
 
 - No dynamic workflow execution or live subagent dispatch
-- No automatic / unattended execution — see "Governed loop execution" below for the one gated exception
-- No scheduled / cron / hook-triggered execution
-- No external writes (PRs, issue trackers, notifications) or agent tool-call interception
+- No automatic / unattended execution of target-project commands — see "Governed loop execution" below for the one gated exception
+- No scheduled / cron / hook-triggered execution of target-project commands; the only scheduler is the experimental bounded H7 maintenance runtime, `amber harness runtime`
+- No external writes (PRs, issue trackers, notifications) except through the experimental `external` family's registered contracts and approvals; no agent tool-call interception
 - No automatic rewrite of existing project docs
 - No governed verb-stage execution in a vanilla install: the implementation-owned adapter table ships **empty** (there is no fallback), so `session run` stages fail closed until a capability is registered — and registering one is a reviewed code change, not a config edit
 
@@ -281,6 +287,7 @@ declared `governed.command` — but only behind four gates: a declarative policy
 (`.amber/governance/rules.json`, deny-wins / default-deny), an explicit `amber loop approve` (one
 approval authorizes one run), an isolated git worktree (your main checkout is never the cwd), and a
 tamper-evident hash-chain ledger. Default `loop run` is still dry-run; execution needs `--execute`.
+The worktree separates checkout state; without OS sandboxing, absolute-path writes can still escape it.
 
 ```bash
 amber loop approve --file <pack> --contract <id> --reviewer <name>
@@ -302,7 +309,7 @@ amber loop recommend --target . --goal "continuous improvement" --json
 amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
 ```
 
-Live scheduling stays outside the product boundary: `loop run` requires `--dry-run`.
+Loop contracts remain unscheduled. Use `--dry-run` for previews; governed execution needs `--execute` and an approval.
 
 ### Governed trust layer (trusted-control contracts)
 

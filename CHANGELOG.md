@@ -5,6 +5,13 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Declare `harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` experimental in the command registry and mark them under `amber --all`. All commands remain callable; default help keeps the seven primary verbs.
+- Document the bounded H7 maintenance scheduler and the need for OS sandboxing to contain absolute-path writes. State the experimental families in the charter, README, and spec, and regenerate the public CLI reference and knowledge corpus with the documentation changes.
+
 ## [2.0.1] - 2026-09-30
 
 ### Fixed

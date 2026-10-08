@@ -14,7 +14,22 @@ Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acce
 
 ## Project Overview
 
-**Amber Protocol** (formerly Coding Harness) is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
+Amber Protocol is a repository-local governance toolkit for agent-assisted engineering, with experimental runtime and external-effect capabilities.
+
+Command stability is `core` or `experimental`, independently of the existing visibility tiers.
+The `harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` families are
+**EXPERIMENTAL**. They remain callable and appear in the top-level command list only under
+`amber --all`, which marks them explicitly. Default help keeps the seven primary core verbs.
+
+Repository-local describes state placement, not process containment. Absolute-path writes can
+escape the worktree. Filesystem containment requires OS sandboxing; a worktree alone does not
+provide it.
+
+The experimental `harness` family includes the bounded H7 maintenance scheduler,
+`amber harness runtime` (F080, ADR-0103/F079). It invokes only closed-registry deterministic
+Amber maintenance jobs with `executesAnything=false`, `schedulesJobs=true`,
+`dispatchesAgents=false`, and `writesExternalSystems=false`. Its records are append-only under
+`.amber/harness/runtime/`. Existing Loop/Workflow contracts remain unscheduled.
 
 **Product Boundary:** Amber is a governance-first protocol layer, NOT a general agent framework or execution platform. It focuses on constraining, verifying, auditing, and handing off agent work safely inside a repository.
 
@@ -269,8 +284,9 @@ See `docs/product/LOOP.md` for the operational description of Amber's loops (dai
 > `governed.command` via `amber loop run --execute`, but ONLY behind four gates — policy
 > (`.amber/governance/rules.json`), an explicit `amber loop approve` (one approval ⇒ one run),
 > an isolated git worktree, and a tamper-evident ledger (`amber loop verify-ledger`). This is
-> governance-gated, human-triggered execution, NOT autonomous or scheduled work. Cron/daemon
-> scheduling, external writes, auto-approval, and agent tool-call interception remain disallowed.
+> governance-gated, human-triggered execution. Loop contracts remain unscheduled. The experimental
+> H7 maintenance scheduler and the F056 external-effect lifecycle have their own bounded contracts.
+> Auto-approval and agent tool-call interception remain disallowed.
 > `loop run` is dry-run unless `--execute` is passed and an approval exists.
 
 ### File Conventions
@@ -309,14 +325,14 @@ See `docs/product/LOOP.md` for the operational description of Amber's loops (dai
 ### Common Gotchas
 
 1. **Web app uses `--legacy-peer-deps`**: Required for current dependency resolution
-2. **Daemon commands exist but are lower-level**: Not documented in main README; used internally by execution engine
-3. **Loop commands are dry-run/inspect only**: `readyForLiveScheduling` is `false` by product boundary
+2. **H7 is experimental**: `amber harness runtime` schedules only closed-registry deterministic Amber maintenance jobs, as documented in `AGENTS.md` and the README
+3. **Loop commands default to dry-run**: Explicit approval and `--execute` permit governed execution; Loop contracts remain unscheduled
 4. **Route/session schemas are versioned**: Check `schemaVersion` field; migration utilities exist in `src/migration/`
 5. **Agent instructions live in `skills/`**: These are NOT general coding patterns; they're task-specific agent workflows
 
 ### When Working on This Codebase
 
-- **Adding new commands**: Add the Command definition (identity, tier, help, output policy, public order) in `scripts/lib/command-registry.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes only `journey` and `core`; `--all` is the complete compatibility projection.
+- **Adding new commands**: Add the Command definition (identity, tier, stability, help, output policy, public order) in `scripts/lib/command-registry.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes stability `core` commands in the `journey` and `core` tiers; `--all` lists every command and marks experimental families.
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
 - **Schema validation**: compile every JSON Schema through `scripts/lib/core/schema-contract.js` (`compileSchema`/`compileInline`/`validate`); never instantiate Ajv elsewhere — `tests/unit/schema-contract-guard.test.js` fails the suite otherwise
 - **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffold.js`
