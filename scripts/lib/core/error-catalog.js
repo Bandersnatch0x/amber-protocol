@@ -46,6 +46,24 @@ const CATALOG = {
 		layer: "Verification",
 		related: [],
 	},
+	AMBER_E_SESSION_LOCKED: {
+		title: "Session is locked by a running process",
+		cause:
+			"The session lock names a holder pid that is still running with the same process start identity.",
+		remedy:
+			"Wait for the holding session command to finish; the lock frees itself once that process exits.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_SESSION_LOCK_CORRUPT"],
+	},
+	AMBER_E_SESSION_LOCK_CORRUPT: {
+		title: "Session lock does not name a holder",
+		cause:
+			"The session .lock file is not JSON with a holder pid or timestamp, so its holder cannot be judged.",
+		remedy:
+			"Confirm no amber session command is running for this session, then delete the named .lock file.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_SESSION_LOCKED"],
+	},
 	AMBER_E_MISSING_PATH_ARG: {
 		title: "Required path argument missing",
 		cause: "A command that needs a file/path argument was invoked without one.",
