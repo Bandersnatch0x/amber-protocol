@@ -7,7 +7,8 @@
 // rewriting git tag history too. Human-triggered; no push; no scheduling.
 const fs = require("node:fs");
 const { resolveTarget } = require("./fs-utils");
-const { walkLedgers, readLedger } = require("./loop-ledger");
+const { walkLedgers, readLedger, verifyLedgerChain } = require("./loop-ledger");
+const { codedError } = require("./error-catalog");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 // §5.5 row 6 split (governance contract G-9): the seal/verify LOGIC is
 // Core; the git EXECUTION source is Adapter-injected. Default reader: the
@@ -39,9 +40,52 @@ function collectTails(targetRoot) {
 	walkLedgers(stateDirAbs, ({ home, sub, ledgerPath }) => {
 		const records = readLedger(ledgerPath);
 		const tail = records.length ? records[records.length - 1].hash : null;
-		tails.push({ home, sub, tailHash: tail, recordCount: records.length });
+		tails.push({
+			home,
+			sub,
+			tailHash: tail,
+			recordCount: records.length,
+			hashes: records.map((r) => r.hash),
+			intact: verifyLedgerChain(ledgerPath).intact,
+		});
 	});
 	return { stateDir: stateDirAbs, tails };
+}
+
+// A sealed tail anchors a prefix: the current chain must still carry the
+// sealed tail hash at the sealed position. Appending after a seal extends it.
+function sealDrift(sealedLedgers, current) {
+	const byKey = new Map(current.map((t) => [`${t.home}/${t.sub}`, t]));
+	const drift = [];
+	const extended = [];
+	for (const sealedTail of sealedLedgers) {
+		const { home, sub, tailHash, recordCount } = sealedTail;
+		const cur = byKey.get(`${home}/${sub}`);
+		if (!cur) {
+			drift.push({ home, sub, status: "ledger-removed" });
+		} else if (!cur.intact || (recordCount > 0 && cur.hashes[recordCount - 1] !== tailHash)) {
+			drift.push({
+				home,
+				sub,
+				status: "tail-changed",
+				sealedTail: tailHash,
+				currentTail: cur.tailHash,
+			});
+		} else if (cur.recordCount > recordCount) {
+			extended.push({ home, sub, sealedCount: recordCount, currentCount: cur.recordCount });
+		}
+	}
+	return { drift, extended };
+}
+
+function readLatestSeal(targetRoot) {
+	const tagName = latestSealTag(targetRoot);
+	if (!tagName) return { tagName: null, sealed: null };
+	try {
+		return { tagName, sealed: JSON.parse(readSealMessage(targetRoot, tagName)) };
+	} catch {
+		return { tagName, sealed: null };
+	}
 }
 
 function sealLedger(target, options = {}) {
@@ -58,19 +102,38 @@ function sealLedger(target, options = {}) {
 			warnings: [],
 		};
 	}
+	const refuse = (reason) => ({
+		target: targetRoot,
+		sealed: false,
+		errors: [codedError("AMBER_E_LEDGER_RESEAL_REFUSED", reason)],
+		warnings: [],
+	});
+	const broken = tails.filter((t) => !t.intact);
+	if (broken.length > 0) {
+		return refuse(`ledger chain broken: ${broken.map((t) => `${t.home}/${t.sub}`).join(", ")}`);
+	}
+	const previous = readLatestSeal(targetRoot);
+	if (previous.tagName) {
+		if (!previous.sealed) return refuse(`seal tag ${previous.tagName} message is not valid JSON`);
+		const { drift } = sealDrift(previous.sealed.ledgers || [], tails);
+		if (drift.length > 0) {
+			return refuse(
+				`ledger(s) no longer extend seal ${previous.tagName}: ${drift.map((d) => `${d.home}/${d.sub} ${d.status}`).join(", ")}`,
+			);
+		}
+	}
 	const head = defaultGitAdapter().gitOutput(targetRoot, ["rev-parse", "HEAD"]);
 	const headShort = head ? head.slice(0, 12) : "no-head";
 	const tagName = `${SEAL_PREFIX}${headShort}`;
-	const message = JSON.stringify({ reviewer: options.reviewer || null, ledgers: tails });
-	const res = defaultGitAdapter().gitRun(targetRoot, ["tag", "-f", "-a", tagName, "-m", message]);
-	if (!res.ok) {
-		return {
-			target: targetRoot,
-			sealed: false,
-			errors: [`failed to create seal tag: ${res.stderr || "git error"}`],
-			warnings: [],
-		};
-	}
+	const ledgers = tails.map(({ home, sub, tailHash, recordCount }) => ({
+		home,
+		sub,
+		tailHash,
+		recordCount,
+	}));
+	const message = JSON.stringify({ reviewer: options.reviewer || null, ledgers });
+	const res = defaultGitAdapter().gitRun(targetRoot, ["tag", "-a", tagName, "-m", message]);
+	if (!res.ok) return refuse(`git tag ${tagName} failed: ${res.stderr || "git error"}`);
 	return {
 		target: targetRoot,
 		sealed: true,
@@ -104,7 +167,7 @@ function readSealMessage(targetRoot, tagName) {
 
 function verifyAnchoring(target) {
 	const targetRoot = resolveTarget(target);
-	const tagName = latestSealTag(targetRoot);
+	const { tagName, sealed } = readLatestSeal(targetRoot);
 	if (!tagName) {
 		return {
 			target: targetRoot,
@@ -113,11 +176,7 @@ function verifyAnchoring(target) {
 			warnings: [],
 		};
 	}
-	const msg = readSealMessage(targetRoot, tagName);
-	let sealed;
-	try {
-		sealed = JSON.parse(msg);
-	} catch {
+	if (!sealed) {
 		return {
 			target: targetRoot,
 			anchored: false,
@@ -126,30 +185,14 @@ function verifyAnchoring(target) {
 			warnings: [],
 		};
 	}
-	const current = collectTails(targetRoot).tails;
-	const byKey = new Map(current.map((t) => [`${t.home}/${t.sub}`, t]));
-	const drift = [];
-	for (const sealedTail of sealed.ledgers || []) {
-		const key = `${sealedTail.home}/${sealedTail.sub}`;
-		const cur = byKey.get(key);
-		if (!cur) {
-			drift.push({ home: sealedTail.home, sub: sealedTail.sub, status: "ledger-removed" });
-		} else if (cur.tailHash !== sealedTail.tailHash) {
-			drift.push({
-				home: sealedTail.home,
-				sub: sealedTail.sub,
-				status: "tail-changed",
-				sealedTail: sealedTail.tailHash,
-				currentTail: cur.tailHash,
-			});
-		}
-	}
+	const { drift, extended } = sealDrift(sealed.ledgers || [], collectTails(targetRoot).tails);
 	return {
 		target: targetRoot,
 		anchored: drift.length === 0,
 		sealTag: tagName,
 		ledgerChangedSinceSeal: drift.length,
 		drift,
+		extended,
 		errors: [],
 		warnings: [],
 	};

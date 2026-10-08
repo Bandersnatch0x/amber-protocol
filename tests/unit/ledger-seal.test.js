@@ -35,13 +35,11 @@ test("seal creates a tag and verifies anchored immediately after", () => {
 	assert.strictEqual(v.ledgerChangedSinceSeal, 0);
 });
 
-test("appending a record after seal flips verify to not-anchored", () => {
+test("editing a sealed record flips verify to not-anchored", () => {
 	const dir = mkHarnessWithLedger();
 	sealLedger(dir);
-	L.appendLedgerRecord(path.join(dir, ".amber", "sessions", "S1", "ledger.jsonl"), {
-		kind: "executed",
-		consumedApprovalKey: "a1",
-	});
+	const lp = path.join(dir, ".amber", "sessions", "S1", "ledger.jsonl");
+	fs.writeFileSync(lp, fs.readFileSync(lp, "utf8").replace('"a1"', '"a2"'));
 	const v = verifyAnchoring(dir);
 	assert.strictEqual(v.anchored, false);
 	assert.strictEqual(v.ledgerChangedSinceSeal, 1);
