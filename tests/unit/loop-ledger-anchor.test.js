@@ -196,7 +196,31 @@ test("concurrent appends from separate processes keep one unbroken chain", async
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-anchor-race-"));
 	dirs.push(dir);
 	const lp = path.join(dir, "ledger.jsonl");
-	const script = `const L = require(${JSON.stringify(LEDGER_MODULE)}); for (let i = 0; i < 40; i++) L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", i, pid: process.pid });`;
+	// A concurrent writer is refused once the lock wait budget expires, and the
+	// caller retries; that is the documented contract, not a failure. Retrying here
+	// keeps this test about the chain, which is what it is for, instead of about how
+	// quickly a loaded machine hands the lock over. Any other error still exits 1.
+	const script = `
+		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+		(async () => {
+			for (let i = 0; i < 40; i++) {
+				for (let attempt = 0; ; attempt++) {
+					try {
+						L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", i, pid: process.pid });
+						break;
+					} catch (error) {
+						if (!/AMBER_E_LEDGER_LOCKED/.test(String(error && error.message))) throw error;
+						if (attempt >= 5) throw error;
+						await wait(5);
+					}
+				}
+			}
+		})().catch((error) => {
+			console.error(error);
+			process.exit(1);
+		});
+	`;
 	const exits = await Promise.all(
 		[1, 2, 3, 4].map(
 			() =>
