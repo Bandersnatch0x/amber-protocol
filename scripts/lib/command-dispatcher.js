@@ -1160,8 +1160,8 @@ const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);
 const { dispatchTypedInvocation } = require("./cli-typed-seam");
 
 // ── Deprecated commands ─────────────────────────────────────────────────────
-// These commands are isolated from the core governance flow and will be removed
-// in v2. Users should migrate to equivalent governance commands.
+// Commands with tier "deprecated" stay callable but print a runtime warning
+// pointing users at the equivalent governance commands.
 const DEPRECATED_COMMANDS = new Set(
 	Object.values(COMMAND_REGISTRY)
 		.filter((registration) => registration.definition.tier === "deprecated")

@@ -13,8 +13,8 @@ const path = require("node:path");
 const {
 	countEvolutionFindings,
 	extractEvolutionFindings,
-	runMaintenanceAction,
-} = require("../../scripts/lib/core/maintenance");
+} = require("../../scripts/lib/core/evolution-findings");
+const { runMaintenanceAction } = require("../../scripts/lib/core/maintenance");
 
 function tempTarget() {
 	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "evo-count-")));
