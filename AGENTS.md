@@ -12,7 +12,7 @@ safety:
 
 # AGENTS.md
 
-Amber Protocol is a repository-local governance toolkit for agent-assisted engineering, with experimental runtime and external-effect capabilities.
+Amber Protocol is a repository-local governance layer for agent-assisted engineering.
 All capability is exposed through one CLI entry point.
 
 Command stability is `core` or `experimental`, independently of the existing visibility tiers.
