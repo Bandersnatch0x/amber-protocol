@@ -107,7 +107,7 @@ function parseGovernedArgv(command) {
 		if (quote === '"') {
 			if (ch === '"') quote = null;
 			else if (ch === "$" || ch === "`")
-				throw refuseShellMeta(text, `uses ${ch} inside double quotes`);
+				throw refuseShellMeta(text, `uses ${JSON.stringify(ch)} inside double quotes`);
 			else if (ch === "\\" && i + 1 < text.length && '"\\'.includes(text[i + 1])) word += text[++i];
 			else word += ch;
 			continue;
@@ -118,7 +118,7 @@ function parseGovernedArgv(command) {
 			continue;
 		}
 		if (SHELL_META_OUTSIDE_SINGLE_QUOTES.has(ch))
-			throw refuseShellMeta(text, `uses the shell metacharacter ${ch}`);
+			throw refuseShellMeta(text, `uses the shell metacharacter ${JSON.stringify(ch)}`);
 		word ??= "";
 		if (ch === "'" || ch === '"') quote = ch;
 		else if (ch === "\\" && i + 1 < text.length) word += text[++i];
