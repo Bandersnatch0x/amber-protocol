@@ -37,7 +37,7 @@ function loopPackWith(extraRules) {
 	};
 }
 
-test("context allow rule permits a command the global rules.json does not allow", async () => {
+test("a context allow rule is refused when the pack is read", async () => {
 	const dir = tmpGitRepo();
 	// global rules.json: default-deny, NO allow for `node --version`
 	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
@@ -73,54 +73,8 @@ test("context allow rule permits a command the global rules.json does not allow"
 		target: dir,
 		execute: true,
 	});
-	assert.deepEqual(r.errors, [], JSON.stringify(r.errors));
-	assert.equal(r.executed, true);
-	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-});
-
-test("a global deny is NOT overridden by a context allow (deny-wins is absolute)", async () => {
-	const dir = tmpGitRepo();
-	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
-	fs.writeFileSync(
-		path.join(dir, ".amber", "governance", "rules.json"),
-		JSON.stringify({
-			schemaVersion: 1,
-			defaultAction: "deny",
-			rules: [{ id: "global-deny-rm", action: "deny", match: "regex", pattern: "rm\\s+-rf" }],
-		}),
-	);
-	// contract command is `rm -rf /tmp/x`; context tries to allow it — must still deny
-	const pack = {
-		id: "p",
-		version: "1",
-		loopContracts: [
-			{
-				id: "c1",
-				trigger: { type: "manual", enabled: false },
-				cadence: "on-demand",
-				stateSpine: ".amber/loops/c1/state.json",
-				hardStops: { maxIterations: 1 },
-				reviewGates: ["human-approval"],
-				governed: {
-					command: "rm -rf /tmp/x",
-					requiresApproval: true,
-					rules: [{ id: "ctx-allow-rm", action: "allow", match: "regex", pattern: "rm\\s+-rf" }],
-				},
-				execution: { executesAnything: false },
-			},
-		],
-	};
-	const packPath = path.join(dir, "pack.json");
-	fs.writeFileSync(packPath, JSON.stringify(pack));
-	execSync("git add -A && git commit -qm pkg", { cwd: dir });
-	approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
-	const r = await executeLoopContract({
-		file: packPath,
-		contract: "c1",
-		target: dir,
-		execute: true,
-	});
-	assert.ok(r.errors.join("\n").includes("AMBER_E_POLICY_DENY"), r.errors.join("\n"));
+	assert.match(r.errors.join("\n"), /ctx-allow-node-ver.*AMBER_E_PACK_ALLOW_RULE/);
+	assert.equal(r.executed, undefined);
 	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
@@ -170,7 +124,7 @@ test("a context deny blocks a command even if global rules would allow it", asyn
 	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("route stage with rules composes the same way (context allow supplements global)", async () => {
+test("a route stage allow rule is refused the same way", async () => {
 	const dir = tmpGitRepo();
 	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
 	fs.writeFileSync(
@@ -215,6 +169,7 @@ test("route stage with rules composes the same way (context allow supplements gl
 	const routesDir = path.join(dir, "routes");
 	approveRouteStage("r1", "verify", dir, "me", routesDir);
 	const r = await executeRouteStage("r1", "verify", dir, routesDir);
-	assert.equal(r.exitCode, 0, r.text + JSON.stringify(r.errors));
+	assert.equal(r.exitCode, 1);
+	assert.match(r.text, /ctx-allow-npm-test.*AMBER_E_PACK_ALLOW_RULE/);
 	fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });

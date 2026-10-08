@@ -9,8 +9,20 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { findLoopContract, dryRunLoopContract } = require("./loops");
-const { appendLedgerRecord, verifyLedgerOutcome } = require("./loop-ledger");
-const { runGovernedCommand } = require("./governed-runner");
+const {
+	appendLedgerRecord,
+	latestUnconsumedApproval,
+	readLedger,
+	verifyLedgerOutcome,
+} = require("./loop-ledger");
+const {
+	eligibilityProblem,
+	packAllowRuleProblem,
+	runGovernedCommand,
+} = require("./governed-runner");
+const { loadPolicyRules } = require("./loop-policy");
+const { policyHashOf, scopeHashOf } = require("./run-freeze");
+const { codedError } = require("./error-catalog");
 const { statePathForCreate } = require("../state-dir-resolver");
 
 // Loop execution ledgers (post-rename state kind, 2026-06-30): they never
@@ -26,40 +38,46 @@ function loadContract(file, contractId) {
 	if (!data || typeof data !== "object" || Array.isArray(data)) {
 		throw new Error(`Workflow pack file is not a valid object: ${file}`);
 	}
-	return { data, contract: findLoopContract(data, contractId) };
+	const contract = findLoopContract(data, contractId);
+	const packProblem = packAllowRuleProblem(contract.governed?.rules);
+	if (packProblem) throw new Error(packProblem);
+	return contract;
+}
+
+// §6.4 loop-surface identity binding: approve records this tuple and run
+// recomputes it, so an approval authorizes only the command, pack rules, and
+// policy it saw. No separate loopRunId exists — contractId + the consumed
+// approvalKey remain the loop execution identity.
+function approvalBindingOf(targetRoot, contractId, contract) {
+	const rules = loadPolicyRules(targetRoot);
+	const command = contract.governed?.command ?? null;
+	return {
+		scopeHash: scopeHashOf({
+			capabilities: [`loop:${contractId}`],
+			targets: [command ?? contractId],
+			constraints: null,
+			context_scope: null,
+			side_effect_policy: {
+				defaultAction: rules?.defaultAction ?? "deny",
+				capabilityEffects: ["execute"],
+			},
+			expiration: null,
+		}),
+		policyHash: policyHashOf(rules),
+		capabilityHash: policyHashOf({ command, rules: contract.governed?.rules ?? null }),
+	};
 }
 
 function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 	const targetRoot = resolveTarget(target);
-	let data;
+	let contract;
 	try {
-		({ data } = loadContract(file, contractId));
+		contract = loadContract(file, contractId);
 	} catch (e) {
 		return { target: targetRoot, errors: [e.message], warnings: [] };
 	}
 	const approvalKey = crypto.randomUUID();
-	// §6.4 loop-surface identity binding: the approved record gains the same
-	// three-hash tuple as the run contract's grants (scopeHash over the
-	// loop's authority projection, policyVersion over the CURRENT rules,
-	// capabilityHash over the loop's governed-command projection). No
-	// separate loopRunId exists — contractId + the consumed approvalKey
-	// remain the loop execution identity (loop runs are single-execution
-	// contracts; R-AU-3/R-AU-4 hold via the tuple binding).
-	const { loadPolicyRules } = require("./loop-policy");
-	const { policyHashOf, scopeHashOf } = require("./run-freeze");
-	const rules = loadPolicyRules(targetRoot);
-	const governed = data?.contracts?.find?.((entry) => entry.id === contractId) ?? null;
-	const loopScopeInputs = {
-		capabilities: [`loop:${contractId}`],
-		targets: [governed?.governed?.command ?? contractId],
-		constraints: null,
-		context_scope: null,
-		side_effect_policy: {
-			defaultAction: rules?.defaultAction ?? "deny",
-			capabilityEffects: ["execute"],
-		},
-		expiration: null,
-	};
+	const binding = approvalBindingOf(targetRoot, contractId, contract);
 	const record = appendLedgerRecord(ledgerPath(targetRoot, contractId), {
 		schemaVersion: 2,
 		kind: "approved",
@@ -67,12 +85,9 @@ function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 		contractId,
 		approvalKey,
 		reviewer: reviewer || "unknown",
-		scopeHash: scopeHashOf(loopScopeInputs),
-		policyVersion: policyHashOf(rules),
-		capabilityHash: policyHashOf({
-			command: governed?.governed?.command ?? null,
-			rules: governed?.governed?.rules ?? null,
-		}),
+		scopeHash: binding.scopeHash,
+		policyVersion: binding.policyHash,
+		capabilityHash: binding.capabilityHash,
 		recordedAt: new Date().toISOString(),
 		executesAnything: false,
 	});
@@ -86,6 +101,30 @@ function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 	};
 }
 
+function dryRunWithDriftCheck(targetRoot, { file, contract: contractId, dryRun, output }) {
+	const preview = dryRunLoopContract({
+		file,
+		contract: contractId,
+		dryRun: dryRun !== false,
+		output,
+	});
+	if (preview.errors.length > 0) return preview;
+	let contract;
+	try {
+		contract = loadContract(file, contractId);
+	} catch (e) {
+		return { ...preview, errors: [e.message] };
+	}
+	const approval = latestUnconsumedApproval(readLedger(ledgerPath(targetRoot, contractId)));
+	const drift =
+		approval && eligibilityProblem(approval, approvalBindingOf(targetRoot, contractId, contract));
+	if (!drift) return preview;
+	return {
+		...preview,
+		warnings: [...preview.warnings, codedError("AMBER_E_LOOP_CONTRACT_DRIFT", drift.reason)],
+	};
+}
+
 async function executeLoopContract({
 	file,
 	contract: contractId,
@@ -96,14 +135,13 @@ async function executeLoopContract({
 }) {
 	const targetRoot = resolveTarget(target);
 
-	// Default path unchanged: no --execute → existing dry-run behaviour.
 	if (!execute) {
-		return dryRunLoopContract({ file, contract: contractId, dryRun: dryRun !== false, output });
+		return dryRunWithDriftCheck(targetRoot, { file, contract: contractId, dryRun, output });
 	}
 
 	let contract;
 	try {
-		({ contract } = loadContract(file, contractId));
+		contract = loadContract(file, contractId);
 	} catch (e) {
 		return { target: targetRoot, errors: [e.message], warnings: [] };
 	}
@@ -130,7 +168,8 @@ async function executeLoopContract({
 		budgetMinutes,
 		subject: { contractId },
 		label: contractId,
-		contextRules: contract.governed && contract.governed.rules,
+		contextRules: contract.governed.rules,
+		approvalBinding: approvalBindingOf(targetRoot, contractId, contract),
 	});
 	if (outcome.errors.length > 0) {
 		return { target: targetRoot, errors: outcome.errors, warnings: outcome.warnings };

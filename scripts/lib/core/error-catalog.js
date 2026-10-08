@@ -146,6 +146,24 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_POLICY_DENY", "AMBER_E_CONFIDENCE_GATE"],
 	},
+	AMBER_E_LOOP_CONTRACT_DRIFT: {
+		title: "Loop contract changed after approval",
+		cause:
+			"The contract's governed.command or governed.rules, or the governance rules.json, no longer hash to what the unconsumed approval pinned.",
+		remedy:
+			"Restore the approved contract, or review the new one and record a fresh approval: amber loop approve --file <pack> --contract <id> --reviewer <name>",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED", "AMBER_E_POLICY_DENY"],
+	},
+	AMBER_E_PACK_ALLOW_RULE: {
+		title: "Pack rules may only narrow the governance policy",
+		cause:
+			"A pack or route stage declared a rules entry that is not a deny or require_approval rule; only .amber/governance/rules.json may allow a command.",
+		remedy:
+			"Remove the allow rule from the pack and add it to .amber/governance/rules.json if the command should be allowed.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY"],
+	},
 	AMBER_E_LEDGER_TAMPERED: {
 		title: "Loop ledger hash chain is broken",
 		cause: "verify-ledger recomputed a record hash that does not match the stored chain.",
