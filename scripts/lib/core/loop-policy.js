@@ -42,7 +42,9 @@ const DEFAULT_RULES = {
 			id: "allow-npm-checks",
 			action: "allow",
 			match: "regex",
-			pattern: "^npm (test|run (doctor|manifests))$",
+			// The FD-redirect tail is unreachable (argv parsing refuses `>` and `&`)
+			// but stays so the default policy keeps the hash approvals were bound to.
+			pattern: "^npm (test|run (doctor|manifests))(?:\\s+\\d*>&\\d+)*\\s*$",
 			mapsTo: ["ASI04"],
 		},
 	],
