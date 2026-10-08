@@ -451,10 +451,12 @@ async function observeHandle(handle, { signal }) {
 			signalResult: { signalled: false, reason: "resumed-settlement" },
 			outcome: "unknown",
 		};
-	// Only ever signal a pid that is still OURS. A recycled pid belongs to an
-	// unrelated process, and signalling it would be exactly the "killed something
-	// else" failure this seam exists to prevent. The recorded attempt is gone, so
-	// the honest outcome is `already-exited` and nothing is sent.
+	// Signal a pid only when ownership cannot be falsified. On Linux and macOS a
+	// recycled pid fails `pidStillOwned` and is never signalled. On Windows
+	// `processIdentity` returns null by design, so ownership cannot be falsified
+	// there and the recorded pid is signalled as before — the residual the spec
+	// states. When the pid is refused, the recorded process is gone, so the honest
+	// outcome is `already-exited` and nothing is sent.
 	if (!pidStillOwned(handle))
 		return {
 			aliveBefore,

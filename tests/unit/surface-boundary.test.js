@@ -108,6 +108,13 @@ const FAMILY_BY_MODULE = new Map([
 // "win32"` spawns give a governed child its own process group so a cancellation
 // can address the whole tree; they are awaited, not backgrounded, so they are
 // deliberately outside this boundary definition.
+//
+// This is the whole reach of the scan: one single-line literal, in `.js` files
+// under `scripts/`. It does not see `detached : true`, a value held in a
+// variable, a literal split across lines, a `.mjs`/`.cjs` extension, or anything
+// under `src/` or `apps/`. Widening the regex would start matching the awaited
+// POSIX form above, so the gaps are stated here instead. A detached site the
+// scanner cannot see is not covered by this boundary test.
 const DETACHED_PROCESS = /detached:\s*true/;
 const SCHEDULES_WORK = /schedulesJobs:\s*true/;
 
@@ -235,7 +242,7 @@ test("the registry declares the literal core and experimental stability sets", (
 	}
 });
 
-test("no core family declares scheduling or detached-process authority", () => {
+test("no core family declares scheduling or a fire-and-forget detached spawn", () => {
 	const executionSites = declaredAuthoritySites();
 	assert.ok(
 		executionSites.length > 0,
@@ -267,6 +274,15 @@ test("no core family declares scheduling or detached-process authority", () => {
 		);
 	}
 	assert.ok(ownerFamilies.has("harness"), "the scheduler declaration must be owned by harness");
+
+	// `ownerFamilies.has("harness")` is satisfied by the scheduler site alone, so
+	// on its own it stays green even if DETACHED_PROCESS silently stops matching.
+	// Pin the detached sites the scanner actually found, by file and so by count.
+	const detachedSites = executionSites
+		.filter((site) => site.capability === "detached")
+		.map((site) => site.rel)
+		.sort();
+	assert.deepEqual(detachedSites, ["scripts/lib/harness/runtime-core.js"]);
 });
 
 test("the boundary predicate rejects a core family given scheduling authority", () => {

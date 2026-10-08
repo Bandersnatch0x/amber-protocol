@@ -2435,8 +2435,11 @@ const VALID_TIERS = new Set(["core", "journey", "deprecated", "expert"]);
 // F083: stability is a second, independent registry field — `core` or
 // `experimental` — never a visibility tier. The six experimental families stay
 // callable and are listed with a marker only under `amber --all`; default help
-// keeps the stability-`core` commands in the `journey`/`core` tiers. This is the
-// same missing-plus-orphan validation shape the tier path performs.
+// keeps the stability-`core` commands in the `journey`/`core` tiers. Validation
+// below rejects both a missing and an orphaned stability. That orphan check is
+// real, unlike the tier path's: `COMMAND_TIERS` is built from `COMMANDS`, so its
+// keys cannot be foreign, while `STABILITY_BY_COMMAND` is a hand-written literal
+// that can name a command the registry no longer has.
 const STABILITY_BY_COMMAND = {
 	init: "core",
 	audit: "core",
