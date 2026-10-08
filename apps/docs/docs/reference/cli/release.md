@@ -14,6 +14,7 @@ import CommandBlock from '@site/src/components/command-block';
 <div className="amber-generated-banner">
   <strong>Reference generated from Amber Protocol v2.0.1</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
+  Stability: <code>core</code>
 </div>
 
 ## Summary
@@ -108,6 +109,5 @@ amber release show --target . --id release/web-42 --json
 
 ## Boundaries & Safety
 
-- **Target Repository Scoping**: All mutations and reads are confined to `--target <path>`.
+- `--target <path>` selects repository state; it does not provide filesystem containment. Absolute-path writes can escape a worktree without OS sandboxing.
 - **Fail-Closed Behavior**: Corrupt governance state or invalid schema parameters immediately halt execution with non-zero exit codes.
-- **No Dynamic Spawning**: Command executes locally within the current process; it does not spawn unmonitored background daemons.

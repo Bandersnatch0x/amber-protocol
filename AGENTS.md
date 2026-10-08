@@ -12,8 +12,17 @@ safety:
 
 # AGENTS.md
 
-Amber Protocol is a repository-local governance layer for agent-assisted engineering.
+Amber Protocol is a repository-local governance toolkit for agent-assisted engineering, with experimental runtime and external-effect capabilities.
 All capability is exposed through one CLI entry point.
+
+Command stability is `core` or `experimental`, independently of the existing visibility tiers.
+The `harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` families are
+**EXPERIMENTAL**. They remain callable and appear in the top-level command list only under
+`amber --all`, which marks them explicitly. Default help keeps the seven primary core verbs.
+
+Repository-local describes state placement, not process containment. Absolute-path writes can
+escape the worktree. Filesystem containment requires OS sandboxing; a worktree alone does not
+provide it.
 
 **This file is the single source of repository-level rules** (boundaries, gates, routing, safety).
 `CLAUDE.md` is the Claude Code mirror of it and must not contradict it — a disagreement is fixed here
@@ -76,7 +85,7 @@ Default `amber` help projects the seven primary verbs — `audit`, `init`, `doct
 
 - Read-only / dry-run first; `init` and `wiki` never overwrite existing files.
 - Amber does not auto-execute or schedule target-project/governed commands, dispatch live agents, or run dynamic workflows.
-- ADR-0103/F079 permits one bounded H7 exception, delivered as `amber harness runtime` (F080): a repository-local scheduler may invoke only closed-registry deterministic Amber maintenance jobs with `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`, `writesExternalSystems=false`; writes are confined to append-only `.amber/harness/runtime/` proposal/evidence/ledger records, and the lease/fenced daemon can only wake that closed registry. Existing Loop/Workflow contracts remain unscheduled.
+- The experimental `harness` family includes the bounded H7 maintenance scheduler, `amber harness runtime` (F080, ADR-0103/F079): it may invoke only closed-registry deterministic Amber maintenance jobs with `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`, `writesExternalSystems=false`; its records are append-only `.amber/harness/runtime/` proposal/evidence/ledger records, and the lease/fenced daemon can only wake that closed registry. Existing Loop/Workflow contracts remain unscheduled.
 - Never overwrite user-authored files without explicit approval.
 - Amber never runs `git push`. The one gated exception to "no live git": ADR-0020 Stage A
   (`amber sync session push --execute --yes`) performs the local `git add` + `git commit` of sync

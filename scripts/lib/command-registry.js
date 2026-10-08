@@ -2432,21 +2432,93 @@ const COMMAND_TIERS = Object.freeze(
 	Object.fromEntries(COMMANDS.map((name) => [name, TIER_BY_COMMAND[name]])),
 );
 const VALID_TIERS = new Set(["core", "journey", "deprecated", "expert"]);
+// F083: stability is a second, independent registry field — `core` or
+// `experimental` — never a visibility tier. The six experimental families stay
+// callable and are listed with a marker only under `amber --all`; default help
+// keeps the stability-`core` commands in the `journey`/`core` tiers. This is the
+// same missing-plus-orphan validation shape the tier path performs.
+const STABILITY_BY_COMMAND = {
+	init: "core",
+	audit: "core",
+	wiki: "core",
+	doctor: "core",
+	handoff: "core",
+	plan: "core",
+	gate: "core",
+	policy: "core",
+	adapter: "core",
+	runner: "experimental",
+	release: "core",
+	maintain: "core",
+	retention: "experimental",
+	external: "experimental",
+	breakglass: "experimental",
+	review: "core",
+	accept: "core",
+	learnings: "core",
+	"break-loop": "core",
+	loop: "core",
+	ledger: "core",
+	route: "core",
+	session: "core",
+	governance: "core",
+	feature: "core",
+	context: "core",
+	memory: "core",
+	projection: "core",
+	knowledge: "core",
+	phase: "core",
+	artifact: "core",
+	principal: "core",
+	eval: "core",
+	evidence: "core",
+	approval: "core",
+	contracts: "core",
+	harness: "experimental",
+	next: "core",
+	profile: "core",
+	task: "core",
+	result: "core",
+	pack: "core",
+	maintenance: "core",
+	status: "core",
+	drift: "core",
+	sync: "experimental",
+	migrate: "core",
+	execution: "core",
+	security: "core",
+	clean: "core",
+	explain: "core",
+	hooks: "core",
+	workflow: "core",
+};
+const COMMAND_STABILITIES = Object.freeze(
+	Object.fromEntries(COMMANDS.map((name) => [name, STABILITY_BY_COMMAND[name]])),
+);
+const VALID_STABILITIES = new Set(["core", "experimental"]);
 const commandNames = new Set(COMMANDS);
 const missingHelp = COMMANDS.filter((name) => !Object.hasOwn(COMMAND_HELP, name));
 const orphanedHelp = Object.keys(COMMAND_HELP).filter((name) => !commandNames.has(name));
 const orphanedOutput = Object.keys(COMMAND_OUTPUT).filter((name) => !commandNames.has(name));
 const missingTiers = COMMANDS.filter((name) => !VALID_TIERS.has(COMMAND_TIERS[name]));
 const orphanedTiers = Object.keys(COMMAND_TIERS).filter((name) => !commandNames.has(name));
+const missingStabilities = COMMANDS.filter(
+	(name) => !VALID_STABILITIES.has(COMMAND_STABILITIES[name]),
+);
+const orphanedStabilities = Object.keys(STABILITY_BY_COMMAND).filter(
+	(name) => !commandNames.has(name),
+);
 if (
 	missingHelp.length > 0 ||
 	orphanedHelp.length > 0 ||
 	orphanedOutput.length > 0 ||
 	missingTiers.length > 0 ||
-	orphanedTiers.length > 0
+	orphanedTiers.length > 0 ||
+	missingStabilities.length > 0 ||
+	orphanedStabilities.length > 0
 ) {
 	throw new Error(
-		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}], missing tier [${missingTiers.join(", ")}], orphaned tier [${orphanedTiers.join(", ")}].`,
+		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}], missing tier [${missingTiers.join(", ")}], orphaned tier [${orphanedTiers.join(", ")}], missing stability [${missingStabilities.join(", ")}], orphaned stability [${orphanedStabilities.join(", ")}].`,
 	);
 }
 const COMMAND_DEFINITIONS = Object.freeze(
@@ -2456,6 +2528,7 @@ const COMMAND_DEFINITIONS = Object.freeze(
 			Object.freeze({
 				name,
 				tier: COMMAND_TIERS[name],
+				stability: COMMAND_STABILITIES[name],
 				typed: TYPED_COMMAND_NAMES.has(name),
 				help: COMMAND_HELP[name],
 				output: Object.freeze({ ...DEFAULT_OUTPUT, ...(COMMAND_OUTPUT[name] || {}) }),
@@ -2464,7 +2537,11 @@ const COMMAND_DEFINITIONS = Object.freeze(
 	),
 );
 const DEFAULT_COMMANDS = Object.freeze(
-	COMMANDS.filter((name) => ["journey", "core"].includes(COMMAND_DEFINITIONS[name].tier)),
+	COMMANDS.filter(
+		(name) =>
+			COMMAND_DEFINITIONS[name].stability === "core" &&
+			["journey", "core"].includes(COMMAND_DEFINITIONS[name].tier),
+	),
 );
 
 function commandSummary(command) {
@@ -2651,6 +2728,7 @@ module.exports = {
 	COMMANDS,
 	DEFAULT_COMMANDS,
 	COMMAND_TIERS,
+	COMMAND_STABILITIES,
 	COMMAND_DEFINITIONS,
 	TYPED_COMMANDS,
 	KNOWN_UNTYPED_SUBCOMMANDS,
