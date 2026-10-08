@@ -7,7 +7,7 @@
 // verdict (closed kind set, validity windows, terminal revocation, ceiling,
 // corruption) as a stable AMBER_E_* code.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 
 // The readFailure FALLBACK for untyped crashes/misses at the show/list seams,
@@ -101,7 +101,7 @@ function requiredId(args) {
 	return { value: id };
 }
 
-const dispatch = defineCommand({
+const principalDispatch = defineCliCommand({
 	command: "principal",
 	actions: ["register", "show", "list", "revoke"],
 	handlers: {
@@ -219,9 +219,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function principalDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { principalDispatch };

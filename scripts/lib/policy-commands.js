@@ -7,7 +7,7 @@
 // the core evaluator, which owns deny-wins semantics, separation of duties,
 // explicit delegation, and the immutable policy outcome ledger.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { parseTimestamp } = require("./core/principal-registry");
 
@@ -122,7 +122,7 @@ function verdictFilterValue(args) {
 	return { value: verdict };
 }
 
-const dispatch = defineCommand({
+const policyDispatch = defineCliCommand({
 	command: "policy",
 	actions: ["evaluate", "show", "list"],
 	handlers: {
@@ -248,9 +248,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function policyDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { policyDispatch };

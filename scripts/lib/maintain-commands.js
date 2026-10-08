@@ -5,7 +5,7 @@
 // rollups. This adapter parses flags only; the core owns every verdict,
 // is target-read-only, and never mutates canonical or target state.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const {
 	invalidArg,
 	targetValue,
@@ -94,7 +94,7 @@ function resultEnvelope(result) {
 	);
 }
 
-const dispatch = defineCommand({
+const maintainDispatch = defineCliCommand({
 	command: "maintain",
 	actions: [
 		"register-detector",
@@ -372,9 +372,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function maintainDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { maintainDispatch };

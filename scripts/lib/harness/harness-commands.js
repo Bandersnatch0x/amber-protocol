@@ -7,7 +7,7 @@
 // run transitions, fail-closed reads) as stable AMBER_E_* codes. Expert tier
 // by registration; the default seven-verb help surface is unchanged.
 
-const { defineCommand } = require("../subcommand-dispatcher");
+const { defineCliCommand } = require("../subcommand-dispatcher");
 const { resolveTarget, parseRevisionPin } = require("../command-helpers");
 const path = require("node:path");
 
@@ -35,7 +35,7 @@ function requiredFlag(args, key, label, example) {
 	return { value: args[key] };
 }
 
-const dispatch = defineCommand({
+const harnessDispatch = defineCliCommand({
 	command: "harness",
 	actions: [
 		"admit",
@@ -1140,9 +1140,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function harnessDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { harnessDispatch };

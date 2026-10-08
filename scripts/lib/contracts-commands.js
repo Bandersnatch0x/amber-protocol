@@ -7,7 +7,7 @@
 //
 // Envelope, routing and exit codes are owned by defineCommand (F039).
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const {
 	loadRegistry,
 	loadSchema,
@@ -47,7 +47,7 @@ function formatReport(registry, result) {
 	return lines.join("\n");
 }
 
-const dispatch = defineCommand({
+const contractsDispatch = defineCliCommand({
 	command: "contracts",
 	actions: ["validate"],
 	handlers: {
@@ -93,9 +93,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function contractsDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { contractsDispatch };

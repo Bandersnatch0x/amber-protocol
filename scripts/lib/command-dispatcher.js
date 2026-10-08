@@ -347,13 +347,9 @@ function handleInit(args) {
 function handleAudit(args) {
 	const sub = args._?.[0];
 	if (sub === "org") {
-		return handleOrganizationAudit(args);
+		return orgAuditDispatch(args);
 	}
 	return { result: auditProject(args.target) };
-}
-
-function handleOrganizationAudit(args) {
-	return orgAuditDispatch(args);
 }
 
 function handleWiki(args) {
@@ -1018,82 +1014,6 @@ function handleStatus(args) {
 	};
 }
 
-function handleSync(args) {
-	return syncDispatch(args);
-}
-
-function handleProjection(args) {
-	return projectionDispatch(args);
-}
-
-function handleKnowledge(args) {
-	return knowledgeDispatch(args);
-}
-
-function handlePhase(args) {
-	return phaseDispatch(args);
-}
-
-function handleArtifact(args) {
-	return artifactDispatch(args);
-}
-
-function handlePrincipal(args) {
-	return principalDispatch(args);
-}
-
-function handleEval(args) {
-	return evalDispatch(args);
-}
-
-function handleEvidence(args) {
-	return evidenceDispatch(args);
-}
-
-function handleApproval(args) {
-	return approvalDispatch(args);
-}
-
-function handleContracts(args) {
-	return contractsDispatch(args);
-}
-
-function handleHarness(args) {
-	return harnessDispatch(args);
-}
-
-function handlePolicy(args) {
-	return policyDispatch(args);
-}
-
-function handleAdapter(args) {
-	return adapterDispatch(args);
-}
-
-function handleRunner(args) {
-	return runnerDispatch(args);
-}
-
-function handleRelease(args) {
-	return releaseDispatch(args);
-}
-
-function handleMaintain(args) {
-	return maintainDispatch(args);
-}
-
-function handleRetention(args) {
-	return retentionDispatch(args);
-}
-
-function handleExternal(args) {
-	return externalDispatch(args);
-}
-
-function handleBreakglass(args) {
-	return breakglassDispatch(args);
-}
-
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1168,10 +1088,6 @@ function handleBreakLoop(args) {
 	};
 }
 
-function handleHooks(args) {
-	return hooksDispatch(args);
-}
-
 function handleContext(args) {
 	const { contextDispatch } = require("./context/adapters/command");
 	return contextDispatch(args._?.[0], args);
@@ -1192,14 +1108,14 @@ const COMMAND_HANDLERS = {
 	handoff: handleHandoff,
 	plan: handlePlan,
 	gate: handleGate,
-	policy: handlePolicy,
-	adapter: handleAdapter,
-	runner: handleRunner,
-	release: handleRelease,
-	maintain: handleMaintain,
-	retention: handleRetention,
-	external: handleExternal,
-	breakglass: handleBreakglass,
+	policy: policyDispatch,
+	adapter: adapterDispatch,
+	runner: runnerDispatch,
+	release: releaseDispatch,
+	maintain: maintainDispatch,
+	retention: retentionDispatch,
+	external: externalDispatch,
+	breakglass: breakglassDispatch,
 	review: handleReview,
 	accept: handleAccept,
 	learnings: handleLearnings,
@@ -1208,7 +1124,7 @@ const COMMAND_HANDLERS = {
 	profile: handleProfile,
 	status: handleStatus,
 	drift: handleDrift,
-	sync: handleSync,
+	sync: syncDispatch,
 	task: handleTask,
 	result: handleResult,
 	loop: handleLoop,
@@ -1224,20 +1140,20 @@ const COMMAND_HANDLERS = {
 	clean: handleClean,
 	next: handleNext,
 	explain: handleExplain,
-	hooks: handleHooks,
+	hooks: hooksDispatch,
 	workflow: handleWorkflow,
 	context: handleContext,
 	memory: handleMemory,
-	projection: handleProjection,
-	knowledge: handleKnowledge,
-	phase: handlePhase,
-	artifact: handleArtifact,
-	principal: handlePrincipal,
-	eval: handleEval,
-	evidence: handleEvidence,
-	approval: handleApproval,
-	contracts: handleContracts,
-	harness: handleHarness,
+	projection: projectionDispatch,
+	knowledge: knowledgeDispatch,
+	phase: phaseDispatch,
+	artifact: artifactDispatch,
+	principal: principalDispatch,
+	eval: evalDispatch,
+	evidence: evidenceDispatch,
+	approval: approvalDispatch,
+	contracts: contractsDispatch,
+	harness: harnessDispatch,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

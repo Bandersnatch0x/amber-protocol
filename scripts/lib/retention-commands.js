@@ -6,7 +6,7 @@
 // flags only; the core owns every verdict, candidates are governance
 // writes, and no content is ever deleted here.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const {
 	invalidArg,
 	targetValue,
@@ -71,7 +71,7 @@ function parsePolicyPin(raw) {
 	return parseRevisionPin(raw, "--policy", "policy/tenant-retention@1");
 }
 
-const dispatch = defineCommand({
+const retentionDispatch = defineCliCommand({
 	command: "retention",
 	actions: [
 		"classify",
@@ -407,9 +407,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function retentionDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { retentionDispatch };

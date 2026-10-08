@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert");
 const {
 	defineCommand,
+	defineCliCommand,
 	createSubcommandDispatcher,
 } = require("../../scripts/lib/subcommand-dispatcher");
 
@@ -122,4 +123,17 @@ test("createSubcommandDispatcher still dispatches (regression)", () => {
 	});
 	assert.deepEqual(dispatch("a"), { result: { ok: true }, exitCode: 0 });
 	assert.deepEqual(dispatch("zzz"), { result: { errors: ["nope"] }, exitCode: 1 });
+});
+
+test("defineCliCommand reads the action from the positional at actionIndex", () => {
+	const spec = {
+		command: "demo",
+		actions: ["read"],
+		handlers: { read: (args) => ({ text: `read ${args._.join(" ")}` }) },
+	};
+	const first = defineCliCommand(spec)({ target: "t", _: ["read", "x"] });
+	const second = defineCliCommand({ ...spec, actionIndex: 1 })({ target: "t", _: ["org", "read"] });
+	assert.equal(first.result.text, "read read x");
+	assert.equal(second.result.text, "read org read");
+	assert.equal(defineCliCommand(spec)({ target: "t", _: ["org", "read"] }).exitCode, 1);
 });
