@@ -4,119 +4,124 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("node:crypto");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
+const { isProcessAlive, pidStillOwned, processIdentity } = require("./core/execution-handles");
 
-const LOCK_TIMEOUT_MS = 300000; // 5 minutes
-// Bounds retry against concurrent stale-lock cleaners: if several processes
-// all decide a stale lock is removable, they each unlink and race to re-link
-// a replacement. Only one can win per round; the rest loop. A cap keeps this
-// finite instead of spinning forever under contention.
-const MAX_STALE_RETRIES = 4;
+// Only locks written before leases carried a pid are judged by age.
+const PID_LESS_LOCK_TIMEOUT_MS = 300000;
+const MAX_ATTEMPTS = 5;
+// A takeover guard is itself a lease; a guard left by a crashed taker is taken
+// over through one more guard, and no deeper.
+const MAX_TAKEOVER_DEPTH = 2;
 
-// Atomically claim the lock by writing the full payload to a unique temp
-// file and then link(2)-ing it into place. link is atomic: concurrent
-// callers cannot both succeed (the second hits EEXIST), AND a reader never
-// observes a half-written lock - lockPath only exists once the complete temp
-// file is linked in. This closes both races the old existsSync+writeFileSync
-// had: the TOCTOU double-acquire (two processes both see "no lock" and both
-// write one) and the create-then-write gap a bare O_EXCL+write would leave
-// open (a concurrent reader sees an empty file, mistakes it for a corrupt/
-// stale lock, and unlinks a lock its owner had only half-created).
-function claimLockAtomically(lockPath) {
-	const tempPath = `${lockPath}.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString("hex")}`;
-	fs.writeFileSync(tempPath, JSON.stringify({ pid: process.pid, timestamp: Date.now() }));
+// link(2) of a fully written temp file is exclusive like O_EXCL, and a reader
+// never sees a half-written lease.
+function claim(lockPath, lease) {
+	const tempPath = `${lockPath}.${lease.leaseId}`;
+	fs.writeFileSync(tempPath, JSON.stringify(lease));
 	try {
 		fs.linkSync(tempPath, lockPath);
+		return true;
+	} catch (e) {
+		if (e.code === "EEXIST") return false;
+		throw e;
 	} finally {
-		// Drop the temp name whether we won the link or hit EEXIST. The
-		// inode lives on via lockPath if the link succeeded.
-		try {
-			fs.unlinkSync(tempPath);
-		} catch {
-			// already removed - nothing to do
-		}
+		fs.rmSync(tempPath, { force: true });
 	}
 }
 
-function readLock(lockPath) {
+function readRaw(lockPath) {
 	try {
-		return JSON.parse(fs.readFileSync(lockPath, "utf8"));
+		return fs.readFileSync(lockPath, "utf8");
+	} catch (e) {
+		if (e.code === "ENOENT") return null;
+		throw e;
+	}
+}
+
+function parseLease(raw) {
+	try {
+		const lease = JSON.parse(raw);
+		return lease && typeof lease === "object" ? lease : null;
 	} catch {
-		// Missing (ENOENT) or corrupt - treat as stale so the caller removes
-		// any leftover and re-claims. A missing file after EEXIST means a
-		// concurrent cleaner already unlinked it; retrying is correct.
 		return null;
 	}
 }
 
-function acquireLock(projectRoot, sessionId) {
-	const lockPath = getLockPath(projectRoot, sessionId);
-	const lockDir = path.dirname(lockPath);
-
-	if (!fs.existsSync(lockDir)) {
-		fs.mkdirSync(lockDir, { recursive: true });
+function holderState(lease) {
+	if (lease && Number.isInteger(lease.pid)) {
+		const running =
+			isProcessAlive(lease.pid) && pidStillOwned({ pid: lease.pid, pidStartedAt: lease.startTime });
+		return running ? "live" : "stale";
 	}
-
-	for (let attempt = 0; attempt <= MAX_STALE_RETRIES; attempt++) {
-		try {
-			claimLockAtomically(lockPath);
-			return { success: true };
-		} catch (e) {
-			if (e.code !== "EEXIST") throw e;
-		}
-
-		// Lock exists - decide stale vs active. Because link is atomic, the
-		// file we read here is either complete or absent (a concurrent cleaner
-		// may have unlinked it between our EEXIST and our read); never partial.
-		const lock = readLock(lockPath);
-		const stale = !lock || Date.now() - lock.timestamp >= LOCK_TIMEOUT_MS;
-
-		if (!stale) {
-			return { success: false, error: "Session is locked by another process" };
-		}
-
-		// Stale (or corrupt, or just-unlinked) - remove and let the next link
-		// decide the sole winner. Concurrent cleaners may both unlink; only
-		// one's next link succeeds, so the lock is never granted twice.
-		try {
-			fs.unlinkSync(lockPath);
-		} catch (e) {
-			if (e.code !== "ENOENT") throw e; // already removed by a concurrent cleaner
-		}
+	if (lease && typeof lease.timestamp === "number") {
+		return Date.now() - lease.timestamp < PID_LESS_LOCK_TIMEOUT_MS ? "live" : "stale";
 	}
-
-	// Exhausted retries under sustained contention. Fail safe: refuse rather
-	// than fall back to a non-atomic write that would reintroduce the race.
-	return { success: false, error: "Session is locked by another process" };
+	return "corrupt";
 }
 
-function releaseLock(projectRoot, sessionId) {
-	const lockPath = getLockPath(projectRoot, sessionId);
-
-	if (fs.existsSync(lockPath)) {
-		fs.unlinkSync(lockPath);
-	}
+function locked(holder) {
+	const who = Number.isInteger(holder?.pid) ? `pid ${holder.pid}` : "another process";
+	return {
+		success: false,
+		code: "AMBER_E_SESSION_LOCKED",
+		error: `Session is locked by ${who}`,
+	};
 }
 
-function isLocked(projectRoot, sessionId) {
-	const lockPath = getLockPath(projectRoot, sessionId);
-
-	if (!fs.existsSync(lockPath)) {
-		return false;
-	}
-
-	let lock;
+// Only the winner of the guard keyed by the stale lock's exact bytes may
+// remove it, so a slow taker can never delete the lease a faster taker wrote.
+function removeStale(lockPath, raw, depth) {
+	const guardPath = `${lockPath}.takeover-${crypto.createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
+	const guard = acquireAt(guardPath, depth + 1);
+	if (!guard.success) return;
 	try {
-		lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-	} catch {
-		return false;
+		if (readRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
+	} finally {
+		releaseAt(guardPath, guard.leaseId);
 	}
-	const age = Date.now() - lock.timestamp;
+}
 
-	return age < LOCK_TIMEOUT_MS;
+function acquireAt(lockPath, depth) {
+	fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+	const lease = {
+		leaseId: crypto.randomUUID(),
+		pid: process.pid,
+		startTime: processIdentity(process.pid),
+		acquiredAt: new Date().toISOString(),
+	};
+	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+		if (claim(lockPath, lease)) return { success: true, leaseId: lease.leaseId };
+		const raw = readRaw(lockPath);
+		if (raw === null) continue;
+		const holder = parseLease(raw);
+		const state = holderState(holder);
+		if (state === "corrupt") {
+			return {
+				success: false,
+				code: "AMBER_E_SESSION_LOCK_CORRUPT",
+				error: `Session lock ${lockPath} does not name a holder`,
+			};
+		}
+		if (state === "live" || depth >= MAX_TAKEOVER_DEPTH) return locked(holder);
+		removeStale(lockPath, raw, depth);
+	}
+	return locked(parseLease(readRaw(lockPath)));
+}
+
+function releaseAt(lockPath, leaseId) {
+	if (parseLease(readRaw(lockPath))?.leaseId === leaseId) fs.rmSync(lockPath, { force: true });
+}
+
+function acquireLock(projectRoot, sessionId) {
+	return acquireAt(getLockPath(projectRoot, sessionId), 0);
+}
+
+function releaseLock(projectRoot, sessionId, leaseId) {
+	releaseAt(getLockPath(projectRoot, sessionId), leaseId);
 }
 
 function getLockPath(projectRoot, sessionId) {
 	return path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId, ".lock");
 }
 
-module.exports = { acquireLock, releaseLock, isLocked };
+module.exports = { acquireLock, releaseLock };

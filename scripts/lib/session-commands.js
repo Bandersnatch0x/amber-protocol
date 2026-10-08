@@ -1149,7 +1149,7 @@ async function leaseSession(projectRoot, options) {
 
 	const lock = acquireLock(projectRoot, sessionId);
 	if (!lock.success) {
-		return result(`Error: ${lock.error}`, 1);
+		return result(`Error: ${lock.error} [${lock.code}]`, 1);
 	}
 	try {
 		const loaded = requireSession(projectRoot, sessionId);
@@ -1213,7 +1213,7 @@ async function leaseSession(projectRoot, options) {
 			0,
 		);
 	} finally {
-		releaseLock(projectRoot, sessionId);
+		releaseLock(projectRoot, sessionId, lock.leaseId);
 	}
 }
 
