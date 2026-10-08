@@ -499,10 +499,12 @@ hash); `verify-ledger` reports `head-truncated`, `head-mismatch`, or `anchor-mis
 `AMBER_E_LEDGER_TAMPERED`. Deleting the `.anchor` store refuses that ledger for every run and
 append: this is fail-closed by design. The store is not tamper-proof, though. It shares the
 filesystem and the OS user with the governed actor, so an actor who can write there can recreate it
-with a lower anchored head, and that is not detected. Approval carries no authentication yet, so the
-single-use guarantee holds against replay and against truncate-and-rerun inside a process boundary,
-not against an actor who can rewrite the store. Ledgers written before the anchor existed are
-refused the same way; archive them and approve again.
+with a lower anchored head. That rewrite is caught by `amber ledger seal` and `amber ledger
+verify-anchoring`, which is why a sealed ledger is the one that holds; an unsealed one has nothing to
+catch it. Approval carries no authentication yet, so the single-use guarantee holds against replay
+and against truncate-and-rerun inside a process boundary, not against an actor who can rewrite the
+store and its seal. Ledgers written before the anchor existed are refused the same way; archive them
+and approve again.
 
 ### artifact admit / show / list
 

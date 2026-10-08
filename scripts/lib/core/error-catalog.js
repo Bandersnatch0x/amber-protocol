@@ -53,7 +53,7 @@ const CATALOG = {
 		remedy:
 			"Wait for the holding session command to finish; the lock frees itself once that process exits.",
 		layer: "Lifecycle",
-		related: ["AMBER_E_SESSION_LOCK_CORRUPT"],
+		related: ["AMBER_E_SESSION_LOCK_CHAIN", "AMBER_E_SESSION_LOCK_CORRUPT"],
 	},
 	AMBER_E_SESSION_LOCK_CHAIN: {
 		title: "Session lock needs manual removal",

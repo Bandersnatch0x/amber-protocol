@@ -73,12 +73,13 @@ function locked(holder) {
 function removeStale(lockPath, raw, depth) {
 	const guardPath = `${lockPath}.takeover-${crypto.createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
 	const guard = acquireAt(guardPath, depth + 1);
-	if (!guard.success) return;
+	if (!guard.success) return guard;
 	try {
 		if (readRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
 	} finally {
 		releaseAt(guardPath, guard.leaseId);
 	}
+	return null;
 }
 
 // The chain is bounded, so a crash inside a guard of a guard leaves files nothing
@@ -87,9 +88,12 @@ function removeStale(lockPath, raw, depth) {
 // rooted at the real lock, because the guard names are hashes of the bytes they
 // guard and cannot be derived by appending.
 function takeoverChainTooDeep(lockPath) {
-	const root = lockPath.replace(/\.takeover-.*$/, "");
+	// Only trailing hash-shaped groups come off, and only from the basename: a plain
+	// replace would strip at the leftmost `.takeover-` anywhere in the path, so a
+	// directory whose own name contains it would be reported and the real lock omitted.
+	const base = path.basename(lockPath).replace(/(?:\.takeover-[0-9a-f]{16})+$/, "");
+	const root = path.join(path.dirname(lockPath), base);
 	const dir = path.dirname(root);
-	const base = path.basename(root);
 	let guards = [];
 	try {
 		guards = fs
@@ -117,6 +121,7 @@ function acquireAt(lockPath, depth) {
 		startTime: processIdentity(process.pid),
 		acquiredAt: new Date().toISOString(),
 	};
+	let guardFailure = null;
 	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 		if (claim(lockPath, lease)) return { success: true, leaseId: lease.leaseId };
 		const raw = readRaw(lockPath);
@@ -132,12 +137,16 @@ function acquireAt(lockPath, depth) {
 		}
 		if (state === "live") return locked(holder);
 		if (depth >= MAX_TAKEOVER_DEPTH) return takeoverChainTooDeep(lockPath);
-		removeStale(lockPath, raw, depth);
+		guardFailure = removeStale(lockPath, raw, depth);
 	}
-	// The attempts ran out with the holder still stale, which means the takeover chain
-	// could not be unwound. Naming the files is the only useful answer; a generic
-	// "locked by pid N" would name a process that is already dead.
+	// The attempts ran out with the holder still stale, so the lock could not be
+	// reclaimed. Why matters: a deeper level that reported the chain is the reason and
+	// its message is the remedy, while a guard held by a live process just means
+	// someone else is reclaiming it right now and waiting is the remedy. Reporting the
+	// chain for that second case would name a file a live process holds.
+	if (guardFailure?.code === "AMBER_E_SESSION_LOCK_CHAIN") return guardFailure;
 	const remaining = parseLease(readRaw(lockPath));
+	if (guardFailure?.code === "AMBER_E_SESSION_LOCKED") return locked(remaining);
 	if (holderState(remaining) === "stale") return takeoverChainTooDeep(lockPath);
 	return locked(remaining);
 }
