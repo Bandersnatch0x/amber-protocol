@@ -192,7 +192,10 @@ test("a traversal contractId is refused and writes nothing outside the target", 
 	assert.equal(fs.existsSync(escaped), false);
 });
 
-test("concurrent appends from separate processes keep one unbroken chain", async () => {
+// The retry loop below tolerates the documented lock refusal, and the internal wait
+// bound means a pathological hang would otherwise take tens of minutes to surface.
+// This ceiling turns that into a failure instead.
+test("concurrent appends from separate processes keep one unbroken chain", { timeout: 120000 }, async () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-anchor-race-"));
 	dirs.push(dir);
 	const lp = path.join(dir, "ledger.jsonl");
