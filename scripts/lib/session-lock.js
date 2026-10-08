@@ -65,6 +65,10 @@ function locked(holder) {
 		success: false,
 		code: "AMBER_E_SESSION_LOCKED",
 		error: `Session is locked by ${who}`,
+		// On a platform that cannot name a process identity, a live pid may be a
+		// recycled one, so "live" there means "not falsifiable", not "the same
+		// process". Callers that would otherwise say "just wait" need this.
+		identityKnown: Number.isInteger(holder?.pid) && processIdentity(holder.pid) !== null,
 	};
 }
 
@@ -86,8 +90,11 @@ function removeStale(lockPath, raw, depth) {
 // can reclaim. Naming them is the whole remedy: the code cannot clear them itself,
 // and "locked by pid N" would name a process that is already dead. The walk is
 // rooted at the real lock, because the guard names are hashes of the bytes they
-// guard and cannot be derived by appending.
-function takeoverChainTooDeep(lockPath) {
+// guard and cannot be derived by appending. A guard held by a pid that cannot be
+// shown to be a live amber process shares this refusal, because it needs the same
+// remedy: on a platform that cannot name a process identity the pid may be recycled,
+// so nothing would ever release it and "wait" would be a refusal with no way out.
+function lockStuck(lockPath, detail) {
 	// Only trailing hash-shaped groups come off, and only from the basename: a plain
 	// replace would strip at the leftmost `.takeover-` anywhere in the path, so a
 	// directory whose own name contains it would be reported and the real lock omitted.
@@ -104,12 +111,11 @@ function takeoverChainTooDeep(lockPath) {
 	} catch {
 		/* the directory is gone, so there is nothing to name */
 	}
-	// The count is deliberately not reported: the caller may be an inner level whose
-	// own depth is not the chain's depth, and a wrong number is worse than none.
+	const because = detail ? ` (${detail})` : "";
 	return {
 		success: false,
-		code: "AMBER_E_SESSION_LOCK_CHAIN",
-		error: `Session lock ${root} cannot be reclaimed after repeated crashes; remove ${[root, ...guards].join(", ")}`,
+		code: "AMBER_E_SESSION_LOCK_STUCK",
+		error: `Session lock ${root} cannot be reclaimed${because}; if no amber session command is running, remove ${[root, ...guards].join(", ")}`,
 	};
 }
 
@@ -136,18 +142,22 @@ function acquireAt(lockPath, depth) {
 			};
 		}
 		if (state === "live") return locked(holder);
-		if (depth >= MAX_TAKEOVER_DEPTH) return takeoverChainTooDeep(lockPath);
+		if (depth >= MAX_TAKEOVER_DEPTH) return lockStuck(lockPath);
 		guardFailure = removeStale(lockPath, raw, depth);
 	}
 	// The attempts ran out with the holder still stale, so the lock could not be
-	// reclaimed. Why matters: a deeper level that reported the chain is the reason and
-	// its message is the remedy, while a guard held by a live process just means
-	// someone else is reclaiming it right now and waiting is the remedy. Reporting the
-	// chain for that second case would name a file a live process holds.
-	if (guardFailure?.code === "AMBER_E_SESSION_LOCK_CHAIN") return guardFailure;
+	// reclaimed. Why matters, and the two reasons want different answers. A guard held
+	// by a process whose identity could be checked is genuinely another live process,
+	// and it is the guard holder, not the dead lock holder, that must be named, so its
+	// own refusal is the honest one. A guard whose identity cannot be checked may be a
+	// recycled pid, and then waiting would never end, so that keeps the manual-removal
+	// remedy instead.
+	if (guardFailure?.code === "AMBER_E_SESSION_LOCK_STUCK") return guardFailure;
+	if (guardFailure?.code === "AMBER_E_SESSION_LOCKED") {
+		return guardFailure.identityKnown ? guardFailure : lockStuck(lockPath, guardFailure.error);
+	}
 	const remaining = parseLease(readRaw(lockPath));
-	if (guardFailure?.code === "AMBER_E_SESSION_LOCKED") return locked(remaining);
-	if (holderState(remaining) === "stale") return takeoverChainTooDeep(lockPath);
+	if (holderState(remaining) === "stale") return lockStuck(lockPath);
 	return locked(remaining);
 }
 

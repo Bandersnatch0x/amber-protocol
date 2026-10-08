@@ -205,8 +205,55 @@ describe("session lock lease", () => {
 		const result = acquireLock(root, SESSION);
 
 		assert.strictEqual(result.success, false);
-		assert.strictEqual(result.code, "AMBER_E_SESSION_LOCK_CHAIN");
-		const named = result.error.split("; remove ").pop().split(", ");
+		assert.strictEqual(result.code, "AMBER_E_SESSION_LOCK_STUCK");
+		const named = result.error
+			.split("; if no amber session command is running, remove ")
+			.pop()
+			.split(", ");
 		assert.deepStrictEqual(named, [lockPath, guardOne, guardTwo]);
+	});
+
+	// A guard held by a process whose identity can be checked is genuinely another live
+	// process, so the refusal must name that process, not the dead holder of the lock.
+	// Where the identity cannot be checked, as on Windows, the pid may be recycled and
+	// nothing would ever release it, so the refusal has to keep the manual-removal
+	// remedy instead of telling the operator to wait.
+	it("does not name the dead lock holder when a guard is held", () => {
+		const lockRaw = JSON.stringify({
+			leaseId: "gone",
+			pid: deadPid(),
+			startTime: "1",
+			acquiredAt: new Date(HOUR_AGO).toISOString(),
+		});
+		writeLock(lockRaw);
+		const guardPath = `${lockPath}.takeover-${crypto.createHash("sha256").update(lockRaw).digest("hex").slice(0, 16)}`;
+		fs.writeFileSync(
+			guardPath,
+			JSON.stringify({
+				leaseId: "live",
+				pid: process.pid,
+				startTime: "1",
+				acquiredAt: new Date().toISOString(),
+			}),
+		);
+
+		const result = acquireLock(root, SESSION);
+
+		assert.strictEqual(result.success, false);
+		const dead = JSON.parse(lockRaw).pid;
+		assert.ok(
+			!new RegExp(`locked by pid ${dead}\\b`).test(result.error),
+			`the refusal must not present the dead holder as the live one: ${result.error}`,
+		);
+		if (process.platform === "win32") {
+			assert.strictEqual(result.code, "AMBER_E_SESSION_LOCK_STUCK");
+			assert.ok(result.error.includes(guardPath), "the manual-removal remedy must name the guard");
+		} else {
+			assert.strictEqual(result.code, "AMBER_E_SESSION_LOCKED");
+			assert.ok(
+				result.error.includes(`pid ${process.pid}`),
+				"the refusal must name the live guard holder",
+			);
+		}
 	});
 });

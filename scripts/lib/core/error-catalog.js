@@ -53,12 +53,12 @@ const CATALOG = {
 		remedy:
 			"Wait for the holding session command to finish; the lock frees itself once that process exits.",
 		layer: "Lifecycle",
-		related: ["AMBER_E_SESSION_LOCK_CHAIN", "AMBER_E_SESSION_LOCK_CORRUPT"],
+		related: ["AMBER_E_SESSION_LOCK_STUCK", "AMBER_E_SESSION_LOCK_CORRUPT"],
 	},
-	AMBER_E_SESSION_LOCK_CHAIN: {
+	AMBER_E_SESSION_LOCK_STUCK: {
 		title: "Session lock needs manual removal",
 		cause:
-			"A process died taking over a dead holder's session lock, and then a process died taking over that takeover, which is as deep as the chain goes. Nothing can reclaim the leftovers by itself.",
+			"The session lock names a holder that is gone, and the code cannot reclaim it by itself: either a takeover guard beside it is held by a pid that cannot be shown to be a live amber process, which on a platform without a process identity may be a recycled pid, or the takeover chain is as deep as it goes after repeated crashes.",
 		remedy:
 			"Check no amber session command is running for this session, then delete the .lock and .lock.takeover-* files the error names.",
 		layer: "Lifecycle",
