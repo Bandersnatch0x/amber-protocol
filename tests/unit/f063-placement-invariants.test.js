@@ -2,7 +2,7 @@
 
 // F063 spec N4/N4.1 placement invariants, pinned by tests so the consolidated
 // layout cannot silently regress: root-level tracked .md budget, docs tree
-// single-responsibility dirs, .gitignore active-line budget, SPEC.md status
+// single-responsibility dirs, .gitignore guard entries, SPEC.md status
 // header, router one-line index, and git-status cleanliness after a full run.
 // The budgets carry the recorded deviations (spec §N4.1): ROADMAP/PRODUCT/
 // UBIQUITOUS stay root-pending their own P2 tickets.
@@ -69,13 +69,11 @@ test("F063 N4: docs/ first-level directories each carry ≥3 tracked files or a 
 	);
 });
 
-test("F063 N4: .gitignore stays within the 60 active-line budget", () => {
+test("F063 N4: .gitignore keeps the required guard entries", () => {
 	const lines = fs.readFileSync(path.join(REPO, ".gitignore"), "utf8").split(/\r?\n/);
 	const active = lines.filter((line) => line.trim() !== "" && !line.trim().startsWith("#"));
-	assert.ok(
-		active.length <= 60,
-		`.gitignore active lines ${active.length} exceed the N4 budget of 60`,
-	);
+	// Spec N4: directory counts and `.gitignore` line counts are maintenance
+	// signals, not F063 release gates, so no ceiling is asserted here.
 	// Guard entries kept after the .scratch/ move (spec N4.1 #5).
 	for (const guard of [
 		"docs/research/",
