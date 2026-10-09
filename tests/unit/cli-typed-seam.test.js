@@ -17,14 +17,25 @@ const {
 
 // The seam is read on first use, not at import, so one corrupt Action Type cannot
 // break every dispatched command and the check is owned by a test rather than paid
-// by the whole surface at load.
-test("importing the seam does not read the Action Types", () => {
+// by the whole surface at load. Counting require.cache keys would not show this: the
+// read is an fs read, not a require, so the test watches the reads themselves.
+test("importing the seam reads no Action Type file", () => {
 	const seamPath = require.resolve("../../scripts/lib/cli-typed-seam");
 	const script = `
-		const before = Object.keys(require.cache).filter((f) => /action-types/.test(f)).length;
+		const fs = require("node:fs");
+		const seen = [];
+		const realRead = fs.readFileSync;
+		fs.readFileSync = function (file, ...rest) {
+			if (String(file).includes("action-types")) seen.push(String(file));
+			return realRead.call(this, file, ...rest);
+		};
+		const realReaddir = fs.readdirSync;
+		fs.readdirSync = function (dir, ...rest) {
+			if (String(dir).includes("action-types")) seen.push(String(dir));
+			return realReaddir.call(this, dir, ...rest);
+		};
 		require(${JSON.stringify(seamPath)});
-		const after = Object.keys(require.cache).filter((f) => /action-types/.test(f)).length;
-		console.log(JSON.stringify({ before, after }));
+		console.log(JSON.stringify(seen));
 	`;
 	const child = spawnSync(process.execPath, ["-e", script], {
 		cwd: path.join(__dirname, "..", ".."),
@@ -32,7 +43,7 @@ test("importing the seam does not read the Action Types", () => {
 	});
 
 	assert.equal(child.status, 0, child.stderr);
-	assert.deepEqual(JSON.parse(child.stdout), { before: 0, after: 0 });
+	assert.deepEqual(JSON.parse(child.stdout), []);
 });
 
 test("a corrupt Action Type fails the typed command by name and leaves the CLI usable", () => {
@@ -55,11 +66,11 @@ test("a corrupt Action Type fails the typed command by name and leaves the CLI u
 
 	const session = amber(["session", "status", "--target", fixture]);
 	assert.equal(session.status, 1);
-	assert.match(session.stderr, /AMBER_E_INVALID_ARG/);
+	assert.match(session.stderr, /AMBER_E_TYPED_SEAM_CORRUPT/);
 	assert.match(session.stderr, /session-run\.json/);
 });
 
-test("CLI typed seam validates the same Action registry at startup", () => {
+test("CLI typed seam validates the same Action registry on first use", () => {
 	assert.ok(REGISTERED_ACTIONS.length >= 8);
 });
 

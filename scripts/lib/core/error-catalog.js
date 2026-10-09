@@ -3,6 +3,15 @@
 // Single source of truth for user-facing Amber error codes.
 // Each code maps to the Amber control layer it defends (see CLAUDE.md).
 const CATALOG = {
+	AMBER_E_TYPED_SEAM_CORRUPT: {
+		title: "CLI typed seam cannot be read",
+		cause:
+			"An Action Type under action-types/ is not valid JSON, or the registry does not satisfy the typed whitelist. The seam is read on first use, so only the command that needs it is refused.",
+		remedy:
+			"Fix or restore the named file under action-types/; amber --version and untyped commands keep working meanwhile.",
+		layer: "Context",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_FEATURE_NOT_FOUND: {
 		title: "Feature not registered in feature_list.json",
 		cause: "A command referenced a feature id that is not present in feature_list.json.",

@@ -102,7 +102,9 @@ describe("session lock lease", () => {
 
 		const next = acquireLock(root, SESSION);
 
-		if (process.platform === "win32") {
+		// Branch on what the product branches on: whether this platform can name a process
+		// identity at all, not on the platform name.
+		if (processIdentity(process.pid) === null) {
 			assert.strictEqual(next.success, false);
 			assert.strictEqual(next.code, "AMBER_E_SESSION_LOCKED");
 			assert.strictEqual(JSON.parse(fs.readFileSync(lockPath, "utf8")).leaseId, "old");
@@ -249,7 +251,7 @@ describe("session lock lease", () => {
 			!new RegExp(`locked by pid ${dead}\\b`).test(result.error),
 			`the refusal must not present the dead holder as the live one: ${result.error}`,
 		);
-		if (process.platform === "win32") {
+		if (processIdentity(process.pid) === null) {
 			assert.strictEqual(result.code, "AMBER_E_SESSION_LOCK_STUCK");
 			assert.ok(result.error.includes(guardPath), "the manual-removal remedy must name the guard");
 		} else {

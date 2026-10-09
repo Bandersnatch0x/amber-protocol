@@ -27,7 +27,7 @@ function validateTypedSeam(actionTypesDir = ACTION_TYPES_DIR) {
 				return JSON.parse(fs.readFileSync(path.join(actionTypesDir, file), "utf8"));
 			} catch (cause) {
 				throw typedError(
-					"AMBER_E_INVALID_ARG",
+					"AMBER_E_TYPED_SEAM_CORRUPT",
 					`CLI typed seam is invalid: ${file}: ${cause.message}`,
 				);
 			}
@@ -35,7 +35,7 @@ function validateTypedSeam(actionTypesDir = ACTION_TYPES_DIR) {
 	const result = validateWhitelist(actions);
 	if (!result.valid) {
 		throw typedError(
-			"AMBER_E_INVALID_ARG",
+			"AMBER_E_TYPED_SEAM_CORRUPT",
 			`CLI typed seam is invalid:\n${result.findings.join("\n")}`,
 		);
 	}

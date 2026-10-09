@@ -17,10 +17,12 @@ const MAX_PATTERN_LEN = 200;
 // launch a .cmd shim with shell:false. Resolve them to the Node entry point beside
 // the running interpreter, so the governed spawn stays shell-free everywhere. The
 // map is closed: any other name is spawned exactly as parsed.
-const WINDOWS_NPM_ENTRY = Object.freeze({
-	npm: ["node_modules", "npm", "bin", "npm-cli.js"],
-	npx: ["node_modules", "npm", "bin", "npx-cli.js"],
-});
+const WINDOWS_NPM_ENTRY = Object.freeze(
+	Object.assign(Object.create(null), {
+		npm: ["node_modules", "npm", "bin", "npm-cli.js"],
+		npx: ["node_modules", "npm", "bin", "npx-cli.js"],
+	}),
+);
 
 /**
  * The argv to spawn for a parsed governed command. On Windows, npm and npx are
@@ -28,14 +30,17 @@ const WINDOWS_NPM_ENTRY = Object.freeze({
  * otherwise the argv is returned unchanged so the failure stays visible.
  * @param {string[]} argv - Parsed governed argv.
  * @param {NodeJS.Platform} [platform] - Injected for tests.
+ * @param {string} [interpreter] - Injected for tests; defaults to the running node.
  * @returns {string[]} The argv to hand to spawn.
  */
-function toSpawnArgv(argv, platform = process.platform) {
+function toSpawnArgv(argv, platform = process.platform, interpreter = process.execPath) {
 	if (platform !== "win32" || argv.length === 0) return argv;
+	// A null-prototype map, so an inherited name such as `constructor` reads as absent
+	// rather than resolving to something that cannot be spread.
 	const entry = WINDOWS_NPM_ENTRY[argv[0]];
 	if (!entry) return argv;
-	const cli = path.join(path.dirname(process.execPath), ...entry);
-	return fs.existsSync(cli) ? [process.execPath, cli, ...argv.slice(1)] : argv;
+	const cli = path.join(path.dirname(interpreter), ...entry);
+	return fs.existsSync(cli) ? [interpreter, cli, ...argv.slice(1)] : argv;
 }
 
 // Shared destructive-command pattern. Referenced by the DEFAULT_RULES deny rule

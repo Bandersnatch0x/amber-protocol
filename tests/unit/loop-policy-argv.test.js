@@ -12,6 +12,7 @@ const {
 	evaluateVerifyPolicy,
 	DEFAULT_RULES,
 } = require("../../scripts/lib/core/loop-policy");
+const { trackTempDir } = require("../helpers/harness");
 const { executeInPreparedWorkspace } = require("../../scripts/lib/core/execution-domain-adapter");
 const { runEvidenceCommand } = require("../../scripts/lib/core/evidence-runner");
 
@@ -30,17 +31,31 @@ const allowNode = {
 test("toSpawnArgv resolves npm and npx for a shell-free Windows spawn", () => {
 	// Node cannot launch the npm.cmd shim with shell:false, and npm ships only that
 	// shim on a standard Windows install, so the two names the default policy allows
-	// are rewritten to the Node entry point beside the running interpreter.
-	const entry = path.join(
-		path.dirname(process.execPath),
-		"node_modules",
-		"npm",
-		"bin",
-		"npm-cli.js",
-	);
-	const expected = fs.existsSync(entry) ? [process.execPath, entry, "test"] : ["npm", "test"];
+	// are rewritten to the Node entry point beside the interpreter. The interpreter is
+	// injected so the mapping is exercised on every platform, including the CI one
+	// where no npm entry sits beside the running node.
+	const interpreter = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-argv-win32-")));
+	const entry = path.join(interpreter, "node_modules", "npm", "bin");
+	fs.mkdirSync(entry, { recursive: true });
+	for (const name of ["npm-cli.js", "npx-cli.js"]) fs.writeFileSync(path.join(entry, name), "");
+	const interpreterPath = path.join(interpreter, "node.exe");
 
-	assert.deepEqual(toSpawnArgv(["npm", "test"], "win32"), expected);
+	assert.deepEqual(toSpawnArgv(["npm", "test"], "win32", interpreterPath), [
+		interpreterPath,
+		path.join(entry, "npm-cli.js"),
+		"test",
+	]);
+	assert.deepEqual(toSpawnArgv(["npx", "--version"], "win32", interpreterPath), [
+		interpreterPath,
+		path.join(entry, "npx-cli.js"),
+		"--version",
+	]);
+	// With no entry beside the interpreter the argv is handed back untouched, so the
+	// spawn fails visibly instead of being silently rewritten.
+	assert.deepEqual(
+		toSpawnArgv(["npm", "test"], "win32", path.join(interpreter, "missing", "node.exe")),
+		["npm", "test"],
+	);
 });
 
 test("toSpawnArgv leaves every other name and platform exactly as parsed", () => {
@@ -51,6 +66,11 @@ test("toSpawnArgv leaves every other name and platform exactly as parsed", () =>
 		"scripts/amber.js",
 	]);
 	assert.deepEqual(toSpawnArgv([], "win32"), []);
+	// The map is closed: an inherited name must read as absent, not resolve to
+	// something that cannot be spread.
+	for (const inherited of ["constructor", "__proto__", "toString", "valueOf", "hasOwnProperty"]) {
+		assert.deepEqual(toSpawnArgv([inherited, "test"], "win32"), [inherited, "test"]);
+	}
 });
 
 test("parseGovernedArgv splits plain words and keeps quoted literals whole", () => {
