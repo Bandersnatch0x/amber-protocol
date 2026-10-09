@@ -12,6 +12,32 @@ const { typedError } = require("./error-catalog");
 
 const MAX_PATTERN_LEN = 200;
 
+// npm and npx are the two names the default policy allows that are not real
+// executables on a standard Windows install: npm ships npm.cmd, and Node cannot
+// launch a .cmd shim with shell:false. Resolve them to the Node entry point beside
+// the running interpreter, so the governed spawn stays shell-free everywhere. The
+// map is closed: any other name is spawned exactly as parsed.
+const WINDOWS_NPM_ENTRY = Object.freeze({
+	npm: ["node_modules", "npm", "bin", "npm-cli.js"],
+	npx: ["node_modules", "npm", "bin", "npx-cli.js"],
+});
+
+/**
+ * The argv to spawn for a parsed governed command. On Windows, npm and npx are
+ * rewritten to `node <npm entry>` when that entry exists beside the interpreter;
+ * otherwise the argv is returned unchanged so the failure stays visible.
+ * @param {string[]} argv - Parsed governed argv.
+ * @param {NodeJS.Platform} [platform] - Injected for tests.
+ * @returns {string[]} The argv to hand to spawn.
+ */
+function toSpawnArgv(argv, platform = process.platform) {
+	if (platform !== "win32" || argv.length === 0) return argv;
+	const entry = WINDOWS_NPM_ENTRY[argv[0]];
+	if (!entry) return argv;
+	const cli = path.join(path.dirname(process.execPath), ...entry);
+	return fs.existsSync(cli) ? [process.execPath, cli, ...argv.slice(1)] : argv;
+}
+
 // Shared destructive-command pattern. Referenced by the DEFAULT_RULES deny rule
 // AND enforced as an un-removable built-in on the verify surface (see
 // evaluateVerifyPolicy) so a custom verify-rules.json cannot silently drop it.
@@ -445,6 +471,7 @@ module.exports = {
 	evaluateVerifyPolicy,
 	evaluateGovernedPolicy,
 	parseGovernedArgv,
+	toSpawnArgv,
 	loadPolicyRules,
 	loadVerifyPolicyRules,
 	DEFAULT_RULES,

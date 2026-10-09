@@ -9,7 +9,12 @@
 // loop-policy + loop-ledger with governed-runner.
 const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
-const { evaluateVerifyPolicy, loadVerifyPolicyRules, parseGovernedArgv } = require("./loop-policy");
+const {
+	evaluateVerifyPolicy,
+	loadVerifyPolicyRules,
+	parseGovernedArgv,
+	toSpawnArgv,
+} = require("./loop-policy");
 const { appendLedgerRecord } = require("./loop-ledger");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const { typedError } = require("./error-catalog");
@@ -83,7 +88,7 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	const startedAt = Date.now();
 	let exec;
 	try {
-		const argv = parseGovernedArgv(command);
+		const argv = toSpawnArgv(parseGovernedArgv(command));
 		const res = spawnSync(argv[0], argv.slice(1), {
 			shell: false,
 			cwd: targetRoot,

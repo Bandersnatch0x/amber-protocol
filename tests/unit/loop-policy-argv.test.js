@@ -7,6 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
 	parseGovernedArgv,
+	toSpawnArgv,
 	evaluateGovernedPolicy,
 	evaluateVerifyPolicy,
 	DEFAULT_RULES,
@@ -25,6 +26,32 @@ const allowNode = {
 	defaultAction: "deny",
 	rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }],
 };
+
+test("toSpawnArgv resolves npm and npx for a shell-free Windows spawn", () => {
+	// Node cannot launch the npm.cmd shim with shell:false, and npm ships only that
+	// shim on a standard Windows install, so the two names the default policy allows
+	// are rewritten to the Node entry point beside the running interpreter.
+	const entry = path.join(
+		path.dirname(process.execPath),
+		"node_modules",
+		"npm",
+		"bin",
+		"npm-cli.js",
+	);
+	const expected = fs.existsSync(entry) ? [process.execPath, entry, "test"] : ["npm", "test"];
+
+	assert.deepEqual(toSpawnArgv(["npm", "test"], "win32"), expected);
+});
+
+test("toSpawnArgv leaves every other name and platform exactly as parsed", () => {
+	assert.deepEqual(toSpawnArgv(["npm", "test"], "linux"), ["npm", "test"]);
+	assert.deepEqual(toSpawnArgv(["npm", "test"], "darwin"), ["npm", "test"]);
+	assert.deepEqual(toSpawnArgv(["node", "scripts/amber.js"], "win32"), [
+		"node",
+		"scripts/amber.js",
+	]);
+	assert.deepEqual(toSpawnArgv([], "win32"), []);
+});
 
 test("parseGovernedArgv splits plain words and keeps quoted literals whole", () => {
 	assert.deepEqual(parseGovernedArgv("node scripts/amber.js status"), [

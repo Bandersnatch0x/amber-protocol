@@ -18,7 +18,7 @@ const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { codedError } = require("./error-catalog");
-const { parseGovernedArgv } = require("./loop-policy");
+const { parseGovernedArgv, toSpawnArgv } = require("./loop-policy");
 
 // One handle per runId (see the catalog entry). Without the pre-check the duplicate
 // write fails only AFTER the spawn, leaving a running child with no handle and no
@@ -200,7 +200,8 @@ async function executeInPreparedWorkspace(
 	const timeoutMs = budgetMinutes * 60_000;
 	let handleRecord = null;
 	try {
-		const spawned = spawn(argv[0], argv.slice(1), {
+		const spawnArgv = toSpawnArgv(argv);
+		const spawned = spawn(spawnArgv[0], spawnArgv.slice(1), {
 			shell: false,
 			cwd: workspacePath,
 			// Detached gives the child its own process group, so a cancellation
@@ -343,7 +344,7 @@ function prepare(targetRoot, label) {
  * asynchronous, so this declared boundary method is async too).
  */
 async function execute(worktreePath, command, { timeoutMs = 300_000 } = {}) {
-	const argv = parseGovernedArgv(command);
+	const argv = toSpawnArgv(parseGovernedArgv(command));
 	const child = spawn(argv[0], argv.slice(1), {
 		shell: false,
 		cwd: worktreePath,

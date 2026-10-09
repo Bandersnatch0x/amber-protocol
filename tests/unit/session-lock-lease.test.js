@@ -7,6 +7,7 @@ const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const crypto = require("node:crypto");
 
+const { processIdentity } = require("../../scripts/lib/core/execution-handles");
 const LOCK_MODULE = require.resolve("../../scripts/lib/session-lock");
 const { acquireLock, releaseLock } = require(LOCK_MODULE);
 
@@ -227,12 +228,15 @@ describe("session lock lease", () => {
 		});
 		writeLock(lockRaw);
 		const guardPath = `${lockPath}.takeover-${crypto.createHash("sha256").update(lockRaw).digest("hex").slice(0, 16)}`;
+		// The guard must read as a genuine live holder, which needs the recorded start
+		// identity to match where the platform can name one. A made-up identity makes the
+		// guard stale on Linux, so it is reclaimed and the lock is granted instead.
 		fs.writeFileSync(
 			guardPath,
 			JSON.stringify({
 				leaseId: "live",
 				pid: process.pid,
-				startTime: "1",
+				startTime: processIdentity(process.pid) ?? "1",
 				acquiredAt: new Date().toISOString(),
 			}),
 		);

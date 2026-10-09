@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { spawnSync } = require("node:child_process");
 const {
 	REGISTERED_ACTIONS,
 	classifyCliInvocation,
@@ -13,6 +14,50 @@ const {
 	validateCliInvocation,
 	validateTypedSeam,
 } = require("../../scripts/lib/cli-typed-seam");
+
+// The seam is read on first use, not at import, so one corrupt Action Type cannot
+// break every dispatched command and the check is owned by a test rather than paid
+// by the whole surface at load.
+test("importing the seam does not read the Action Types", () => {
+	const seamPath = require.resolve("../../scripts/lib/cli-typed-seam");
+	const script = `
+		const before = Object.keys(require.cache).filter((f) => /action-types/.test(f)).length;
+		require(${JSON.stringify(seamPath)});
+		const after = Object.keys(require.cache).filter((f) => /action-types/.test(f)).length;
+		console.log(JSON.stringify({ before, after }));
+	`;
+	const child = spawnSync(process.execPath, ["-e", script], {
+		cwd: path.join(__dirname, "..", ".."),
+		encoding: "utf8",
+	});
+
+	assert.equal(child.status, 0, child.stderr);
+	assert.deepEqual(JSON.parse(child.stdout), { before: 0, after: 0 });
+});
+
+test("a corrupt Action Type fails the typed command by name and leaves the CLI usable", () => {
+	const root = path.join(__dirname, "..", "..");
+	const fixture = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-seam-corrupt-")));
+	for (const entry of ["scripts", "action-types"]) {
+		fs.cpSync(path.join(root, entry), path.join(fixture, entry), { recursive: true });
+	}
+	fs.copyFileSync(path.join(root, "package.json"), path.join(fixture, "package.json"));
+	fs.writeFileSync(path.join(fixture, "action-types", "session-run.json"), "{ corrupt");
+	const amber = (args) =>
+		spawnSync(process.execPath, ["scripts/amber.js", ...args], {
+			cwd: fixture,
+			encoding: "utf8",
+		});
+
+	const version = amber(["--version"]);
+	assert.equal(version.status, 0, version.stderr);
+	assert.equal(version.stdout.trim(), require("../../package.json").version);
+
+	const session = amber(["session", "status", "--target", fixture]);
+	assert.equal(session.status, 1);
+	assert.match(session.stderr, /AMBER_E_INVALID_ARG/);
+	assert.match(session.stderr, /session-run\.json/);
+});
 
 test("CLI typed seam validates the same Action registry at startup", () => {
 	assert.ok(REGISTERED_ACTIONS.length >= 8);
