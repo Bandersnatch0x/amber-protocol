@@ -20,7 +20,7 @@
 | 交付状态 | `feature_list.json` | `amber feature`/`accept` 等命令写入 | spec lifecycle、票据状态、路线图 |
 | 规范生命周期状态 | 各 spec 头部 `**Status:**` | 该 spec 的 owner 变更 | `feature_list.json`，不与之机械互推 |
 | 运行态 | `.amber/`（会话、账本、上下文页） | 命令写入，人工不手改 | 不写入 wiki/规格 |
-| 治理事件账本 | `docs/governance/governance-ledger.jsonl`（tracked，交付物） | 只经 `governance-ledger.js` append（chain-hashed、append-only）；`adjudicated` 仅 user | 与 `.amber/` 的会话运行态账本区分：这是持久、可审计、可 CI 门禁的规则裁决记录，非 per-session 运行态 |
+| 治理事件账本 | `docs/governance/governance-ledger.jsonl`（tracked，交付物） | 只经 `governance-ledger.js` append（chain-hashed、append-only）；`adjudicated` 仅 user。**该模块已在 B1 删除：账本文件仍在版本控制中，但当前既无写入者也无校验者，见 issue 338。本行描述的目标机制暂时没有实现。** | 与 `.amber/` 的会话运行态账本区分：这是持久、可审计、可 CI 门禁的规则裁决记录，非 per-session 运行态 |
 | 票据状态 | `issues/` frontmatter + Log | 票内更新 | 不机械提升为 feature/ADR 状态 |
 
 **互不提升原则：** `feature_list.json` 的交付状态与 spec 的规范生命周期是两个独立维度，任何一方
@@ -101,3 +101,4 @@
 规则裁决除 `issues/` 留痕外，**同时**向 `docs/governance/governance-ledger.jsonl` 追加一条
 governance-event（`candidate_opened` 由 agent 开、`adjudicated` 仅 user；chain-hashed、append-only，
 见 `issues/0155`）。历史散文裁决不回填——账本对本机制建立之后的新裁决生效，此前裁决仍以 `issues/` Log 为准。
+**注意：追加所需的写入模块已在 B1 删除，因此本条目前只能人工执行，且账本无人校验；见 issue 338。**
