@@ -65,7 +65,7 @@
 
 const { typedError } = require("./error-catalog");
 const { deletionTombstones } = require("./retention-registry");
-const { GENESIS_HASH, chainHash, isPlainObject } = require("./registry-ledger");
+const { GENESIS_HASH, chainHash, isPlainObject, quotedList } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { parseTimestamp } = require("./principal-registry");
 const { ASSURANCE_LEVELS, listEvidence } = require("./evidence-receipts");
@@ -205,10 +205,6 @@ function isNonEmptyString(value) {
 
 function isPositiveInt(value) {
 	return Number.isInteger(value) && value > 0;
-}
-
-function quotedList(values) {
-	return values.map((value) => `"${value}"`).join(", ");
 }
 
 function evaluationClockValue(input, opts) {

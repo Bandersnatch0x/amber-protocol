@@ -17,6 +17,8 @@ const {
 	appendWithinCeiling: sharedAppendWithinCeiling,
 	isPlainObject,
 	isNonEmptyString,
+	quotedList,
+	closedFieldProblem,
 } = require("./registry-ledger");
 
 const STALENESS_SCHEMA_VERSION = 1;
@@ -47,24 +49,6 @@ function ledgerPath(cwd) {
 
 function corrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
-}
-
-function quotedList(values) {
-	return values.map((value) => `"${value}"`).join(", ");
-}
-
-function closedFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length > 0) {
-		return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-	}
-	const missing = fields.filter((field) => !(field in value));
-	if (missing.length > 0) {
-		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
-	}
-	return null;
 }
 
 function dependencyProblem(dependency, label = "dependency") {

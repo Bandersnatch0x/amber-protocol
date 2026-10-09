@@ -11,7 +11,7 @@
 // completed policy outcome is appended to its own tamper-evident ledger.
 
 const { typedError } = require("./error-catalog");
-const { GENESIS_HASH, chainHash, isPlainObject } = require("./registry-ledger");
+const { GENESIS_HASH, chainHash, isPlainObject, quotedList } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { hashText, canonicalJson } = require("./context-hash");
 const { parseTimestamp, resolveActivePrincipal } = require("./principal-registry");
@@ -112,10 +112,6 @@ function isPositiveInt(value) {
 
 function isNonNegativeInt(value) {
 	return Number.isInteger(value) && value >= 0;
-}
-
-function quotedList(values) {
-	return values.map((value) => `"${value}"`).join(", ");
 }
 
 function hasRelaxingName(key) {
