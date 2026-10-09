@@ -91,6 +91,6 @@ flowchart LR
   generated products.
 - The root CLI package intentionally depends only on `ajv` and `ajv-formats`; Web
   dependencies remain isolated in `apps/web/package.json`.
- - `scripts/lib/cli-typed-seam.js` validates the Action whitelist at CLI startup and classifies
-   Action-equivalent invocations through the same capability registry used by MCP. It does not
-   replace CLI handlers or grant execution authority.
+ - `scripts/lib/cli-typed-seam.js` validates the Action whitelist on first use, not at CLI
+   startup, and classifies Action-equivalent invocations through the same capability registry
+   used by MCP. It does not replace CLI handlers or grant execution authority.

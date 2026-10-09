@@ -92,7 +92,7 @@ describe("session lock lease", () => {
 	// time is still treated as the holder and the lock is refused rather than
 	// taken over. Both branches are asserted, so the residual is covered on every
 	// platform instead of being skipped on one.
-	it("handles a live pid whose recorded start identity cannot be verified", () => {
+	it("handles a live pid whose recorded start identity does not match", () => {
 		writeLock({
 			leaseId: "old",
 			pid: process.pid,

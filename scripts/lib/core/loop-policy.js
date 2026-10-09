@@ -12,11 +12,12 @@ const { typedError } = require("./error-catalog");
 
 const MAX_PATTERN_LEN = 200;
 
-// npm and npx are the two names the default policy allows that are not real
-// executables on a standard Windows install: npm ships npm.cmd, and Node cannot
-// launch a .cmd shim with shell:false. Resolve them to the Node entry point beside
-// the running interpreter, so the governed spawn stays shell-free everywhere. The
-// map is closed: any other name is spawned exactly as parsed.
+// npm and npx are the two names that are not real executables on a standard Windows
+// install: npm ships npm.cmd, and Node cannot launch a .cmd shim with shell:false.
+// Resolve them to the Node entry point beside the running interpreter, so the governed
+// spawn stays shell-free everywhere. This is a spawn-resolution map, not a policy
+// allowlist: the policy still decides which commands may run, and the map is closed, so
+// any other name is spawned exactly as parsed.
 const WINDOWS_NPM_ENTRY = Object.freeze(
 	Object.assign(Object.create(null), {
 		npm: ["node_modules", "npm", "bin", "npm-cli.js"],

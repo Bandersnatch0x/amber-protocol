@@ -4,7 +4,7 @@
 // Each code maps to the Amber control layer it defends (see CLAUDE.md).
 const CATALOG = {
 	AMBER_E_TYPED_SEAM_CORRUPT: {
-		title: "CLI typed seam cannot be read",
+		title: "CLI typed seam is invalid",
 		cause:
 			"An Action Type under action-types/ is not valid JSON, or the registry does not satisfy the typed whitelist. The seam is read on first use, so only the command that needs it is refused.",
 		remedy:
