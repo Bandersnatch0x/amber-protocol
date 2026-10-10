@@ -142,13 +142,25 @@ describe("session lock lease", () => {
 				null,
 				"the live foreign process has a nameable identity",
 			);
-			writeLock({ leaseId: "foreign", pid: foreign.pid, startTime: "node.exe", acquiredAt: new Date().toISOString() });
+			writeLock({
+				leaseId: "foreign",
+				pid: foreign.pid,
+				startTime: "node.exe",
+				acquiredAt: new Date().toISOString(),
+			});
 
 			const result = acquireLock(root, SESSION);
 
 			assert.strictEqual(result.success, true, "an unrelated live pid is not our holder");
-			assert.strictEqual(pidStillOwned({ pid: foreign.pid, pidStartedAt: processIdentity(process.pid) }), false);
-			assert.strictEqual(pidStillOwned({ pid: foreign.pid, pidStartedAt: null }), true, "the unrecorded residual");
+			assert.strictEqual(
+				pidStillOwned({ pid: foreign.pid, pidStartedAt: processIdentity(process.pid) }),
+				false,
+			);
+			assert.strictEqual(
+				pidStillOwned({ pid: foreign.pid, pidStartedAt: null }),
+				true,
+				"the unrecorded residual",
+			);
 		} finally {
 			try {
 				spawnSync("taskkill", ["/PID", String(foreign.pid), "/T", "/F"], { stdio: "ignore" });
