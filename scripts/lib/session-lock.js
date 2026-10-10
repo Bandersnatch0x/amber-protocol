@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("node:crypto");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
+const { sleepSync } = require("./core/fs-utils");
 const { isProcessAlive, pidStillOwned, processIdentity } = require("./core/execution-handles");
 
 // Only locks written before leases carried a pid are judged by age.
@@ -29,12 +30,24 @@ function claim(lockPath, lease) {
 	}
 }
 
+// A read can be refused for a moment on Windows when another process is creating the same
+// path at that instant. The takeover guard is named after the stale lock's bytes, so two
+// takers target one path by design and the loser's read of it races the winner's create,
+// which surfaces as a sharing violation rather than as ENOENT. Letting that out would
+// crash a governed session command instead of refusing it. Retry briefly, then rethrow: a
+// real permission problem still has to surface, and treating the failure as absent would
+// make a healthy lock read as corrupt.
+const TRANSIENT_READ_CODES = new Set(["EPERM", "EBUSY", "EACCES"]);
+
 function readRaw(lockPath) {
-	try {
-		return fs.readFileSync(lockPath, "utf8");
-	} catch (e) {
-		if (e.code === "ENOENT") return null;
-		throw e;
+	for (let attempt = 0; ; attempt++) {
+		try {
+			return fs.readFileSync(lockPath, "utf8");
+		} catch (e) {
+			if (e.code === "ENOENT") return null;
+			if (!TRANSIENT_READ_CODES.has(e.code) || attempt >= 20) throw e;
+			sleepSync(5);
+		}
 	}
 }
 

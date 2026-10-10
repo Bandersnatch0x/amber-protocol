@@ -297,6 +297,17 @@ function fileContains(targetRoot, relativePath, pattern) {
 	return pathExists(filePath) && pattern.test(readText(filePath));
 }
 
+/**
+ * Block the current thread for a bounded time. Used where the platform can refuse an
+ * operation for a moment, such as a Windows sharing violation on a path another process is
+ * creating at that instant, and a bounded retry is the honest remedy rather than a guess
+ * about the state of the file.
+ * @param {number} ms - Milliseconds to block.
+ */
+function sleepSync(ms) {
+	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 module.exports = {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
@@ -317,4 +328,5 @@ module.exports = {
 	relativeSlash,
 	repoRelativePath,
 	fileContains,
+	sleepSync,
 };

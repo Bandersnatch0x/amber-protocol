@@ -11,6 +11,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { codedError } = require("./error-catalog");
 const { readJSONL, appendJSONL } = require("./jsonl");
+const { sleepSync } = require("./fs-utils");
 const { sha256Hex } = require("./context-hash");
 
 const GENESIS = "0".repeat(64);
@@ -83,10 +84,6 @@ function headProblem(records, anchor) {
 	if (records[anchor.count - 1]?.hash !== anchor.headHash)
 		return { reason: "head-mismatch", brokenAt: anchor.count - 1 };
 	return null;
-}
-
-function sleepSync(ms) {
-	Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function readLockRaw(lockPath) {

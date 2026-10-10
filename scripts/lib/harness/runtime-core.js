@@ -14,6 +14,7 @@ const { spawn } = require("node:child_process");
 
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { listArtifactRevisions } = require("../core/canonical-artifacts");
+const { sleepSync } = require("../core/fs-utils");
 // One liveness seam for the whole harness (F081 `isProcessAlive`). A pid that
 // has terminated but whose parent has not reaped it is a ZOMBIE, and POSIX
 // still answers signal 0 for it — probing locally read a stopped daemon as
@@ -992,11 +993,6 @@ function daemonStatus(targetRoot) {
 		state,
 		authority: AUTHORITY,
 	};
-}
-
-function sleepSync(ms) {
-	const shared = new Int32Array(new SharedArrayBuffer(4));
-	Atomics.wait(shared, 0, 0, ms);
 }
 
 function stopDaemon(targetRoot, { now } = {}) {

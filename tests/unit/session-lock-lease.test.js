@@ -180,6 +180,61 @@ describe("session lock lease", () => {
 		assert.strictEqual(results.filter((r) => r.success).length, 1, JSON.stringify(results));
 	});
 
+	// A read can be refused for a moment on Windows while another process creates the same
+	// path. The takeover guard is named after the stale lock's bytes, so two takers target
+	// one path by design and the loser's read of it races the winner's create. That used to
+	// escape as an unhandled EPERM, which a governed session command reports as a crash
+	// rather than a refusal (issue 344). The first read of the guard is forced to fail the
+	// way Windows fails it, and the acquire has to come back with a refusal either way.
+	it("retries a transient refusal to read a contended guard instead of throwing", () => {
+		const raw = JSON.stringify({
+			leaseId: "dead",
+			pid: deadPid(),
+			startTime: "1",
+			acquiredAt: new Date().toISOString(),
+		});
+		writeLock(raw);
+		const guardPath = `${lockPath}.takeover-${crypto.createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
+		fs.writeFileSync(
+			guardPath,
+			JSON.stringify({
+				leaseId: "guard",
+				pid: process.pid,
+				startTime: processIdentity(process.pid) ?? "1",
+				acquiredAt: new Date().toISOString(),
+			}),
+		);
+
+		const realRead = fs.readFileSync;
+		let refused = 0;
+		fs.readFileSync = (file, ...rest) => {
+			if (String(file).includes(".takeover-") && refused === 0) {
+				refused++;
+				const error = new Error("EPERM: operation not permitted");
+				error.code = "EPERM";
+				throw error;
+			}
+			return realRead(file, ...rest);
+		};
+		try {
+			const result = acquireLock(root, SESSION);
+			assert.strictEqual(refused, 1, "the forced refusal has to have happened");
+			assert.strictEqual(result.success, false);
+			// Which refusal it is depends on whether this platform can name an identity, the
+			// same discriminator the guard refusal uses everywhere else: where it cannot, a
+			// guard pid may be recycled and waiting would never end, so the manual-removal
+			// remedy is kept instead of naming a holder.
+			assert.strictEqual(
+				result.code,
+				processIdentity(process.pid) === null
+					? "AMBER_E_SESSION_LOCK_STUCK"
+					: "AMBER_E_SESSION_LOCKED",
+			);
+		} finally {
+			fs.readFileSync = realRead;
+		}
+	});
+
 	// The takeover chain is bounded, so a crash inside a guard of a guard leaves files
 	// nothing can reclaim. The refusal has to name them: the code cannot clear them
 	// itself, and "locked by pid N" would name a process that is already dead.
