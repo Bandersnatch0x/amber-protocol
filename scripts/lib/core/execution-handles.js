@@ -131,10 +131,11 @@ function processIdentity(pid) {
 		// these paths (see the doc comment above). It reports no start time, so the
 		// identity recorded is the image name; `pidStillOwned` compares that name.
 		try {
-			const stdout = execFileSync("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], {
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "ignore"],
-			});
+			const stdout = execFileSync(
+				"tasklist",
+				["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"],
+				{ encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+			);
 			const match = /^"([^"]*)","(\d+)"/m.exec(stdout);
 			if (match === null || Number(match[2]) !== pid) return null;
 			const executable = match[1].split("\\").pop();
