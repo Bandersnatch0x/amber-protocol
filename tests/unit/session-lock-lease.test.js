@@ -7,7 +7,7 @@ const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const crypto = require("node:crypto");
 
-const { processIdentity } = require("../../scripts/lib/core/execution-handles");
+const { processIdentity, pidStillOwned } = require("../../scripts/lib/core/execution-handles");
 const LOCK_MODULE = require.resolve("../../scripts/lib/session-lock");
 const { acquireLock, releaseLock } = require(LOCK_MODULE);
 
@@ -86,12 +86,11 @@ describe("session lock lease", () => {
 		assert.strictEqual(fs.existsSync(lockPath), false);
 	});
 
-	// Windows deliberately has no process-identity probe (see processIdentity in
-	// core/execution-handles.js): a platform that cannot name a start identity
-	// cannot FALSIFY ownership, so a live pid with a mismatched recorded start
-	// time is still treated as the holder and the lock is refused rather than
-	// taken over. Both branches are asserted, so the residual is covered on every
-	// platform instead of being skipped on one.
+	// The holder's recorded identity is compared with the live one (core/execution-handles.js).
+	// Where the platform can name an identity — Linux start time, Windows image name — a
+	// mismatch FALSIFIES ownership, so the lock is stale and is taken over. Where it cannot,
+	// ownership cannot be falsified and the lock is refused. Both branches are asserted, so
+	// the residual is covered on every platform instead of being skipped on one.
 	it("handles a live pid whose recorded start identity does not match", () => {
 		writeLock({
 			leaseId: "old",
@@ -112,6 +111,51 @@ describe("session lock lease", () => {
 		}
 		assert.strictEqual(next.success, true);
 		assert.notStrictEqual(next.leaseId, "old");
+	});
+
+	// The identity primitive itself, on the real machine: a live process has a nameable
+	// identity, the same process answers with the same identity twice, and a reaped pid
+	// answers null. This is the fact the lock and the cancellation both lean on.
+	it("names a live pid identity and returns null for a reaped pid", async () => {
+		if (processIdentity(process.pid) === null) return; // no identity source: the residual branch
+		assert.strictEqual(typeof processIdentity(process.pid), "string");
+		assert.strictEqual(processIdentity(process.pid), processIdentity(process.pid));
+		const gone = deadPid();
+		spawnSync("taskkill", ["/PID", String(gone), "/T", "/F"], { stdio: "ignore" });
+		await new Promise((resolve) => setTimeout(resolve, 700));
+		assert.strictEqual(processIdentity(gone), null, "a reaped pid has no identity");
+	});
+
+	// A live pid whose identity is a DIFFERENT image is not our holder: the recorded
+	// identity cannot match it, so the lock must not present it as the live owner. This
+	// is the Windows recycling case (node.exe → powershell.exe), asserted against the
+	// real image the platform reports rather than a platform name.
+	it("refuses to read a live foreign-image pid as the holder", async () => {
+		if (processIdentity(process.pid) === null) return; // no identity source: the residual branch
+		const foreign = spawn("powershell", ["-NoProfile", "-Command", "Start-Sleep 30"], {
+			stdio: "ignore",
+		});
+		try {
+			await new Promise((resolve) => setTimeout(resolve, 1200));
+			assert.notStrictEqual(
+				processIdentity(foreign.pid),
+				null,
+				"the live foreign process has a nameable identity",
+			);
+			writeLock({ leaseId: "foreign", pid: foreign.pid, startTime: "node.exe", acquiredAt: new Date().toISOString() });
+
+			const result = acquireLock(root, SESSION);
+
+			assert.strictEqual(result.success, true, "an unrelated live pid is not our holder");
+			assert.strictEqual(pidStillOwned({ pid: foreign.pid, pidStartedAt: processIdentity(process.pid) }), false);
+			assert.strictEqual(pidStillOwned({ pid: foreign.pid, pidStartedAt: null }), true, "the unrecorded residual");
+		} finally {
+			try {
+				spawnSync("taskkill", ["/PID", String(foreign.pid), "/T", "/F"], { stdio: "ignore" });
+			} catch (_error) {
+				/* already gone */
+			}
+		}
 	});
 
 	it("refuses a corrupt lock with a named error and leaves it in place", () => {

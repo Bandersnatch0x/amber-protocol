@@ -80,14 +80,22 @@ function pidIsZombie(pid) {
 
 /**
  * The kernel's identity for a running process, or null when the platform cannot
- * provide one. A recycled pid belongs to a process with a different identity, and
- * comparing it is how this seam knows the pid it is about to signal is still OURS.
+ * provide one. A recycled pid belongs to a process with a different identity (the
+ * recycled process at least carries a different image name), and comparing it is
+ * how this seam refuses to signal a pid that is no longer OURS.
  *
  *   - Linux: the process start time (the 22nd field of /proc/<pid>/stat, in clock
  *     ticks since boot) — a plain file read.
  *   - macOS: `ps -o lstart=` — locale-formatted, but stable within a run. Implemented;
  *     not exercised by this session's test runs (no macOS host).
- *   - Windows: deliberately unimplemented — see the note at the end of the function.
+ *   - Windows: the image name (executable basename) `tasklist` reports for the pid.
+ *     Measured here (Node v22, Windows 10.0.26300): ~270-730ms per call, versus
+ *     ~2.3-3.0s for the `powershell Get-Process` creation-time query and ~3s for
+ *     an unfiltered `tasklist`; no cheaper start-time primitive exists without a
+ *     native addon. The image name refutes a pid recycled onto a DIFFERENT image,
+ *     which is the recycling this seam can falsify; a pid recycled back onto the
+ *     same image (node.exe -> node.exe) is still indistinguishable and is the
+ *     stated residual. See the note at the end of the function.
  *
  * Any other platform returns null, and the caller must read "no identity" as
  * "cannot falsify ownership" — a residual, never a guess.
@@ -118,12 +126,24 @@ function processIdentity(pid) {
 			return null;
 		}
 	}
-	// Windows is deliberately NOT probed. Its only identity primitive is a process
-	// spawn (Get-Process via PowerShell), and measuring it here showed ~1-3s per call —
-	// which turned this suite from 37s into 100s for a check that matters only when a
-	// pid was recycled between two reads. `tasklist` carries no start time and `wmic` is
-	// gone from current Windows. So on Windows the recorded pid is signalled after the
-	// liveness, zombie and ownership-shape checks, and that gap is a stated residual.
+	if (process.platform === "win32") {
+		// Measured on this machine: `tasklist` is the only primitive cheap enough for
+		// these paths (see the doc comment above). It reports no start time, so the
+		// identity recorded is the image name; `pidStillOwned` compares that name.
+		try {
+			const stdout = execFileSync(
+				"tasklist",
+				["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"],
+				{ encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+			);
+			const match = /^"([^"]*)","(\d+)"/m.exec(stdout);
+			if (match === null || Number(match[2]) !== pid) return null;
+			const executable = match[1].split("\\").pop();
+			return executable.length === 0 ? null : executable;
+		} catch {
+			return null;
+		}
+	}
 	return null;
 }
 
@@ -132,6 +152,10 @@ function processIdentity(pid) {
  * Reports true when either side has no identity: a platform that cannot name one,
  * or a handle written before identity was recorded, cannot FALSIFY ownership, and
  * that residual is stated in the spec rather than guessed at here.
+ *
+ * The residual is narrower than "the platform cannot name one": on Windows the
+ * named identity is the image name, so a pid recycled onto a DIFFERENT image is
+ * falsified (returns false) while a pid recycled onto the SAME image is not.
  */
 function pidStillOwned(record) {
 	if (!record || !Number.isInteger(record.pid)) return false;
