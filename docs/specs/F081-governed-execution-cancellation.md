@@ -63,11 +63,9 @@ means *no handle*, which cancellation reports as such.
 is observed gone. When the signal was not delivered and the pid is gone anyway, the process
 exited on its own — that is `already-exited`, never a kill the seam did not perform. The
 seam also verifies the pid is still OURS before signalling: the handle records the process
-start time where the platform exposes one (Linux `/proc/<pid>/stat`; Windows the image name
-`tasklist` reports, the only primitive there cheap enough for this path), and a pid whose
+start time where the platform exposes one (Linux `/proc/<pid>/stat`), and a pid whose
 identity no longer matches is never signalled (`already-exited`, `signalResult.reason:
-"pid-reused"`). The residual, stated plainly: an identity that is only the image name cannot
-falsify a pid recycled onto the SAME image, and a platform that can name no identity at all
+"pid-reused"`). The residual, stated plainly: a platform that cannot name a process identity
 cannot falsify ownership, so there the recorded pid is signalled as before — the handle's
 fence and lease name the owner, but they are not a process identity. One more limit,
 learned by testing: the seam observes the RECORDED pid, not the tree. The command is

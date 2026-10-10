@@ -25,7 +25,6 @@ const {
 	persistExecutionHandle,
 	clearExecutionHandle,
 	isProcessAlive,
-	processIdentity,
 } = require("../../scripts/lib/core/execution-handles");
 const {
 	cancelExecution,
@@ -306,14 +305,10 @@ test("classifyOutcome never reports a kill the seam did not perform", () => {
 
 // F3: a recycled pid belongs to an unrelated process, and signalling it would be
 // the one failure this seam exists to prevent. The handle records the process
-// identity (Linux start time; Windows image name); when the live pid carries a
-// different identity the seam sends nothing and records what it observed. The
-// residual is the platform that can name no identity at all, where the branch
-// below is unreachable by design and the recorded pid is signalled as before.
+// identity (Linux start time); when the live pid carries a different identity the
+// seam sends nothing and records what it observed.
 test("a handle whose pid now belongs to another process is never signalled", async () => {
-	// Branch on what the seam branches on: whether this platform can name an
-	// identity, not on the platform name.
-	if (processIdentity(process.pid) === null) return;
+	if (process.platform !== "linux") return; // identity is read from /proc (see the seam)
 	const target = gitTarget("pid-reuse", allowRules(SLEEP_COMMAND));
 	try {
 		decisionFixture(target);
