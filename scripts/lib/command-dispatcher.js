@@ -13,8 +13,6 @@
  * dispatch, and the public command list cannot drift independently.
  */
 
-const path = require("node:path");
-
 // ── Imports ─────────────────────────────────────────────────────────────────
 // Command modules are required inside the handler that runs them, so a CLI
 // call loads only its own command chain.
@@ -35,7 +33,10 @@ function handleLedger(args) {
 		const result = exportLedger(targetRoot, { format: args.format, home: args.home });
 		if (args.out) {
 			const fs = require("node:fs");
-			const outputPath = path.resolve(targetRoot, args.out);
+			const { resolvePathWithin } = require("./core/fs-utils");
+			const outputPath = resolvePathWithin(targetRoot, args.out, {
+				label: "Ledger export destination",
+			});
 			fs.writeFileSync(outputPath, result.payload + "\n");
 			return require("./command-helpers").shapeResult(args, {
 				text: `Wrote ${result.ledgers.length} ledger(s) to ${outputPath} (intact=${result.intactCount}, broken=${result.brokenCount})`,
@@ -908,9 +909,12 @@ function handleExecution(args) {
 			};
 
 		const { checkExecutionReadiness } = require("./core/execution-validator");
-		const { resolveTarget: resolve } = require("./core/fs-utils");
+		const { resolvePathWithin, resolveTarget: resolve } = require("./core/fs-utils");
 		const targetRoot = resolve(args.target);
-		const resolvedPlan = path.resolve(targetRoot, planPath);
+		const resolvedPlan = resolvePathWithin(targetRoot, planPath, {
+			label: "Execution readiness plan",
+			canonicalExisting: true,
+		});
 		const readiness = checkExecutionReadiness(targetRoot, resolvedPlan, {
 			strict: args.strict || false,
 		});
