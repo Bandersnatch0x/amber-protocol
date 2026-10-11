@@ -1,13 +1,20 @@
 "use strict";
 
 const fs = require("node:fs");
-const path = require("node:path");
-const { readJson, resolveTarget, writeJsonPrettier } = require("./core/fs-utils");
+const {
+	readJson,
+	resolveTarget,
+	resolvePathWithin,
+	writeJsonPrettier,
+} = require("./core/fs-utils");
 const { localIsoDate, splitCommaList } = require("./core/text-utils");
 const { defineCommand } = require("./subcommand-dispatcher");
 
 function getFeatureListPath(targetRoot) {
-	return path.join(targetRoot, "feature_list.json");
+	return resolvePathWithin(targetRoot, "feature_list.json", {
+		label: "Feature list",
+		canonicalExisting: true,
+	});
 }
 
 function loadFeatures(targetRoot) {

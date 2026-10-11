@@ -64,6 +64,95 @@ test("--refresh-amber-owned overwrites a stale controlled file, backs up, and re
 	}
 });
 
+test("--refresh-amber-owned refuses a stale controlled file reached through a symlink", () => {
+	const tpl = copyTemplates();
+	const dir = installDir(tpl);
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-refresh-outside-"));
+	try {
+		const shippedPath = path.join(tpl, REL);
+		const installedPath = path.join(dir, REL);
+		const original = fs.readFileSync(shippedPath, "utf8");
+		// Preserve the install-time bytes outside the target so drift is stale,
+		// then replace the target file with an escaping symlink.
+		const outsidePath = path.join(outside, "glossary.md");
+		fs.writeFileSync(outsidePath, original);
+		fs.unlinkSync(installedPath);
+		fs.symlinkSync(outsidePath, installedPath);
+		fs.writeFileSync(shippedPath, original + "\n# refreshed addition\n");
+		const drift = detectScaffoldDrift(dir, { templateRoot: tpl });
+		assert.equal(drift.files.find((f) => f.path === REL).classification, "stale");
+		assert.throws(
+			() => refreshAmberOwnedFiles(dir, { templateRoot: tpl }),
+			/outside the target root/i,
+		);
+		assert.equal(fs.readFileSync(outsidePath, "utf8"), original);
+	} finally {
+		fs.rmSync(tpl, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("--refresh-amber-owned preflights every stale destination before mutating", () => {
+	const tpl = copyTemplates();
+	const dir = installDir(tpl);
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-refresh-atomic-outside-"));
+	const safeRel = "docs/wiki/agent/amber.md";
+	try {
+		const safeTemplate = path.join(tpl, safeRel);
+		const safeInstalled = path.join(dir, safeRel);
+		const unsafeTemplate = path.join(tpl, REL);
+		const unsafeInstalled = path.join(dir, REL);
+		const safeOriginal = fs.readFileSync(safeTemplate, "utf8");
+		const unsafeOriginal = fs.readFileSync(unsafeTemplate, "utf8");
+		const outsidePath = path.join(outside, "glossary.md");
+		fs.writeFileSync(outsidePath, unsafeOriginal, "utf8");
+		fs.unlinkSync(unsafeInstalled);
+		fs.symlinkSync(outsidePath, unsafeInstalled);
+		fs.writeFileSync(safeTemplate, safeOriginal + "\n# safe refresh\n", "utf8");
+		fs.writeFileSync(unsafeTemplate, unsafeOriginal + "\n# unsafe refresh\n", "utf8");
+
+		assert.throws(
+			() => refreshAmberOwnedFiles(dir, { templateRoot: tpl }),
+			/outside the target root/i,
+		);
+		assert.equal(fs.readFileSync(safeInstalled, "utf8"), safeOriginal);
+		assert.equal(fs.existsSync(safeInstalled + ".bak"), false);
+		assert.equal(fs.readFileSync(outsidePath, "utf8"), unsafeOriginal);
+	} finally {
+		fs.rmSync(tpl, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("--refresh-amber-owned refuses an escaping proposal directory", () => {
+	const tpl = copyTemplates();
+	const dir = installDir(tpl);
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-refresh-proposal-outside-"));
+	try {
+		const shippedPath = path.join(tpl, REL);
+		fs.writeFileSync(
+			shippedPath,
+			fs.readFileSync(shippedPath, "utf8") + "\n# new release\n",
+			"utf8",
+		);
+		fs.writeFileSync(path.join(dir, REL), "customized by user\n", "utf8");
+		const proposalDir = path.join(dir, ".amber", "maintenance", "proposals");
+		fs.mkdirSync(path.dirname(proposalDir), { recursive: true });
+		fs.symlinkSync(outside, proposalDir, "dir");
+		assert.throws(
+			() => refreshAmberOwnedFiles(dir, { templateRoot: tpl }),
+			/outside the target root/i,
+		);
+		assert.deepEqual(fs.readdirSync(outside), []);
+	} finally {
+		fs.rmSync(tpl, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 test("--refresh-amber-owned does NOT overwrite a customized controlled file, but caches the new template for manual merge", () => {
 	const tpl = copyTemplates();
 	const dir = installDir(tpl);

@@ -386,6 +386,26 @@ function adapterProblem(adapter) {
 	return null;
 }
 
+// An adapter's allow-list is interpreted as target-relative path prefixes.
+// Validate those prefixes at registration time as well as validating each
+// source at read time: otherwise a persisted contract could advertise an
+// escaping prefix (or a symlink that points outside the target) and leave the
+// registry with a misleading permission boundary. Missing in-target paths are
+// allowed because adapters may be registered before their legacy source is
+// provisioned.
+function adapterAllowedPathsProblem(cwd, adapter) {
+	const allowed = adapter.permissions?.allowedPaths;
+	if (allowed === null || allowed === undefined) return null;
+	for (const entry of allowed) {
+		try {
+			resolvePathWithin(cwd, entry, { label: "Adapter allowed path" });
+		} catch (error) {
+			return error.message || String(error);
+		}
+	}
+	return null;
+}
+
 function applyAdapterEvent(records, event, lineIndex) {
 	const closed = closedFieldProblem(
 		event,
@@ -1447,6 +1467,9 @@ function registerAdapter(cwd, input = {}, opts = {}) {
 	};
 	const problem = adapterProblem(adapter);
 	if (problem !== null) return { ok: false, code: INVALID_CODE, adapter: null, errors: [problem] };
+	const allowedPathProblem = adapterAllowedPathsProblem(cwd, adapter);
+	if (allowedPathProblem !== null)
+		return { ok: false, code: INVALID_CODE, adapter: null, errors: [allowedPathProblem] };
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	const body = { kind: "registered", schemaVersion: ADAPTER_SCHEMA_VERSION, at, adapter };
 	const result = ADAPTER_LEDGER.append(

@@ -97,3 +97,66 @@ test("plan body: dry-run draft fields with defaulted errors/warnings", () => {
 	assert.deepEqual(body.warnings, []);
 	fs.rmSync(root, { recursive: true, force: true });
 });
+
+test("workflow report reads refuse symlinks that escape the target", () => {
+	const root = tmpRoot();
+	const outside = tmpRoot();
+	const outsideReport = path.join(outside, "report.json");
+	const linkedReport = path.join(root, "report.json");
+	fs.writeFileSync(outsideReport, JSON.stringify({ findings: [] }), "utf8");
+	fs.symlinkSync(outsideReport, linkedReport);
+	try {
+		const result = workflowDispatch("findings", root, { report: "report.json" });
+		assert.match(result.errors[0], /outside the target root/i);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("workflow assessment output refuses outside directories and output-file symlinks", () => {
+	const root = tmpRoot();
+	const outside = tmpRoot();
+	try {
+		const outsideDir = path.join(outside, "reports");
+		const escapedDir = workflowDispatch("assess", root, {
+			target: root,
+			noSessions: true,
+			outputDir: outsideDir,
+		});
+		assert.match(escapedDir.errors[0], /outside the target root/i);
+		assert.equal(fs.existsSync(path.join(outsideDir, "workflow-assessment.json")), false);
+
+		const outputDir = path.join(root, "reports");
+		fs.mkdirSync(outputDir, { recursive: true });
+		const outsideFile = path.join(outside, "assessment.json");
+		fs.writeFileSync(outsideFile, "sentinel\n", "utf8");
+		fs.symlinkSync(outsideFile, path.join(outputDir, "workflow-assessment.json"));
+		const escapedFile = workflowDispatch("assess", root, {
+			target: root,
+			noSessions: true,
+			outputDir,
+		});
+		assert.match(escapedFile.errors[0], /outside the target root/i);
+		assert.equal(fs.readFileSync(outsideFile, "utf8"), "sentinel\n");
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("workflow assessment handoff bundle reads refuse outside directories", () => {
+	const root = tmpRoot();
+	const outside = tmpRoot();
+	try {
+		const result = workflowDispatch("assess", root, {
+			target: root,
+			noSessions: true,
+			handoffBundleDir: outside,
+		});
+		assert.match(result.errors[0], /outside the target root/i);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});

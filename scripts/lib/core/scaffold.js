@@ -14,6 +14,7 @@ const {
 	readText,
 	relativeSlash,
 	resolveTarget,
+	resolvePathWithin,
 	walkFiles,
 	writeJson,
 } = require("./fs-utils");
@@ -68,7 +69,12 @@ function copyTemplateFiles(targetRoot, items, options = {}) {
 	const backups = [];
 
 	for (const item of items) {
-		const destination = path.join(targetRoot, item.relativePath);
+		// A template destination outside the target (including through a
+		// symlinked ancestor) is a hard refusal, never a best-effort write.
+		const destination = resolvePathWithin(targetRoot, item.relativePath, {
+			label: "Scaffold destination",
+			canonicalExisting: true,
+		});
 		if (pathExists(destination)) {
 			skipped.push(item.relativePath);
 

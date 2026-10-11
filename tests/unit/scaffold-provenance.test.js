@@ -14,6 +14,7 @@ const {
 	loadProvenance,
 	writeProvenance,
 } = require("../../scripts/lib/core/scaffold-provenance");
+const { copyTemplateFiles } = require("../../scripts/lib/core/scaffold");
 
 // A tiny fake template root with one controlled, one authored, one state file.
 function fakeTemplateRoot() {
@@ -111,4 +112,20 @@ test("loadProvenance / writeProvenance round-trip; absent/corrupt → null", () 
 	fs.writeFileSync(path.join(target, ".amber", "provenance.json"), "{ broken");
 	assert.equal(loadProvenance(target), null);
 	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("template copy refuses symlinked destination ancestors", () => {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-tgt-"));
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-outside-"));
+	try {
+		fs.symlinkSync(outside, path.join(target, "docs"), "dir");
+		assert.throws(
+			() => copyTemplateFiles(target, [{ source: __filename, relativePath: "docs/escaped.md" }]),
+			/outside the target root/,
+		);
+		assert.equal(fs.existsSync(path.join(outside, "escaped.md")), false);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
 });

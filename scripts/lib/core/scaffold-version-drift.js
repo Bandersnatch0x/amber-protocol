@@ -12,7 +12,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { TEMPLATE_ROOT } = require("./constants");
-const { pathExists } = require("./fs-utils");
+const { pathExists, resolvePathWithin } = require("./fs-utils");
 const {
 	computeTemplateHash,
 	templateManagedFiles,
@@ -92,9 +92,25 @@ function refreshAmberOwnedFiles(targetRoot, { templateRoot = TEMPLATE_ROOT } = {
 	const provenance = loadProvenance(targetRoot);
 	let changed = false;
 
+	// Resolve every stale destination before the first mutation. A later
+	// symlink escape must not leave earlier files refreshed while provenance is
+	// still pinned to the previous release (a partial refresh is harder to
+	// recover from than a clean refusal).
+	const staleDestinations = new Map();
 	for (const f of drift.files) {
 		if (f.classification !== "stale" || f.tier !== "controlled") continue;
-		const dest = path.join(targetRoot, f.path);
+		staleDestinations.set(
+			f.path,
+			resolvePathWithin(targetRoot, f.path, {
+				label: "Scaffold refresh destination",
+				canonicalExisting: true,
+			}),
+		);
+	}
+
+	for (const f of drift.files) {
+		if (f.classification !== "stale" || f.tier !== "controlled") continue;
+		const dest = staleDestinations.get(f.path);
 		const bak = dest + ".bak";
 		if (!pathExists(bak)) fs.copyFileSync(dest, bak);
 		fs.copyFileSync(path.join(templateRoot, f.path), dest);
@@ -110,12 +126,17 @@ function refreshAmberOwnedFiles(targetRoot, { templateRoot = TEMPLATE_ROOT } = {
 		if (f.classification === "customized" || f.classification === "ambiguous") {
 			// Proposals are freshly created artifacts (like maintenance-propose),
 			// so the create policy (always .amber) applies.
-			const proposalDir = statePathForCreate(targetRoot, "maintenance", "proposals");
-			fs.mkdirSync(proposalDir, { recursive: true });
-			fs.copyFileSync(
-				path.join(templateRoot, f.path),
-				path.join(proposalDir, f.path.replace(/\//g, "__") + ".new"),
+			const proposalDir = resolvePathWithin(
+				targetRoot,
+				statePathForCreate(targetRoot, "maintenance", "proposals"),
+				{ label: "Scaffold proposal directory", allowRoot: true, canonicalExisting: true },
 			);
+			const proposalPath = resolvePathWithin(proposalDir, f.path.replace(/\//g, "__") + ".new", {
+				label: "Scaffold proposal",
+				canonicalExisting: true,
+			});
+			fs.mkdirSync(proposalDir, { recursive: true });
+			fs.copyFileSync(path.join(templateRoot, f.path), proposalPath);
 			proposals.push(f.path);
 		}
 	}

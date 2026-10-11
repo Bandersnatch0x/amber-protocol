@@ -15,6 +15,7 @@ const path = require("node:path");
 const { compileSchema } = require("../core/schema-contract");
 const { canonicalHashOf } = require("../core/registry-ledger");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { resolvePathWithin } = require("../core/fs-utils");
 
 const CODE_IMMUTABLE = "AMBER_E_HARNESS_EXEC_IMMUTABLE";
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_EXEC_NOT_FOUND";
@@ -118,7 +119,12 @@ function admitExecutionContract(targetRoot, { contractPath, now } = {}) {
 			"--file <contract.json> is required to admit an execution contract",
 		);
 	}
-	const resolvedPath = path.resolve(targetRoot, contractPath);
+	let resolvedPath;
+	try {
+		resolvedPath = resolvePathWithin(targetRoot, contractPath, { label: "Execution contract" });
+	} catch (err) {
+		throw typedError(CODE_INVALID_ARG, err.message);
+	}
 	let candidate;
 	try {
 		candidate = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));

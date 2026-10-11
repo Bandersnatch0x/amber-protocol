@@ -26,6 +26,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { resolvePathWithin } = require("./core/fs-utils");
 
 const store = require("./core/memory-store");
 const { sha256, hashFile } = require("./core/context-hash");
@@ -131,7 +132,15 @@ function findRequestId(targetRoot, entryId) {
 // Shared payload loading for request/ingest: resolve, exist-check, JSON.parse
 // — both verbs emit the same coded failures.
 function loadPayloadJson(targetRoot, ref) {
-	const payloadPath = path.resolve(targetRoot, ref);
+	let payloadPath;
+	try {
+		payloadPath = resolvePathWithin(targetRoot, ref, {
+			label: "Memory payload",
+			canonicalExisting: true,
+		});
+	} catch (error) {
+		return failure("AMBER_E_MEMORY_REQUEST_NOT_FOUND", error.message);
+	}
 	if (!fs.existsSync(payloadPath)) {
 		return failure("AMBER_E_MEMORY_REQUEST_NOT_FOUND", `payload not found: ${ref}`);
 	}

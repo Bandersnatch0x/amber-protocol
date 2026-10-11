@@ -28,6 +28,30 @@ function readFeatures(dir) {
 	return JSON.parse(fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"));
 }
 
+test("feature writes refuse a symlinked feature list", () => {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-feat-link-"));
+	const outside = path.join(os.tmpdir(), `amber-feature-outside-${Date.now()}.json`);
+	fs.writeFileSync(outside, JSON.stringify({ features: [] }));
+	try {
+		fs.symlinkSync(outside, path.join(target, "feature_list.json"));
+		assert.throws(
+			() =>
+				addFeature(target, {
+					id: "F999",
+					title: "should refuse",
+					area: "test",
+					behavior: "none",
+					verify: ["node --test"],
+				}),
+			/outside the target root/,
+		);
+		assert.deepEqual(JSON.parse(fs.readFileSync(outside, "utf8")), { features: [] });
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { force: true });
+	}
+});
+
 test("addFeature stores paths array from comma-separated string", () => {
 	const dir = tmpDir();
 	const r = addFeature(dir, { id: "F10", title: "T", paths: "src/a,src/b" });

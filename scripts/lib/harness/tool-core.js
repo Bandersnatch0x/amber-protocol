@@ -20,6 +20,7 @@ const { resolveRequestCapability } = require("../core/runner-registry");
 const { showExternalEffect } = require("../core/external-registry");
 const { loadPolicyRules } = require("../core/loop-policy");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { resolvePathWithin } = require("../core/fs-utils");
 
 const CODE_IMMUTABLE = "AMBER_E_HARNESS_TOOL_IMMUTABLE";
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_TOOL_NOT_FOUND";
@@ -133,7 +134,12 @@ function admitHarnessTool(targetRoot, { toolPath, now } = {}) {
 	if (!toolPath || typeof toolPath !== "string") {
 		throw typedError(CODE_INVALID_ARG, "--file <tool.json> is required to admit a tool");
 	}
-	const resolvedPath = path.resolve(targetRoot, toolPath);
+	let resolvedPath;
+	try {
+		resolvedPath = resolvePathWithin(targetRoot, toolPath, { label: "Harness tool" });
+	} catch (err) {
+		throw typedError(CODE_INVALID_ARG, err.message);
+	}
 	let candidate;
 	try {
 		candidate = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));

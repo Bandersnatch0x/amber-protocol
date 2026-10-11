@@ -4,9 +4,25 @@ const fs = require("fs");
 const path = require("path");
 const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 const { gitExec } = require("./core/git-exec");
+const { resolvePathWithin } = require("./core/fs-utils");
+
+function worktreePathFor(projectRoot, sessionId, { create = false } = {}) {
+	const stateDir = create
+		? resolveStateDirForCreate(projectRoot)
+		: resolveStateDirForRead(projectRoot);
+	// Resolve from the project root, rather than treating the state directory as
+	// a trusted root: `.amber` itself may be a symlink to an external tree.
+	const candidate = path.join(path.relative(projectRoot, stateDir), "worktrees", String(sessionId));
+	return resolvePathWithin(projectRoot, candidate, { label: "Worktree path" });
+}
 
 function createWorktree(projectRoot, sessionId) {
-	const worktreePath = path.join(resolveStateDirForCreate(projectRoot), "worktrees", sessionId);
+	let worktreePath;
+	try {
+		worktreePath = worktreePathFor(projectRoot, sessionId, true);
+	} catch (error) {
+		return { success: false, error: error.message };
+	}
 
 	const currentBranchResult = gitExec(projectRoot, ["branch", "--show-current"]);
 
@@ -45,7 +61,12 @@ function createWorktree(projectRoot, sessionId) {
 }
 
 function removeWorktree(projectRoot, sessionId) {
-	const worktreePath = path.join(resolveStateDirForRead(projectRoot), "worktrees", sessionId);
+	let worktreePath;
+	try {
+		worktreePath = worktreePathFor(projectRoot, sessionId);
+	} catch (error) {
+		return { success: false, error: error.message };
+	}
 
 	if (!fs.existsSync(worktreePath)) {
 		return {

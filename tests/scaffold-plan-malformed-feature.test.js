@@ -44,3 +44,43 @@ test("scaffoldPlan still scaffolds a plan for a well-formed feature", () => {
 	assert.equal(result.created.length, 1);
 	fs.rmSync(root, { recursive: true, force: true });
 });
+
+test("scaffoldPlan refuses a feature id that would escape the target", () => {
+	const escapeId = `../../../../tmp/amber-plan-escape-${process.pid}`;
+	const root = tempProject([
+		{
+			id: escapeId,
+			title: "Escape",
+			user_visible_behavior: "x",
+			verification: ["run npm test"],
+		},
+	]);
+	const escaped = path.resolve(root, "docs", "plans", `${escapeId}-Escape.md`);
+	try {
+		const result = scaffoldPlan(root, { feature: escapeId });
+		assert.deepEqual(result.created, []);
+		assert.match(result.errors.join("\n"), /outside the target root/i);
+		assert.equal(fs.existsSync(escaped), false);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(escaped, { force: true });
+	}
+});
+
+test("scaffoldPlan refuses a symlinked plans directory", () => {
+	const root = tempProject([
+		{ id: "f3", title: "Linked", user_visible_behavior: "x", verification: ["run npm test"] },
+	]);
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "scaffold-plan-outside-"));
+	try {
+		fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+		fs.symlinkSync(outside, path.join(root, "docs", "plans"), "dir");
+		const result = scaffoldPlan(root, { feature: "f3" });
+		assert.deepEqual(result.created, []);
+		assert.match(result.errors.join("\n"), /outside the target root/i);
+		assert.deepEqual(fs.readdirSync(outside), []);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});

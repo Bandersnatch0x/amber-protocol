@@ -17,6 +17,7 @@ const path = require("node:path");
 const { compileSchema } = require("../core/schema-contract");
 const { canonicalHashOf } = require("../core/registry-ledger");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { resolvePathWithin } = require("../core/fs-utils");
 const { emitHarnessEvent } = require("./event-ledger");
 
 const CODE_IMMUTABLE = "AMBER_E_HARNESS_CTX_IMMUTABLE";
@@ -127,7 +128,12 @@ function admitContextGrant(targetRoot, { grantPath, now } = {}) {
 	if (!grantPath || typeof grantPath !== "string") {
 		throw typedError(CODE_INVALID_ARG, "--file <grant.json> is required to admit a context grant");
 	}
-	const resolvedPath = path.resolve(targetRoot, grantPath);
+	let resolvedPath;
+	try {
+		resolvedPath = resolvePathWithin(targetRoot, grantPath, { label: "Context grant" });
+	} catch (err) {
+		throw typedError(CODE_INVALID_ARG, err.message);
+	}
 	let candidate;
 	try {
 		candidate = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
