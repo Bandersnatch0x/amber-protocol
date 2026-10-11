@@ -18,6 +18,7 @@ const {
 const { appendLedgerRecord } = require("./loop-ledger");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const { typedError } = require("./error-catalog");
+const { signalPidTree } = require("./execution-handles");
 
 const STDOUT_CAP = 4000;
 const STDERR_CAP = 2000;
@@ -102,11 +103,10 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 			let timedOut = false;
 			const timer = setTimeout(() => {
 				timedOut = true;
-				try {
-					process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGTERM");
-				} catch {
-					// The process may have exited between the timeout and kill attempt.
-				}
+				// Kill the whole tree. A bare signal stops only the direct child, so a
+				// timed-out verification could leave grandchildren running. signalPidTree
+				// already covers both platforms (taskkill /T on win32, process group on POSIX).
+				signalPidTree(child.pid, "SIGTERM");
 			}, timeoutMs);
 			child.stdout.on("data", (b) => out.push(Buffer.from(b)));
 			child.stderr.on("data", (b) => err.push(Buffer.from(b)));
