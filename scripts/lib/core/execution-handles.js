@@ -188,22 +188,34 @@ function signalPidTree(pid, signal = "SIGTERM") {
 
 function nextFence(targetRoot) {
 	const file = fenceFile(targetRoot);
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	let current = 0;
-	if (fs.existsSync(file)) {
-		let record;
-		try {
-			record = JSON.parse(fs.readFileSync(file, "utf8"));
-		} catch (error) {
-			throw typedError(CODE_CORRUPT, `execution handle fence is not valid JSON: ${error.message}`);
+	// Lazy-load the lock seam: session-lock uses this module's process identity
+	// helpers to judge stale leases, so a top-level require would create a cycle
+	// and leave the lock exports only partially initialized.
+	const { acquirePathLock, releasePathLock } = require("../session-lock");
+	const lock = acquirePathLock(`${file}.lock`);
+	if (!lock.success) throw typedError(lock.code, lock.error);
+	try {
+		let current = 0;
+		if (fs.existsSync(file)) {
+			let record;
+			try {
+				record = JSON.parse(fs.readFileSync(file, "utf8"));
+			} catch (error) {
+				throw typedError(
+					CODE_CORRUPT,
+					`execution handle fence is not valid JSON: ${error.message}`,
+				);
+			}
+			if (!Number.isInteger(record.fence) || record.fence < 0)
+				throw typedError(CODE_CORRUPT, "execution handle fence is malformed");
+			current = record.fence;
 		}
-		if (!Number.isInteger(record.fence) || record.fence < 0)
-			throw typedError(CODE_CORRUPT, "execution handle fence is malformed");
-		current = record.fence;
+		const next = current + 1;
+		fs.writeFileSync(file, `${JSON.stringify({ fence: next }, null, "\t")}\n`, "utf8");
+		return next;
+	} finally {
+		releasePathLock(`${file}.lock`, lock.leaseId);
 	}
-	const next = current + 1;
-	fs.writeFileSync(file, `${JSON.stringify({ fence: next }, null, "\t")}\n`, "utf8");
-	return next;
 }
 
 /**

@@ -27,6 +27,7 @@ const {
 	isPlainObject,
 } = require("../core/registry-ledger");
 const { emitHarnessEvent, readHarnessEvents } = require("./event-ledger");
+const { acquirePathLock, releasePathLock } = require("../session-lock");
 
 const SCHEMA_VERSION = 1;
 const DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
@@ -886,16 +887,22 @@ function readDaemonState(targetRoot) {
 
 function nextFence(targetRoot) {
 	const file = fenceFile(targetRoot);
-	let current = 0;
-	if (fs.existsSync(file)) {
-		const record = readJsonClosed(file, "runtime fence");
-		if (!Number.isInteger(record.fence) || record.fence < 0)
-			throw typedError(CODE_CORRUPT, "runtime fence is malformed");
-		current = record.fence;
+	const lock = acquirePathLock(`${file}.lock`);
+	if (!lock.success) throw typedError(lock.code, lock.error);
+	try {
+		let current = 0;
+		if (fs.existsSync(file)) {
+			const record = readJsonClosed(file, "runtime fence");
+			if (!Number.isInteger(record.fence) || record.fence < 0)
+				throw typedError(CODE_CORRUPT, "runtime fence is malformed");
+			current = record.fence;
+		}
+		const next = current + 1;
+		fs.writeFileSync(file, `${JSON.stringify({ fence: next }, null, "\t")}\n`, "utf8");
+		return next;
+	} finally {
+		releasePathLock(`${file}.lock`, lock.leaseId);
 	}
-	const next = current + 1;
-	fs.writeFileSync(file, `${JSON.stringify({ fence: next }, null, "\t")}\n`, "utf8");
-	return next;
 }
 
 function acquireStartLock(targetRoot) {

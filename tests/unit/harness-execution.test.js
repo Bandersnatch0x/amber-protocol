@@ -20,6 +20,7 @@ const {
 	CODE_ALREADY_PREPARED,
 	CODE_ALREADY_RELEASED,
 	CODE_RUN_TERMINAL,
+	runPreparedExecution,
 } = require("../../scripts/lib/harness/execution-adapter");
 const { executeInPreparedWorkspace } = require("../../scripts/lib/core/execution-domain-adapter");
 const { createWorktree } = require("../../scripts/lib/worktree-manager");
@@ -332,6 +333,27 @@ test("execution terminate is an explicit zero-write refusal, not cancel+release 
 	}
 });
 
+test("execution refuses a tampered workspace path outside the target", async () => {
+	const target = tmpTarget("workspace-boundary");
+	try {
+		const runId = "run-workspace-boundary";
+		const prepared = await prepareLocalRun(target, runId);
+		const recordFile = path.join(target, ".amber", "harness", "executions", `${runId}.json`);
+		const record = JSON.parse(fs.readFileSync(recordFile, "utf8"));
+		record.effective.workspace.path = os.tmpdir();
+		fs.writeFileSync(recordFile, `${JSON.stringify(record, null, "\t")}\n`);
+		await assert.rejects(
+			() => runPreparedExecution(target, { runId, commandId: "missing-command" }),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_EXEC_PREPARE_FAILED" &&
+				/outside the target root/.test(error.message),
+		);
+		assert.ok(fs.existsSync(prepared.effective.workspace.path), "external path was not deleted");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
 test("raw CLI routes execution terminate to the explicit refusal, not unknown action", async () => {
 	const target = tmpTarget("terminate-rawcli");
 	try {
@@ -375,6 +397,39 @@ test("executeInPreparedWorkspace runs in the prepared path and creates no worktr
 		assert.deepEqual(listWorktrees(target), before, "no worktree created or auto-removed");
 		removeWorktree(target, "h2b-prepared-1");
 	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
+test("handle persistence failure terminates the already-spawned child", async () => {
+	const target = tmpTarget("handle-persist-race");
+	const originalWriteFileSync = fs.writeFileSync;
+	const runId = "persist-race";
+	try {
+		const command = 'node -e "setTimeout(()=>{},30000)"';
+		let injected = false;
+		fs.writeFileSync = function patchedWriteFileSync(file, data, options) {
+			if (!injected && String(file).endsWith(`${runId}.handle.json`)) {
+				injected = true;
+				const error = new Error("simulated concurrent handle admission");
+				error.code = "EEXIST";
+				throw error;
+			}
+			return originalWriteFileSync.call(this, file, data, options);
+		};
+		const { result, error } = await executeInPreparedWorkspace(target, command, 1, {
+			handle: { targetRoot: target, runId, attemptId: "a1" },
+		});
+		assert.equal(injected, true);
+		assert.equal(result.exitCode, -1);
+		assert.match(result.stderr, /simulated concurrent handle admission/);
+		assert.ok(error === undefined);
+		assert.equal(
+			fs.readdirSync(target).some((name) => name.endsWith(".handle.json")),
+			false,
+		);
+	} finally {
+		fs.writeFileSync = originalWriteFileSync;
 		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });

@@ -9,7 +9,7 @@
 
 const { defineCliCommand } = require("../subcommand-dispatcher");
 const { resolveTarget, parseRevisionPin } = require("../command-helpers");
-const path = require("node:path");
+const { resolvePathWithin } = require("../core/fs-utils");
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -390,7 +390,12 @@ const harnessDispatch = defineCliCommand({
 					let observedEntries = [];
 					if (args.file) {
 						const fs = require("node:fs");
-						const parsed = JSON.parse(fs.readFileSync(path.resolve(target, args.file), "utf8"));
+						const parsed = JSON.parse(
+							fs.readFileSync(
+								resolvePathWithin(target, args.file, { label: "Observed entries" }),
+								"utf8",
+							),
+						);
 						observedEntries = Array.isArray(parsed) ? parsed : parsed.entries || [];
 					}
 					result = evaluateExecution(target, { runId: run.value, observedEntries });
@@ -542,7 +547,12 @@ const harnessDispatch = defineCliCommand({
 					);
 					if (file.error) return invalidArg(file.error);
 					const fs = require("node:fs");
-					const input = JSON.parse(fs.readFileSync(path.resolve(target, file.value), "utf8"));
+					const input = JSON.parse(
+						fs.readFileSync(
+							resolvePathWithin(target, file.value, { label: "Runtime schedule" }),
+							"utf8",
+						),
+					);
 					result = admitSchedule(target, input);
 				} else if (sub === "schedule" && op === "list") {
 					result = { ok: true, schedules: listSchedules(target, { now: args.now }) };

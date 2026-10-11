@@ -178,6 +178,18 @@ function releaseAt(lockPath, leaseId) {
 	if (parseLease(readRaw(lockPath))?.leaseId === leaseId) fs.rmSync(lockPath, { force: true });
 }
 
+// The same crash-safe lease protocol is useful for governed stores that are
+// not keyed by a session id (for example a harness run or a monotonic fence
+// counter). Keep the primitive path-based so those stores cannot accidentally
+// build a weaker open/write lock of their own.
+function acquirePathLock(lockPath) {
+	return acquireAt(lockPath, 0);
+}
+
+function releasePathLock(lockPath, leaseId) {
+	releaseAt(lockPath, leaseId);
+}
+
 function acquireLock(projectRoot, sessionId) {
 	return acquireAt(getLockPath(projectRoot, sessionId), 0);
 }
@@ -190,4 +202,4 @@ function getLockPath(projectRoot, sessionId) {
 	return path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId, ".lock");
 }
 
-module.exports = { acquireLock, releaseLock };
+module.exports = { acquireLock, releaseLock, acquirePathLock, releasePathLock };
