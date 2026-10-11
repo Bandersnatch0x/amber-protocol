@@ -9,7 +9,7 @@
 // the authorized Decision's settlement, ceiling, corruption) as a stable
 // AMBER_E_* code.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
@@ -97,7 +97,7 @@ function requiredFlag(args, key, flag, example) {
 	return { value };
 }
 
-const dispatch = defineCommand({
+const approvalDispatch = defineCliCommand({
 	command: "approval",
 	actions: ["grant", "revoke", "consume", "show", "list"],
 	handlers: {
@@ -268,9 +268,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function approvalDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { approvalDispatch };

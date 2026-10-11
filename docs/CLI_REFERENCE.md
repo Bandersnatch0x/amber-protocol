@@ -14,6 +14,16 @@ invoke the `amber` router skill or the thin verb skills (`amber-start`,
 `amber-check`, `amber-done`); the four deep journey skills remain for the full
 process.
 
+Stability is a separate registry field with values `core` and `experimental`. The
+`harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` families are
+**EXPERIMENTAL**. They remain callable and appear in the top-level list only under
+`--all`, with an `(experimental)` marker. Existing visibility tiers remain unchanged.
+
+The experimental bounded H7 maintenance scheduler is `amber harness runtime`. It schedules
+only closed-registry deterministic Amber maintenance jobs; existing Loop/Workflow contracts
+remain unscheduled. Repository-local state does not imply filesystem containment. Absolute-path
+writes can escape a worktree; filesystem containment requires OS sandboxing.
+
 ## Global Options
 
 ```bash
@@ -21,6 +31,7 @@ process.
 --json            # Output JSON format
 --dry-run         # Preview without making changes where supported (init, wiki, plan, team install/update, loop run)
 --help            # Show command help
+--all             # List every command, marking experimental families
 ```
 
 Text-mode bypass output writes payload text to stdout and prefixes blocking diagnostics as
@@ -458,17 +469,42 @@ node scripts/amber.js governance rules check --target . --command "rm -rf /tmp/x
 ```
 
 `rules check` uses the **same policy surface as `governed-runner`** (`evaluateGovernedPolicy`):
-un-removable built-in denies for destructive commands and shell composition (`&&`, `|`, `;`,
-file redirects, etc.) run **before** user `rules.json` allows. A prefix allow cannot smuggle a
-composite tail past the dry-run check — the verdict matches what `--execute` would enforce.
-Pure FD-to-FD redirects (`2>&1`, `1>&2`) are allowed; they rebind streams of the same process
-and are not a second command.
+un-removable built-in denies for destructive commands and for anything that needs a shell run
+**before** user `rules.json` allows. Governed and verification commands are parsed into argv and
+spawned with no shell, so a command containing `$`, a backtick, `;`, `|`, `&`, `>`, `<`, or a
+newline outside single quotes is refused with `AMBER_E_POLICY_SHELL_META` (redirects such as
+`2>&1` included). Single quotes keep their contents literal; double quotes may hold any literal
+except `$` and backticks. `exact` rules compare argv word for word; `deny` rules also match the
+unquoted argv, so quoting cannot hide a denied word. The verdict matches what `--execute` would
+enforce.
 
 **Per-context rules:** a loop contract's `governed` block and a route `command` stage may each
 declare an extra `rules` array (same `{ id, action, match, pattern }` shape). These compose with
-the global `rules.json` for that one command only — a context `allow` can supplement the global
-policy, but **deny-wins is absolute**: no context `allow` can override a global or context `deny`
-(or a built-in deny).
+the global `rules.json` for that one command only and may only narrow it: a context rule must be a
+`deny` (or a v2 `deny` / `require_approval` decision). A context `allow` is refused when the pack
+is read (`AMBER_E_PACK_ALLOW_RULE`); only `rules.json` can allow a command.
+
+**Approval pinning:** `loop approve` records the hash of the contract's `governed.command`,
+`governed.rules`, and the current `rules.json`. `loop run --execute` recomputes them and refuses
+with `AMBER_E_LOOP_CONTRACT_DRIFT` when any changed; `loop run --dry-run` reports the same drift as
+a warning.
+
+**Single use and the ledger anchor:** loop contract ids must match `^[a-z0-9][a-z0-9-]{0,63}$`
+(`AMBER_E_LOOP_CONTRACT_ID_INVALID`), since the id names `.amber/loops/<id>/`. Once every gate
+passes, `loop run --execute` creates a use marker for the approval in
+`.amber/loops/<id>/ledger.jsonl.anchor/consumed/` *before* the command spawns, so an approval is
+spent even if the run crashes, and a second use is refused with `AMBER_E_LOOP_APPROVAL_CONSUMED`
+whatever the ledger says. The same store holds the ledger head (`head.json`: record count and head
+hash); `verify-ledger` reports `head-truncated`, `head-mismatch`, or `anchor-missing` as
+`AMBER_E_LEDGER_TAMPERED`. Deleting the `.anchor` store refuses that ledger for every run and
+append: this is fail-closed by design. The store is not tamper-proof, though. It shares the
+filesystem and the OS user with the governed actor, so an actor who can write there can recreate it
+with a lower anchored head. That rewrite is caught by `amber ledger seal` and `amber ledger
+verify-anchoring`, which is why a sealed ledger is the one that holds; an unsealed one has nothing to
+catch it. Approval carries no authentication yet, so the single-use guarantee holds against replay
+and against truncate-and-rerun inside a process boundary, not against an actor who can rewrite the
+store and its seal. Ledgers written before the anchor existed are refused the same way; archive them
+and approve again.
 
 ### artifact admit / show / list
 
@@ -1914,7 +1950,7 @@ node scripts/amber.js execution readiness \
 
 ## Daemon Boundary
 
-Amber V1 has no daemon command surface. Do not use Amber as a background autonomous worker. Use explicit, human-triggered commands such as:
+The only daemon is the experimental `amber harness runtime daemon start|stop|status`, together with `harness runtime schedule` and `harness runtime tick`. It runs a closed registry of Amber-internal proposal jobs (`executesAnything=false`), never a project command, and prints an `[experimental]` notice on stderr. It may change or be removed in a minor release. Do not use Amber as a background autonomous worker. For project work, use explicit, human-triggered commands such as:
 
 ```bash
 node scripts/amber.js doctor --target .
@@ -2622,12 +2658,15 @@ node scripts/amber.js ledger export --target . --home sessions                # 
 
 # Git-anchor ledger tail hashes (closes the ADR-0003 full-rewrite gap)
 node scripts/amber.js ledger seal --target . --reviewer <name>
-node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if any ledger changed since the last seal
+node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if a sealed record changed
 ```
 
 `export` emits a broken chain as `intact:false` (data, not refusal) and counts it in `brokenCount`.
 `seal` writes an annotated git tag `amber-ledger-seal-<head-sha>` carrying each ledger's tail hash,
-so forging a ledger then requires rewriting git tag history. No Ed25519 signing yet — deferred per
+so forging a ledger then requires rewriting git tag history. A seal anchors a prefix: records
+appended after it are a valid extension (`extended` in `--json`), and only a changed or removed
+sealed record is drift. `seal` never overwrites a tag and refuses (`AMBER_E_LEDGER_RESEAL_REFUSED`)
+while any ledger is broken or no longer extends the latest seal. No Ed25519 signing yet — deferred per
 the Phase 1 spec until key management (HSM / OS keystore) is a real capability rather than a key in
 the repo.
 
@@ -3004,7 +3043,7 @@ cancellation can address exactly that handle.
   surface, naming its mapping onto the harness spine; `profile inspect` declares NO
   correspondence. The view reads frozen legacy artifacts and writes nothing.
 - `harness runtime jobs` / `schedule admit --file <schedule.json>` / `schedule list|show|revoke`
-  / `tick [--schedule <id>] [--now <iso>]` / `daemon start [--poll-ms <n>]|stop|status` — the
+  / `tick [--schedule <id>] [--now <iso>]` / `daemon start [--poll-ms <n>]|stop|status` — **experimental**: the
   bounded H7 maintenance runtime: a repository-local scheduler for a CLOSED registry of
   deterministic Amber-internal proposal jobs. The authority tuple is fixed at
   `executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`,

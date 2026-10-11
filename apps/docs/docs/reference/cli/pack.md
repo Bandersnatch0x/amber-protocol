@@ -14,6 +14,7 @@ import CommandBlock from '@site/src/components/command-block';
 <div className="amber-generated-banner">
   <strong>Reference generated from Amber Protocol v2.0.1</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
+  Stability: <code>core</code>
 </div>
 
 ## Summary
@@ -42,6 +43,6 @@ Inspect or validate declarative workflow packs without executing them.
 
 ## Boundaries & Safety
 
-- **Target Repository Scoping**: All mutations and reads are confined to `--target <path>`.
+- `--target <path>` selects repository state. Amber confines these target-relative paths, refusing `..` and symlink escapes before reading or writing: plan and scaffold destinations (including `accept --plan`), memory and context payloads, harness inputs, adapter allow-lists, workflow reports and their output directory, ledger exports, execution readiness plans, session and worktree state.
+- Path validation is not OS sandboxing, and the confinement above covers only the surfaces it names. `governance report --output`, `wiki export --output-dir`, and `handoff bundle --output-dir` resolve against the target yet still accept `..` or an absolute path, and `governance audit --output`, `governance readiness --output`, `security audit --output`, `loop record --output`, and `explain --markdown` resolve against the working directory instead of `--target`. A path flag not listed here is confined only when the command that reads it routes through the boundary. A governed or verification command still runs with your user's file permissions.
 - **Fail-Closed Behavior**: Corrupt governance state or invalid schema parameters immediately halt execution with non-zero exit codes.
-- **No Dynamic Spawning**: Command executes locally within the current process; it does not spawn unmonitored background daemons.

@@ -635,7 +635,7 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 	}
 
 	const lock = acquireLock(projectRoot, sessionId);
-	if (!lock.success) return fail("AMBER_E_INVALID_ARG", lock.error);
+	if (!lock.success) return fail(lock.code, lock.error);
 	try {
 		// State is read and the lease verified while the lock is held.
 		const session = loadActiveSession(sessionDir, sessionId);
@@ -659,7 +659,7 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 			options,
 		);
 	} finally {
-		releaseLock(projectRoot, sessionId);
+		releaseLock(projectRoot, sessionId, lock.leaseId);
 	}
 }
 
@@ -1257,11 +1257,11 @@ async function settleSessionRequest(projectRoot, sessionId, requestId, settlemen
 	const sessionDir = sessionDirOf(projectRoot, sessionId);
 
 	const lock = acquireLock(projectRoot, sessionId);
-	if (!lock.success) return fail("AMBER_E_INVALID_ARG", lock.error);
+	if (!lock.success) return fail(lock.code, lock.error);
 	try {
 		return settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement, options);
 	} finally {
-		releaseLock(projectRoot, sessionId);
+		releaseLock(projectRoot, sessionId, lock.leaseId);
 	}
 }
 

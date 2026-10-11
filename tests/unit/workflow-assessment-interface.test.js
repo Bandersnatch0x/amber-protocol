@@ -100,34 +100,46 @@ function writeTempFile(t, name, content) {
 }
 
 test("findings with a nonexistent report returns a read failure, not Invalid JSON", () => {
-	const missing = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wf-missing-")), "nope.json");
-	const result = workflowDispatch("findings", ".", { report: missing });
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "wf-missing-"));
+	const missing = path.join(target, "nope.json");
+	const result = workflowDispatch("findings", target, { report: missing });
 	assert.match(result.errors[0], /^Unable to read report /);
 	assert.match(result.errors[0], /ENOENT/);
+	fs.rmSync(target, { recursive: true, force: true });
 });
 
 test("compare with a corrupt report returns Invalid JSON", (t) => {
-	const baseline = writeTempFile(t, "baseline.json", JSON.stringify({ schemaVersion: "1.0.0" }));
-	const corrupt = writeTempFile(t, "corrupt.json", "{ not json !!");
-	const result = workflowDispatch("compare", ".", { baseline, current: corrupt });
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "wf-interface-"));
+	t.after(() => fs.rmSync(target, { recursive: true, force: true }));
+	const baseline = path.join(target, "baseline.json");
+	const corrupt = path.join(target, "corrupt.json");
+	fs.writeFileSync(baseline, JSON.stringify({ schemaVersion: "1.0.0" }), "utf8");
+	fs.writeFileSync(corrupt, "{ not json !!", "utf8");
+	const result = workflowDispatch("compare", target, { baseline, current: corrupt });
 	assert.match(result.errors[0], /^Invalid JSON in report /);
 });
 
 test("plan with a nonexistent report returns a read failure, not a crash", () => {
-	const missing = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wf-missing-")), "nope.json");
-	const result = workflowDispatch("plan", ".", { report: missing, finding: "x" });
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "wf-missing-"));
+	const missing = path.join(target, "nope.json");
+	const result = workflowDispatch("plan", target, { report: missing, finding: "x" });
 	assert.match(result.errors[0], /^Unable to read report /);
+	fs.rmSync(target, { recursive: true, force: true });
 });
 
 test("plan with a corrupt report returns Invalid JSON", (t) => {
-	const corrupt = writeTempFile(t, "corrupt.json", "{ nope !!");
-	const result = workflowDispatch("plan", ".", { report: corrupt, finding: "x" });
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "wf-interface-"));
+	t.after(() => fs.rmSync(target, { recursive: true, force: true }));
+	const corrupt = path.join(target, "corrupt.json");
+	fs.writeFileSync(corrupt, "{ nope !!", "utf8");
+	const result = workflowDispatch("plan", target, { report: corrupt, finding: "x" });
 	assert.match(result.errors[0], /^Invalid JSON in report /);
 });
 
 test("plan falls back to the dispatch target when the report lacks a target", (t) => {
 	const report = writeTempFile(t, "report.json", JSON.stringify({ findings: [] }));
 	// No finding present → domain error path; must still carry the dispatch target.
-	const result = workflowDispatch("plan", "/some/target", { report, finding: "nope" });
-	assert.equal(result.target, "/some/target");
+	const target = path.dirname(report);
+	const result = workflowDispatch("plan", target, { report, finding: "nope" });
+	assert.equal(result.target, target);
 });

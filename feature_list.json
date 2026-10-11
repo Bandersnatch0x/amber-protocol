@@ -237,7 +237,7 @@
 			"notes": [],
 			"paths": [
 				"scripts/lib/core/loops.js",
-				"scripts/lib/command-help.js",
+				"scripts/lib/command-registry.js",
 				"docs/CLI_REFERENCE.md",
 				"tests/phase-future-loop-readiness.test.js",
 				"tests/unit/loops.test.js"

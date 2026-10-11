@@ -56,3 +56,31 @@ test("resolveSessionFeature returns null for an unknown session", () => {
 	const dir = mkTarget("session-null");
 	assert.equal(resolveSessionFeature(dir, "no-such-session"), null);
 });
+
+// Both readers ran before acceptPlan's own containment refusal, so an escaped
+// path used to be read and its feature name surfaced in the mismatch error.
+test("readPlanFeature refuses a plan path that escapes the target", () => {
+	const dir = mkTarget("plan-escape");
+	const outside = mkTarget("plan-escape-outside");
+	fs.writeFileSync(
+		path.join(outside, "leak.md"),
+		"# Plan\n\nFeature: F999-LEAKED\n\n## High Level Design\n\n- x\n",
+	);
+	const rel = path.relative(dir, path.join(outside, "leak.md"));
+	assert.equal(readPlanFeature(dir, rel), null, "an escaped plan must not be read");
+});
+
+test("resolveSessionFeature refuses a session id that resolves outside the state dir", () => {
+	const dir = mkTarget("session-escape");
+	const other = mkTarget("session-escape-other");
+	const hijackDir = path.join(other, ".amber", "sessions", "hijack");
+	fs.mkdirSync(hijackDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(hijackDir, "manifest.json"),
+		JSON.stringify({ sessionId: "hijack", feature: "F-HIJACKED", status: "created" }),
+	);
+	const rel = path.relative(path.join(dir, ".amber", "sessions"), hijackDir);
+	assert.ok(rel.startsWith(".."), "fixture must actually escape the state dir");
+	assert.equal(resolveSessionFeature(dir, rel), null, "a traversing id must not be read");
+	assert.equal(resolveSessionFeature(dir, hijackDir), null, "an absolute id must not be read");
+});

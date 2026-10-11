@@ -87,7 +87,10 @@ function loadoutsDir(targetRoot) {
 
 function loadoutPathFor(targetRoot, route, feature) {
 	const name = feature ? `${route}-${feature}.json` : `${route}.json`;
-	return path.join(loadoutsDir(targetRoot), name);
+	return resolvePathWithin(loadoutsDir(targetRoot), name, {
+		label: "Context Loadout file",
+		canonicalExisting: true,
+	});
 }
 
 // Word estimate: text.length / 5, rounded. Amber has no tokenizer.

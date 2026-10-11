@@ -45,11 +45,11 @@ Amber 把计划、会话、证据、决策和交接显式留在代码旁。它�
 
 它挂在你已有的编码引擎之下，补治理与证据；不是又一个 agent 运行时，也不是组织级平台。
 
-| Amber 是                          | Amber 不是                         |
-| --------------------------------- | ---------------------------------- |
-| 仓库内的治理与证据协议            | 组织级 Skill 市场 / 插件商店       |
-| 可审查的计划 · 闸门 · 审批 · 交接 | 跨仓网关或跨机器总控看板           |
-| 可在团队间复制的本地约定          | 常驻调度 / 自动跑项目命令的 daemon |
+| Amber 是                          | Amber 不是                      |
+| --------------------------------- | ------------------------------- |
+| 仓库内的治理与证据协议            | 组织级 Skill 市场 / 插件商店    |
+| 可审查的计划 · 闸门 · 审批 · 交接 | 跨仓网关或跨机器总控看板        |
+| 可在团队间复制的本地约定          | 自动跑项目命令的调度器 / daemon |
 
 ---
 
@@ -71,8 +71,14 @@ Amber 把计划、会话、证据、决策和交接显式留在代码旁。它�
 
 1. 不替代编码引擎 / 不做通用 agent 运行时
 2. 不跑动态工作流、不调度 live subagent、不自动执行你的项目命令
-3. 不做组织级市场、跨仓网关、跨机器看板、always-on 调度器
+3. 不做组织级市场、跨仓网关、跨机器看板。唯一的调度器是实验性的 `amber harness runtime`（schedule、tick、daemon），只运行 Amber 内部的提案任务，从不运行项目命令
 4. 不覆盖已有项目文档（init 与 wiki 只补缺失文件）
+5. 不提供文件系统隔离：worktree 只分离检出状态，绝对路径写入仍可逃出；文件系统隔离需要操作系统沙箱
+
+`harness`、`runner`、`retention`、`external`、`breakglass` 和 `sync` 六个命令族标记为
+**EXPERIMENTAL（实验性）**。命令仍可调用，顶层列表仅在 `amber --all` 下显示，并带实验性标记。
+默认帮助保留 `audit`、`init`、`doctor`、`next`、`plan`、`handoff` 和 `session`。
+稳定性独立于可见性层级。
 
 完整边界见 [Team Replication Charter](./docs/TEAM_REPLICATION_CHARTER.md) 与 [SPEC.md](./SPEC.md)。
 
@@ -178,7 +184,7 @@ amber handoff --target my-project
 
 ## 命令面
 
-默认 `amber --help` 只投影**七个主命令**——整条旅程都在里面：
+默认 `amber --help` 只投影**七个主命令**——整条旅程都在里面。`amber --all` 列出完整表面：专家命令族、已弃用的 `profile` / `task` / `result`，以及六个实验性命令族（`harness`、`runner`、`retention`、`external`、`breakglass`、`sync`），每个都带 `(experimental)` 标记：
 
 | 命令            | 作用                                     |
 | --------------- | ---------------------------------------- |
@@ -255,9 +261,9 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 - 不执行 Dynamic Workflow
 - 不调用真实 subagent runner
 - 不自动执行目标项目命令
-- 不写外部系统（PR、issue tracker、通知），也不拦截 agent 的工具调用
+- 外部副作用必须经过实验性 `external` 命令族的注册契约与审批；不拦截 agent 的工具调用
 - 不自动重写已有项目文档
-- 当前产品不执行 scheduled loop
+- 已有 Loop/Workflow 契约不调度执行；唯一的调度器是实验性 H7 维护运行时 `amber harness runtime`
 - 原生安装不执行任何受治理的 verb 阶段：实现拥有的 adapter 表出厂为**空**（无回退），`session run` 的 stage 一律 fail-closed，直到注册 capability——而注册是一次经过评审的代码变更，不是配置修改
 
 完整边界说明见 [SPEC.md](./SPEC.md)。
@@ -269,6 +275,7 @@ contract 声明的 `governed.command`——但必须穿过四道门：声明式�
 （`.amber/governance/rules.json`，deny-wins / 默认拒绝）、一次显式 `amber loop approve`
 （一次授权只批一次运行）、隔离的 git worktree（你的主检出永不作为 cwd）、以及防篡改的
 哈希链 ledger。默认 `loop run` 仍是 dry-run；执行需要 `--execute`。
+worktree 只分离检出状态；没有操作系统沙箱时，绝对路径写入仍可逃出 worktree。
 
 ```bash
 amber loop approve --file <pack> --contract <id> --reviewer <name>
@@ -290,7 +297,7 @@ amber loop recommend --target . --goal "continuous improvement" --json
 amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
 ```
 
-当前产品边界仍不支持 live scheduling；`loop run` 必须带 `--dry-run`。
+Loop 契约仍不调度执行。预览使用 `--dry-run`；受治理执行需要 `--execute` 和审批。
 
 ### 治理信任层（trusted-control contracts）
 

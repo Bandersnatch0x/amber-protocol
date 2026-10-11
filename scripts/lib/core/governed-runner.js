@@ -11,6 +11,7 @@ const { resolveTarget } = require("./fs-utils");
 const { evaluateGovernedPolicy, loadPolicyRules } = require("./loop-policy");
 const {
 	appendLedgerRecord,
+	consumeApproval,
 	readLedger,
 	verifyLedgerChain,
 	latestUnconsumedApproval,
@@ -26,12 +27,32 @@ const {
 	policyHashOf,
 } = require("./run-freeze");
 
+function isNarrowingRule(rule) {
+	if (!rule || typeof rule !== "object") return false;
+	const { action, decision } = rule;
+	if (action === undefined && decision === undefined) return false;
+	return (
+		(action === undefined || action === "deny") &&
+		(decision === undefined || decision === "deny" || decision === "require_approval")
+	);
+}
+
+// Only rules.json may allow a command. Pack and route-stage rules are written
+// by whoever edits the pack, so they may deny or require approval, never allow.
+function packAllowRuleProblem(contextRules) {
+	if (!Array.isArray(contextRules)) return null;
+	const widening = contextRules.filter((rule) => !isNarrowingRule(rule));
+	if (widening.length === 0) return null;
+	const names = widening.map((rule) => rule?.id ?? JSON.stringify(rule)).join(", ");
+	return codedError(
+		"AMBER_E_PACK_ALLOW_RULE",
+		`pack rules may only deny or require approval; refused rule(s): ${names}`,
+	);
+}
+
 function mergeRules(globalRules, contextRules) {
 	const g = Array.isArray(globalRules?.rules) ? globalRules.rules : [];
 	const c = Array.isArray(contextRules) ? contextRules : [];
-	// Context rules are appended; evaluateGovernedPolicy checks ALL deny rules first
-	// (deny-wins, including un-removable built-ins), so a context allow can never
-	// override a global OR context deny.
 	return {
 		...globalRules,
 		defaultAction: globalRules?.defaultAction ?? "deny",
@@ -226,8 +247,8 @@ function frozenAdmissionProblem(targetRoot, frozen, resolvedCommand, globalRules
 
 /**
  * R-AU-3: consumption eligibility in order, each refusal explicit. Single-use
- * (check 1) holds by construction — the candidate grant came from
- * `latestUnconsumedApproval`, which only returns unconsumed grants. Binding
+ * (check 1) is enforced after these checks by `consumeApproval`, right before
+ * the spawn, so a refusal here leaves the grant unspent. Binding
  * fields a legacy grant never carried are recorded absences: the dimension is
  * not checkable and is skipped, never fabricated (compat boundary, spec §8).
  *
@@ -610,6 +631,7 @@ async function runGovernedCommand({
 	label = "command",
 	contextRules,
 	frozen,
+	approvalBinding,
 	preparedWorkspacePath,
 }) {
 	const targetRoot = resolveTarget(target);
@@ -656,6 +678,21 @@ async function runGovernedCommand({
 			errors: [codedError("AMBER_E_COMMAND_ID_UNRESOLVED", reason)],
 			warnings: [],
 		};
+	}
+
+	const packProblem = packAllowRuleProblem(contextRules);
+	if (packProblem) {
+		appendLedgerRecord(lp, {
+			schemaVersion: 2,
+			kind: "denied",
+			gate: "pack-rules",
+			command,
+			reason: packProblem,
+			recordedAt: new Date().toISOString(),
+			executesAnything: false,
+			...subject,
+		});
+		return { target: targetRoot, ...resultMetadata, errors: [packProblem], warnings: [] };
 	}
 
 	let resolvedCommand = command;
@@ -788,8 +825,9 @@ async function runGovernedCommand({
 	// R-AU-3: authorization-consumption eligibility, in order, before any
 	// effect. A refusal here leaves the grant unconsumed and terminates the
 	// attempt at the gate (drift is never noticed only in a later fold).
-	if (frozen) {
-		const eligibility = eligibilityProblem(approval, frozen, executionSubject.attemptId);
+	const binding = frozen ?? approvalBinding;
+	if (binding) {
+		const eligibility = eligibilityProblem(approval, binding, executionSubject.attemptId);
 		if (eligibility) {
 			appendLedgerRecord(lp, {
 				schemaVersion: 2,
@@ -807,7 +845,12 @@ async function runGovernedCommand({
 				target: targetRoot,
 				...resultMetadata,
 				refusal: eligibility.refusal,
-				errors: [codedError("AMBER_E_POLICY_DENY", eligibility.reason)],
+				errors: [
+					codedError(
+						frozen ? "AMBER_E_POLICY_DENY" : "AMBER_E_LOOP_CONTRACT_DRIFT",
+						eligibility.reason,
+					),
+				],
 				warnings: [],
 			};
 		}
@@ -818,6 +861,26 @@ async function runGovernedCommand({
 			target: targetRoot,
 			...(namedCommand ? { commandId, matchedRule } : {}),
 			errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")],
+			warnings: [],
+		};
+	}
+	if (!consumeApproval(lp, approval.approvalKey)) {
+		const reason = `approval ${approval.approvalKey} was already used for ${label}`;
+		appendLedgerRecord(lp, {
+			schemaVersion: 2,
+			kind: "denied",
+			gate: "approval-consumed",
+			approvalKey: approval.approvalKey,
+			...(namedCommand ? { commandId } : {}),
+			reason,
+			recordedAt: new Date().toISOString(),
+			executesAnything: false,
+			...subject,
+		});
+		return {
+			target: targetRoot,
+			...(namedCommand ? { commandId, matchedRule } : {}),
+			errors: [codedError("AMBER_E_LOOP_APPROVAL_CONSUMED", reason)],
 			warnings: [],
 		};
 	}
@@ -867,6 +930,7 @@ async function runGovernedCommand({
 module.exports = {
 	runGovernedCommand,
 	mergeRules,
+	packAllowRuleProblem,
 	resolveCommandId,
 	canonicalOutputDigest,
 	attachExecutionDigest,

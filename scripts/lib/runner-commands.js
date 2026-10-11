@@ -8,7 +8,7 @@
 
 const fs = require("node:fs");
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { resolvePathWithin } = require("./core/fs-utils");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
@@ -151,7 +151,7 @@ function readReceiptFile(target, receipt) {
 	}
 }
 
-const dispatch = defineCommand({
+const runnerDispatch = defineCliCommand({
 	command: "runner",
 	actions: [
 		"register",
@@ -549,9 +549,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function runnerDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { runnerDispatch };

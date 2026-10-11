@@ -2,11 +2,12 @@ const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const { acquireLock, releaseLock, isLocked } = require("../../scripts/lib/session-lock");
+const { acquireLock, releaseLock } = require("../../scripts/lib/session-lock");
 
 describe("session-lock", () => {
 	const testRoot = path.join(__dirname, "../fixtures/lock-test");
 	const sessionId = "test-session";
+	const lockPath = path.join(testRoot, ".amber", "sessions", sessionId, ".lock");
 
 	beforeEach(() => {
 		if (fs.existsSync(testRoot)) fs.rmSync(testRoot, { recursive: true });
@@ -20,7 +21,7 @@ describe("session-lock", () => {
 	it("should acquire lock successfully", () => {
 		const result = acquireLock(testRoot, sessionId);
 		assert.strictEqual(result.success, true);
-		assert.ok(isLocked(testRoot, sessionId));
+		assert.strictEqual(JSON.parse(fs.readFileSync(lockPath, "utf8")).leaseId, result.leaseId);
 	});
 
 	it("should fail to acquire when already locked", () => {
@@ -31,14 +32,14 @@ describe("session-lock", () => {
 	});
 
 	it("should release lock", () => {
-		acquireLock(testRoot, sessionId);
-		releaseLock(testRoot, sessionId);
-		assert.strictEqual(isLocked(testRoot, sessionId), false);
+		const held = acquireLock(testRoot, sessionId);
+		releaseLock(testRoot, sessionId, held.leaseId);
+		assert.strictEqual(fs.existsSync(lockPath), false);
 	});
 
 	it("should not be locked after release", () => {
-		acquireLock(testRoot, sessionId);
-		releaseLock(testRoot, sessionId);
+		const held = acquireLock(testRoot, sessionId);
+		releaseLock(testRoot, sessionId, held.leaseId);
 		const result = acquireLock(testRoot, sessionId);
 		assert.strictEqual(result.success, true);
 	});
@@ -49,7 +50,8 @@ describe("session-lock", () => {
 		const gateFile = path.join(testRoot, ".gate");
 		const lockModule = require.resolve("../../scripts/lib/session-lock");
 		// Each child spins on a gate file so all N reach acquireLock at the same
-		// instant, then reports its result as JSON on stdout.
+		// instant, then reports its result as JSON on stdout and stays alive, since a
+		// lock whose holder exited is free.
 		const script = [
 			"const fs=require('fs');",
 			`const {acquireLock}=require(${JSON.stringify(lockModule)});`,
@@ -59,6 +61,7 @@ describe("session-lock", () => {
 			"while(!fs.existsSync(gate)){}",
 			"const r=acquireLock(testRoot,sessionId);",
 			"process.stdout.write(JSON.stringify(r));",
+			"setTimeout(()=>{},2000);",
 		].join("");
 
 		const children = [];

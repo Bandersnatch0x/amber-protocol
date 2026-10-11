@@ -93,4 +93,25 @@ describe("worktree-manager", () => {
 		const result = removeWorktree(TEST_ROOT, "does-not-exist");
 		assert.strictEqual(result.success, false);
 	});
+
+	it("refuses a symlinked worktree state directory", () => {
+		const outside = path.join(TEST_ROOT, "..", "worktree-outside");
+		fs.mkdirSync(outside, { recursive: true });
+		fs.mkdirSync(path.join(TEST_ROOT, ".amber"), { recursive: true });
+		fs.symlinkSync(outside, path.join(TEST_ROOT, ".amber", "worktrees"), "dir");
+		const result = createWorktree(TEST_ROOT, SESSION_ID);
+		assert.strictEqual(result.success, false);
+		assert.match(result.error, /outside the target root/);
+		assert.strictEqual(fs.existsSync(path.join(outside, SESSION_ID)), false);
+	});
+
+	it("refuses a symlinked state root", () => {
+		const outside = path.join(TEST_ROOT, "..", "state-root-outside");
+		fs.mkdirSync(outside, { recursive: true });
+		fs.symlinkSync(outside, path.join(TEST_ROOT, ".amber"), "dir");
+		const result = createWorktree(TEST_ROOT, SESSION_ID);
+		assert.strictEqual(result.success, false);
+		assert.match(result.error, /outside the target root/);
+		assert.strictEqual(fs.existsSync(path.join(outside, "worktrees", SESSION_ID)), false);
+	});
 });

@@ -26,7 +26,7 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
   generation consume this same registry. `knownSubcommands()` derives family
   invocations from registered capabilities plus documented help verbs, while
   `commandInvocationContract()` projects command-specific allowed and required
-  options from the Command help/usage definitions. `scripts/lib/command-help.js` is
+  options from the Command help/usage definitions. `scripts/lib/command-registry.js` is
   a compatibility re-export of that module.
 - `scripts/lib/command-dispatcher.js` owns handler implementation, the bound runtime
   registry, family argument mapping, and deprecation warnings.
@@ -91,6 +91,6 @@ flowchart LR
   generated products.
 - The root CLI package intentionally depends only on `ajv` and `ajv-formats`; Web
   dependencies remain isolated in `apps/web/package.json`.
- - `scripts/lib/cli-typed-seam.js` validates the Action whitelist at CLI startup and classifies
-   Action-equivalent invocations through the same capability registry used by MCP. It does not
-   replace CLI handlers or grant execution authority.
+ - `scripts/lib/cli-typed-seam.js` validates the Action whitelist on first use, not at CLI
+   startup, and classifies Action-equivalent invocations through the same capability registry
+   used by MCP. It does not replace CLI handlers or grant execution authority.

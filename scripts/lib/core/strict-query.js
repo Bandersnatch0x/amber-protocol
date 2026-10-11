@@ -14,6 +14,7 @@ const {
 } = require("./governance-graph");
 const { invalidationsForSubject } = require("./staleness-registry");
 const { sha256Hex } = require("./context-hash");
+const { isNonEmptyString } = require("./registry-ledger");
 
 const STRICT_QUERY_VERSION = 1;
 const PROJECTION_VERSION = 1;
@@ -40,10 +41,6 @@ function fail(code, errors, extra = {}) {
 		errors,
 		...extra,
 	};
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
 }
 
 function isSha256(value) {

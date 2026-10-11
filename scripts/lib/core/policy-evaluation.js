@@ -11,7 +11,13 @@
 // completed policy outcome is appended to its own tamper-evident ledger.
 
 const { typedError } = require("./error-catalog");
-const { GENESIS_HASH, chainHash } = require("./registry-ledger");
+const {
+	GENESIS_HASH,
+	chainHash,
+	isPlainObject,
+	quotedList,
+	closedFieldProblem,
+} = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { hashText, canonicalJson } = require("./context-hash");
 const { parseTimestamp, resolveActivePrincipal } = require("./principal-registry");
@@ -102,10 +108,6 @@ function outcomeCorrupt(message) {
 	return typedError(OUTCOME_REGISTRY_CORRUPT_CODE, message);
 }
 
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 function isNonEmptyString(value) {
 	return typeof value === "string" && value.length > 0;
 }
@@ -116,10 +118,6 @@ function isPositiveInt(value) {
 
 function isNonNegativeInt(value) {
 	return Number.isInteger(value) && value >= 0;
-}
-
-function quotedList(values) {
-	return values.map((value) => `"${value}"`).join(", ");
 }
 
 function hasRelaxingName(key) {
@@ -929,23 +927,9 @@ function nullableStringProblem(value, label) {
 	return null;
 }
 
-function closedFieldsProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length > 0) {
-		return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-	}
-	const missing = fields.filter((field) => !(field in value));
-	if (missing.length > 0) {
-		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
-	}
-	return null;
-}
-
 function policyRefProblem(ref, label) {
 	if (!isPlainObject(ref)) return `${label} must be an object; got ${JSON.stringify(ref)}`;
-	const closed = closedFieldsProblem(ref, POLICY_REF_FIELDS, label);
+	const closed = closedFieldProblem(ref, POLICY_REF_FIELDS, label);
 	if (closed !== null) return closed;
 	if (!isNonEmptyString(ref.identity)) return `${label}.identity must be a non-empty string`;
 	if (!isPositiveInt(ref.revision)) return `${label}.revision must be a positive integer`;
@@ -955,7 +939,7 @@ function policyRefProblem(ref, label) {
 
 function approvalRefProblem(ref) {
 	if (!isPlainObject(ref)) return `approval must be an object; got ${JSON.stringify(ref)}`;
-	const closed = closedFieldsProblem(ref, APPROVAL_REF_FIELDS, "approval");
+	const closed = closedFieldProblem(ref, APPROVAL_REF_FIELDS, "approval");
 	if (closed !== null) return closed;
 	if (!isNonEmptyString(ref.id)) return `approval.id must be a non-empty string`;
 	const statusProblem = nullableStringProblem(ref.status, "approval.status");
@@ -967,7 +951,7 @@ function approvalRefProblem(ref) {
 
 function gateOutcomeRefProblem(ref) {
 	if (!isPlainObject(ref)) return `gateOutcome must be an object; got ${JSON.stringify(ref)}`;
-	const closed = closedFieldsProblem(ref, GATE_OUTCOME_REF_FIELDS, "gateOutcome");
+	const closed = closedFieldProblem(ref, GATE_OUTCOME_REF_FIELDS, "gateOutcome");
 	if (closed !== null) return closed;
 	if (!isNonNegativeInt(ref.index)) return `gateOutcome.index must be a non-negative integer`;
 	for (const field of ["gate", "hash", "verdict"]) {
@@ -987,7 +971,7 @@ function delegationRefProblem(ref) {
 	if (ref === null) return null;
 	if (!isPlainObject(ref))
 		return `delegation must be null or an object; got ${JSON.stringify(ref)}`;
-	const closed = closedFieldsProblem(ref, DELEGATION_REF_FIELDS, "delegation");
+	const closed = closedFieldProblem(ref, DELEGATION_REF_FIELDS, "delegation");
 	if (closed !== null) return closed;
 	for (const field of ["delegator", "delegate", "capability", "scope", "validFrom", "validUntil"]) {
 		if (!isNonEmptyString(ref[field])) return `delegation.${field} must be a non-empty string`;
@@ -1027,7 +1011,7 @@ function outcomeChainWording(kind, event, lineIndex, label) {
 }
 
 function validateOutcomeHeader(event, lineIndex) {
-	const closed = closedFieldsProblem(
+	const closed = closedFieldProblem(
 		event,
 		OUTCOME_EVENT_FIELDS,
 		`policy outcome ledger event ${lineIndex}`,

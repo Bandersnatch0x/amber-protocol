@@ -13,6 +13,7 @@ const {
 	knownSubcommands,
 } = require("./command-registry");
 const { resolveContextAction, toCapability } = require("./context/action-registry");
+const { typedError } = require("./core/error-catalog");
 
 const ACTION_TYPES_DIR = path.resolve(__dirname, "../../action-types");
 
@@ -21,20 +22,44 @@ function validateTypedSeam(actionTypesDir = ACTION_TYPES_DIR) {
 		.readdirSync(actionTypesDir)
 		.filter((file) => file.endsWith(".json"))
 		.sort()
-		.map((file) => JSON.parse(fs.readFileSync(path.join(actionTypesDir, file), "utf8")));
+		.map((file) => {
+			try {
+				return JSON.parse(fs.readFileSync(path.join(actionTypesDir, file), "utf8"));
+			} catch (cause) {
+				throw typedError(
+					"AMBER_E_TYPED_SEAM_CORRUPT",
+					`CLI typed seam is invalid: ${file}: ${cause.message}`,
+				);
+			}
+		});
 	const result = validateWhitelist(actions);
-	if (!result.valid) throw new Error(`CLI typed seam is invalid:\n${result.findings.join("\n")}`);
+	if (!result.valid) {
+		throw typedError(
+			"AMBER_E_TYPED_SEAM_CORRUPT",
+			`CLI typed seam is invalid:\n${result.findings.join("\n")}`,
+		);
+	}
 	return actions;
 }
 
-const REGISTERED_ACTIONS = validateTypedSeam();
-const ACTIONS_BY_CAPABILITY = new Map();
-for (const action of REGISTERED_ACTIONS) {
-	const execution = action.execution;
-	const mappings = execution.variants ? Object.values(execution.variants) : [execution];
-	for (const mapping of mappings) {
-		ACTIONS_BY_CAPABILITY.set(capabilityKey(mapping.command, mapping.subcommand), action);
+// The seam is read on first use, not at import. Validating every Action Type while
+// the module loads makes one corrupt file break every dispatched command, and it
+// charges the whole surface for a check only the typed commands need.
+let registeredActions = null;
+let actionsByCapability = null;
+function loadTypedSeam() {
+	if (registeredActions) return;
+	const actions = validateTypedSeam();
+	const byCapability = new Map();
+	for (const action of actions) {
+		const execution = action.execution;
+		const mappings = execution.variants ? Object.values(execution.variants) : [execution];
+		for (const mapping of mappings) {
+			byCapability.set(capabilityKey(mapping.command, mapping.subcommand), action);
+		}
 	}
+	registeredActions = actions;
+	actionsByCapability = byCapability;
 }
 
 function classifyCliInvocation(command, args = {}) {
@@ -73,7 +98,8 @@ function validateCliInvocation(command, args = {}) {
 	}
 	const key = capabilityKey(command, subcommand);
 	const capability = classifyCliInvocation(command, args);
-	const action = ACTIONS_BY_CAPABILITY.get(key) || null;
+	loadTypedSeam();
+	const action = actionsByCapability.get(key) || null;
 	if (!capability && KNOWN_UNTYPED_SUBCOMMANDS.has(key)) {
 		return { valid: true, disposition: "untyped", capability: null, action: null };
 	}
@@ -163,7 +189,10 @@ function dispatchTypedInvocation(command, args, invokeHandler) {
 
 module.exports = {
 	TYPED_COMMANDS,
-	REGISTERED_ACTIONS,
+	get REGISTERED_ACTIONS() {
+		loadTypedSeam();
+		return registeredActions;
+	},
 	validateTypedSeam,
 	classifyCliInvocation,
 	validateCliInvocation,

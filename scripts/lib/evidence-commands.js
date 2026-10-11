@@ -8,7 +8,7 @@
 // binding, replayOf provenance, ceiling, corruption) as a stable AMBER_E_*
 // code.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 
 // The readFailure FALLBACK for untyped crashes at the show/list seams, not a
@@ -128,7 +128,7 @@ function environmentFromEntries(entries) {
 	return { value: environment };
 }
 
-const dispatch = defineCommand({
+const evidenceDispatch = defineCliCommand({
 	command: "evidence",
 	actions: ["record", "verify", "show", "list"],
 	handlers: {
@@ -262,9 +262,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function evidenceDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { evidenceDispatch };

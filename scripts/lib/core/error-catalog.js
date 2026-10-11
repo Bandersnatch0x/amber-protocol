@@ -3,6 +3,15 @@
 // Single source of truth for user-facing Amber error codes.
 // Each code maps to the Amber control layer it defends (see CLAUDE.md).
 const CATALOG = {
+	AMBER_E_TYPED_SEAM_CORRUPT: {
+		title: "CLI typed seam is invalid",
+		cause:
+			"An Action Type under action-types/ is not valid JSON, or the registry does not satisfy the typed whitelist. The seam is read on first use, so only the command that needs it is refused.",
+		remedy:
+			"Fix or restore the named file under action-types/; amber --version and untyped commands keep working meanwhile.",
+		layer: "Context",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_FEATURE_NOT_FOUND: {
 		title: "Feature not registered in feature_list.json",
 		cause: "A command referenced a feature id that is not present in feature_list.json.",
@@ -46,6 +55,33 @@ const CATALOG = {
 		layer: "Verification",
 		related: [],
 	},
+	AMBER_E_SESSION_LOCKED: {
+		title: "Session is locked by a running process",
+		cause:
+			"The session lock names a holder pid that is still running with the same process start identity.",
+		remedy:
+			"Wait for the holding session command to finish; the lock frees itself once that process exits.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_SESSION_LOCK_STUCK", "AMBER_E_SESSION_LOCK_CORRUPT"],
+	},
+	AMBER_E_SESSION_LOCK_STUCK: {
+		title: "Session lock needs manual removal",
+		cause:
+			"The session lock names a holder that is gone, and the code cannot reclaim it by itself: either a takeover guard beside it is held by a pid that cannot be shown to be a live amber process, which on a platform without a process identity may be a recycled pid, or the takeover chain is as deep as it goes after repeated crashes.",
+		remedy:
+			"Check no amber session command is running for this session, then delete the .lock and .lock.takeover-* files the error names.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_SESSION_LOCKED"],
+	},
+	AMBER_E_SESSION_LOCK_CORRUPT: {
+		title: "Session lock does not name a holder",
+		cause:
+			"The session .lock file is not JSON with a holder pid or timestamp, so its holder cannot be judged.",
+		remedy:
+			"Confirm no amber session command is running for this session, then delete the named .lock file.",
+		layer: "Lifecycle",
+		related: ["AMBER_E_SESSION_LOCKED"],
+	},
 	AMBER_E_MISSING_PATH_ARG: {
 		title: "Required path argument missing",
 		cause: "A command that needs a file/path argument was invoked without one.",
@@ -84,6 +120,15 @@ const CATALOG = {
 		remedy: "Adjust .amber/governance/rules.json or change the contract's governed.command.",
 		layer: "Governance",
 		related: ["AMBER_E_CONFIDENCE_GATE", "AMBER_E_LOOP_NOT_APPROVED"],
+	},
+	AMBER_E_POLICY_SHELL_META: {
+		title: "Governed command needs a shell",
+		cause:
+			"A governed or verification command contains a shell metacharacter outside single quotes ($, backtick, ;, |, &, >, <, a newline) or an unterminated quote. Governed commands run as argv with no shell, so nothing would expand or compose them.",
+		remedy:
+			"Pass literal arguments (single quotes keep $ and backticks verbatim), or move multi-step logic into a script and allow-list that script.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY"],
 	},
 	AMBER_E_COMMAND_ID_UNRESOLVED: {
 		title: "Named governed command could not be resolved",
@@ -137,12 +182,75 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_POLICY_DENY", "AMBER_E_CONFIDENCE_GATE"],
 	},
+	AMBER_E_LOOP_CONTRACT_DRIFT: {
+		title: "Loop contract changed after approval",
+		cause:
+			"The contract's governed.command or governed.rules, or the governance rules.json, no longer hash to what the unconsumed approval pinned.",
+		remedy:
+			"Restore the approved contract, or review the new one and record a fresh approval: amber loop approve --file <pack> --contract <id> --reviewer <name>",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED", "AMBER_E_POLICY_DENY"],
+	},
+	AMBER_E_LOOP_APPROVAL_CONSUMED: {
+		title: "Approval already used",
+		cause:
+			"The approval's use marker already exists in the ledger's anchor store (<ledger>.anchor/consumed/). Use is recorded before the command spawns, so an approval whose run crashed is spent too.",
+		remedy:
+			"Record a fresh approval: amber loop approve --file <pack> --contract <id> --reviewer <name>",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_LOOP_CONTRACT_ID_INVALID: {
+		title: "Loop contract id is not a safe path segment",
+		cause:
+			"A loop contract id names its ledger directory, so it must match ^[a-z0-9][a-z0-9-]{0,63}$.",
+		remedy: "Rename the contract in the pack to lowercase letters, digits, and hyphens.",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED"],
+	},
+	AMBER_E_PACK_ALLOW_RULE: {
+		title: "Pack rules may only narrow the governance policy",
+		cause:
+			"A pack or route stage declared a rules entry that is not a deny or require_approval rule; only .amber/governance/rules.json may allow a command.",
+		remedy:
+			"Remove the allow rule from the pack and add it to .amber/governance/rules.json if the command should be allowed.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY"],
+	},
 	AMBER_E_LEDGER_TAMPERED: {
 		title: "Loop ledger hash chain is broken",
-		cause: "verify-ledger recomputed a record hash that does not match the stored chain.",
-		remedy: "Investigate the flagged record; restore it from version control if it was edited.",
+		cause:
+			"verify-ledger recomputed a record hash that does not match the stored chain, or the ledger no longer reaches the head anchored in <ledger>.anchor/head.json (head-truncated, head-mismatch), or that anchor is gone (anchor-missing).",
+		remedy:
+			"Investigate the flagged record; restore the ledger and its .anchor store from version control or backup. A ledger without its anchor stays refused by design.",
 		layer: "Observability",
-		related: ["AMBER_E_KB_CORRUPT"],
+		related: ["AMBER_E_KB_CORRUPT", "AMBER_E_LOOP_APPROVAL_CONSUMED"],
+	},
+	AMBER_E_LEDGER_LOCKED: {
+		title: "Ledger append lock is held",
+		cause:
+			"Another live process held <ledger>.lock for the whole wait. A lock left by a dead process is reclaimed automatically.",
+		remedy: "Retry once the other Amber command finishes.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_LEDGER_LOCK_CHAIN: {
+		title: "Ledger append lock needs manual removal",
+		cause:
+			"A process died while reclaiming a dead holder's lock, and then a process died reclaiming that reclaim, which is as deep as the takeover chain goes. Nothing can reclaim the leftover by itself.",
+		remedy:
+			"Check no Amber command is running, then delete the <ledger>.lock and <ledger>.lock.takeover* files the error names.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_LOCKED"],
+	},
+	AMBER_E_LEDGER_RESEAL_REFUSED: {
+		title: "Ledger seal refused",
+		cause:
+			"A seal tag already exists for HEAD, or a ledger is broken or no longer extends the latest seal. Sealing never overwrites a tag or anchors a rewritten chain.",
+		remedy:
+			"amber ledger verify-anchoring to see which ledger drifted; restore it, or commit and seal at a new HEAD once the chain extends the old seal.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED"],
 	},
 	AMBER_E_RUN_EVENTS_CORRUPT: {
 		title: "Session timeline chain is broken",

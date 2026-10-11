@@ -92,6 +92,26 @@ test("invalid adapter contracts fail closed before writing", () => {
 	assert.equal(fs.existsSync(registryPath(dir)), false);
 });
 
+test("adapter registration refuses allow-list prefixes outside the target", () => {
+	const dir = mkTarget("invalid-path");
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-adapter-allowed-outside-"));
+	try {
+		for (const allowedPath of ["../outside", path.join(outside, "legacy")]) {
+			const result = registerAdapter(
+				dir,
+				adapter({ permissions: { readOnly: true, allowedPaths: [allowedPath] } }),
+			);
+			assert.equal(result.ok, false);
+			assert.equal(result.code, "AMBER_E_ADAPTER_INVALID");
+			assert.match(result.errors[0], /outside the target root/i);
+			assert.equal(fs.existsSync(registryPath(dir)), false);
+		}
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 test("readAdapterRecord reads legacy bytes, appends a receipt, and does not create artifacts", () => {
 	const dir = mkTarget("read");
 	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });

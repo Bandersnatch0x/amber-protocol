@@ -67,30 +67,12 @@ test("Knowledge Plan root exposes only its facade (index.js)", () => {
 });
 
 test("production modules cannot import Knowledge Plan internals", () => {
-	// The legacy compatibility module (core/knowledge-plan.js) is the ONLY
-	// sanctioned production consumer OUTSIDE the module tree: it forwards
-	// deprecated helper exports for the one deprecation cycle (F013-K3).
-	// Files inside the module itself (index.js, adapters, internal) may
-	// naturally require internal/.
 	const scriptsRoot = path.join(REPO_ROOT, "scripts", "lib");
 	const violations = internalConsumers(scriptsRoot)
 		.map(relative)
-		.filter(
-			(filePath) =>
-				filePath !== "scripts/lib/core/knowledge-plan.js" &&
-				!filePath.startsWith("scripts/lib/knowledge-plan/"),
-		)
-		.sort();
-	assert.deepEqual(violations, []);
-});
-
-test("only the legacy compatibility module may import Knowledge Plan internals outside the module tree", () => {
-	const scriptsRoot = path.join(REPO_ROOT, "scripts", "lib");
-	const consumers = internalConsumers(scriptsRoot)
-		.map(relative)
 		.filter((filePath) => !filePath.startsWith("scripts/lib/knowledge-plan/"))
 		.sort();
-	assert.deepEqual(consumers, ["scripts/lib/core/knowledge-plan.js"]);
+	assert.deepEqual(violations, []);
 });
 
 test("ordinary tests cannot import Knowledge Plan internals", () => {

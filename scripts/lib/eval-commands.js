@@ -3,7 +3,7 @@
 // F058 — instruction-surface Eval CLI (run / list / show). Report-only.
 // Envelope, routing, and exit codes are owned by defineCommand (F039).
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget } = require("./command-helpers");
 const {
 	SUITE_ID,
@@ -76,7 +76,7 @@ function formatSuite(suite) {
 	return lines.join("\n");
 }
 
-const dispatch = defineCommand({
+const evalDispatch = defineCliCommand({
 	command: "eval",
 	actions: ["run", "list", "show", "admit"],
 	handlers: {
@@ -191,9 +191,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function evalDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { evalDispatch };

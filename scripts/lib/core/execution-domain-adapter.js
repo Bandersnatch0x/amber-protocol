@@ -10,10 +10,7 @@
 // adapter (register/readReceipt/shadowCompare/cutover) with different
 // semantics; the two share the ledger-family factory base and nothing else.
 //
-// First implementation: the Coding domain (worktree + git-exec). The
-// ResearchProcess boundary (context-runtime contract §6) is the second
-// consumer, implemented in `research-adapter.js` — the precondition §5.2
-// records for any physical `src/` relocation, which stays deferred.
+// First implementation: the Coding domain (worktree + git-exec).
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -21,6 +18,7 @@ const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { codedError } = require("./error-catalog");
+const { parseGovernedArgv, toSpawnArgv } = require("./loop-policy");
 
 // One handle per runId (see the catalog entry). Without the pre-check the duplicate
 // write fails only AFTER the spawn, leaving a running child with no handle and no
@@ -176,6 +174,12 @@ async function executeInPreparedWorkspace(
 	budgetMinutes,
 	{ captureDigest = false, handle = null } = {},
 ) {
+	let argv;
+	try {
+		argv = parseGovernedArgv(command);
+	} catch (error) {
+		return { error: error.message };
+	}
 	let result;
 	// Decide ownership BEFORE any effect: a live handle refuses, a stale one is
 	// reconciled away exactly as the reader treats it (restart reconciliation). The
@@ -195,9 +199,11 @@ async function executeInPreparedWorkspace(
 	const startedAt = new Date().toISOString();
 	const timeoutMs = budgetMinutes * 60_000;
 	let handleRecord = null;
+	let spawned = null;
 	try {
-		const spawned = spawn(command, {
-			shell: true,
+		const spawnArgv = toSpawnArgv(argv);
+		spawned = spawn(spawnArgv[0], spawnArgv.slice(1), {
+			shell: false,
 			cwd: workspacePath,
 			// Detached gives the child its own process group, so a cancellation
 			// can address the whole tree and never the parent CLI.
@@ -242,6 +248,13 @@ async function executeInPreparedWorkspace(
 			stderr,
 		};
 	} catch (error) {
+		// A concurrent caller can win the handle-file create between our
+		// liveness pre-check and persistExecutionHandle's exclusive write. The
+		// child has already been spawned in that window, but has no governable
+		// handle; terminate it before returning the persistence error so a
+		// failed admission cannot leak an unowned process.
+		if (spawned && !handleRecord && Number.isInteger(spawned.pid))
+			signalPidTree(spawned.pid, "SIGTERM");
 		const finishedAt = new Date().toISOString();
 		result = {
 			command,
@@ -339,8 +352,9 @@ function prepare(targetRoot, label) {
  * asynchronous, so this declared boundary method is async too).
  */
 async function execute(worktreePath, command, { timeoutMs = 300_000 } = {}) {
-	const child = spawn(command, {
-		shell: true,
+	const argv = toSpawnArgv(parseGovernedArgv(command));
+	const child = spawn(argv[0], argv.slice(1), {
+		shell: false,
 		cwd: worktreePath,
 		detached: process.platform !== "win32",
 		stdio: ["ignore", "pipe", "pipe"],

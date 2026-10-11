@@ -31,6 +31,7 @@ const { emitHarnessEvent } = require("./event-ledger");
 const { runGovernedCommand } = require("../core/governed-runner");
 const { recordAttempt } = require("./attempt-core");
 const { cancellationAttribution } = require("./execution-cancel");
+const { resolvePathWithin } = require("../core/fs-utils");
 
 const CODE_PREPARE_FAILED = "AMBER_E_HARNESS_EXEC_PREPARE_FAILED";
 const CODE_ALREADY_PREPARED = "AMBER_E_HARNESS_EXEC_ALREADY_PREPARED";
@@ -51,6 +52,14 @@ function typedError(code, message) {
 	const err = new Error(message);
 	err.amberCode = code;
 	return err;
+}
+
+function confinedWorkspacePath(targetRoot, candidate) {
+	try {
+		return resolvePathWithin(targetRoot, candidate, { label: "Prepared workspace" });
+	} catch (error) {
+		throw typedError(CODE_PREPARE_FAILED, error.message);
+	}
 }
 
 function executionRecordFile(targetRoot, runId) {
@@ -496,7 +505,7 @@ async function runPreparedExecution(
 			`run "${runId}" is ${run.state}; execution requires created/admitted/running/paused — a terminal or blocked run never executes (blocked must be human-recovered first)`,
 		);
 	}
-	const workspacePath = record.effective.workspace.path;
+	const workspacePath = confinedWorkspacePath(targetRoot, record.effective.workspace.path);
 	if (!fs.existsSync(workspacePath)) {
 		throw typedError(
 			CODE_PREPARE_FAILED,
@@ -674,6 +683,7 @@ function releaseExecution(targetRoot, { runId, now } = {}) {
 	}
 	const at = now || new Date().toISOString();
 	const workspace = record.effective.workspace;
+	const workspacePath = confinedWorkspacePath(targetRoot, workspace.path);
 	if (workspace.type === "git-worktree") {
 		const { removeWorktree } = require("../worktree-manager");
 		const removed = removeWorktree(targetRoot, runId);
@@ -686,7 +696,7 @@ function releaseExecution(targetRoot, { runId, now } = {}) {
 	} else {
 		// A local workspace is the bounded scratch root prepared under the
 		// harness state area — delete exactly that directory, never the target.
-		fs.rmSync(workspace.path, { recursive: true, force: true });
+		fs.rmSync(workspacePath, { recursive: true, force: true });
 	}
 	record.releasedAt = at;
 	const file = executionRecordFileForRead(targetRoot, runId);

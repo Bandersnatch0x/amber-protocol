@@ -4,7 +4,7 @@
 // parses flags only; the core owns every candidate verdict, never deploys,
 // and touches no git state — preparation is a pure governance write.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
@@ -91,7 +91,7 @@ function parsePolicyPin(raw) {
 	return { value: { identity: match[1], revision: Number(match[2]) } };
 }
 
-const dispatch = defineCommand({
+const releaseDispatch = defineCliCommand({
 	command: "release",
 	actions: [
 		"prepare",
@@ -389,10 +389,6 @@ function transactionHandler(args, verb) {
 		exitCode: result.ok ? 0 : 1,
 		...(result.code ? { code: result.code } : {}),
 	};
-}
-
-function releaseDispatch(args) {
-	return dispatch(args._?.[0], args);
 }
 
 module.exports = { releaseDispatch };

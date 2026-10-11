@@ -950,6 +950,39 @@ test("ingest rejects malformed --payload JSON with a coded error", () => {
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
+test("request and ingest refuse memory payloads outside the target, including symlinks", () => {
+	const target = mkTarget();
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-memory-payload-outside-"));
+	const body = requestFor("mreq-path-boundary", [entryFor(target, "path boundary")]);
+	const outsidePayload = path.join(outside, "payload.json");
+	fs.writeFileSync(outsidePayload, JSON.stringify(body));
+	const symlinkPayload = path.join(target, "payload-link.json");
+	try {
+		for (const payload of [
+			path.join("..", path.basename(outside), "payload.json"),
+			outsidePayload,
+		]) {
+			for (const verb of ["request", "ingest"]) {
+				const result = run(target, verb, { payload });
+				assert.equal(result.exitCode, 1, `${verb} should refuse ${payload}`);
+				assert.equal(result.result.code, "AMBER_E_MEMORY_REQUEST_NOT_FOUND");
+				assert.match(result.result.errors.join("\n"), /outside the target root/i);
+			}
+		}
+		fs.symlinkSync(outsidePayload, symlinkPayload);
+		for (const verb of ["request", "ingest"]) {
+			const result = run(target, verb, { payload: "payload-link.json" });
+			assert.equal(result.exitCode, 1, `${verb} should refuse symlink payload`);
+			assert.equal(result.result.code, "AMBER_E_MEMORY_REQUEST_NOT_FOUND");
+			assert.match(result.result.errors.join("\n"), /outside the target root/i);
+		}
+		assert.equal(fs.readFileSync(outsidePayload, "utf8"), JSON.stringify(body));
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 test("doctor rules 4/8 fire for surface-only targets with no .amber/memory", () => {
 	const target = mkTarget();
 	// No registry use at all — human entries sit on MEMORY.md unratified.

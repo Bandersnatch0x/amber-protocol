@@ -134,6 +134,20 @@ function withOptionalWarning(baseResult, warning) {
 	};
 }
 
+// Every session mutator must take the per-session lease before reading the
+// manifest. Keeping the acquire/release envelope in one helper makes it hard
+// for a new early return or thrown side effect to leak the lock, and preserves
+// the lock helper's fail-closed stale-takeover behavior.
+async function withSessionLock(projectRoot, sessionId, fn) {
+	const lock = acquireLock(projectRoot, sessionId);
+	if (!lock.success) return result(`Error: ${lock.error} [${lock.code}]`, 1);
+	try {
+		return await fn();
+	} finally {
+		releaseLock(projectRoot, sessionId, lock.leaseId);
+	}
+}
+
 // Every continue/resume guard clause rejects with the same ACK envelope, differing
 // only in the message — single home so the reject contract can't drift per guard.
 function rejectResume(projectRoot, sessionId, options, message) {
@@ -218,104 +232,106 @@ async function startSession(projectRoot, options) {
 		agent,
 	});
 	const sessionDir = getSessionDirForCreate(projectRoot, manifest.sessionId);
-	fs.mkdirSync(sessionDir, { recursive: true });
+	return withSessionLock(projectRoot, manifest.sessionId, async () => {
+		fs.mkdirSync(sessionDir, { recursive: true });
 
-	const lines = [
-		`Session created: ${manifest.sessionId}`,
-		`Route: ${selectedRouteId}`,
-		`Goal: ${goal}`,
-	];
-	if (selectedJourneyId) {
-		lines.push(`Journey: ${selectedJourneyId}`);
-	}
-	if (feature) {
-		lines.push(`Feature: ${feature}`);
-	}
-
-	const extras = {
-		continuitySurfaces: ensureContinuitySurfaces(projectRoot),
-	};
-	if (selectedJourneyId) {
-		extras.journeyId = selectedJourneyId;
-	}
-	lines.push(
-		`Continuity surfaces: ${extras.continuitySurfaces.memory}, ${extras.continuitySurfaces.notes}, ${extras.continuitySurfaces.tasksReadme}`,
-	);
-
-	if (worktree) {
-		const worktreeResult = createWorktree(projectRoot, manifest.sessionId);
-		if (worktreeResult.success) {
-			extras.worktree = `${CANONICAL_STATE_DIR}/worktrees/${manifest.sessionId}`;
-			lines.push(`Worktree: ${manifest.sessionId}`);
-		} else {
-			lines.push(`Worktree failed: ${worktreeResult.error}`);
+		const lines = [
+			`Session created: ${manifest.sessionId}`,
+			`Route: ${selectedRouteId}`,
+			`Goal: ${goal}`,
+		];
+		if (selectedJourneyId) {
+			lines.push(`Journey: ${selectedJourneyId}`);
 		}
-	}
+		if (feature) {
+			lines.push(`Feature: ${feature}`);
+		}
 
-	if (mode) {
-		extras.mode = mode;
-		lines.push(`Mode: ${mode}`);
-	}
-
-	// F062 lease minting: an owner-claimed session gets a short-lived fencing
-	// lease so `session run --execute` / `session settle` can prove ownership.
-	// The raw token is returned ONCE here and never persisted — only its
-	// SHA-256 digest reaches the manifest (ADR-0029 §8.1). TTL matches the
-	// five-minute session-lock ceiling; execute-mode work must happen inside
-	// the window, and reacquisition is explicit (a fresh start), never silent.
-	if (agent) {
-		const token = crypto.randomBytes(32).toString("hex");
-		const acquiredAt = new Date().toISOString();
-		const ttlMs = 300_000;
-		extras.lease = {
-			ownerId: agent,
-			tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
-			acquiredAt,
-			expiresAt: new Date(Date.parse(acquiredAt) + ttlMs).toISOString(),
-			ttlMs,
-			fence: 1,
+		const extras = {
+			continuitySurfaces: ensureContinuitySurfaces(projectRoot),
 		};
-		lines.push("");
-		lines.push(`Lease token (shown ONCE, not stored): ${token}`);
+		if (selectedJourneyId) {
+			extras.journeyId = selectedJourneyId;
+		}
 		lines.push(
-			"Prove it with: amber session run --execute --owner-id <agent> --token-hash <sha256(token)> --lease-fence 1",
+			`Continuity surfaces: ${extras.continuitySurfaces.memory}, ${extras.continuitySurfaces.notes}, ${extras.continuitySurfaces.tasksReadme}`,
 		);
-	}
 
-	if (fallbackWarning) {
-		lines.push("");
-		lines.push(fallbackWarning);
-	}
-	if (goalMismatchWarning) {
-		lines.push("");
-		lines.push(goalMismatchWarning);
-	}
+		if (worktree) {
+			const worktreeResult = createWorktree(projectRoot, manifest.sessionId);
+			if (worktreeResult.success) {
+				extras.worktree = `${CANONICAL_STATE_DIR}/worktrees/${manifest.sessionId}`;
+				lines.push(`Worktree: ${manifest.sessionId}`);
+			} else {
+				lines.push(`Worktree failed: ${worktreeResult.error}`);
+			}
+		}
 
-	const finalManifest = writeSessionManifest(sessionDir, { ...manifest, ...extras });
+		if (mode) {
+			extras.mode = mode;
+			lines.push(`Mode: ${mode}`);
+		}
 
-	appendSessionEvent(sessionDir, {
-		type: "session_created",
-		data: { sessionId: finalManifest.sessionId, goal },
-	});
-
-	// Materialize route gates as pending .gate.json files for the web viewer.
-	if (route) {
-		const gateCount = writeRouteGates(sessionDir, finalManifest.sessionId, route);
-		const declared = (route.gates || []).length;
-		if (declared > 0 && gateCount < declared) {
+		// F062 lease minting: an owner-claimed session gets a short-lived fencing
+		// lease so `session run --execute` / `session settle` can prove ownership.
+		// The raw token is returned ONCE here and never persisted — only its
+		// SHA-256 digest reaches the manifest (ADR-0029 §8.1). TTL matches the
+		// five-minute session-lock ceiling; execute-mode work must happen inside
+		// the window, and reacquisition is explicit (a fresh start), never silent.
+		if (agent) {
+			const token = crypto.randomBytes(32).toString("hex");
+			const acquiredAt = new Date().toISOString();
+			const ttlMs = 300_000;
+			extras.lease = {
+				ownerId: agent,
+				tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+				acquiredAt,
+				expiresAt: new Date(Date.parse(acquiredAt) + ttlMs).toISOString(),
+				ttlMs,
+				fence: 1,
+			};
 			lines.push("");
+			lines.push(`Lease token (shown ONCE, not stored): ${token}`);
 			lines.push(
-				`Warning: ${declared - gateCount} of ${declared} route gates could not be written ` +
-					"(check route definition for invalid gate IDs).",
+				"Prove it with: amber session run --execute --owner-id <agent> --token-hash <sha256(token)> --lease-fence 1",
 			);
 		}
-	}
 
-	return {
-		text: lines.join("\n"),
-		exitCode: 0,
-		sessionId: finalManifest.sessionId,
-	};
+		if (fallbackWarning) {
+			lines.push("");
+			lines.push(fallbackWarning);
+		}
+		if (goalMismatchWarning) {
+			lines.push("");
+			lines.push(goalMismatchWarning);
+		}
+
+		const finalManifest = writeSessionManifest(sessionDir, { ...manifest, ...extras });
+
+		appendSessionEvent(sessionDir, {
+			type: "session_created",
+			data: { sessionId: finalManifest.sessionId, goal },
+		});
+
+		// Materialize route gates as pending .gate.json files for the web viewer.
+		if (route) {
+			const gateCount = writeRouteGates(sessionDir, finalManifest.sessionId, route);
+			const declared = (route.gates || []).length;
+			if (declared > 0 && gateCount < declared) {
+				lines.push("");
+				lines.push(
+					`Warning: ${declared - gateCount} of ${declared} route gates could not be written ` +
+						"(check route definition for invalid gate IDs).",
+				);
+			}
+		}
+
+		return {
+			text: lines.join("\n"),
+			exitCode: 0,
+			sessionId: finalManifest.sessionId,
+		};
+	});
 }
 
 function statusSession(projectRoot, options) {
@@ -398,42 +414,44 @@ async function abortSession(projectRoot, options) {
 		return result(`Error: ${validation.error}`, 1);
 	}
 
-	const loaded = requireSession(projectRoot, sessionId);
-	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir } = loaded;
+	return withSessionLock(projectRoot, sessionId, async () => {
+		const loaded = requireSession(projectRoot, sessionId);
+		if (loaded.exitCode !== undefined) return loaded;
+		const { manifest, sessionDir } = loaded;
 
-	const sm = new SessionStateMachine(manifest.status);
-	const transition = sm.transition(STATES.ABORTED);
+		const sm = new SessionStateMachine(manifest.status);
+		const transition = sm.transition(STATES.ABORTED);
 
-	if (!transition.success) {
+		if (!transition.success) {
+			const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+				requestId: options.requestId,
+				action: "abort",
+				status: "rejected",
+				requestedStatus: STATES.ABORTED,
+				source: "amber-session-abort",
+				message: `Cannot abort: ${transition.error}`,
+			});
+			return withOptionalWarning(result(`Cannot abort: ${transition.error}`, 1), warning);
+		}
+
+		writeSessionManifest(sessionDir, { ...manifest, status: STATES.ABORTED });
+
+		appendSessionEvent(sessionDir, transition.event);
+
+		if (manifest.worktree) {
+			removeWorktree(projectRoot, sessionId);
+		}
+
 		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
 			requestId: options.requestId,
 			action: "abort",
-			status: "rejected",
+			status: "acked",
 			requestedStatus: STATES.ABORTED,
 			source: "amber-session-abort",
-			message: `Cannot abort: ${transition.error}`,
+			message: "Session aborted by Amber CLI.",
 		});
-		return withOptionalWarning(result(`Cannot abort: ${transition.error}`, 1), warning);
-	}
-
-	writeSessionManifest(sessionDir, { ...manifest, status: STATES.ABORTED });
-
-	appendSessionEvent(sessionDir, transition.event);
-
-	if (manifest.worktree) {
-		removeWorktree(projectRoot, sessionId);
-	}
-
-	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-		requestId: options.requestId,
-		action: "abort",
-		status: "acked",
-		requestedStatus: STATES.ABORTED,
-		source: "amber-session-abort",
-		message: "Session aborted by Amber CLI.",
+		return withOptionalWarning(result(`Session aborted: ${sessionId}`, 0), warning);
 	});
-	return withOptionalWarning(result(`Session aborted: ${sessionId}`, 0), warning);
 }
 
 // Mark a session completed — the governance terminal state. Gated on
@@ -453,70 +471,72 @@ async function completeSession(projectRoot, options) {
 		return result(`Error: ${validation.error}`, 1);
 	}
 
-	const loaded = requireSession(projectRoot, sessionId);
-	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir } = loaded;
+	return withSessionLock(projectRoot, sessionId, async () => {
+		const loaded = requireSession(projectRoot, sessionId);
+		if (loaded.exitCode !== undefined) return loaded;
+		const { manifest, sessionDir } = loaded;
 
-	if (manifest.status === STATES.COMPLETED) {
-		return result(`Session already completed: ${sessionId}`, 0);
-	}
-	if (manifest.status === STATES.ABORTED) {
-		return result(`Cannot complete an aborted session: ${sessionId}`, 1);
-	}
-
-	const { evaluateCompletion } = require("./completion-check");
-	const completion = evaluateCompletion(projectRoot, sessionId, {
-		strict: options.strict !== false,
-	});
-	if (completion.status !== "pass") {
-		const missing = (completion.missing || []).join(", ") || "evidence";
-		return result(
-			`Cannot complete session: complete-check failed (missing: ${missing}).\n` +
-				`Run: amber session complete-check --session ${sessionId} --strict`,
-			1,
-		);
-	}
-
-	const sm = new SessionStateMachine(manifest.status);
-	const transition = sm.transition(STATES.COMPLETED);
-	if (!transition.success) {
-		return result(`Cannot complete: ${transition.error}`, 1);
-	}
-
-	writeSessionManifest(sessionDir, { ...manifest, status: STATES.COMPLETED });
-	appendSessionEvent(sessionDir, transition.event);
-
-	// T1 memory write-back trigger (ADR-0018 spec §5.1): AFTER the completion
-	// transition succeeds, when strict complete-check passed and handoff
-	// evidence exists, nominate a memory write-back contract. The two halves
-	// of the mechanical condition are checked explicitly here, so a future
-	// non-strict completion path (options.strict === false) can never fire
-	// T1 silently. The trigger is a ledger-visible nomination only (M3).
-	let t1Warning = null;
-	if (options.strict !== false) {
-		const { hasHandoffEvidence } = require("./completion-check");
-		if (hasHandoffEvidence(projectRoot, manifest)) {
-			const { mountWriteBackTrigger } = require("./core/memory-trigger");
-			t1Warning = mountWriteBackTrigger(projectRoot, {
-				channel: "t1-writeback",
-				triggerRef: sessionId,
-				label: "T1",
-			});
+		if (manifest.status === STATES.COMPLETED) {
+			return result(`Session already completed: ${sessionId}`, 0);
 		}
-	}
+		if (manifest.status === STATES.ABORTED) {
+			return result(`Cannot complete an aborted session: ${sessionId}`, 1);
+		}
 
-	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-		requestId: options.requestId,
-		action: "complete",
-		status: "acked",
-		requestedStatus: STATES.COMPLETED,
-		source: "amber-session-complete",
-		message: "Session marked completed after complete-check passed.",
+		const { evaluateCompletion } = require("./completion-check");
+		const completion = evaluateCompletion(projectRoot, sessionId, {
+			strict: options.strict !== false,
+		});
+		if (completion.status !== "pass") {
+			const missing = (completion.missing || []).join(", ") || "evidence";
+			return result(
+				`Cannot complete session: complete-check failed (missing: ${missing}).\n` +
+					`Run: amber session complete-check --session ${sessionId} --strict`,
+				1,
+			);
+		}
+
+		const sm = new SessionStateMachine(manifest.status);
+		const transition = sm.transition(STATES.COMPLETED);
+		if (!transition.success) {
+			return result(`Cannot complete: ${transition.error}`, 1);
+		}
+
+		writeSessionManifest(sessionDir, { ...manifest, status: STATES.COMPLETED });
+		appendSessionEvent(sessionDir, transition.event);
+
+		// T1 memory write-back trigger (ADR-0018 spec §5.1): AFTER the completion
+		// transition succeeds, when strict complete-check passed and handoff
+		// evidence exists, nominate a memory write-back contract. The two halves
+		// of the mechanical condition are checked explicitly here, so a future
+		// non-strict completion path (options.strict === false) can never fire
+		// T1 silently. The trigger is a ledger-visible nomination only (M3).
+		let t1Warning = null;
+		if (options.strict !== false) {
+			const { hasHandoffEvidence } = require("./completion-check");
+			if (hasHandoffEvidence(projectRoot, manifest)) {
+				const { mountWriteBackTrigger } = require("./core/memory-trigger");
+				t1Warning = mountWriteBackTrigger(projectRoot, {
+					channel: "t1-writeback",
+					triggerRef: sessionId,
+					label: "T1",
+				});
+			}
+		}
+
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "complete",
+			status: "acked",
+			requestedStatus: STATES.COMPLETED,
+			source: "amber-session-complete",
+			message: "Session marked completed after complete-check passed.",
+		});
+		return withOptionalWarning(
+			withOptionalWarning(result(`Session completed: ${sessionId}`, 0), warning),
+			t1Warning,
+		);
 	});
-	return withOptionalWarning(
-		withOptionalWarning(result(`Session completed: ${sessionId}`, 0), warning),
-		t1Warning,
-	);
 }
 
 async function continueSession(projectRoot, options) {
@@ -534,138 +554,140 @@ async function continueSession(projectRoot, options) {
 		return result(`Error: ${validation.error}`, 1);
 	}
 
-	const loaded = requireSession(projectRoot, sessionId);
-	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir } = loaded;
+	return withSessionLock(projectRoot, sessionId, async () => {
+		const loaded = requireSession(projectRoot, sessionId);
+		if (loaded.exitCode !== undefined) return loaded;
+		const { manifest, sessionDir } = loaded;
 
-	const versionCheck = checkSchemaVersion(manifest);
-	if (!versionCheck.valid) {
-		return result(`Schema error: ${versionCheck.error}`, 1);
-	}
+		const versionCheck = checkSchemaVersion(manifest);
+		if (!versionCheck.valid) {
+			return result(`Schema error: ${versionCheck.error}`, 1);
+		}
 
-	if (manifest.status === "completed") {
-		return rejectResume(projectRoot, sessionId, options, "Session already completed");
-	}
+		if (manifest.status === "completed") {
+			return rejectResume(projectRoot, sessionId, options, "Session already completed");
+		}
 
-	if (manifest.status === "aborted") {
-		return rejectResume(projectRoot, sessionId, options, "Session was aborted");
-	}
+		if (manifest.status === "aborted") {
+			return rejectResume(projectRoot, sessionId, options, "Session was aborted");
+		}
 
-	if (
-		manifest.status !== "paused" &&
-		manifest.status !== "executing" &&
-		manifest.status !== "created" &&
-		manifest.status !== "routed"
-	) {
-		return rejectResume(
-			projectRoot,
-			sessionId,
-			options,
-			`Cannot continue session with status: ${manifest.status}`,
-		);
-	}
-
-	// Autonomous mode removed in 1.3.0 (ADR-0005): the experimental execution
-	// engine was deleted — unreachable, broken-chained, and shipping dead code.
-	// Amber remains governance-first (ADR-0001): no live execution.
-	if (manifest.mode === "autonomous") {
-		return rejectResume(
-			projectRoot,
-			sessionId,
-			options,
-			"Error: Autonomous execution is not available. " +
-				"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
-		);
-	}
-
-	let checkpoint;
-	if (fromCheckpoint) {
-		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
-		if (!checkpoint) {
+		if (
+			manifest.status !== "paused" &&
+			manifest.status !== "executing" &&
+			manifest.status !== "created" &&
+			manifest.status !== "routed"
+		) {
 			return rejectResume(
 				projectRoot,
 				sessionId,
 				options,
-				`Checkpoint not found: ${fromCheckpoint}`,
+				`Cannot continue session with status: ${manifest.status}`,
 			);
 		}
-	} else {
-		checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
-	}
 
-	if (checkpoint) {
-		// F062: a checkpoint restore writes completedStages directly, which
-		// would diverge the projection from a verb route's ledger-owned
-		// cursor. Refuse verb routes here, exactly as legacy verify does.
-		const { routes: continueRoutes } = loadTargetRoutes(projectRoot);
-		const continueRoute = continueRoutes.find((entry) => entry.routeId === manifest.route.id);
-		if ((continueRoute?.stages || []).some((stage) => stage && stage.type === "verb")) {
+		// Autonomous mode removed in 1.3.0 (ADR-0005): the experimental execution
+		// engine was deleted — unreachable, broken-chained, and shipping dead code.
+		// Amber remains governance-first (ADR-0001): no live execution.
+		if (manifest.mode === "autonomous") {
 			return rejectResume(
 				projectRoot,
 				sessionId,
 				options,
-				`Cannot restore checkpoint: route "${manifest.route.id}" contains verb stages, whose cursor advances only through the governed seam. Use: amber session run --session ${sessionId} [--execute] and amber session settle --session ${sessionId} --request-id <id> ...`,
+				"Error: Autonomous execution is not available. " +
+					"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
 			);
 		}
-		manifest.currentStage = checkpoint.manifest.currentStage || manifest.currentStage;
-		manifest.completedStages =
-			checkpoint.manifest.completedStages || manifest.completedStages || [];
-		manifest.budget = checkpoint.manifest.budget || manifest.budget;
-	}
 
-	const sm = new SessionStateMachine(manifest.status);
-
-	// Auto-route created sessions before executing
-	if (sm.currentState === STATES.CREATED) {
-		const routeTransition = sm.transition(STATES.ROUTED);
-		if (!routeTransition.success) {
-			return rejectResume(
-				projectRoot,
-				sessionId,
-				options,
-				`Cannot route session: ${routeTransition.error}`,
-			);
+		let checkpoint;
+		if (fromCheckpoint) {
+			checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
+			if (!checkpoint) {
+				return rejectResume(
+					projectRoot,
+					sessionId,
+					options,
+					`Checkpoint not found: ${fromCheckpoint}`,
+				);
+			}
+		} else {
+			checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
 		}
-		writeSessionManifest(sessionDir, { ...manifest, status: STATES.ROUTED });
 
-		appendSessionEvent(sessionDir, routeTransition.event);
+		if (checkpoint) {
+			// F062: a checkpoint restore writes completedStages directly, which
+			// would diverge the projection from a verb route's ledger-owned
+			// cursor. Refuse verb routes here, exactly as legacy verify does.
+			const { routes: continueRoutes } = loadTargetRoutes(projectRoot);
+			const continueRoute = continueRoutes.find((entry) => entry.routeId === manifest.route.id);
+			if ((continueRoute?.stages || []).some((stage) => stage && stage.type === "verb")) {
+				return rejectResume(
+					projectRoot,
+					sessionId,
+					options,
+					`Cannot restore checkpoint: route "${manifest.route.id}" contains verb stages, whose cursor advances only through the governed seam. Use: amber session run --session ${sessionId} [--execute] and amber session settle --session ${sessionId} --request-id <id> ...`,
+				);
+			}
+			manifest.currentStage = checkpoint.manifest.currentStage || manifest.currentStage;
+			manifest.completedStages =
+				checkpoint.manifest.completedStages || manifest.completedStages || [];
+			manifest.budget = checkpoint.manifest.budget || manifest.budget;
+		}
 
-		sm.currentState = STATES.ROUTED;
-	}
+		const sm = new SessionStateMachine(manifest.status);
 
-	const transition = sm.transition(STATES.EXECUTING);
-	if (!transition.success) {
-		return rejectResume(projectRoot, sessionId, options, `Cannot resume: ${transition.error}`);
-	}
+		// Auto-route created sessions before executing
+		if (sm.currentState === STATES.CREATED) {
+			const routeTransition = sm.transition(STATES.ROUTED);
+			if (!routeTransition.success) {
+				return rejectResume(
+					projectRoot,
+					sessionId,
+					options,
+					`Cannot route session: ${routeTransition.error}`,
+				);
+			}
+			writeSessionManifest(sessionDir, { ...manifest, status: STATES.ROUTED });
 
-	writeSessionManifest(sessionDir, { ...manifest, status: STATES.EXECUTING });
+			appendSessionEvent(sessionDir, routeTransition.event);
 
-	appendSessionEvent(sessionDir, {
-		type: "session_resumed",
-		data: { sessionId, fromCheckpoint: checkpoint?.stage || null },
+			sm.currentState = STATES.ROUTED;
+		}
+
+		const transition = sm.transition(STATES.EXECUTING);
+		if (!transition.success) {
+			return rejectResume(projectRoot, sessionId, options, `Cannot resume: ${transition.error}`);
+		}
+
+		writeSessionManifest(sessionDir, { ...manifest, status: STATES.EXECUTING });
+
+		appendSessionEvent(sessionDir, {
+			type: "session_resumed",
+			data: { sessionId, fromCheckpoint: checkpoint?.stage || null },
+		});
+
+		const lines = [
+			`Session resumed: ${sessionId}`,
+			`Current stage: ${manifest.currentStage || "none"}`,
+			`Completed stages: ${(manifest.completedStages || []).join(", ") || "none"}`,
+		];
+
+		if (checkpoint) {
+			lines.push(`Restored from checkpoint: ${checkpoint.stage}`);
+		}
+
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "resume",
+			status: "acked",
+			requestedStatus: STATES.EXECUTING,
+			source: "amber-session-continue",
+			message: "Session resumed by Amber CLI.",
+		});
+		if (warning) lines.push(warning);
+
+		return result(lines.join("\n"), 0);
 	});
-
-	const lines = [
-		`Session resumed: ${sessionId}`,
-		`Current stage: ${manifest.currentStage || "none"}`,
-		`Completed stages: ${(manifest.completedStages || []).join(", ") || "none"}`,
-	];
-
-	if (checkpoint) {
-		lines.push(`Restored from checkpoint: ${checkpoint.stage}`);
-	}
-
-	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-		requestId: options.requestId,
-		action: "resume",
-		status: "acked",
-		requestedStatus: STATES.EXECUTING,
-		source: "amber-session-continue",
-		message: "Session resumed by Amber CLI.",
-	});
-	if (warning) lines.push(warning);
-
-	return result(lines.join("\n"), 0);
 }
 
 async function verifySession(projectRoot, options) {
@@ -680,172 +702,176 @@ async function verifySession(projectRoot, options) {
 		return result(`Error: ${validation.error}`, 1);
 	}
 
-	const loaded = requireSession(projectRoot, sessionId);
-	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir } = loaded;
+	return withSessionLock(projectRoot, sessionId, async () => {
+		const loaded = requireSession(projectRoot, sessionId);
+		if (loaded.exitCode !== undefined) return loaded;
+		const { manifest, sessionDir } = loaded;
 
-	if (manifest.status === "completed" || manifest.status === "aborted") {
-		return result(`Cannot verify: session is already ${manifest.status}.`, 1);
-	}
+		if (manifest.status === "completed" || manifest.status === "aborted") {
+			return result(`Cannot verify: session is already ${manifest.status}.`, 1);
+		}
 
-	// Resolve the route definition to find verification stage metadata.
-	const { routes } = loadTargetRoutes(projectRoot);
-	const route = routes.find((r) => r.routeId === manifest.route.id);
-	const stages = route && Array.isArray(route.stages) ? route.stages : [];
+		// Resolve the route definition to find verification stage metadata.
+		const { routes } = loadTargetRoutes(projectRoot);
+		const route = routes.find((r) => r.routeId === manifest.route.id);
+		const stages = route && Array.isArray(route.stages) ? route.stages : [];
 
-	// F062 legacy-seam guard: a Route containing a `verb` stage advances only
-	// through `session run`/`session settle`. Legacy verify writes
-	// completedStages, which would corrupt the verb cursor's contiguous-prefix
-	// invariant — so it refuses the whole operation and points at the new seam.
-	// (Spec §"Legacy and external seams": claim-only inspection may remain
-	// non-mutating; verify is always mutating, so there is no claim-only path.)
-	if (stages.some((s) => s && s.type === "verb")) {
-		return result(
-			`Cannot verify: route "${manifest.route.id}" contains verb stages, whose cursor advances only through the governed seam.\n` +
-				`Use: amber session run --session ${sessionId} [--execute] and amber session settle --session ${sessionId} --request-id <id> ...`,
-			1,
-		);
-	}
-
-	const verifyStage = route ? stages.find((s) => s.name === (stageName || "verify")) : null;
-	const actualStageName = (verifyStage && verifyStage.name) || stageName || "verify";
-	const stageDisplayName = (verifyStage && verifyStage.displayName) || actualStageName;
-
-	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
-
-	// --execute: actually run the verification command and record its real exit
-	// code as evidence. Without --execute, verify records a self-reported claim
-	// (executed:false) — kept for backward compatibility.
-	let executed = false;
-	let execResult = null;
-	if (options.execute) {
-		const command = options.command || (verifyStage && verifyStage.target);
-		if (!command) {
+		// F062 legacy-seam guard: a Route containing a `verb` stage advances only
+		// through `session run`/`session settle`. Legacy verify writes
+		// completedStages, which would corrupt the verb cursor's contiguous-prefix
+		// invariant — so it refuses the whole operation and points at the new seam.
+		// (Spec §"Legacy and external seams": claim-only inspection may remain
+		// non-mutating; verify is always mutating, so there is no claim-only path.)
+		if (stages.some((s) => s && s.type === "verb")) {
 			return result(
-				'Error: --execute needs a command. Pass --command "<cmd>" or use a route whose verify stage declares one.',
+				`Cannot verify: route "${manifest.route.id}" contains verb stages, whose cursor advances only through the governed seam.\n` +
+					`Use: amber session run --session ${sessionId} [--execute] and amber session settle --session ${sessionId} --request-id <id> ...`,
 				1,
 			);
 		}
-		// #315: a per-invocation budget for long verification suites. Validated
-		// against the evidence runner's hard cap; unset keeps the 5-minute
-		// default (or the AMBER_VERIFY_BUDGET_MINUTES override).
-		let budgetMinutes;
-		if (options.budgetMinutes !== undefined && options.budgetMinutes !== null) {
-			try {
-				budgetMinutes = resolveBudgetMinutes(Number(options.budgetMinutes));
-			} catch (error) {
-				return result(`Error: --budget-minutes ${error.message}`, 1);
+
+		const verifyStage = route ? stages.find((s) => s.name === (stageName || "verify")) : null;
+		const actualStageName = (verifyStage && verifyStage.name) || stageName || "verify";
+		const stageDisplayName = (verifyStage && verifyStage.displayName) || actualStageName;
+
+		const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+
+		// --execute: actually run the verification command and record its real exit
+		// code as evidence. Without --execute, verify records a self-reported claim
+		// (executed:false) — kept for backward compatibility.
+		let executed = false;
+		let execResult = null;
+		if (options.execute) {
+			const command = options.command || (verifyStage && verifyStage.target);
+			if (!command) {
+				return result(
+					'Error: --execute needs a command. Pass --command "<cmd>" or use a route whose verify stage declares one.',
+					1,
+				);
+			}
+			// #315: a per-invocation budget for long verification suites. Validated
+			// against the evidence runner's hard cap; unset keeps the 5-minute
+			// default (or the AMBER_VERIFY_BUDGET_MINUTES override).
+			let budgetMinutes;
+			if (options.budgetMinutes !== undefined && options.budgetMinutes !== null) {
+				try {
+					budgetMinutes = resolveBudgetMinutes(Number(options.budgetMinutes));
+				} catch (error) {
+					return result(`Error: --budget-minutes ${error.message}`, 1);
+				}
+			}
+			execResult = await runEvidenceCommand({
+				target: projectRoot,
+				command,
+				ledgerPath,
+				...(budgetMinutes === undefined ? {} : { budgetMinutes }),
+				subject: { sessionId, stage: actualStageName },
+			});
+			if (execResult.denied) {
+				return result(
+					`Verification command denied by policy: ${execResult.reason}\nCommand: ${command}`,
+					1,
+				);
+			}
+			executed = true;
+			if (execResult.exitCode !== 0) {
+				// Negative evidence: record the failure on the timeline, do NOT mark the
+				// stage complete, and fail the command.
+				appendSessionEvent(sessionDir, {
+					type: "verification_failed",
+					data: {
+						stage: actualStageName,
+						displayName: stageDisplayName,
+						command,
+						exitCode: execResult.exitCode,
+						durationMs: execResult.durationMs,
+						stderr: execResult.stderrTail || null,
+					},
+				});
+				return result(
+					`Verification FAILED (exit ${execResult.exitCode}) for session: ${sessionId}\n` +
+						`Command: ${command}\n` +
+						(execResult.stderrTail ? `stderr (tail):\n${execResult.stderrTail}\n` : "") +
+						"The stage was NOT marked complete.",
+					1,
+				);
 			}
 		}
-		execResult = await runEvidenceCommand({
-			target: projectRoot,
-			command,
-			ledgerPath,
-			...(budgetMinutes === undefined ? {} : { budgetMinutes }),
-			subject: { sessionId, stage: actualStageName },
+
+		// Record the stage_completed event so complete-check can see it.
+		appendSessionEvent(sessionDir, {
+			type: "stage_completed",
+			data: {
+				stage: actualStageName,
+				displayName: stageDisplayName,
+				command: options.command || (executed ? execResult.ledgerRecord.command : null),
+				result: options.result || (executed ? "passed" : null),
+				executed,
+				...(executed ? { exitCode: 0, durationMs: execResult.durationMs } : {}),
+			},
 		});
-		if (execResult.denied) {
-			return result(
-				`Verification command denied by policy: ${execResult.reason}\nCommand: ${command}`,
-				1,
-			);
-		}
-		executed = true;
-		if (execResult.exitCode !== 0) {
-			// Negative evidence: record the failure on the timeline, do NOT mark the
-			// stage complete, and fail the command.
-			appendSessionEvent(sessionDir, {
-				type: "verification_failed",
-				data: {
-					stage: actualStageName,
-					displayName: stageDisplayName,
-					command,
-					exitCode: execResult.exitCode,
-					durationMs: execResult.durationMs,
-					stderr: execResult.stderrTail || null,
-				},
+
+		// In --execute mode the evidence-runner already wrote the tamper-evident ledger
+		// record. In legacy (claim) mode, mirror the claim into the ledger here.
+		if (!executed) {
+			appendLedgerRecord(ledgerPath, {
+				schemaVersion: 2,
+				kind: "stage_completed",
+				sessionId,
+				stage: actualStageName,
+				command: options.command || null,
+				result: options.result || null,
+				recordedAt: new Date().toISOString(),
 			});
-			return result(
-				`Verification FAILED (exit ${execResult.exitCode}) for session: ${sessionId}\n` +
-					`Command: ${command}\n` +
-					(execResult.stderrTail ? `stderr (tail):\n${execResult.stderrTail}\n` : "") +
-					"The stage was NOT marked complete.",
-				1,
+		}
+
+		// Update the manifest's completedStages so complete-check also finds it there.
+		const completedStages = Array.isArray(manifest.completedStages)
+			? [...manifest.completedStages]
+			: [];
+		if (!completedStages.includes(actualStageName)) {
+			completedStages.push(actualStageName);
+		}
+		writeSessionManifest(sessionDir, { ...manifest, completedStages });
+
+		// Evidence reflux: a real (--execute) verification is the session's proof of
+		// work. When the session is bound to a feature, mirror that proof into
+		// feature_list.json so `accept`/completion see real evidence instead of a
+		// self-reported claim. Claim-only verifications are not real evidence, so
+		// they do not reflux.
+		const effectiveFeature = options.feature || manifest.feature;
+		let refluxedFeature = null;
+		if (executed && effectiveFeature) {
+			const reflux = recordFeatureEvidence(projectRoot, {
+				feature: effectiveFeature,
+				command: execResult.ledgerRecord.command,
+				result: `passed (exit 0, ${execResult.durationMs}ms)`,
+				notes: `session ${sessionId} stage ${actualStageName}`,
+				sessionId,
+			});
+			if (!reflux.errors || reflux.errors.length === 0) {
+				refluxedFeature = effectiveFeature;
+			}
+		}
+
+		const lines = [`Verification recorded for session: ${sessionId}`, `Stage: ${stageDisplayName}`];
+		if (executed) {
+			lines.push(
+				`Executed: ${execResult.ledgerRecord.command} (exit 0, ${execResult.durationMs}ms)`,
 			);
+		} else if (verifyStage && verifyStage.target) {
+			lines.push(`Suggested verification command: ${verifyStage.target}`);
+			lines.push("(claim only — re-run with --execute to record real evidence)");
 		}
-	}
-
-	// Record the stage_completed event so complete-check can see it.
-	appendSessionEvent(sessionDir, {
-		type: "stage_completed",
-		data: {
-			stage: actualStageName,
-			displayName: stageDisplayName,
-			command: options.command || (executed ? execResult.ledgerRecord.command : null),
-			result: options.result || (executed ? "passed" : null),
-			executed,
-			...(executed ? { exitCode: 0, durationMs: execResult.durationMs } : {}),
-		},
+		if (refluxedFeature) {
+			lines.push(`Evidence recorded for feature ${refluxedFeature}.`);
+		}
+		lines.push(
+			"",
+			"Tip: run `amber session approve --session " + sessionId + "` to record gate approval.",
+		);
+		return result(lines.join("\n"), 0);
 	});
-
-	// In --execute mode the evidence-runner already wrote the tamper-evident ledger
-	// record. In legacy (claim) mode, mirror the claim into the ledger here.
-	if (!executed) {
-		appendLedgerRecord(ledgerPath, {
-			schemaVersion: 2,
-			kind: "stage_completed",
-			sessionId,
-			stage: actualStageName,
-			command: options.command || null,
-			result: options.result || null,
-			recordedAt: new Date().toISOString(),
-		});
-	}
-
-	// Update the manifest's completedStages so complete-check also finds it there.
-	const completedStages = Array.isArray(manifest.completedStages)
-		? [...manifest.completedStages]
-		: [];
-	if (!completedStages.includes(actualStageName)) {
-		completedStages.push(actualStageName);
-	}
-	writeSessionManifest(sessionDir, { ...manifest, completedStages });
-
-	// Evidence reflux: a real (--execute) verification is the session's proof of
-	// work. When the session is bound to a feature, mirror that proof into
-	// feature_list.json so `accept`/completion see real evidence instead of a
-	// self-reported claim. Claim-only verifications are not real evidence, so
-	// they do not reflux.
-	const effectiveFeature = options.feature || manifest.feature;
-	let refluxedFeature = null;
-	if (executed && effectiveFeature) {
-		const reflux = recordFeatureEvidence(projectRoot, {
-			feature: effectiveFeature,
-			command: execResult.ledgerRecord.command,
-			result: `passed (exit 0, ${execResult.durationMs}ms)`,
-			notes: `session ${sessionId} stage ${actualStageName}`,
-			sessionId,
-		});
-		if (!reflux.errors || reflux.errors.length === 0) {
-			refluxedFeature = effectiveFeature;
-		}
-	}
-
-	const lines = [`Verification recorded for session: ${sessionId}`, `Stage: ${stageDisplayName}`];
-	if (executed) {
-		lines.push(`Executed: ${execResult.ledgerRecord.command} (exit 0, ${execResult.durationMs}ms)`);
-	} else if (verifyStage && verifyStage.target) {
-		lines.push(`Suggested verification command: ${verifyStage.target}`);
-		lines.push("(claim only — re-run with --execute to record real evidence)");
-	}
-	if (refluxedFeature) {
-		lines.push(`Evidence recorded for feature ${refluxedFeature}.`);
-	}
-	lines.push(
-		"",
-		"Tip: run `amber session approve --session " + sessionId + "` to record gate approval.",
-	);
-	return result(lines.join("\n"), 0);
 }
 
 async function approveSession(projectRoot, options) {
@@ -860,124 +886,128 @@ async function approveSession(projectRoot, options) {
 		return result(`Error: ${validation.error}`, 1);
 	}
 
-	const loaded = requireSession(projectRoot, sessionId);
-	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir } = loaded;
+	return withSessionLock(projectRoot, sessionId, async () => {
+		const loaded = requireSession(projectRoot, sessionId);
+		if (loaded.exitCode !== undefined) return loaded;
+		const { manifest, sessionDir } = loaded;
 
-	if (manifest.status === "completed" || manifest.status === "aborted") {
-		return result(`Cannot approve: session is already ${manifest.status}.`, 1);
-	}
-
-	// Resolve route gates so we can name the gate being approved. A gate is
-	// approvable when it is declared in route.gates OR referenced by a stage's
-	// gateAfter — a stage-level gateAfter without a route-level entry still
-	// blocks the cursor (session run), so approve must be able to unblock it.
-	const { routes } = loadTargetRoutes(projectRoot);
-	const route = routes.find((r) => r.routeId === manifest.route.id);
-
-	const declaredGates = route && Array.isArray(route.gates) ? route.gates : [];
-	const stageGateIds = (route && Array.isArray(route.stages) ? route.stages : [])
-		.map((s) => s && s.gateAfter)
-		.filter(Boolean);
-	const gateIds = [...new Set([...declaredGates.map((g) => g.id), ...stageGateIds])];
-	if (!gateId && gateIds.length !== 1) {
-		if (gateIds.length === 0) {
-			return result(`Error: route "${manifest.route.id}" has no gates to approve.`, 1);
+		if (manifest.status === "completed" || manifest.status === "aborted") {
+			return result(`Cannot approve: session is already ${manifest.status}.`, 1);
 		}
-		return result(
-			`Error: route has ${gateIds.length} gates — specify one with --gate <id>.\n` +
-				`Available: ${gateIds.join(", ")}`,
-			1,
-		);
-	}
 
-	if (gateId && !gateIds.includes(gateId)) {
-		return result(
-			`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
-				`Available: ${gateIds.join(", ") || "(none)"}`,
-			1,
-		);
-	}
+		// Resolve route gates so we can name the gate being approved. A gate is
+		// approvable when it is declared in route.gates OR referenced by a stage's
+		// gateAfter — a stage-level gateAfter without a route-level entry still
+		// blocks the cursor (session run), so approve must be able to unblock it.
+		const { routes } = loadTargetRoutes(projectRoot);
+		const route = routes.find((r) => r.routeId === manifest.route.id);
 
-	const resolvedGateId = gateId || gateIds[0];
-
-	// Identity gate: a "user-approval" gate must be approved by a human, not by an
-	// agent piping commands. In a non-interactive shell we refuse unless --yes is
-	// explicitly passed; templates/CLAUDE.md instructs agents never to pass --yes.
-	let approvedBy;
-	if (options.yes) {
-		approvedBy = "flag (--yes)";
-	} else if (process.stdin.isTTY) {
-		const ok = await promptYesNo(`Approve gate "${resolvedGateId}"? [y/N] `);
-		if (!ok) {
-			return result(`Approval declined for gate "${resolvedGateId}".`, 1);
+		const declaredGates = route && Array.isArray(route.gates) ? route.gates : [];
+		const stageGateIds = (route && Array.isArray(route.stages) ? route.stages : [])
+			.map((s) => s && s.gateAfter)
+			.filter(Boolean);
+		const gateIds = [...new Set([...declaredGates.map((g) => g.id), ...stageGateIds])];
+		if (!gateId && gateIds.length !== 1) {
+			if (gateIds.length === 0) {
+				return result(`Error: route "${manifest.route.id}" has no gates to approve.`, 1);
+			}
+			return result(
+				`Error: route has ${gateIds.length} gates — specify one with --gate <id>.\n` +
+					`Available: ${gateIds.join(", ")}`,
+				1,
+			);
 		}
-		approvedBy = "user (interactive)";
-	} else {
-		return result(
-			`Error: gate "${resolvedGateId}" needs human approval.\n` +
-				"Run this in an interactive terminal, or pass --yes to approve non-interactively.",
-			1,
-		);
-	}
 
-	// Record gate_passed event so complete-check can see it.
-	appendSessionEvent(sessionDir, {
-		type: "gate_passed",
-		data: {
+		if (gateId && !gateIds.includes(gateId)) {
+			return result(
+				`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
+					`Available: ${gateIds.join(", ") || "(none)"}`,
+				1,
+			);
+		}
+
+		const resolvedGateId = gateId || gateIds[0];
+
+		// Identity gate: a "user-approval" gate must be approved by a human, not by an
+		// agent piping commands. In a non-interactive shell we refuse unless --yes is
+		// explicitly passed; templates/CLAUDE.md instructs agents never to pass --yes.
+		let approvedBy;
+		if (options.yes) {
+			approvedBy = "flag (--yes)";
+		} else if (process.stdin.isTTY) {
+			const ok = await promptYesNo(`Approve gate "${resolvedGateId}"? [y/N] `);
+			if (!ok) {
+				return result(`Approval declined for gate "${resolvedGateId}".`, 1);
+			}
+			approvedBy = "user (interactive)";
+		} else {
+			return result(
+				`Error: gate "${resolvedGateId}" needs human approval.\n` +
+					"Run this in an interactive terminal, or pass --yes to approve non-interactively.",
+				1,
+			);
+		}
+
+		// Record gate_passed event so complete-check can see it.
+		appendSessionEvent(sessionDir, {
+			type: "gate_passed",
+			data: {
+				gateId: resolvedGateId,
+				approvedBy,
+			},
+		});
+
+		// Mirror the gate approval into the tamper-evident ledger.
+		appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
+			schemaVersion: 2,
+			kind: "gate_passed",
+			sessionId,
 			gateId: resolvedGateId,
 			approvedBy,
-		},
-	});
+			recordedAt: new Date().toISOString(),
+		});
 
-	// Mirror the gate approval into the tamper-evident ledger.
-	appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
-		schemaVersion: 2,
-		kind: "gate_passed",
-		sessionId,
-		gateId: resolvedGateId,
-		approvedBy,
-		recordedAt: new Date().toISOString(),
-	});
-
-	// Persist a .decision.json for the web viewer.
-	const isRealGate = declaredGates.some((g) => g.id === resolvedGateId);
-	let gateWarning = null;
-	if (isRealGate) {
-		if (!writeGateDecision(sessionDir, resolvedGateId, "approved")) {
-			gateWarning = `Warning: could not write decision for gate "${resolvedGateId}".`;
+		// Persist a .decision.json for the web viewer.
+		const isRealGate = declaredGates.some((g) => g.id === resolvedGateId);
+		let gateWarning = null;
+		if (isRealGate) {
+			if (!writeGateDecision(sessionDir, resolvedGateId, "approved")) {
+				gateWarning = `Warning: could not write decision for gate "${resolvedGateId}".`;
+			}
 		}
-	}
 
-	// Report whether all route gates are approved. Approval is evidence for
-	// completion, not a terminal-state transition; completeSession owns the only
-	// normal path to STATES.COMPLETED after strict completion evidence passes.
-	const gateEvents = readSessionEvents(sessionDir).filter((e) => e.type === "gate_passed");
-	const allGatesPassed =
-		gateIds.length > 0 &&
-		gateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
-	// Approval is still Session activity even though it does not change status.
-	// Refresh updatedAt so activity ordering remains accurate for readers.
-	writeSessionManifest(sessionDir, manifest);
+		// Report whether all route gates are approved. Approval is evidence for
+		// completion, not a terminal-state transition; completeSession owns the only
+		// normal path to STATES.COMPLETED after strict completion evidence passes.
+		const gateEvents = readSessionEvents(sessionDir).filter((e) => e.type === "gate_passed");
+		const allGatesPassed =
+			gateIds.length > 0 &&
+			gateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
+		// Approval is still Session activity even though it does not change status.
+		// Refresh updatedAt so activity ordering remains accurate for readers.
+		writeSessionManifest(sessionDir, manifest);
 
-	const lines = [`Approval recorded for session: ${sessionId}`, `Gate: ${resolvedGateId}`];
-	if (allGatesPassed) {
+		const lines = [`Approval recorded for session: ${sessionId}`, `Gate: ${resolvedGateId}`];
+		if (allGatesPassed) {
+			lines.push(
+				"All gates passed — approval requirements satisfied; session remains active pending verification and explicit completion.",
+			);
+		} else if (gateIds.length > 1) {
+			const pending = gateIds.filter(
+				(id) => !gateEvents.some((e) => e.data && e.data.gateId === id),
+			);
+			lines.push(`Pending gates: ${pending.join(", ")}`);
+		}
+		if (gateWarning) {
+			lines.push(gateWarning);
+		}
 		lines.push(
-			"All gates passed — approval requirements satisfied; session remains active pending verification and explicit completion.",
+			"",
+			"Tip: run `amber session complete-check --session " + sessionId + "` to verify all evidence.",
 		);
-	} else if (gateIds.length > 1) {
-		const pending = gateIds.filter((id) => !gateEvents.some((e) => e.data && e.data.gateId === id));
-		lines.push(`Pending gates: ${pending.join(", ")}`);
-	}
-	if (gateWarning) {
-		lines.push(gateWarning);
-	}
-	lines.push(
-		"",
-		"Tip: run `amber session complete-check --session " + sessionId + "` to verify all evidence.",
-	);
 
-	return result(lines.join("\n"), 0);
+		return result(lines.join("\n"), 0);
+	});
 }
 
 function verifyLedgerSession(projectRoot, sessionId) {
@@ -1149,7 +1179,7 @@ async function leaseSession(projectRoot, options) {
 
 	const lock = acquireLock(projectRoot, sessionId);
 	if (!lock.success) {
-		return result(`Error: ${lock.error}`, 1);
+		return result(`Error: ${lock.error} [${lock.code}]`, 1);
 	}
 	try {
 		const loaded = requireSession(projectRoot, sessionId);
@@ -1213,7 +1243,7 @@ async function leaseSession(projectRoot, options) {
 			0,
 		);
 	} finally {
-		releaseLock(projectRoot, sessionId);
+		releaseLock(projectRoot, sessionId, lock.leaseId);
 	}
 }
 
@@ -1240,4 +1270,5 @@ module.exports = {
 	requireSession,
 	findMostRecentSession,
 	validateSessionId,
+	validateSessionIdForLookup,
 };

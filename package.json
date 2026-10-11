@@ -1,7 +1,7 @@
 {
 	"name": "amber-protocol",
 	"version": "2.0.1",
-	"description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
+	"description": "Amber Protocol: the governed execution boundary between AI agents and real systems — repository-local plans, gates, approvals, evidence, and handoff.",
 	"type": "commonjs",
 	"bin": {
 		"amber": "scripts/amber.js",

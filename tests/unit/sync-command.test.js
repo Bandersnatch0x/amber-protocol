@@ -14,7 +14,7 @@ const { TEMPLATE_ROOT } = require("../../scripts/lib/core/constants");
 const REL = "docs/wiki/glossary.md"; // controlled file
 
 // parseArgs shim mirroring the {target, _, execute, json, templateRoot} shape dispatch reads.
-// --template-root threads the fixture's template copy through to handleSync (which
+// --template-root threads the fixture's template copy through to syncDispatch (which
 // forwards args.templateRoot to detectScaffoldDrift/refreshAmberOwnedFiles), so the
 // mutated fixture template — not the real TEMPLATE_ROOT — is the drift source.
 function parseArgs(argv) {

@@ -1077,6 +1077,30 @@ describe("buildLoadout required artifacts", () => {
 		}
 	});
 
+	it("returns an error when an individual loadout file symlink escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-loadout-file-link-"));
+		const outsideFile = path.join(outsideRoot, "loadout.json");
+		try {
+			fs.writeFileSync(outsideFile, "sentinel\n", "utf8");
+			const dir = loadoutsDir(root);
+			fs.mkdirSync(dir, { recursive: true });
+			fs.symlinkSync(
+				outsideFile,
+				path.join(dir, "bugfix-quick.json"),
+				process.platform === "win32" ? "file" : undefined,
+			);
+			const result = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(result.loadout, null);
+			assert.equal(result.loadoutPath, null);
+			assert.match(result.errors[0].detail, /outside the target/i);
+			assert.equal(fs.readFileSync(outsideFile, "utf8"), "sentinel\n");
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
 	it("fails verification when a required artifact is missing", () => {
 		const root = makeTarget();
 		try {

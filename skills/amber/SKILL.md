@@ -15,7 +15,7 @@ advisor, then continue with exactly one of the four deep journeys:
 `amber-continuous-improvement`. The seven CLI verbs are operator fallback and
 debug surfaces, not a second skill topology.
 
-The advisor's `journeyId` comes from `scripts/lib/journey-router.js`; do not
+The advisor's `journeyId` comes from `scripts/lib/route-journey-decision.js`; do not
 replace route matching with an LLM. A route suggestion is advisory: keep the
 human authoritative, and never execute a mutating command merely because the
 router selected a journey. Preserve approval, isolation, evidence, and ledger

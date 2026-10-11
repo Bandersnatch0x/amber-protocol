@@ -3,11 +3,12 @@
 // Extracted from command-dispatcher.js (architecture review #1). Envelope,
 // routing, and exit codes are owned by defineCommand (F039).
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 
-const dispatch = defineCommand({
+const orgAuditDispatch = defineCliCommand({
 	command: "audit org",
+	actionIndex: 1,
 	actions: ["events", "isolation", "cross-repo", "retention"],
 	handlers: {
 		events: (args) => {
@@ -68,9 +69,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function orgAuditDispatch(args) {
-	return dispatch(args._?.[1], args);
-}
 
 module.exports = { orgAuditDispatch };

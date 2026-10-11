@@ -18,6 +18,7 @@ const {
 const { evidence: collectMaintenanceEvidence } = require("../../maintenance");
 const { detectCommands } = require("../../core/audit");
 const { REQUIRED_BUNDLE_FILES, defaultBundleDir } = require("../../core/handoff-layout");
+const { resolvePathWithin } = require("../../core/fs-utils");
 const { getSectionBody, hasSectionWithBody } = require("../../core/text-utils");
 const { listExecutionEvidence } = require("../../session-evidence");
 
@@ -93,7 +94,16 @@ function collectExecutions(targetRoot) {
 
 // Handoff bundle: required files + risks/recovery body.
 function collectHandoff(targetRoot, bundleDir) {
-	const dir = bundleDir || defaultBundleDir(targetRoot);
+	let dir;
+	try {
+		dir = resolvePathWithin(targetRoot, bundleDir || defaultBundleDir(targetRoot), {
+			label: "Workflow handoff bundle",
+			allowRoot: true,
+			canonicalExisting: true,
+		});
+	} catch (error) {
+		throw new Error(error.message || String(error), { cause: error });
+	}
 	if (!fs.existsSync(dir)) return { present: false, missing: [], risksBody: "", recoveryBody: "" };
 	const missing = REQUIRED_BUNDLE_FILES.filter((name) => !fs.existsSync(path.join(dir, name)));
 	const risksText = (() => {

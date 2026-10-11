@@ -13,7 +13,7 @@
 // because a Gate Contract is ordinary canonical-artifact content riding
 // the Envelope's extensions carrier; this command only evaluates and reads.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 
 // The readFailure FALLBACK for untyped crashes at the show/list seams, not
@@ -148,7 +148,7 @@ function verdictFilterValue(args) {
 	return { value: verdict };
 }
 
-const dispatch = defineCommand({
+const gateDispatch = defineCliCommand({
 	command: "gate",
 	actions: ["evaluate", "show", "list"],
 	handlers: {
@@ -267,9 +267,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function gateDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { gateDispatch };

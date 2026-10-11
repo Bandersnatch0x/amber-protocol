@@ -18,7 +18,15 @@ const { ARTIFACT_TYPES, bodyHash, listArtifactRevisions } = require("./canonical
 const { resolveActivePrincipal } = require("./principal-registry");
 const { showEvidence } = require("./evidence-receipts");
 const { canonicalJson } = require("./context-hash");
-const { GENESIS_HASH, chainHash, findDecisionSpend } = require("./registry-ledger");
+const {
+	GENESIS_HASH,
+	chainHash,
+	findDecisionSpend,
+	isPlainObject,
+	isNonEmptyString,
+	closedFieldProblem,
+	unknownFieldProblem,
+} = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 
 const ADAPTER_SCHEMA_VERSION = 1;
@@ -308,42 +316,8 @@ function cutoverCorrupt(message) {
 	return typedError(CUTOVER_CORRUPT_CODE, message);
 }
 
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
-}
-
 function isPositiveInt(value) {
 	return Number.isInteger(value) && value > 0;
-}
-
-function quotedList(values) {
-	return values.map((value) => `"${value}"`).join(", ");
-}
-
-function closedFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length > 0) {
-		return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-	}
-	const missing = fields.filter((field) => !(field in value));
-	if (missing.length > 0) {
-		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
-	}
-	return null;
-}
-
-function unknownFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length === 0) return null;
-	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
 }
 
 function stringArrayProblem(value, label) {
@@ -408,6 +382,26 @@ function adapterProblem(adapter) {
 			"adapter.permissions.allowedPaths",
 		);
 		if (allowed !== null) return allowed;
+	}
+	return null;
+}
+
+// An adapter's allow-list is interpreted as target-relative path prefixes.
+// Validate those prefixes at registration time as well as validating each
+// source at read time: otherwise a persisted contract could advertise an
+// escaping prefix (or a symlink that points outside the target) and leave the
+// registry with a misleading permission boundary. Missing in-target paths are
+// allowed because adapters may be registered before their legacy source is
+// provisioned.
+function adapterAllowedPathsProblem(cwd, adapter) {
+	const allowed = adapter.permissions?.allowedPaths;
+	if (allowed === null || allowed === undefined) return null;
+	for (const entry of allowed) {
+		try {
+			resolvePathWithin(cwd, entry, { label: "Adapter allowed path" });
+		} catch (error) {
+			return error.message || String(error);
+		}
 	}
 	return null;
 }
@@ -1473,6 +1467,9 @@ function registerAdapter(cwd, input = {}, opts = {}) {
 	};
 	const problem = adapterProblem(adapter);
 	if (problem !== null) return { ok: false, code: INVALID_CODE, adapter: null, errors: [problem] };
+	const allowedPathProblem = adapterAllowedPathsProblem(cwd, adapter);
+	if (allowedPathProblem !== null)
+		return { ok: false, code: INVALID_CODE, adapter: null, errors: [allowedPathProblem] };
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	const body = { kind: "registered", schemaVersion: ADAPTER_SCHEMA_VERSION, at, adapter };
 	const result = ADAPTER_LEDGER.append(

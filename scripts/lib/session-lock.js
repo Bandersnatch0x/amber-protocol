@@ -4,119 +4,202 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("node:crypto");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
+const { sleepSync } = require("./core/fs-utils");
+const { isProcessAlive, pidStillOwned, processIdentity } = require("./core/execution-handles");
 
-const LOCK_TIMEOUT_MS = 300000; // 5 minutes
-// Bounds retry against concurrent stale-lock cleaners: if several processes
-// all decide a stale lock is removable, they each unlink and race to re-link
-// a replacement. Only one can win per round; the rest loop. A cap keeps this
-// finite instead of spinning forever under contention.
-const MAX_STALE_RETRIES = 4;
+// Only locks written before leases carried a pid are judged by age.
+const PID_LESS_LOCK_TIMEOUT_MS = 300000;
+const MAX_ATTEMPTS = 5;
+// A takeover guard is itself a lease; a guard left by a crashed taker is taken
+// over through one more guard, and no deeper.
+const MAX_TAKEOVER_DEPTH = 2;
 
-// Atomically claim the lock by writing the full payload to a unique temp
-// file and then link(2)-ing it into place. link is atomic: concurrent
-// callers cannot both succeed (the second hits EEXIST), AND a reader never
-// observes a half-written lock - lockPath only exists once the complete temp
-// file is linked in. This closes both races the old existsSync+writeFileSync
-// had: the TOCTOU double-acquire (two processes both see "no lock" and both
-// write one) and the create-then-write gap a bare O_EXCL+write would leave
-// open (a concurrent reader sees an empty file, mistakes it for a corrupt/
-// stale lock, and unlinks a lock its owner had only half-created).
-function claimLockAtomically(lockPath) {
-	const tempPath = `${lockPath}.${process.pid}.${Date.now()}.${crypto.randomBytes(4).toString("hex")}`;
-	fs.writeFileSync(tempPath, JSON.stringify({ pid: process.pid, timestamp: Date.now() }));
+// link(2) of a fully written temp file is exclusive like O_EXCL, and a reader
+// never sees a half-written lease.
+function claim(lockPath, lease) {
+	const tempPath = `${lockPath}.${lease.leaseId}`;
+	fs.writeFileSync(tempPath, JSON.stringify(lease));
 	try {
 		fs.linkSync(tempPath, lockPath);
+		return true;
+	} catch (e) {
+		if (e.code === "EEXIST") return false;
+		throw e;
 	} finally {
-		// Drop the temp name whether we won the link or hit EEXIST. The
-		// inode lives on via lockPath if the link succeeded.
+		fs.rmSync(tempPath, { force: true });
+	}
+}
+
+// A read can be refused for a moment on Windows when another process is creating the same
+// path at that instant. The takeover guard is named after the stale lock's bytes, so two
+// takers target one path by design and the loser's read of it races the winner's create,
+// which surfaces as a sharing violation rather than as ENOENT. Letting that out would
+// crash a governed session command instead of refusing it. Retry briefly, then rethrow: a
+// real permission problem still has to surface, and treating the failure as absent would
+// make a healthy lock read as corrupt.
+const TRANSIENT_READ_CODES = new Set(["EPERM", "EBUSY", "EACCES"]);
+
+function readRaw(lockPath) {
+	for (let attempt = 0; ; attempt++) {
 		try {
-			fs.unlinkSync(tempPath);
-		} catch {
-			// already removed - nothing to do
+			return fs.readFileSync(lockPath, "utf8");
+		} catch (e) {
+			if (e.code === "ENOENT") return null;
+			if (!TRANSIENT_READ_CODES.has(e.code) || attempt >= 20) throw e;
+			sleepSync(5);
 		}
 	}
 }
 
-function readLock(lockPath) {
+function parseLease(raw) {
 	try {
-		return JSON.parse(fs.readFileSync(lockPath, "utf8"));
+		const lease = JSON.parse(raw);
+		return lease && typeof lease === "object" ? lease : null;
 	} catch {
-		// Missing (ENOENT) or corrupt - treat as stale so the caller removes
-		// any leftover and re-claims. A missing file after EEXIST means a
-		// concurrent cleaner already unlinked it; retrying is correct.
 		return null;
 	}
 }
 
-function acquireLock(projectRoot, sessionId) {
-	const lockPath = getLockPath(projectRoot, sessionId);
-	const lockDir = path.dirname(lockPath);
-
-	if (!fs.existsSync(lockDir)) {
-		fs.mkdirSync(lockDir, { recursive: true });
+function holderState(lease) {
+	if (lease && Number.isInteger(lease.pid)) {
+		const running =
+			isProcessAlive(lease.pid) && pidStillOwned({ pid: lease.pid, pidStartedAt: lease.startTime });
+		return running ? "live" : "stale";
 	}
-
-	for (let attempt = 0; attempt <= MAX_STALE_RETRIES; attempt++) {
-		try {
-			claimLockAtomically(lockPath);
-			return { success: true };
-		} catch (e) {
-			if (e.code !== "EEXIST") throw e;
-		}
-
-		// Lock exists - decide stale vs active. Because link is atomic, the
-		// file we read here is either complete or absent (a concurrent cleaner
-		// may have unlinked it between our EEXIST and our read); never partial.
-		const lock = readLock(lockPath);
-		const stale = !lock || Date.now() - lock.timestamp >= LOCK_TIMEOUT_MS;
-
-		if (!stale) {
-			return { success: false, error: "Session is locked by another process" };
-		}
-
-		// Stale (or corrupt, or just-unlinked) - remove and let the next link
-		// decide the sole winner. Concurrent cleaners may both unlink; only
-		// one's next link succeeds, so the lock is never granted twice.
-		try {
-			fs.unlinkSync(lockPath);
-		} catch (e) {
-			if (e.code !== "ENOENT") throw e; // already removed by a concurrent cleaner
-		}
+	if (lease && typeof lease.timestamp === "number") {
+		return Date.now() - lease.timestamp < PID_LESS_LOCK_TIMEOUT_MS ? "live" : "stale";
 	}
-
-	// Exhausted retries under sustained contention. Fail safe: refuse rather
-	// than fall back to a non-atomic write that would reintroduce the race.
-	return { success: false, error: "Session is locked by another process" };
+	return "corrupt";
 }
 
-function releaseLock(projectRoot, sessionId) {
-	const lockPath = getLockPath(projectRoot, sessionId);
-
-	if (fs.existsSync(lockPath)) {
-		fs.unlinkSync(lockPath);
-	}
+function locked(holder) {
+	const who = Number.isInteger(holder?.pid) ? `pid ${holder.pid}` : "another process";
+	return {
+		success: false,
+		code: "AMBER_E_SESSION_LOCKED",
+		error: `Session is locked by ${who}`,
+		// On a platform that cannot name a process identity, a live pid may be a
+		// recycled one, so "live" there means "not falsifiable", not "the same
+		// process". Callers that would otherwise say "just wait" need this.
+		identityKnown: Number.isInteger(holder?.pid) && processIdentity(holder.pid) !== null,
+	};
 }
 
-function isLocked(projectRoot, sessionId) {
-	const lockPath = getLockPath(projectRoot, sessionId);
-
-	if (!fs.existsSync(lockPath)) {
-		return false;
-	}
-
-	let lock;
+// Only the winner of the guard keyed by the stale lock's exact bytes may
+// remove it, so a slow taker can never delete the lease a faster taker wrote.
+function removeStale(lockPath, raw, depth) {
+	const guardPath = `${lockPath}.takeover-${crypto.createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
+	const guard = acquireAt(guardPath, depth + 1);
+	if (!guard.success) return guard;
 	try {
-		lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-	} catch {
-		return false;
+		if (readRaw(lockPath) === raw) fs.rmSync(lockPath, { force: true });
+	} finally {
+		releaseAt(guardPath, guard.leaseId);
 	}
-	const age = Date.now() - lock.timestamp;
+	return null;
+}
 
-	return age < LOCK_TIMEOUT_MS;
+// The chain is bounded, so a crash inside a guard of a guard leaves files nothing
+// can reclaim. Naming them is the whole remedy: the code cannot clear them itself,
+// and "locked by pid N" would name a process that is already dead. The walk is
+// rooted at the real lock, because the guard names are hashes of the bytes they
+// guard and cannot be derived by appending. A guard held by a pid that cannot be
+// shown to be a live amber process shares this refusal, because it needs the same
+// remedy: on a platform that cannot name a process identity the pid may be recycled,
+// so nothing would ever release it and "wait" would be a refusal with no way out.
+function lockStuck(lockPath, detail) {
+	// Only trailing hash-shaped groups come off, and only from the basename: a plain
+	// replace would strip at the leftmost `.takeover-` anywhere in the path, so a
+	// directory whose own name contains it would be reported and the real lock omitted.
+	const base = path.basename(lockPath).replace(/(?:\.takeover-[0-9a-f]{16})+$/, "");
+	const root = path.join(path.dirname(lockPath), base);
+	const dir = path.dirname(root);
+	let guards = [];
+	try {
+		guards = fs
+			.readdirSync(dir)
+			.filter((name) => name.startsWith(`${base}.takeover-`))
+			.sort()
+			.map((name) => path.join(dir, name));
+	} catch {
+		/* the directory is gone, so there is nothing to name */
+	}
+	const because = detail ? ` (${detail})` : "";
+	return {
+		success: false,
+		code: "AMBER_E_SESSION_LOCK_STUCK",
+		error: `Session lock ${root} cannot be reclaimed${because}; if no amber session command is running, remove ${[root, ...guards].join(", ")}`,
+	};
+}
+
+function acquireAt(lockPath, depth) {
+	fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+	const lease = {
+		leaseId: crypto.randomUUID(),
+		pid: process.pid,
+		startTime: processIdentity(process.pid),
+		acquiredAt: new Date().toISOString(),
+	};
+	let guardFailure = null;
+	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+		if (claim(lockPath, lease)) return { success: true, leaseId: lease.leaseId };
+		const raw = readRaw(lockPath);
+		if (raw === null) continue;
+		const holder = parseLease(raw);
+		const state = holderState(holder);
+		if (state === "corrupt") {
+			return {
+				success: false,
+				code: "AMBER_E_SESSION_LOCK_CORRUPT",
+				error: `Session lock ${lockPath} does not name a holder`,
+			};
+		}
+		if (state === "live") return locked(holder);
+		if (depth >= MAX_TAKEOVER_DEPTH) return lockStuck(lockPath);
+		guardFailure = removeStale(lockPath, raw, depth);
+	}
+	// The attempts ran out with the holder still stale, so the lock could not be
+	// reclaimed. Why matters, and the two reasons want different answers. A guard held
+	// by a process whose identity could be checked is genuinely another live process,
+	// and it is the guard holder, not the dead lock holder, that must be named, so its
+	// own refusal is the honest one. A guard whose identity cannot be checked may be a
+	// recycled pid, and then waiting would never end, so that keeps the manual-removal
+	// remedy instead.
+	if (guardFailure?.code === "AMBER_E_SESSION_LOCK_STUCK") return guardFailure;
+	if (guardFailure?.code === "AMBER_E_SESSION_LOCKED") {
+		return guardFailure.identityKnown ? guardFailure : lockStuck(lockPath, guardFailure.error);
+	}
+	const remaining = parseLease(readRaw(lockPath));
+	if (holderState(remaining) === "stale") return lockStuck(lockPath);
+	return locked(remaining);
+}
+
+function releaseAt(lockPath, leaseId) {
+	if (parseLease(readRaw(lockPath))?.leaseId === leaseId) fs.rmSync(lockPath, { force: true });
+}
+
+// The same crash-safe lease protocol is useful for governed stores that are
+// not keyed by a session id (for example a harness run or a monotonic fence
+// counter). Keep the primitive path-based so those stores cannot accidentally
+// build a weaker open/write lock of their own.
+function acquirePathLock(lockPath) {
+	return acquireAt(lockPath, 0);
+}
+
+function releasePathLock(lockPath, leaseId) {
+	releaseAt(lockPath, leaseId);
+}
+
+function acquireLock(projectRoot, sessionId) {
+	return acquireAt(getLockPath(projectRoot, sessionId), 0);
+}
+
+function releaseLock(projectRoot, sessionId, leaseId) {
+	releaseAt(getLockPath(projectRoot, sessionId), leaseId);
 }
 
 function getLockPath(projectRoot, sessionId) {
 	return path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId, ".lock");
 }
 
-module.exports = { acquireLock, releaseLock, isLocked };
+module.exports = { acquireLock, releaseLock, acquirePathLock, releasePathLock };

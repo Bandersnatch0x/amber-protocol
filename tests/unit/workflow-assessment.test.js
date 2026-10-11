@@ -160,6 +160,20 @@ test("facade assess does not create files", () => {
 	assert.deepEqual(before, after, "no files created by report build");
 });
 
+test("facade assess refuses an out-of-target handoff bundle", () => {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "wf-handoff-target-"));
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "wf-handoff-outside-"));
+	try {
+		assert.throws(
+			() => assess(target, { noSessions: true, handoffBundleDir: outside }),
+			/outside the target root/i,
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 // ── Provider registry: amber-native supported, others unsupported in P1 ──
 
 test("provider registry declares amber-native available; claude depends on local install", () => {
@@ -374,7 +388,7 @@ test("workflow plan dry-run emits maintenance-proposal draft for il findings", (
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wf-maint-"));
 	const tmp = path.join(tmpDir, "report.json");
 	fs.writeFileSync(tmp, JSON.stringify(report), "utf8");
-	const r = workflowDispatch("plan", ".", { report: tmp, finding: "il-1-evolution-recurrent" });
+	const r = workflowDispatch("plan", tmpDir, { report: tmp, finding: "il-1-evolution-recurrent" });
 	assert.equal(r.errors.length, 0);
 	assert.equal(r.draft.kind, "maintenance-proposal");
 	assert.ok(r.draft.content.includes("amber maintenance propose"));
@@ -432,7 +446,7 @@ test("workflow plan --dry-run produces a draft with owner and verifier", () => {
 	const tmp = path.join(tmpDir, "report.json");
 	fs.writeFileSync(tmp, JSON.stringify(report), "utf8");
 	try {
-		const r = workflowDispatch("plan", ".", { report: tmp, finding: "x" });
+		const r = workflowDispatch("plan", tmpDir, { report: tmp, finding: "x" });
 		assert.equal(r.findingId, "x");
 		assert.ok(r.draft.content.includes("planning"), "draft includes owner");
 		assert.ok(r.draft.content.includes("Check passes."), "draft includes verifier");

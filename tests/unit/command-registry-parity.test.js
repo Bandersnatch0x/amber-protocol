@@ -18,6 +18,7 @@ const {
 const {
 	COMMAND_DEFINITIONS,
 	COMMAND_TIERS,
+	COMMAND_STABILITIES,
 	bindCommandHandlers,
 	commandInvocationContract,
 	knownSubcommands,
@@ -102,9 +103,17 @@ test("one Command registry drives help, policy, dispatch, and the public command
 
 test("Command tiers are the single visibility source", () => {
 	assert.deepEqual(Object.keys(COMMAND_TIERS), COMMANDS);
+	// The default surface is the registry's real projection: stability `core` AND a
+	// `journey`/`core` tier. A tier-only filter diverges the moment an experimental
+	// command lands in a default tier, and reports that as a tier fault rather than
+	// the stability exclusion it is.
 	assert.deepEqual(
 		DEFAULT_COMMANDS,
-		COMMANDS.filter((name) => ["journey", "core"].includes(COMMAND_TIERS[name])),
+		COMMANDS.filter(
+			(name) =>
+				COMMAND_DEFINITIONS[name].stability === "core" &&
+				["journey", "core"].includes(COMMAND_DEFINITIONS[name].tier),
+		),
 	);
 	assert.deepEqual(
 		new Set(COMMANDS.filter((name) => COMMAND_TIERS[name] === "deprecated")),
@@ -147,7 +156,13 @@ test("F063 default help projects the seven primary verbs in order", () => {
 test("F063 --all projects the complete registry in its canonical order", () => {
 	const all = runCliProjection(["--all"]);
 	assert.equal(all.status, 0);
-	assert.match(all.stdout, new RegExp(`^Commands: ${COMMANDS.join(", ")}$`, "m"));
+	// F083: --all marks each experimental family inline; the expected line is
+	// derived from the registry stability value, never hard-coded prose.
+	const expected = COMMANDS.map((name) =>
+		COMMAND_STABILITIES[name] === "experimental" ? `${name} (experimental)` : name,
+	).join(", ");
+	const line = all.stdout.split("\n").find((entry) => entry.startsWith("Commands: "));
+	assert.equal(line, `Commands: ${expected}`);
 });
 
 test("F063 demoted platform commands stay callable and visible under --all", () => {

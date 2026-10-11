@@ -532,8 +532,8 @@
       "sourcePath": "docs/wiki/knowledge/cli-architecture-command-dispatch/cli-architecture-command-dispatch.md",
       "title": "CLI Architecture & Command Dispatch",
       "source": {
-        "rawHash": "sha256:7a06c5d0d9bb0d1b278436d68dc8c42cd34477483ac0974463f86242986cbef4",
-        "normHash": "sha256:d3b904ba6055f4bcb45beac2fd80d719b7847ec9fbc29f3d282d07075bff0858"
+        "rawHash": "sha256:4d4153accac2fbfa3977a6de4c9b1faf73b078dd867fcf4de01b1e6f67de62b0",
+        "normHash": "sha256:7d3475cedd8ad0e1e7b7f762228cb27e06289ea4e908ecbc8e70a5ef67fdc9ba"
       }
     },
     {
@@ -633,5 +633,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:361e4c28f2994345f7b5d508dcc7be413c09fd8aa8e795ea51db0201829ac0fc"
+  "manifestHash": "sha256:9f1012a89f5512a0656425cae5e239f556e50d352246700758502fb321d5a34c"
 }

@@ -1,7 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const path = require("path");
-const { selectRoute, scoreRoutes } = require("../../scripts/lib/route-selector");
+const { selectRoute, scoreRoutes } = require("../../scripts/lib/route-journey-decision");
 const { loadRoutes } = require("../../scripts/lib/route-loader");
 
 const ROUTES = loadRoutes(path.join(__dirname, "../../routes")).routes;

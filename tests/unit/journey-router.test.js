@@ -8,7 +8,7 @@ const {
 	JOURNEYS,
 	routeJourney,
 	nextObjectiveCommand,
-} = require("../../scripts/lib/journey-router");
+} = require("../../scripts/lib/route-journey-decision");
 
 test("intent router maps representative intents to four deep journeys", () => {
 	assert.equal(JOURNEYS.length, 4);

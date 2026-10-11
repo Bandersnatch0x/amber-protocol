@@ -1,21 +1,29 @@
 "use strict";
 
 const fs = require("node:fs");
-const path = require("node:path");
-const { isMissingPath, resolveTarget } = require("../../core/fs-utils");
+const { isMissingPath, resolvePathWithin, resolveTarget } = require("../../core/fs-utils");
 const { defineCommand } = require("../../subcommand-dispatcher");
 const { assess, buildDraft, compare, findings } = require("..");
 const { renderJson, renderMarkdown } = require("./renderers");
 
-function readReportFile(filePath) {
+function readReportFile(targetRoot, filePath) {
 	// Distinguish read failures (missing file, permission, race) from
 	// unparseable content so callers get a precise machine-friendly cause.
 	if (isMissingPath(filePath)) {
 		return { errors: [`Report not found: ${filePath}.`] };
 	}
+	let resolvedPath;
+	try {
+		resolvedPath = resolvePathWithin(targetRoot, filePath, {
+			label: "Workflow report",
+			canonicalExisting: true,
+		});
+	} catch (error) {
+		return { errors: [`Unable to read report ${filePath}: ${error.message || String(error)}.`] };
+	}
 	let raw;
 	try {
-		raw = fs.readFileSync(path.resolve(filePath), "utf8");
+		raw = fs.readFileSync(resolvedPath, "utf8");
 	} catch (error) {
 		return { errors: [`Unable to read report ${filePath}: ${error.message}.`] };
 	}
@@ -29,9 +37,27 @@ function readReportFile(filePath) {
 function assessWorkflow(args) {
 	const targetRoot = resolveTarget(args.target);
 	const format = args.format === "markdown" ? "markdown" : "json";
+	let handoffBundleDir = args.handoffBundleDir;
+	if (handoffBundleDir !== undefined && handoffBundleDir !== null) {
+		try {
+			handoffBundleDir = resolvePathWithin(targetRoot, handoffBundleDir, {
+				label: "Workflow handoff bundle",
+				allowRoot: true,
+				canonicalExisting: true,
+			});
+		} catch (error) {
+			return {
+				target: targetRoot,
+				format,
+				report: null,
+				errors: [error.message || String(error)],
+				warnings: [],
+			};
+		}
+	}
 	const report = assess(targetRoot, {
 		noSessions: args.noSessions === true,
-		handoffBundleDir: args.handoffBundleDir,
+		handoffBundleDir,
 	});
 	const output = format === "markdown" ? renderMarkdown(report) : renderJson(report);
 	const result = {
@@ -42,10 +68,29 @@ function assessWorkflow(args) {
 		warnings: [],
 	};
 	if (args.outputDir) {
-		const outputDir = path.resolve(args.outputDir);
+		let outputDir;
+		try {
+			outputDir = resolvePathWithin(targetRoot, args.outputDir, {
+				label: "Workflow assessment output directory",
+				allowRoot: true,
+				canonicalExisting: true,
+			});
+		} catch (error) {
+			result.errors.push(error.message || String(error));
+			return result;
+		}
 		fs.mkdirSync(outputDir, { recursive: true });
 		const extension = format === "markdown" ? "md" : "json";
-		const outputPath = path.join(outputDir, `workflow-assessment.${extension}`);
+		let outputPath;
+		try {
+			outputPath = resolvePathWithin(outputDir, `workflow-assessment.${extension}`, {
+				label: "Workflow assessment output",
+				canonicalExisting: true,
+			});
+		} catch (error) {
+			result.errors.push(error.message || String(error));
+			return result;
+		}
 		fs.writeFileSync(outputPath, output, "utf8");
 		result.outputPath = outputPath;
 	}
@@ -60,7 +105,7 @@ function dispatchFindings(target, args) {
 			warnings: [],
 		};
 	}
-	const report = readReportFile(args.report);
+	const report = readReportFile(resolveTarget(target || "."), args.report);
 	if (report.errors) {
 		return { target: target || ".", errors: report.errors, warnings: [] };
 	}
@@ -75,8 +120,9 @@ function dispatchCompare(target, args) {
 			warnings: [],
 		};
 	}
-	const baseline = readReportFile(args.baseline);
-	const current = readReportFile(args.current);
+	const targetRoot = resolveTarget(target || ".");
+	const baseline = readReportFile(targetRoot, args.baseline);
+	const current = readReportFile(targetRoot, args.current);
 	if (baseline.errors) {
 		return { target: target || ".", errors: baseline.errors, warnings: [] };
 	}
@@ -96,7 +142,7 @@ function dispatchPlan(target, args) {
 			warnings: [],
 		};
 	}
-	const report = readReportFile(args.report);
+	const report = readReportFile(resolveTarget(target || "."), args.report);
 	if (report.errors) {
 		return { target: target || ".", errors: report.errors, warnings: [] };
 	}

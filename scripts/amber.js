@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 "use strict";
 
-const { parseArgs, printResult } = require("./lib/core/cli-output");
 const {
 	COMMANDS,
 	DEFAULT_COMMANDS,
+	COMMAND_STABILITIES,
 	commandSummary,
 	commandUsageLine,
 } = require("./lib/command-registry");
-const { dispatch } = require("./lib/command-dispatcher");
 
 const PRODUCT_LINE =
 	"Amber puts governance files in your repo so your AI coding session leaves an inspectable trail and the next session knows exactly where to pick up.";
@@ -21,6 +20,14 @@ function usage(command, options = {}) {
 	}
 
 	const visibleCommands = options.all ? COMMANDS : DEFAULT_COMMANDS;
+	// F083: `--all` is the only surface that names an experimental family, and it
+	// marks each one inline. Default help keeps the bare comma list so the
+	// seven-verb projection stays byte-stable.
+	const commandList = visibleCommands
+		.map((name) =>
+			options.all && COMMAND_STABILITIES[name] === "experimental" ? `${name} (experimental)` : name,
+		)
+		.join(", ");
 	const coreExamples = [
 		"  amber audit --target path/to/repo",
 		"  amber init --target path/to/repo",
@@ -47,9 +54,9 @@ function usage(command, options = {}) {
 		"",
 		PRODUCT_LINE,
 		"",
-		`Commands: ${visibleCommands.join(", ")}`,
+		`Commands: ${commandList}`,
 		options.all
-			? "All commands are shown."
+			? "All commands are shown; (experimental) families may change or be removed in a minor release."
 			: "Run `amber --all` to show every governance and platform command.",
 		"Run `amber <command> --help` for command-specific options.",
 		"",
@@ -62,6 +69,10 @@ function usage(command, options = {}) {
 async function run(argv = process.argv.slice(2)) {
 	const [command, ...rest] = argv;
 
+	if (command === "--version" || command === "-v") {
+		console.log(require("../package.json").version);
+		return 0;
+	}
 	if (command === "--all") {
 		console.log(usage(null, { all: true }));
 		return 0;
@@ -81,17 +92,13 @@ async function run(argv = process.argv.slice(2)) {
 		return 0;
 	}
 
-	if (command === "--version" || command === "-v") {
-		console.log(require("../package.json").version);
-		return 0;
-	}
-
 	if (!COMMANDS.includes(command)) {
 		console.error(`Unknown command: ${command}`);
 		console.error(`Expected one of: ${COMMANDS.join(", ")}`);
 		return 1;
 	}
 
+	const { parseArgs, printResult } = require("./lib/core/cli-output");
 	const args = parseArgs(rest);
 	if (args.help) {
 		console.log(usage(command));
@@ -99,6 +106,7 @@ async function run(argv = process.argv.slice(2)) {
 	}
 
 	// Dispatch to registered handler — may return a Promise for async commands
+	const { dispatch } = require("./lib/command-dispatcher");
 	const dispatchResult = await dispatch(command, args);
 	const { result: resolved, exitCode, bypassPrint, onBypass } = dispatchResult;
 

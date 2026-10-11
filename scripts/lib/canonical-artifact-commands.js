@@ -3,7 +3,7 @@
 // F049 tickets 01–03 — Canonical Artifact CLI surface (admit/show/list).
 // Envelope, routing, and exit codes are owned by defineCommand (F039).
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const {
 	ARTIFACT_TYPES,
@@ -283,7 +283,7 @@ function unknownType(type) {
 	};
 }
 
-const dispatch = defineCommand({
+const artifactDispatch = defineCliCommand({
 	command: "artifact",
 	actions: ["admit", "show", "list"],
 	handlers: {
@@ -422,10 +422,6 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function artifactDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 // parseTraceFlags is shared with the approval command (F050 #229): the
 // consume action forwards the same `--trace decides:<type>:<identity>` grammar

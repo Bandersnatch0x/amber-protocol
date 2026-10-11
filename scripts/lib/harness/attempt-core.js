@@ -18,6 +18,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { acquirePathLock, releasePathLock } = require("../session-lock");
 
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_ATTEMPT_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_ATTEMPT_CORRUPT";
@@ -50,6 +51,10 @@ function attemptsDirForRead(targetRoot, runId) {
 
 function attemptFile(targetRoot, runId, attemptId) {
 	return path.join(attemptsDirForCreate(targetRoot, runId), `${safeId(attemptId)}.json`);
+}
+
+function runLockFile(targetRoot, runId) {
+	return path.join(statePathForCreate(targetRoot, "harness", "runs"), `${safeId(runId)}.lock`);
 }
 
 // A pure read resolves through the read policy (listAttempts does too), so
@@ -136,45 +141,53 @@ function recordAttempt(
 	if (!commandId || typeof commandId !== "string") {
 		throw typedError(CODE_INVALID_ARG, "a commandId is required to record an attempt");
 	}
-	const at = now || new Date().toISOString();
-	const file = attemptFile(targetRoot, runId, attemptId);
-	let record = readAttemptFile(file);
-	if (record === null) {
-		record = {
-			attemptId,
-			runId,
-			state: "running",
-			commandId,
-			startedAt: at,
-			...(governedRef ? { governedRef } : {}),
-			...(observedRef ? { observedRef } : {}),
-		};
-	} else if (FINAL_ATTEMPT_STATES.has(record.state)) {
-		throw typedError(
-			CODE_FINAL,
-			`attempt "${attemptId}" is already terminal (${record.state}); attempt records are immutable`,
-		);
-	}
-	if (state !== undefined) {
-		if (!ATTEMPT_STATES.includes(state)) {
+	const lockPath = runLockFile(targetRoot, runId);
+	const lock = acquirePathLock(lockPath);
+	if (!lock.success) throw typedError(lock.code, lock.error);
+	try {
+		const at = now || new Date().toISOString();
+		const file = attemptFile(targetRoot, runId, attemptId);
+		let record = readAttemptFile(file);
+		if (record === null) {
+			record = {
+				attemptId,
+				runId,
+				state: "running",
+				commandId,
+				startedAt: at,
+				...(governedRef ? { governedRef } : {}),
+				...(observedRef ? { observedRef } : {}),
+			};
+		} else if (FINAL_ATTEMPT_STATES.has(record.state)) {
 			throw typedError(
-				CODE_INVALID_ARG,
-				`unknown attempt state ${JSON.stringify(state)}; closed set: ${ATTEMPT_STATES.join(", ")}`,
+				CODE_FINAL,
+				`attempt "${attemptId}" is already terminal (${record.state}); attempt records are immutable`,
 			);
 		}
-		record.state = state;
+		if (state !== undefined) {
+			if (!ATTEMPT_STATES.includes(state)) {
+				throw typedError(
+					CODE_INVALID_ARG,
+					`unknown attempt state ${JSON.stringify(state)}; closed set: ${ATTEMPT_STATES.join(", ")}`,
+				);
+			}
+			record.state = state;
+		}
+		if (exitCode !== undefined) record.exitCode = exitCode;
+		if (governedRef !== undefined) record.governedRef = governedRef;
+		if (observedRef !== undefined) record.observedRef = observedRef;
+		if (reason !== undefined) record.reason = reason;
+		if (FINAL_ATTEMPT_STATES.has(record.state)) record.finishedAt = at;
+		const problem = attemptProblem(record);
+		if (problem)
+			throw typedError(CODE_CORRUPT, `refusing to store a malformed attempt: ${problem}`);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
+		refreshAttemptSummary(targetRoot, { runId });
+		return { ok: true, attempt: record, attemptFile: file };
+	} finally {
+		releasePathLock(lockPath, lock.leaseId);
 	}
-	if (exitCode !== undefined) record.exitCode = exitCode;
-	if (governedRef !== undefined) record.governedRef = governedRef;
-	if (observedRef !== undefined) record.observedRef = observedRef;
-	if (reason !== undefined) record.reason = reason;
-	if (FINAL_ATTEMPT_STATES.has(record.state)) record.finishedAt = at;
-	const problem = attemptProblem(record);
-	if (problem) throw typedError(CODE_CORRUPT, `refusing to store a malformed attempt: ${problem}`);
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
-	refreshAttemptSummary(targetRoot, { runId });
-	return { ok: true, attempt: record, attemptFile: file };
 }
 
 /**

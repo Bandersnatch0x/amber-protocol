@@ -5,7 +5,7 @@
 // adapter parses flags only; the core owns every verdict, and nothing
 // here ever executes an external operation — every write is governance.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const {
 	invalidArg,
 	targetValue,
@@ -77,7 +77,7 @@ function parseEffectPin(raw) {
 	return { value: { id: match[1], version: match[2] } };
 }
 
-const dispatch = defineCommand({
+const externalDispatch = defineCliCommand({
 	command: "external",
 	actions: [
 		"register",
@@ -452,9 +452,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function externalDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { externalDispatch };

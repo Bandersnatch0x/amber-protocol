@@ -5,7 +5,7 @@
 // anything — a grant is a governance record, and neither --yes nor
 // --force ever routes into this surface.
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const {
 	invalidArg,
 	targetValue,
@@ -76,7 +76,7 @@ function parseCapabilityPin(raw) {
 	};
 }
 
-const dispatch = defineCommand({
+const breakglassDispatch = defineCliCommand({
 	command: "breakglass",
 	actions: ["grant", "revoke", "grants", "use", "show", "settle", "review", "status"],
 	handlers: {
@@ -331,9 +331,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function breakglassDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { breakglassDispatch };

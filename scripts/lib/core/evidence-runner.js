@@ -7,12 +7,18 @@
 // needs no approval: collecting evidence is not a mutating action. It keeps the
 // policy gate (only allow-listed commands run) and the hash-chain ledger, sharing
 // loop-policy + loop-ledger with governed-runner.
-const { spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
-const { evaluateVerifyPolicy, loadVerifyPolicyRules } = require("./loop-policy");
+const {
+	evaluateVerifyPolicy,
+	loadVerifyPolicyRules,
+	parseGovernedArgv,
+	toSpawnArgv,
+} = require("./loop-policy");
 const { appendLedgerRecord } = require("./loop-ledger");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const { typedError } = require("./error-catalog");
+const { signalPidTree } = require("./execution-handles");
 
 const STDOUT_CAP = 4000;
 const STDERR_CAP = 2000;
@@ -57,9 +63,9 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	// Gate — verification policy (verify-rules.json; deny-wins, default-deny). Only
 	// allow-listed verification commands run, so `verify --execute --command "rm -rf /"`
 	// is refused even if the global governance rules.json has been relaxed. Built-in
-	// denies (destructive patterns + shell composition) are enforced BEFORE user
+	// denies (destructive argv, anything that needs a shell) are enforced BEFORE user
 	// rules, so a custom verify-rules.json can neither drop destructive protection nor
-	// be defeated by chaining a second command through the shell (`pytest && rm -rf`).
+	// chain a second command (`pytest && rm -rf`); the command then runs as argv.
 	const verdict = evaluateVerifyPolicy(command, loadVerifyPolicyRules(targetRoot));
 	if (!verdict.allowed) {
 		const record = appendLedgerRecord(ledgerPath, {
@@ -83,20 +89,46 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	const startedAt = Date.now();
 	let exec;
 	try {
-		const res = spawnSync(command, {
-			shell: true,
-			cwd: targetRoot,
-			encoding: "utf8",
-			timeout: resolveBudgetMinutes(budgetMinutes) * 60_000,
+		const argv = toSpawnArgv(parseGovernedArgv(command));
+		const timeoutMs = resolveBudgetMinutes(budgetMinutes) * 60_000;
+		const res = await new Promise((resolve) => {
+			const child = spawn(argv[0], argv.slice(1), {
+				shell: false,
+				cwd: targetRoot,
+				detached: process.platform !== "win32",
+				stdio: ["ignore", "pipe", "pipe"],
+			});
+			const out = [],
+				err = [];
+			let timedOut = false;
+			const timer = setTimeout(() => {
+				timedOut = true;
+				// Kill the whole tree. A bare signal stops only the direct child, so a
+				// timed-out verification could leave grandchildren running. signalPidTree
+				// already covers both platforms (taskkill /T on win32, process group on POSIX).
+				signalPidTree(child.pid, "SIGTERM");
+			}, timeoutMs);
+			child.stdout.on("data", (b) => out.push(Buffer.from(b)));
+			child.stderr.on("data", (b) => err.push(Buffer.from(b)));
+			child.on("error", (e) => {
+				clearTimeout(timer);
+				resolve({ status: -1, stdout: "", stderr: e.message });
+			});
+			child.on("close", (code, _signal) => {
+				clearTimeout(timer);
+				resolve({
+					status: timedOut ? -1 : (code ?? -1),
+					stdout: Buffer.concat(out).toString(),
+					stderr: Buffer.concat(err).toString(),
+				});
+			});
 		});
-		// A null status means the process was killed (e.g. timeout/signal); treat as
-		// failure (-1) so a timed-out verify never records as passed.
-		const exitCode = res.status === null ? -1 : res.status;
+		const exitCode = res.status;
 		exec = {
 			command,
 			exitCode,
-			stdoutTail: (res.stdout || "").slice(-STDOUT_CAP),
-			stderrTail: (res.stderr || "").slice(-STDERR_CAP),
+			stdoutTail: res.stdout.slice(-STDOUT_CAP),
+			stderrTail: res.stderr.slice(-STDERR_CAP),
 		};
 	} catch (e) {
 		exec = {

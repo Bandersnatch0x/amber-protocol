@@ -202,6 +202,56 @@ describe("latestRequestForPage", () => {
 			cleanup(root);
 		}
 	});
+
+	it("returns the last created request when every request file has the same mtime", () => {
+		const root = makeTarget();
+		try {
+			seedLedger(root);
+			const created = [];
+			for (let i = 0; i < 5; i++) {
+				created.push(createRequest(root, { pageId: "p1", title: `R${i}`, force: true }));
+			}
+			const sameTime = new Date("2026-01-01T00:00:00.000Z");
+			for (const r of created) fs.utimesSync(r.requestPath, sameTime, sameTime);
+			assert.equal(latestRequestForPage(root, "p1").target.title, "R4");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("ignores a later mtime on an older request", () => {
+		const root = makeTarget();
+		try {
+			seedLedger(root);
+			const older = createRequest(root, { pageId: "p1", title: "older" });
+			createRequest(root, { pageId: "p1", title: "newer", force: true });
+			const later = new Date(Date.now() + 60_000);
+			fs.utimesSync(older.requestPath, later, later);
+			assert.equal(latestRequestForPage(root, "p1").target.title, "newer");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("orders requests written before sequencing by createdAt", () => {
+		const root = makeTarget();
+		try {
+			const dir = path.join(root, ".amber", "context", "requests");
+			fs.mkdirSync(dir, { recursive: true });
+			const write = (requestId, createdAt) =>
+				fs.writeFileSync(
+					path.join(dir, `${requestId}.json`),
+					JSON.stringify({ requestId, createdAt, target: { pageId: "p1" } }),
+				);
+			write("kd-2026-01-01-aaaaaa", "2026-01-01T00:00:02.000Z");
+			write("kd-2026-01-01-ffffff", "2026-01-01T00:00:01.000Z");
+			const sameTime = new Date("2026-01-01T00:00:00.000Z");
+			for (const f of fs.readdirSync(dir)) fs.utimesSync(path.join(dir, f), sameTime, sameTime);
+			assert.equal(latestRequestForPage(root, "p1").requestId, "kd-2026-01-01-aaaaaa");
+		} finally {
+			cleanup(root);
+		}
+	});
 });
 
 describe("createRequest scope (ADR-0010 D5)", () => {

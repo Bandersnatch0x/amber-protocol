@@ -1,14 +1,9 @@
 "use strict";
 
 /**
- * Maintenance legacy CommonJS surface (F014).
- *
- * Production consumers now use the root facade (`scripts/lib/maintenance`,
- * exposing inspect / evidence / staleDocs outcomes) or the Governance Console
- * command adapter (`scripts/lib/maintenance/adapters/command`). This file
- * remains the documented require path for package consumers during the
- * deprecation cycle and forwards retained helper exports without runtime
- * deprecation noise. Removal is deferred to a declared major release.
+ * Maintenance implementation behind the root facade (`scripts/lib/maintenance`)
+ * and the Governance Console command adapter
+ * (`scripts/lib/maintenance/adapters/command`).
  */
 
 const fs = require("node:fs");
@@ -30,14 +25,10 @@ const {
 // so the Maintenance evidence facade can share them without a circular require.
 const {
 	EVOLUTION_FINDING_MIN_COUNT,
-	countEvolutionFindings,
-	extractEvolutionFindings,
 	significantEvolutionFindings,
 } = require("./evolution-findings");
 
 const { TEMPLATE_ROOT } = require("./constants");
-
-// MESSAGES moved with buildMaintenanceProposalContent into maintenance-propose.js.
 
 const { validateWiki } = require("./validators");
 
@@ -260,18 +251,9 @@ function inspectMaintenance(target) {
 	return inspection;
 }
 
-// buildMaintenanceProposalContent + proposeMaintenance were extracted to
-// maintenance-propose.js (architecture review #5). inspectMaintenance is NOT
-// moved (shared core seam for governance-report/adoption-reports), so propose
-// receives it by injection. proposeMaintenance stays HANDLER-ONLY (not on
-// module.exports) — dispatch uses `module.exports.proposeMaintenance ||
-// proposeMaintenance` so a test can stub the export and fall back to this
-// lexical wrapper, which late-binds inspect via module.exports so the inspect
-// stub seam also stays intact.
-const {
-	buildMaintenanceProposalContent,
-	proposeMaintenance: proposeMaintenanceImpl,
-} = require("./maintenance-propose");
+// inspectMaintenance stays here as a shared seam, so propose receives it by
+// injection and late-binds it through module.exports to keep test stubs seen.
+const { proposeMaintenance: proposeMaintenanceImpl } = require("./maintenance-propose");
 
 function proposeMaintenance(target, priority) {
 	// Reach inspect through module.exports so a test stub on
@@ -420,11 +402,8 @@ module.exports = {
 	listWikiMarkdownFiles,
 	detectStaleDocs,
 	buildWikiLintCi,
-	countEvolutionFindings,
-	extractEvolutionFindings,
 	extractRegressionProposals,
 	readRegressionProposal,
 	inspectMaintenance,
-	buildMaintenanceProposalContent,
 	runMaintenanceAction,
 };

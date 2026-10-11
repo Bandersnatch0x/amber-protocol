@@ -469,6 +469,10 @@ test("a live handle makes a second attempt for the same runId refuse before spaw
 		approve(target);
 		const { promise, handle } = await startRunning(target);
 		try {
+			appendLedgerRecord(ledgerPathOf(target), {
+				kind: "approved",
+				approvalKey: "cancel-run:second-approval",
+			});
 			const second = await runGovernedCommand({
 				target,
 				commandId: "allow-cancel",

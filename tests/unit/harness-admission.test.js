@@ -85,6 +85,30 @@ test("a complete six-check receipt freezes into the record and rides run.admitte
 	}
 });
 
+test("harness contract admission refuses files outside the target root", () => {
+	const target = tmpTarget();
+	const outside = path.join(os.tmpdir(), `amber-outside-${Date.now()}.json`);
+	try {
+		fs.writeFileSync(
+			outside,
+			JSON.stringify({
+				apiVersion: "amber.dev/v1",
+				kind: "HarnessContract",
+				metadata: { id: "outside", version: "1" },
+				agent: { id: "worker", role: "implementation" },
+				governance: { policy: "default-safe" },
+			}),
+		);
+		const result = dispatch("harness", { target, file: outside, json: true, _: ["admit"] });
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.result.code, "AMBER_E_INVALID_ARG");
+		assert.match(result.result.errors[0], /outside the target root/);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { force: true });
+	}
+});
+
 test("a missing check refuses the whole admission and leaves the run untouched", () => {
 	const target = tmpTarget();
 	try {

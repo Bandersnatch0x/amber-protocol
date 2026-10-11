@@ -18,6 +18,7 @@ const { inspectHarnessContract } = require("./contract-core");
 const { isLegalTransition, isFinal } = require("./run-state-machine");
 const { emitHarnessEvent } = require("./event-ledger");
 const { toolsSnapshot } = require("./tool-core");
+const { acquirePathLock, releasePathLock } = require("../session-lock");
 
 const CODE_ILLEGAL = "AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION";
 const CODE_FINAL = "AMBER_E_HARNESS_RUN_FINAL";
@@ -55,6 +56,10 @@ function runFileForRead(targetRoot, runId) {
 
 function safeId(runId) {
 	return String(runId).replace(/[^A-Za-z0-9._-]/g, "-");
+}
+
+function runLockFile(targetRoot, runId) {
+	return path.join(statePathForCreate(targetRoot, "harness", "runs"), `${safeId(runId)}.lock`);
 }
 
 function validateRunRecord(candidate) {
@@ -159,53 +164,60 @@ function createRun(targetRoot, { contractId, subject, runId, executionRef, now }
 	if (!subject || !subject.agent) {
 		throw typedError(CODE_INVALID_ARG, "--agent <id> is required as the run subject");
 	}
-	const admitted = inspectHarnessContract(targetRoot, { contractId });
 	const id = runId || generateRunId(now);
-	const at = now || new Date().toISOString();
-	const record = {
-		apiVersion: "amber.dev/v1",
-		kind: "HarnessRun",
-		id,
-		subject: {
-			agent: subject.agent,
-			...(subject.session ? { session: subject.session } : {}),
-			...(subject.task ? { task: subject.task } : {}),
-		},
-		harness: {
-			contract: admitted.id,
-			contractSnapshotHash: admitted.snapshotHash,
-			...(admitted.contract.governance && admitted.contract.governance.policy
-				? { policy: admitted.contract.governance.policy }
-				: {}),
-		},
-		...(executionRef ? { execution: { ref: String(executionRef) } } : {}),
-		events: { stream: "harness/events.jsonl" },
-		state: "created",
-		stateHistory: [{ from: null, to: "created", at }],
-	};
-	// F067 (Harness v2 §30 acceptance 5): the run records the tool-registry
-	// snapshot it operated under, so tool drift between runs is detectable.
-	// Empty registry → no section (pre-H1 records stay byte-compatible).
-	const tools = toolsSnapshot(targetRoot);
-	if (tools) record.tools = tools;
-	const file = runFileForCreate(targetRoot, id);
-	if (fs.existsSync(file)) {
-		throw typedError(
-			CODE_INVALID_ARG,
-			`run id "${id}" already exists; retry is a new run, never a rewrite`,
+	const lockPath = runLockFile(targetRoot, id);
+	const lock = acquirePathLock(lockPath);
+	if (!lock.success) throw typedError(lock.code, lock.error);
+	try {
+		const admitted = inspectHarnessContract(targetRoot, { contractId });
+		const at = now || new Date().toISOString();
+		const record = {
+			apiVersion: "amber.dev/v1",
+			kind: "HarnessRun",
+			id,
+			subject: {
+				agent: subject.agent,
+				...(subject.session ? { session: subject.session } : {}),
+				...(subject.task ? { task: subject.task } : {}),
+			},
+			harness: {
+				contract: admitted.id,
+				contractSnapshotHash: admitted.snapshotHash,
+				...(admitted.contract.governance && admitted.contract.governance.policy
+					? { policy: admitted.contract.governance.policy }
+					: {}),
+			},
+			...(executionRef ? { execution: { ref: String(executionRef) } } : {}),
+			events: { stream: "harness/events.jsonl" },
+			state: "created",
+			stateHistory: [{ from: null, to: "created", at }],
+		};
+		// F067 (Harness v2 §30 acceptance 5): the run records the tool-registry
+		// snapshot it operated under, so tool drift between runs is detectable.
+		// Empty registry → no section (pre-H1 records stay byte-compatible).
+		const tools = toolsSnapshot(targetRoot);
+		if (tools) record.tools = tools;
+		const file = runFileForCreate(targetRoot, id);
+		if (fs.existsSync(file)) {
+			throw typedError(
+				CODE_INVALID_ARG,
+				`run id "${id}" already exists; retry is a new run, never a rewrite`,
+			);
+		}
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
+		emitRunEvent(
+			targetRoot,
+			"run.created",
+			record,
+			at,
+			undefined,
+			tools ? [`tools:${tools.snapshotHash}`] : null,
 		);
+		return { ok: true, run: record, runFile: file };
+	} finally {
+		releasePathLock(lockPath, lock.leaseId);
 	}
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
-	emitRunEvent(
-		targetRoot,
-		"run.created",
-		record,
-		at,
-		undefined,
-		tools ? [`tools:${tools.snapshotHash}`] : null,
-	);
-	return { ok: true, run: record, runFile: file };
 }
 
 /**
@@ -225,56 +237,63 @@ function transitionRun(targetRoot, { runId, to, reason, now, admission } = {}) {
 	if (!to || typeof to !== "string") {
 		throw typedError(CODE_INVALID_ARG, "--to <state> is required to advance a run");
 	}
-	const file = runFileForRead(targetRoot, runId);
-	const record = readRunFile(file);
-	if (!record) {
-		throw typedError(CODE_NOT_FOUND, `no run "${runId}" under the harness state area`);
-	}
-	if (isFinal(record.state)) {
-		throw typedError(
-			CODE_FINAL,
-			`run "${runId}" is final (${record.state}); terminal records are immutable — retry is a new run on the same task`,
+	const lockPath = runLockFile(targetRoot, runId);
+	const lock = acquirePathLock(lockPath);
+	if (!lock.success) throw typedError(lock.code, lock.error);
+	try {
+		const file = runFileForRead(targetRoot, runId);
+		const record = readRunFile(file);
+		if (!record) {
+			throw typedError(CODE_NOT_FOUND, `no run "${runId}" under the harness state area`);
+		}
+		if (isFinal(record.state)) {
+			throw typedError(
+				CODE_FINAL,
+				`run "${runId}" is final (${record.state}); terminal records are immutable — retry is a new run on the same task`,
+			);
+		}
+		if (!isLegalTransition(record.state, to)) {
+			throw typedError(
+				CODE_ILLEGAL,
+				`illegal run transition ${record.state} → ${to}; see run-state-machine TRANSITIONS`,
+			);
+		}
+		const at = now || new Date().toISOString();
+		let receiptPointers = null;
+		if (to === "admitted") {
+			const problem = admissionProblem(admission);
+			if (problem !== null) throw typedError(CODE_ADMISSION_INCOMPLETE, problem);
+			record.admission = {
+				receiptedAt: at,
+				checks: Object.fromEntries(
+					ADMISSION_CHECK_NAMES.map((name) => [
+						name,
+						{ result: "pass", pointer: admission[name].pointer },
+					]),
+				),
+			};
+			receiptPointers = ADMISSION_CHECK_NAMES.map(
+				(name) => `${name}:${record.admission.checks[name].pointer}`,
+			);
+		}
+		record.stateHistory.push({ from: record.state, to, at, ...(reason ? { reason } : {}) });
+		record.state = to;
+		record.outcome = record.outcome || {};
+		if (to === "running" && !record.outcome.startedAt) record.outcome.startedAt = at;
+		if (isFinal(to)) record.outcome.finishedAt = at;
+		fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
+		emitRunEvent(
+			targetRoot,
+			eventKindForTransition(record.stateHistory[record.stateHistory.length - 2].to, to),
+			record,
+			at,
+			reason,
+			receiptPointers,
 		);
+		return { ok: true, run: record, runFile: file };
+	} finally {
+		releasePathLock(lockPath, lock.leaseId);
 	}
-	if (!isLegalTransition(record.state, to)) {
-		throw typedError(
-			CODE_ILLEGAL,
-			`illegal run transition ${record.state} → ${to}; see run-state-machine TRANSITIONS`,
-		);
-	}
-	const at = now || new Date().toISOString();
-	let receiptPointers = null;
-	if (to === "admitted") {
-		const problem = admissionProblem(admission);
-		if (problem !== null) throw typedError(CODE_ADMISSION_INCOMPLETE, problem);
-		record.admission = {
-			receiptedAt: at,
-			checks: Object.fromEntries(
-				ADMISSION_CHECK_NAMES.map((name) => [
-					name,
-					{ result: "pass", pointer: admission[name].pointer },
-				]),
-			),
-		};
-		receiptPointers = ADMISSION_CHECK_NAMES.map(
-			(name) => `${name}:${record.admission.checks[name].pointer}`,
-		);
-	}
-	record.stateHistory.push({ from: record.state, to, at, ...(reason ? { reason } : {}) });
-	record.state = to;
-	record.outcome = record.outcome || {};
-	if (to === "running" && !record.outcome.startedAt) record.outcome.startedAt = at;
-	if (isFinal(to)) record.outcome.finishedAt = at;
-	fs.writeFileSync(file, `${JSON.stringify(record, null, "\t")}\n`, "utf8");
-	emitRunEvent(
-		targetRoot,
-		eventKindForTransition(record.stateHistory[record.stateHistory.length - 2].to, to),
-		record,
-		at,
-		reason,
-		receiptPointers,
-	);
-	return { ok: true, run: record, runFile: file };
 }
 
 /**

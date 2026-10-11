@@ -13,74 +13,10 @@
  * dispatch, and the public command list cannot drift independently.
  */
 
-const path = require("node:path");
-
-// ── Barrel imports ──────────────────────────────────────────────────────────
-// Direct core imports (the amber-core facade was removed — ADR-0005, #4 PR2).
-const { scaffoldHarness, scaffoldWiki } = require("./core/scaffold");
-const { auditProject, validateHandoff } = require("./core/audit");
-const { doctor } = require("./core/doctor");
-const {
-	scaffoldPlan,
-	validatePlanGate,
-	confirmPlanGate,
-	reviewPlan,
-	acceptPlan,
-} = require("./core/planning");
-const { resolveSessionFeature, readPlanFeature } = require("./core/feature-attribution");
-const { validateWiki } = require("./core/validators");
-const { exportOkfBundle } = require("./core/okf-export");
-const { inspectWorkflowPack, inspectWorkflowPackReadiness } = require("./core/workflow-packs");
-const { inspectProjectProfile } = require("./core/profiles");
-const { prepareTaskExecution, inspectTaskResult } = require("./core/task-execution");
-const {
-	inspectLoopContract,
-	recommendLoopContract,
-	recordLoopContract,
-	inspectLoopLedger,
-} = require("./core/loops");
-const {
-	executeLoopContract,
-	approveLoopContract,
-	verifyLoopLedger,
-} = require("./core/loop-execution");
-const routeCommands = require("./route-commands");
-const { resolveTargetRoutesDirectory } = require("./route-loader");
-const featureCommands = require("./feature-commands");
-const sessionCommands = require("./session-commands");
-const {
-	resolveTarget,
-	unknownAction,
-	shapeResult,
-	requireSessionId,
-} = require("./command-helpers");
-const { projectionDispatch } = require("./projection-commands");
-const { syncDispatch } = require("./sync-commands");
-const { knowledgeDispatch } = require("./knowledge-commands");
-const { phaseDispatch } = require("./phase-commands");
-const { artifactDispatch } = require("./canonical-artifact-commands");
-const { principalDispatch } = require("./principal-commands");
-const { evalDispatch } = require("./eval-commands");
-const { evidenceDispatch } = require("./evidence-commands");
-const { approvalDispatch } = require("./approval-commands");
-const { contractsDispatch } = require("./contracts-commands");
-const { harnessDispatch } = require("./harness/harness-commands");
-const { gateDispatch } = require("./gate-commands");
-const { policyDispatch } = require("./policy-commands");
-const { adapterDispatch } = require("./adapter-commands");
-const { runnerDispatch } = require("./runner-commands");
-const { releaseDispatch } = require("./release-commands");
-const { maintainDispatch } = require("./maintain-commands");
-const { retentionDispatch } = require("./retention-commands");
-const { externalDispatch } = require("./external-commands");
-const { breakglassDispatch } = require("./breakglass-commands");
-const { orgAuditDispatch } = require("./org-audit-commands");
-const { hooksDispatch } = require("./hooks-commands");
+// ── Imports ─────────────────────────────────────────────────────────────────
+// Command modules are required inside the handler that runs them, so a CLI
+// call loads only its own command chain.
 const { bindCommandHandlers } = require("./command-registry");
-const { inferNext } = require("./next-command");
-const { backfillVersioning, migrateManifests } = require("./migrate-command");
-const { migrateState, migrateWiki } = require("./state-migration");
-const { validateWorkflowPack, validateLoopContract } = require("./core/execution-validator");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -91,24 +27,27 @@ function handleMaintenance(args) {
 
 function handleLedger(args) {
 	const action = args._?.[0];
-	const targetRoot = resolveTarget(args);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
 	if (action === "export") {
 		const { exportLedger } = require("./core/ledger-export");
 		const result = exportLedger(targetRoot, { format: args.format, home: args.home });
 		if (args.out) {
 			const fs = require("node:fs");
-			const outputPath = path.resolve(targetRoot, args.out);
+			const { resolvePathWithin } = require("./core/fs-utils");
+			const outputPath = resolvePathWithin(targetRoot, args.out, {
+				label: "Ledger export destination",
+			});
 			fs.writeFileSync(outputPath, result.payload + "\n");
-			return shapeResult(args, {
+			return require("./command-helpers").shapeResult(args, {
 				text: `Wrote ${result.ledgers.length} ledger(s) to ${outputPath} (intact=${result.intactCount}, broken=${result.brokenCount})`,
 				errors: result.errors,
 				warnings: result.warnings,
 			});
 		}
 		if (args.json) {
-			return shapeResult(args, result, { bypassPrint: false });
+			return require("./command-helpers").shapeResult(args, result, { bypassPrint: false });
 		}
-		return shapeResult(args, {
+		return require("./command-helpers").shapeResult(args, {
 			text: result.payload,
 			errors: result.errors,
 			warnings: result.warnings,
@@ -120,7 +59,7 @@ function handleLedger(args) {
 		const text = result.sealed
 			? `Sealed ${result.ledgerCount} ledger(s) to tag ${result.tagName} at HEAD ${result.head}.`
 			: `Seal failed: ${result.errors.join("; ")}`;
-		return shapeResult(
+		return require("./command-helpers").shapeResult(
 			args,
 			{ text, ...result, errors: result.errors, warnings: result.warnings },
 			{ exitCode: result.sealed ? 0 : 1 },
@@ -137,13 +76,13 @@ function handleLedger(args) {
 		} else {
 			text = `NOT anchored: ${result.ledgerChangedSinceSeal} ledger(s) changed since seal tag ${result.sealTag}.`;
 		}
-		return shapeResult(
+		return require("./command-helpers").shapeResult(
 			args,
 			{ text, ...result, errors: result.errors, warnings: result.warnings },
 			{ exitCode: result.errors?.length ? 1 : result.anchored ? 0 : 1 },
 		);
 	}
-	return shapeResult(
+	return require("./command-helpers").shapeResult(
 		args,
 		{ errors: ["ledger requires export, seal, or verify-anchoring."] },
 		{ exitCode: 1 },
@@ -152,7 +91,7 @@ function handleLedger(args) {
 
 async function handleSession(args) {
 	const action = args._?.[0];
-	const targetRoot = resolveTarget(args);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
 	let sessionResult;
 
 	if (action === "start") {
@@ -164,7 +103,7 @@ async function handleSession(args) {
 			}
 		}
 		if (!sessionResult) {
-			sessionResult = await sessionCommands.startSession(targetRoot, {
+			sessionResult = await require("./session-commands").startSession(targetRoot, {
 				goal: args.goal || args._?.[1],
 				route: args.route,
 				budget: parsedBudget,
@@ -175,41 +114,41 @@ async function handleSession(args) {
 			});
 		}
 	} else if (action === "status") {
-		sessionResult = sessionCommands.statusSession(targetRoot, {
+		sessionResult = require("./session-commands").statusSession(targetRoot, {
 			sessionId: args._?.[1] || args.session,
 		});
 	} else if (action === "list") {
-		sessionResult = sessionCommands.listSessions(targetRoot, {});
+		sessionResult = require("./session-commands").listSessions(targetRoot, {});
 	} else if (action === "abort") {
-		sessionResult = await sessionCommands.abortSession(targetRoot, {
+		sessionResult = await require("./session-commands").abortSession(targetRoot, {
 			sessionId: args._?.[1] || args.session,
 			requestId: args.requestId,
 		});
 	} else if (action === "continue") {
-		sessionResult = await sessionCommands.continueSession(targetRoot, {
+		sessionResult = await require("./session-commands").continueSession(targetRoot, {
 			sessionId: args._?.[1] || args.session,
 			requestId: args.requestId,
 		});
 	} else if (action === "complete-check") {
-		sessionResult = requireSessionId(args, "complete-check");
+		sessionResult = require("./command-helpers").requireSessionId(args, "complete-check");
 		if (!sessionResult) {
 			const { buildCompletionResult } = require("./completion-check");
 			const completion = buildCompletionResult(targetRoot, args.session, args);
 			sessionResult = { text: completion.text, exitCode: completion.errors.length > 0 ? 1 : 0 };
 		}
 	} else if (action === "complete") {
-		sessionResult = requireSessionId(args, "complete");
+		sessionResult = require("./command-helpers").requireSessionId(args, "complete");
 		if (!sessionResult) {
-			sessionResult = await sessionCommands.completeSession(targetRoot, {
+			sessionResult = await require("./session-commands").completeSession(targetRoot, {
 				sessionId: args.session,
 				strict: args.strict,
 				requestId: args.requestId,
 			});
 		}
 	} else if (action === "verify") {
-		sessionResult = requireSessionId(args, "verify");
+		sessionResult = require("./command-helpers").requireSessionId(args, "verify");
 		if (!sessionResult) {
-			sessionResult = await sessionCommands.verifySession(targetRoot, {
+			sessionResult = await require("./session-commands").verifySession(targetRoot, {
 				sessionId: args.session,
 				stage: args.stage,
 				command: args.command,
@@ -220,25 +159,25 @@ async function handleSession(args) {
 			});
 		}
 	} else if (action === "approve") {
-		sessionResult = requireSessionId(args, "approve");
+		sessionResult = require("./command-helpers").requireSessionId(args, "approve");
 		if (!sessionResult) {
-			sessionResult = await sessionCommands.approveSession(targetRoot, {
+			sessionResult = await require("./session-commands").approveSession(targetRoot, {
 				sessionId: args.session,
 				gate: args.gate || args._?.[1],
 				yes: args.yes,
 			});
 		}
 	} else if (action === "verify-ledger") {
-		sessionResult = requireSessionId(args, "verify-ledger");
+		sessionResult = require("./command-helpers").requireSessionId(args, "verify-ledger");
 		if (!sessionResult) {
-			sessionResult = sessionCommands.verifyLedgerSession(targetRoot, args.session);
+			sessionResult = require("./session-commands").verifyLedgerSession(targetRoot, args.session);
 		}
 	} else if (action === "lease") {
 		// F062 lease reacquisition (ADR-0029 §8.1): explicit, owner-bound, new
 		// fence. Owner proof is the same digest the run/settle seam uses.
-		sessionResult = requireSessionId(args, "lease");
+		sessionResult = require("./command-helpers").requireSessionId(args, "lease");
 		if (!sessionResult) {
-			sessionResult = await sessionCommands.leaseSession(targetRoot, {
+			sessionResult = await require("./session-commands").leaseSession(targetRoot, {
 				sessionId: args.session,
 				ownerId: args.ownerId,
 				tokenHash: args.tokenHash,
@@ -257,9 +196,9 @@ async function handleSession(args) {
 				exitCode: 1,
 			};
 		} else if (action === "run") {
-			sessionResult = requireSessionId(args, "run");
+			sessionResult = require("./command-helpers").requireSessionId(args, "run");
 			if (!sessionResult) {
-				sessionResult = await sessionCommands.runSession(targetRoot, {
+				sessionResult = await require("./session-commands").runSession(targetRoot, {
 					sessionId: args.session,
 					execute: args.execute === true,
 					ownerId: args.ownerId,
@@ -268,7 +207,7 @@ async function handleSession(args) {
 				});
 			}
 		} else {
-			sessionResult = requireSessionId(args, "settle");
+			sessionResult = require("./command-helpers").requireSessionId(args, "settle");
 			if (!sessionResult) {
 				let parsedResult;
 				let parseError = null;
@@ -283,7 +222,7 @@ async function handleSession(args) {
 				}
 				sessionResult = parseError
 					? { text: parseError, exitCode: 1 }
-					: await sessionCommands.settleSession(targetRoot, {
+					: await require("./session-commands").settleSession(targetRoot, {
 							sessionId: args.session,
 							requestId: args.requestId,
 							attemptId: args.attemptId,
@@ -335,7 +274,7 @@ function handleGovernance(args) {
 
 function handleInit(args) {
 	return {
-		result: scaffoldHarness(args.target, {
+		result: require("./core/scaffold").scaffoldHarness(args.target, {
 			dryRun: args.dryRun,
 			withWiki: args.withWiki,
 			skipDetection: args.skipDetection,
@@ -347,20 +286,20 @@ function handleInit(args) {
 function handleAudit(args) {
 	const sub = args._?.[0];
 	if (sub === "org") {
-		return handleOrganizationAudit(args);
+		return require("./org-audit-commands").orgAuditDispatch(args);
 	}
-	return { result: auditProject(args.target) };
-}
-
-function handleOrganizationAudit(args) {
-	return orgAuditDispatch(args);
+	return { result: require("./core/audit").auditProject(args.target) };
 }
 
 function handleWiki(args) {
 	const action = args._?.[0];
 
 	if (action === "export") {
-		return { result: exportOkfBundle(args.target, { outputDir: args.outputDir }) };
+		return {
+			result: require("./core/okf-export").exportOkfBundle(args.target, {
+				outputDir: args.outputDir,
+			}),
+		};
 	}
 
 	// Knowledge Plan support (declarative architecture + knowledge cards, integrated for Amber).
@@ -372,14 +311,14 @@ function handleWiki(args) {
 	}
 
 	if (args.okf) {
-		return { result: validateWiki(args.target, { okf: true }) };
+		return { result: require("./core/validators").validateWiki(args.target, { okf: true }) };
 	}
 
-	return { result: scaffoldWiki(args.target, { dryRun: args.dryRun }) };
+	return { result: require("./core/scaffold").scaffoldWiki(args.target, { dryRun: args.dryRun }) };
 }
 
 function handleDoctor(args) {
-	return { result: doctor(args.target, { okf: args.okf }) };
+	return { result: require("./core/doctor").doctor(args.target, { okf: args.okf }) };
 }
 
 function handleHandoff(args) {
@@ -387,7 +326,7 @@ function handleHandoff(args) {
 	if (action === "bundle") {
 		const { writeHandoffBundle } = require("./core/handoff-bundle");
 		return {
-			result: writeHandoffBundle(resolveTarget(args), {
+			result: writeHandoffBundle(require("./command-helpers").resolveTarget(args), {
 				outputDir: args.outputDir || args.bundleDir,
 				targetDisplay: args.target || ".",
 				replayScope: args.replayScope,
@@ -400,7 +339,7 @@ function handleHandoff(args) {
 			resolveTargetRelativePath,
 			validateHandoffBundle,
 		} = require("./core/handoff-bundle");
-		const targetRoot = resolveTarget(args);
+		const targetRoot = require("./command-helpers").resolveTarget(args);
 		const bundleDir =
 			args.bundleDir || args.outputDir
 				? resolveTargetRelativePath(targetRoot, args.bundleDir || args.outputDir)
@@ -410,7 +349,7 @@ function handleHandoff(args) {
 	const { writeHandoff } = require("./handoff-command");
 	const rel = "session-handoff.md";
 	const written = writeHandoff(args.target, { dryRun: args.dryRun });
-	const validation = validateHandoff(args.target);
+	const validation = require("./core/audit").validateHandoff(args.target);
 	const wrote = written.changed && !args.dryRun;
 	return {
 		result: {
@@ -431,7 +370,7 @@ function handleHandoff(args) {
 
 function handlePlan(args) {
 	return {
-		result: scaffoldPlan(args.target, {
+		result: require("./core/planning").scaffoldPlan(args.target, {
 			feature: args.feature,
 			title: args.title,
 			dryRun: args.dryRun,
@@ -447,19 +386,26 @@ function handleGate(args) {
 	// behavior unchanged.
 	const action = args._?.[0];
 	if (action === "evaluate" || action === "show" || action === "list") {
-		return gateDispatch(args);
+		return require("./gate-commands").gateDispatch(args);
 	}
 	if (action !== undefined) {
-		return { result: unknownAction("gate", ["evaluate", "show", "list", "--plan <path>"]) };
+		return {
+			result: require("./command-helpers").unknownAction("gate", [
+				"evaluate",
+				"show",
+				"list",
+				"--plan <path>",
+			]),
+		};
 	}
 	if (args.confirm) {
-		return { result: confirmPlanGate(args.target, args.plan) };
+		return { result: require("./core/planning").confirmPlanGate(args.target, args.plan) };
 	}
-	return { result: validatePlanGate(args.target, args.plan) };
+	return { result: require("./core/planning").validatePlanGate(args.target, args.plan) };
 }
 
 function handleReview(args) {
-	return { result: reviewPlan(args.target, args.plan) };
+	return { result: require("./core/planning").reviewPlan(args.target, args.plan) };
 }
 
 function handleAccept(args) {
@@ -467,9 +413,26 @@ function handleAccept(args) {
 	// feature. Only block on a definite mismatch (both known and different) —
 	// an unreadable session/plan falls through and is reported downstream.
 	if (args.session) {
-		const targetRoot = resolveTarget(args);
-		const sessionFeature = resolveSessionFeature(targetRoot, args.session);
-		const planFeature = readPlanFeature(targetRoot, args.plan);
+		const shape = require("./session-commands").validateSessionIdForLookup(args.session);
+		if (!shape.valid) {
+			return {
+				result: {
+					target: args.target,
+					accepted: false,
+					errors: [`${shape.error}: ${args.session}`],
+					warnings: [],
+				},
+			};
+		}
+		const targetRoot = require("./command-helpers").resolveTarget(args);
+		const sessionFeature = require("./core/feature-attribution").resolveSessionFeature(
+			targetRoot,
+			args.session,
+		);
+		const planFeature = require("./core/feature-attribution").readPlanFeature(
+			targetRoot,
+			args.plan,
+		);
 		if (sessionFeature && planFeature && sessionFeature !== planFeature) {
 			return {
 				result: {
@@ -485,11 +448,17 @@ function handleAccept(args) {
 		}
 	}
 
-	const acceptResult = acceptPlan(args.target, args.plan, { force: args.force });
+	const acceptResult = require("./core/planning").acceptPlan(args.target, args.plan, {
+		force: args.force,
+	});
 	if (!args.session) return { result: acceptResult };
 
 	const { buildCompletionResult } = require("./completion-check");
-	const completion = buildCompletionResult(resolveTarget(args), args.session, args);
+	const completion = buildCompletionResult(
+		require("./command-helpers").resolveTarget(args),
+		args.session,
+		args,
+	);
 	return {
 		result: {
 			...acceptResult,
@@ -505,22 +474,31 @@ function handleAccept(args) {
 function handlePack(args) {
 	const action = args._?.[0];
 	if (action === "inspect" || action === "validate") {
-		const r = inspectWorkflowPack(args.file || "");
+		const r = require("./core/workflow-packs").inspectWorkflowPack(args.file || "");
 		if (action === "validate") r.valid = r.errors.length === 0;
 		return { result: r };
 	}
 	if (action === "readiness") {
-		return { result: inspectWorkflowPackReadiness(args.file || args._?.[1] || "") };
+		return {
+			result: require("./core/workflow-packs").inspectWorkflowPackReadiness(
+				args.file || args._?.[1] || "",
+			),
+		};
 	}
 	if (action === "validate-execution") {
 		const packPath = args.file || args.pack || args._?.[1] || "";
-		const v = validateWorkflowPack(packPath);
+		const v = require("./core/execution-validator").validateWorkflowPack(packPath);
 		return {
 			result: { target: args.target, ...v, errors: v.errors || [], warnings: v.warnings || [] },
 		};
 	}
 	return {
-		result: unknownAction("pack", ["inspect", "validate", "readiness", "validate-execution"]),
+		result: require("./command-helpers").unknownAction("pack", [
+			"inspect",
+			"validate",
+			"readiness",
+			"validate-execution",
+		]),
 	};
 }
 
@@ -530,9 +508,11 @@ function handleProfile(args) {
 		return handleDeploymentProfile(args);
 	}
 	if (action !== "inspect") {
-		return { result: unknownAction("profile", ["inspect", "deployment"]) };
+		return {
+			result: require("./command-helpers").unknownAction("profile", ["inspect", "deployment"]),
+		};
 	}
-	return { result: inspectProjectProfile(args.file || "") };
+	return { result: require("./core/profiles").inspectProjectProfile(args.file || "") };
 }
 
 function handleDeploymentProfile(args) {
@@ -614,36 +594,59 @@ function handleDeploymentProfile(args) {
 			bypassPrint: !args.json,
 		};
 	}
-	return { result: unknownAction("profile deployment", ["show", "set", "validate", "resolve"]) };
+	return {
+		result: require("./command-helpers").unknownAction("profile deployment", [
+			"show",
+			"set",
+			"validate",
+			"resolve",
+		]),
+	};
 }
 
 function handleTask(args) {
 	if (args._?.[0] !== "prepare") {
-		return { result: unknownAction("task", ["prepare"]) };
+		return { result: require("./command-helpers").unknownAction("task", ["prepare"]) };
 	}
-	return { result: prepareTaskExecution(args.target, args.plan, args.task, args) };
+	return {
+		result: require("./core/task-execution").prepareTaskExecution(
+			args.target,
+			args.plan,
+			args.task,
+			args,
+		),
+	};
 }
 
 function handleResult(args) {
 	if (args._?.[0] !== "inspect") {
-		return { result: unknownAction("result", ["inspect"]) };
+		return { result: require("./command-helpers").unknownAction("result", ["inspect"]) };
 	}
-	return { result: inspectTaskResult(args.target, args.task) };
+	return { result: require("./core/task-execution").inspectTaskResult(args.target, args.task) };
 }
 
 async function handleLoop(args) {
 	const action = args._?.[0];
 	if (action === "inspect") {
-		return { result: inspectLoopContract({ file: args.file, contract: args.contract }) };
+		return {
+			result: require("./core/loops").inspectLoopContract({
+				file: args.file,
+				contract: args.contract,
+			}),
+		};
 	}
 	if (action === "recommend") {
 		return {
-			result: recommendLoopContract({ target: args.target, file: args.file, goal: args.goal }),
+			result: require("./core/loops").recommendLoopContract({
+				target: args.target,
+				file: args.file,
+				goal: args.goal,
+			}),
 		};
 	}
 	if (action === "run") {
 		return {
-			result: await executeLoopContract({
+			result: await require("./core/loop-execution").executeLoopContract({
 				file: args.file,
 				contract: args.contract,
 				target: args.target,
@@ -655,7 +658,7 @@ async function handleLoop(args) {
 	}
 	if (action === "approve") {
 		return {
-			result: approveLoopContract({
+			result: require("./core/loop-execution").approveLoopContract({
 				file: args.file,
 				contract: args.contract,
 				target: args.target,
@@ -664,11 +667,16 @@ async function handleLoop(args) {
 		};
 	}
 	if (action === "verify-ledger") {
-		return { result: verifyLoopLedger({ target: args.target, contract: args.contract }) };
+		return {
+			result: require("./core/loop-execution").verifyLoopLedger({
+				target: args.target,
+				contract: args.contract,
+			}),
+		};
 	}
 	if (action === "record") {
 		return {
-			result: recordLoopContract({
+			result: require("./core/loops").recordLoopContract({
 				file: args.file,
 				contract: args.contract,
 				triggerSource: args.triggerSource,
@@ -678,13 +686,13 @@ async function handleLoop(args) {
 		};
 	}
 	if (action === "status") {
-		return { result: inspectLoopLedger({ ledger: args.ledger }) };
+		return { result: require("./core/loops").inspectLoopLedger({ ledger: args.ledger }) };
 	}
 	if (action === "validate-loop") {
-		return { result: validateLoopContract(args.contract) };
+		return { result: require("./core/execution-validator").validateLoopContract(args.contract) };
 	}
 	return {
-		result: unknownAction("loop", [
+		result: require("./command-helpers").unknownAction("loop", [
 			"inspect",
 			"recommend",
 			"run",
@@ -700,27 +708,33 @@ async function handleLoop(args) {
 async function handleRoute(args) {
 	const action = args._?.[0];
 	const routeId = args._?.[1] || "";
-	const targetRoot = resolveTarget(args);
-	const routesDir = resolveTargetRoutesDirectory(targetRoot);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
+	const routesDir = require("./route-loader").resolveTargetRoutesDirectory(targetRoot);
 	let routeResult;
 
-	if (action === "list") routeResult = routeCommands.listRoutes(routesDir);
-	else if (action === "inspect") routeResult = routeCommands.inspectRoute(routeId, routesDir);
+	if (action === "list") routeResult = require("./route-commands").listRoutes(routesDir);
+	else if (action === "inspect")
+		routeResult = require("./route-commands").inspectRoute(routeId, routesDir);
 	else if (action === "validate")
-		routeResult = routeCommands.validateRouteFile(args.file || routeId);
+		routeResult = require("./route-commands").validateRouteFile(args.file || routeId);
 	else if (action === "test") {
 		// Governed execution of a single command stage (GLX Phase 3); default stays dry-run.
 		if (args.execute && args.stage) {
-			const er = await routeCommands.executeRouteStage(routeId, args.stage, targetRoot, routesDir);
+			const er = await require("./route-commands").executeRouteStage(
+				routeId,
+				args.stage,
+				targetRoot,
+				routesDir,
+			);
 			routeResult = { text: er.text, exitCode: er.exitCode };
 		} else {
-			routeResult = routeCommands.testRoute(routeId, routesDir);
+			routeResult = require("./route-commands").testRoute(routeId, routesDir);
 		}
 	} else if (action === "approve") {
 		if (!args.stage) {
 			routeResult = { text: "route approve requires --stage <name>.", exitCode: 1 };
 		} else {
-			routeResult = routeCommands.approveRouteStage(
+			routeResult = require("./route-commands").approveRouteStage(
 				routeId,
 				args.stage,
 				targetRoot,
@@ -729,7 +743,7 @@ async function handleRoute(args) {
 			);
 		}
 	} else if (action === "verify-ledger") {
-		routeResult = routeCommands.verifyRouteLedger(routeId, targetRoot);
+		routeResult = require("./route-commands").verifyRouteLedger(routeId, targetRoot);
 	} else {
 		routeResult = {
 			text: "route requires list, inspect, validate, test, approve, or verify-ledger.",
@@ -748,7 +762,7 @@ async function handleRoute(args) {
 
 function handleWorkflow(args) {
 	const action = args._?.[0];
-	const targetRoot = resolveTarget(args);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
 	// Guard before dispatch: only assess supports --output-dir.
 	const SUPPORTS_OUTPUT_DIR = action === "assess";
 	if (args.outputDir && !SUPPORTS_OUTPUT_DIR) {
@@ -831,10 +845,12 @@ function handleWorkflow(args) {
 
 function handleMigrate(args) {
 	const action = args._?.[0];
-	const targetRoot = resolveTarget(args);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
 
 	if (action === "state") {
-		const stateResult = migrateState(targetRoot, { archiveLegacy: args.archiveLegacy });
+		const stateResult = require("./state-migration").migrateState(targetRoot, {
+			archiveLegacy: args.archiveLegacy,
+		});
 		return {
 			result: {
 				...stateResult,
@@ -847,12 +863,18 @@ function handleMigrate(args) {
 		};
 	}
 	if (action === "wiki") {
-		return { result: { ...migrateWiki(targetRoot), target: targetRoot } };
+		return {
+			result: { ...require("./state-migration").migrateWiki(targetRoot), target: targetRoot },
+		};
 	}
 
 	// Default: migrate manifests
-	const migrateResult = migrateManifests(targetRoot, { dryRun: args.dryRun });
-	const versioningResult = backfillVersioning(targetRoot, { dryRun: args.dryRun });
+	const migrateResult = require("./migrate-command").migrateManifests(targetRoot, {
+		dryRun: args.dryRun,
+	});
+	const versioningResult = require("./migrate-command").backfillVersioning(targetRoot, {
+		dryRun: args.dryRun,
+	});
 	const message = `${migrateResult.message}\n${versioningResult.message}`;
 	const logs = [...(migrateResult.logs || []), ...(versioningResult.logs || [])];
 	return {
@@ -898,9 +920,12 @@ function handleExecution(args) {
 			};
 
 		const { checkExecutionReadiness } = require("./core/execution-validator");
-		const { resolveTarget: resolve } = require("./core/fs-utils");
+		const { resolvePathWithin, resolveTarget: resolve } = require("./core/fs-utils");
 		const targetRoot = resolve(args.target);
-		const resolvedPlan = path.resolve(targetRoot, planPath);
+		const resolvedPlan = resolvePathWithin(targetRoot, planPath, {
+			label: "Execution readiness plan",
+			canonicalExisting: true,
+		});
 		const readiness = checkExecutionReadiness(targetRoot, resolvedPlan, {
 			strict: args.strict || false,
 		});
@@ -916,7 +941,12 @@ function handleExecution(args) {
 			},
 		};
 	}
-	return { result: unknownAction("execution", ["validate-integration", "readiness"]) };
+	return {
+		result: require("./command-helpers").unknownAction("execution", [
+			"validate-integration",
+			"readiness",
+		]),
+	};
 }
 
 function handleSecurity(args) {
@@ -928,8 +958,8 @@ function handleSecurity(args) {
 
 function handleFeature(args) {
 	const action = args._?.[0];
-	const targetRoot = resolveTarget(args);
-	const featureResult = featureCommands.runFeatureAction(action, targetRoot, args);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
+	const featureResult = require("./feature-commands").runFeatureAction(action, targetRoot, args);
 
 	return {
 		result: {
@@ -969,7 +999,7 @@ function handleClean(args) {
 function handleNext(args) {
 	// strict defaults true inside lifecycle.buildContext so next matches
 	// complete-check --strict / session complete (last-mile terminal steps).
-	const nextResult = inferNext(args.target, {
+	const nextResult = require("./next-command").inferNext(args.target, {
 		feature: args.feature,
 		session: args.session,
 		strict: args.strict !== false,
@@ -1004,7 +1034,7 @@ function handleDrift(args) {
 
 function handleStatus(args) {
 	const statusCommand = require("./status-command");
-	const targetRoot = resolveTarget(args);
+	const targetRoot = require("./command-helpers").resolveTarget(args);
 	const status = statusCommand.buildStatus(targetRoot);
 	return {
 		result: {
@@ -1016,82 +1046,6 @@ function handleStatus(args) {
 		},
 		bypassPrint: !args.json,
 	};
-}
-
-function handleSync(args) {
-	return syncDispatch(args);
-}
-
-function handleProjection(args) {
-	return projectionDispatch(args);
-}
-
-function handleKnowledge(args) {
-	return knowledgeDispatch(args);
-}
-
-function handlePhase(args) {
-	return phaseDispatch(args);
-}
-
-function handleArtifact(args) {
-	return artifactDispatch(args);
-}
-
-function handlePrincipal(args) {
-	return principalDispatch(args);
-}
-
-function handleEval(args) {
-	return evalDispatch(args);
-}
-
-function handleEvidence(args) {
-	return evidenceDispatch(args);
-}
-
-function handleApproval(args) {
-	return approvalDispatch(args);
-}
-
-function handleContracts(args) {
-	return contractsDispatch(args);
-}
-
-function handleHarness(args) {
-	return harnessDispatch(args);
-}
-
-function handlePolicy(args) {
-	return policyDispatch(args);
-}
-
-function handleAdapter(args) {
-	return adapterDispatch(args);
-}
-
-function handleRunner(args) {
-	return runnerDispatch(args);
-}
-
-function handleRelease(args) {
-	return releaseDispatch(args);
-}
-
-function handleMaintain(args) {
-	return maintainDispatch(args);
-}
-
-function handleRetention(args) {
-	return retentionDispatch(args);
-}
-
-function handleExternal(args) {
-	return externalDispatch(args);
-}
-
-function handleBreakglass(args) {
-	return breakglassDispatch(args);
 }
 
 function handleExplain(args) {
@@ -1122,7 +1076,9 @@ function handleLearnings(args) {
 			owners: args.owners,
 		});
 	} else {
-		r = inspectLearningWriteBack(resolveTarget(args), { featureId: args.feature });
+		r = inspectLearningWriteBack(require("./command-helpers").resolveTarget(args), {
+			featureId: args.feature,
+		});
 	}
 	return {
 		result: {
@@ -1145,11 +1101,11 @@ function handleBreakLoop(args) {
 	const { scaffoldPostMortem, validatePostMortem } = require("./core/break-loop");
 	const subAction = args._?.[0];
 	if (subAction !== undefined && subAction !== "validate") {
-		return { result: unknownAction("break-loop", ["validate"]) };
+		return { result: require("./command-helpers").unknownAction("break-loop", ["validate"]) };
 	}
 	const r =
 		subAction === "validate"
-			? validatePostMortem(resolveTarget(args), { file: args.file })
+			? validatePostMortem(require("./command-helpers").resolveTarget(args), { file: args.file })
 			: scaffoldPostMortem(args.target, {
 					issue: args.issue,
 					title: args.title,
@@ -1168,10 +1124,6 @@ function handleBreakLoop(args) {
 	};
 }
 
-function handleHooks(args) {
-	return hooksDispatch(args);
-}
-
 function handleContext(args) {
 	const { contextDispatch } = require("./context/adapters/command");
 	return contextDispatch(args._?.[0], args);
@@ -1179,7 +1131,7 @@ function handleContext(args) {
 
 function handleMemory(args) {
 	const { memoryDispatch } = require("./memory-commands");
-	return memoryDispatch(args._?.[0], args, resolveTarget(args));
+	return memoryDispatch(args._?.[0], args, require("./command-helpers").resolveTarget(args));
 }
 
 // ── Command registry ────────────────────────────────────────────────────────
@@ -1192,14 +1144,14 @@ const COMMAND_HANDLERS = {
 	handoff: handleHandoff,
 	plan: handlePlan,
 	gate: handleGate,
-	policy: handlePolicy,
-	adapter: handleAdapter,
-	runner: handleRunner,
-	release: handleRelease,
-	maintain: handleMaintain,
-	retention: handleRetention,
-	external: handleExternal,
-	breakglass: handleBreakglass,
+	policy: (args) => require("./policy-commands").policyDispatch(args),
+	adapter: (args) => require("./adapter-commands").adapterDispatch(args),
+	runner: (args) => require("./runner-commands").runnerDispatch(args),
+	release: (args) => require("./release-commands").releaseDispatch(args),
+	maintain: (args) => require("./maintain-commands").maintainDispatch(args),
+	retention: (args) => require("./retention-commands").retentionDispatch(args),
+	external: (args) => require("./external-commands").externalDispatch(args),
+	breakglass: (args) => require("./breakglass-commands").breakglassDispatch(args),
 	review: handleReview,
 	accept: handleAccept,
 	learnings: handleLearnings,
@@ -1208,7 +1160,7 @@ const COMMAND_HANDLERS = {
 	profile: handleProfile,
 	status: handleStatus,
 	drift: handleDrift,
-	sync: handleSync,
+	sync: (args) => require("./sync-commands").syncDispatch(args),
 	task: handleTask,
 	result: handleResult,
 	loop: handleLoop,
@@ -1224,28 +1176,28 @@ const COMMAND_HANDLERS = {
 	clean: handleClean,
 	next: handleNext,
 	explain: handleExplain,
-	hooks: handleHooks,
+	hooks: (args) => require("./hooks-commands").hooksDispatch(args),
 	workflow: handleWorkflow,
 	context: handleContext,
 	memory: handleMemory,
-	projection: handleProjection,
-	knowledge: handleKnowledge,
-	phase: handlePhase,
-	artifact: handleArtifact,
-	principal: handlePrincipal,
-	eval: handleEval,
-	evidence: handleEvidence,
-	approval: handleApproval,
-	contracts: handleContracts,
-	harness: handleHarness,
+	projection: (args) => require("./projection-commands").projectionDispatch(args),
+	knowledge: (args) => require("./knowledge-commands").knowledgeDispatch(args),
+	phase: (args) => require("./phase-commands").phaseDispatch(args),
+	artifact: (args) => require("./canonical-artifact-commands").artifactDispatch(args),
+	principal: (args) => require("./principal-commands").principalDispatch(args),
+	eval: (args) => require("./eval-commands").evalDispatch(args),
+	evidence: (args) => require("./evidence-commands").evidenceDispatch(args),
+	approval: (args) => require("./approval-commands").approvalDispatch(args),
+	contracts: (args) => require("./contracts-commands").contractsDispatch(args),
+	harness: (args) => require("./harness/harness-commands").harnessDispatch(args),
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);
 const { dispatchTypedInvocation } = require("./cli-typed-seam");
 
 // ── Deprecated commands ─────────────────────────────────────────────────────
-// These commands are isolated from the core governance flow and will be removed
-// in v2. Users should migrate to equivalent governance commands.
+// Commands with tier "deprecated" stay callable but print a runtime warning
+// pointing users at the equivalent governance commands.
 const DEPRECATED_COMMANDS = new Set(
 	Object.values(COMMAND_REGISTRY)
 		.filter((registration) => registration.definition.tier === "deprecated")

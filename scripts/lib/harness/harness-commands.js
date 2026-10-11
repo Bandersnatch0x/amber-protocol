@@ -7,9 +7,9 @@
 // run transitions, fail-closed reads) as stable AMBER_E_* codes. Expert tier
 // by registration; the default seven-verb help surface is unchanged.
 
-const { defineCommand } = require("../subcommand-dispatcher");
+const { defineCliCommand } = require("../subcommand-dispatcher");
 const { resolveTarget, parseRevisionPin } = require("../command-helpers");
-const path = require("node:path");
+const { resolvePathWithin } = require("../core/fs-utils");
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -35,7 +35,7 @@ function requiredFlag(args, key, label, example) {
 	return { value: args[key] };
 }
 
-const dispatch = defineCommand({
+const harnessDispatch = defineCliCommand({
 	command: "harness",
 	actions: [
 		"admit",
@@ -390,7 +390,12 @@ const dispatch = defineCommand({
 					let observedEntries = [];
 					if (args.file) {
 						const fs = require("node:fs");
-						const parsed = JSON.parse(fs.readFileSync(path.resolve(target, args.file), "utf8"));
+						const parsed = JSON.parse(
+							fs.readFileSync(
+								resolvePathWithin(target, args.file, { label: "Observed entries" }),
+								"utf8",
+							),
+						);
 						observedEntries = Array.isArray(parsed) ? parsed : parsed.entries || [];
 					}
 					result = evaluateExecution(target, { runId: run.value, observedEntries });
@@ -515,6 +520,9 @@ const dispatch = defineCommand({
 			const sub = args._?.[1];
 			const op = args._?.[2];
 			const target = resolveTarget(args);
+			process.stderr.write(
+				"[experimental] amber harness runtime (scheduler and daemon) may change or be removed in a minor release.\n",
+			);
 			const {
 				admitSchedule,
 				revokeSchedule,
@@ -539,7 +547,12 @@ const dispatch = defineCommand({
 					);
 					if (file.error) return invalidArg(file.error);
 					const fs = require("node:fs");
-					const input = JSON.parse(fs.readFileSync(path.resolve(target, file.value), "utf8"));
+					const input = JSON.parse(
+						fs.readFileSync(
+							resolvePathWithin(target, file.value, { label: "Runtime schedule" }),
+							"utf8",
+						),
+					);
 					result = admitSchedule(target, input);
 				} else if (sub === "schedule" && op === "list") {
 					result = { ok: true, schedules: listSchedules(target, { now: args.now }) };
@@ -1140,9 +1153,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function harnessDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { harnessDispatch };

@@ -18,6 +18,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { readPlanField } = require("./planning");
+const { resolvePathWithin } = require("./fs-utils");
 
 /**
  * Resolve the feature id a session manifest carries, or null when unknown.
@@ -30,7 +31,11 @@ function resolveSessionFeature(targetRoot, sessionId) {
 		const { resolveStateDirForRead } = require("../state-dir-resolver");
 		const { readSessionManifest } = require("../session-manifest");
 		const stateDir = resolveStateDirForRead(targetRoot, { quiet: true });
-		const loaded = readSessionManifest(path.join(stateDir, "sessions", sessionId));
+		const sessionDir = resolvePathWithin(path.join(stateDir, "sessions"), sessionId, {
+			label: "Session directory",
+			canonicalExisting: true,
+		});
+		const loaded = readSessionManifest(sessionDir);
 		if (!loaded || loaded.corrupt || !loaded.manifest) return null;
 		return loaded.manifest.feature || null;
 	} catch {
@@ -48,7 +53,10 @@ function resolveSessionFeature(targetRoot, sessionId) {
 function readPlanFeature(targetRoot, planRelPath) {
 	if (!planRelPath) return null;
 	try {
-		const abs = path.resolve(targetRoot, planRelPath);
+		const abs = resolvePathWithin(targetRoot, planRelPath, {
+			label: "Plan path",
+			canonicalExisting: true,
+		});
 		if (!fs.existsSync(abs)) return null;
 		return readPlanField(fs.readFileSync(abs, "utf8"), "Feature") || null;
 	} catch {

@@ -14,6 +14,7 @@ import CommandBlock from '@site/src/components/command-block';
 <div className="amber-generated-banner">
   <strong>Reference generated from Amber Protocol v2.0.1</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
+  Stability: <code>EXPERIMENTAL</code>
 </div>
 
 ## Summary
@@ -167,9 +168,10 @@ Subcommands:
                       OBSERVED (terminated | already-exited | unknown),
                       retains the workspace, and never rewrites the run's
                       terminal result.
-  runtime             Bounded H7 maintenance runtime (F080, ADR-0103): a
-                      repository-local scheduler for a CLOSED registry of
-                      deterministic Amber-internal proposal jobs. Jobs may
+  runtime             EXPERIMENTAL. Bounded H7 maintenance runtime (F080,
+                      ADR-0103): a repository-local scheduler for a CLOSED
+                      registry of deterministic Amber-internal proposal
+                      jobs. Jobs may
                       read the repository and append proposal/evidence/runtime
                       records under .amber/harness/runtime/ only; they never
                       run a target command, dispatch an agent, execute a
@@ -324,6 +326,7 @@ amber harness status --run run-abc --target path/to/repo --json
 
 ## Boundaries & Safety
 
-- **Target Repository Scoping**: All mutations and reads are confined to `--target <path>`.
+- `--target <path>` selects repository state. Amber confines these target-relative paths, refusing `..` and symlink escapes before reading or writing: plan and scaffold destinations (including `accept --plan`), memory and context payloads, harness inputs, adapter allow-lists, workflow reports and their output directory, ledger exports, execution readiness plans, session and worktree state.
+- Path validation is not OS sandboxing, and the confinement above covers only the surfaces it names. `governance report --output`, `wiki export --output-dir`, and `handoff bundle --output-dir` resolve against the target yet still accept `..` or an absolute path, and `governance audit --output`, `governance readiness --output`, `security audit --output`, `loop record --output`, and `explain --markdown` resolve against the working directory instead of `--target`. A path flag not listed here is confined only when the command that reads it routes through the boundary. A governed or verification command still runs with your user's file permissions.
 - **Fail-Closed Behavior**: Corrupt governance state or invalid schema parameters immediately halt execution with non-zero exit codes.
-- **No Dynamic Spawning**: Command executes locally within the current process; it does not spawn unmonitored background daemons.
+- The experimental bounded H7 maintenance scheduler, `amber harness runtime`, runs only closed-registry deterministic Amber maintenance jobs; it never runs a target command, dispatches an agent, or writes an external system.

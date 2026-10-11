@@ -43,6 +43,7 @@ const {
 	GENESIS_HASH,
 	chainHash,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	isPlainObject,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { resolveActivePrincipal, parseTimestamp } = require("./principal-registry");
@@ -155,10 +156,6 @@ function approvalCorrupt(message) {
 
 function isNullableNonEmptyString(value) {
 	return value === null || (typeof value === "string" && value.length > 0);
-}
-
-function isPlainObject(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**

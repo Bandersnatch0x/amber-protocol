@@ -8,7 +8,7 @@
 
 const fs = require("node:fs");
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { resolvePathWithin } = require("./core/fs-utils");
 
@@ -181,7 +181,7 @@ function listScopedLedger(args, fallbackCode, listFn) {
 	}
 }
 
-const dispatch = defineCommand({
+const adapterDispatch = defineCliCommand({
 	command: "adapter",
 	actions: [
 		"register",
@@ -477,9 +477,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function adapterDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { adapterDispatch };

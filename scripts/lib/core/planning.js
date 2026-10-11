@@ -230,7 +230,16 @@ function scaffoldPlan(target, options = {}) {
 
 	const title = options.title || feature.title;
 	const relativePath = path.join("docs", "plans", `${feature.id}-${slugify(title)}.md`);
-	const destination = path.join(targetRoot, relativePath);
+	let destination;
+	try {
+		destination = resolvePathWithin(targetRoot, relativePath, {
+			label: "Plan destination",
+			canonicalExisting: true,
+		});
+	} catch (error) {
+		errors.push(error.message || String(error));
+		return { target: targetRoot, created, skipped, errors, warnings };
+	}
 
 	if (pathExists(destination)) {
 		skipped.push(relativePath);

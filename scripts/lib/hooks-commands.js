@@ -3,7 +3,7 @@
 // Extracted from command-dispatcher.js (architecture review #1). Envelope,
 // routing, and exit codes are owned by defineCommand (F039 pilot).
 
-const { defineCommand } = require("./subcommand-dispatcher");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 const { unknownAction } = require("./command-helpers");
 
 function hooksBreadcrumbPlatform(args) {
@@ -23,7 +23,7 @@ function hookBody(r) {
 	return { text: r.text || "", errors: r.errors, warnings: r.warnings };
 }
 
-const dispatch = defineCommand({
+const hooksDispatch = defineCliCommand({
 	command: "hooks",
 	actions: ["check", "install", "uninstall", "status", "breadcrumb"],
 	handlers: {
@@ -82,9 +82,5 @@ const dispatch = defineCommand({
 		},
 	},
 });
-
-function hooksDispatch(args) {
-	return dispatch(args._?.[0], args);
-}
 
 module.exports = { hooksDispatch };

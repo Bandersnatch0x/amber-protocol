@@ -19,6 +19,12 @@ It is based on:
 
 `amber-protocol` is a plugin-first toolkit for safely installing, auditing, validating, and maintaining an Agent-readable Amber setup inside real code repositories.
 
+The current command registry declares stability independently of visibility tier. The `harness`,
+`runner`, `retention`, `external`, `breakglass`, and `sync` families are **EXPERIMENTAL**.
+They remain callable and appear with an experimental marker in `amber --all`. Default help
+lists the seven primary core verbs. Other core commands retain their expert or deprecated tiers.
+The V1 sections below describe historical scope; this stability declaration describes the shipped CLI.
+
 It is not a general Agent operating system.
 
 It is not a dynamic multi-agent orchestration platform in V1.
@@ -42,6 +48,15 @@ V1 does not promise deep framework-specific understanding. Framework packs can b
 
 ## 3. Core Product Boundary
 
+The experimental bounded H7 maintenance scheduler, `amber harness runtime` (F080, ADR-0103),
+invokes only closed-registry deterministic Amber maintenance jobs. Its authority is
+`executesAnything=false`, `schedulesJobs=true`, `dispatchesAgents=false`, and
+`writesExternalSystems=false`. Existing Loop/Workflow contracts remain unscheduled.
+Experimental external effects use the registered F056 contract and approval lifecycle.
+
+Repository-local state and separate worktrees do not provide process or filesystem containment.
+Absolute-path writes can escape the worktree. Filesystem containment requires OS sandboxing.
+
 V1 is:
 
 > A pluginized Amber installer, auditor, Wiki scaffold, doctor, handoff validator, and static continuous-improvement state template.
@@ -64,16 +79,18 @@ Article-inspired capabilities such as remote task ingress, always-on control, pe
 
 Loop-inspired capabilities such as scheduled discovery, goal loops, connector-backed triage, trace diagnosis, auto-fix proposals, and regression-test generation are allowed only as declarative contracts and reviewable artifacts until an explicit future execution layer exists. The core Amber Protocol must not run cron jobs, open PRs, update external trackers, or apply trace-derived fixes.
 
-Live loop scheduling is outside the current product boundary. The Amber setup may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
+Live loop scheduling is outside the current product boundary. The one exception is the experimental `amber harness runtime` (F080, ADR-0103): `schedule`, `tick`, and `daemon start|stop|status` run a closed registry of Amber-internal proposal jobs with `executesAnything=false`; they never run a target command, dispatch an agent, or write an external system, and they may change or be removed in a minor release. The Amber setup may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
 
 ### Governed execution (ADR-0003, 2026-06-30)
 
 A first governance-gated execution path now exists: `amber loop run --execute` may run a loop
 contract's `governed.command` after a policy gate (`.amber/governance/rules.json`), an explicit
 `amber loop approve` (one approval authorizes one run), git-worktree isolation, and a tamper-evident
-hash-chain ledger. This is human-triggered and gated; it does NOT enable scheduling, daemons,
-external writes, auto-PRs, auto-approval, or agent tool-call interception, which remain outside the
-boundary. See `docs/adr/0003-governance-gated-execution.md`.
+hash-chain ledger. This human-triggered path does not schedule Loop contracts and grants no
+scheduling, daemon, external-write, auto-PR, auto-approval, or agent tool-call interception
+authority beyond the experimental H7 and F056 contracts described above.
+Worktree isolation does not prevent absolute-path writes outside that worktree.
+See `docs/adr/0003-governance-gated-execution.md`.
 
 ## Service packages
 

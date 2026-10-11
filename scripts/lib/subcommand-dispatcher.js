@@ -113,4 +113,15 @@ function defineCommand({ command, actions, aliases = {}, handlers, unknown }) {
 	}
 }
 
-module.exports = { createSubcommandDispatcher, defineCommand };
+/**
+ * defineCommand bound to the CLI: the action is the positional at actionIndex.
+ *
+ * @param {object} opts - defineCommand options plus actionIndex (default 0).
+ * @returns {(args: object) => { result, exitCode, bypassPrint, onBypass? }}
+ */
+function defineCliCommand({ actionIndex = 0, ...spec }) {
+	const dispatch = defineCommand(spec);
+	return (args) => dispatch(args._?.[actionIndex], args);
+}
+
+module.exports = { createSubcommandDispatcher, defineCommand, defineCliCommand };

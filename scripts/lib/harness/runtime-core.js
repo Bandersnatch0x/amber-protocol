@@ -14,6 +14,7 @@ const { spawn } = require("node:child_process");
 
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { listArtifactRevisions } = require("../core/canonical-artifacts");
+const { sleepSync } = require("../core/fs-utils");
 // One liveness seam for the whole harness (F081 `isProcessAlive`). A pid that
 // has terminated but whose parent has not reaped it is a ZOMBIE, and POSIX
 // still answers signal 0 for it — probing locally read a stopped daemon as
@@ -26,6 +27,7 @@ const {
 	isPlainObject,
 } = require("../core/registry-ledger");
 const { emitHarnessEvent, readHarnessEvents } = require("./event-ledger");
+const { acquirePathLock, releasePathLock } = require("../session-lock");
 
 const SCHEMA_VERSION = 1;
 const DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
@@ -885,16 +887,22 @@ function readDaemonState(targetRoot) {
 
 function nextFence(targetRoot) {
 	const file = fenceFile(targetRoot);
-	let current = 0;
-	if (fs.existsSync(file)) {
-		const record = readJsonClosed(file, "runtime fence");
-		if (!Number.isInteger(record.fence) || record.fence < 0)
-			throw typedError(CODE_CORRUPT, "runtime fence is malformed");
-		current = record.fence;
+	const lock = acquirePathLock(`${file}.lock`);
+	if (!lock.success) throw typedError(lock.code, lock.error);
+	try {
+		let current = 0;
+		if (fs.existsSync(file)) {
+			const record = readJsonClosed(file, "runtime fence");
+			if (!Number.isInteger(record.fence) || record.fence < 0)
+				throw typedError(CODE_CORRUPT, "runtime fence is malformed");
+			current = record.fence;
+		}
+		const next = current + 1;
+		fs.writeFileSync(file, `${JSON.stringify({ fence: next }, null, "\t")}\n`, "utf8");
+		return next;
+	} finally {
+		releasePathLock(`${file}.lock`, lock.leaseId);
 	}
-	const next = current + 1;
-	fs.writeFileSync(file, `${JSON.stringify({ fence: next }, null, "\t")}\n`, "utf8");
-	return next;
 }
 
 function acquireStartLock(targetRoot) {
@@ -992,11 +1000,6 @@ function daemonStatus(targetRoot) {
 		state,
 		authority: AUTHORITY,
 	};
-}
-
-function sleepSync(ms) {
-	const shared = new Int32Array(new SharedArrayBuffer(4));
-	Atomics.wait(shared, 0, 0, ms);
 }
 
 function stopDaemon(targetRoot, { now } = {}) {
