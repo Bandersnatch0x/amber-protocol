@@ -313,24 +313,35 @@ test("a takeover chain deeper than the bound is refused with the files to remove
 // to reclaim it. Exactly one may remove it, and the other must not remove the lock
 // the first one created. This one guards the guard itself, added when the reclaim
 // was first serialized, not the depth change that followed it.
-test("two writers reclaiming one stale lock both append and leave one chain", async () => {
+test("eight writers released at once reclaim one stale lock and leave one chain", async () => {
 	const lp = raceDir("amber-anchor-reclaimrace-");
+	const gate = `${lp}.gate`;
 	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+	// Two staggered writers rarely overlap in the reclaim read, so the old pair passed
+	// even with the byte guard removed. Every writer spins on one gate file instead, so
+	// they reach the stale lock at the same instant and only the guard keeps them out of
+	// each other's critical section.
 	const script = `
+		const fs = require("node:fs");
+		while (!fs.existsSync(${JSON.stringify(gate)})) {}
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
 		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", pid: process.pid });
 	`;
-	const exits = await Promise.all(
-		[1, 2].map(
-			() =>
-				new Promise((resolve) => {
-					spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
-				}),
-		),
+	const pending = [1, 2, 3, 4, 5, 6, 7, 8].map(
+		() =>
+			new Promise((resolve) => {
+				spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
+			}),
 	);
+	setTimeout(() => fs.writeFileSync(gate, "go"), 400);
+	const exits = await Promise.all(pending);
 
-	assert.deepEqual(exits, [0, 0]);
-	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+	assert.deepEqual(
+		exits,
+		[0, 0, 0, 0, 0, 0, 0, 0],
+		"every writer is served, none times out on the lock",
+	);
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 8 });
 });
 
 // Hard links are what publish a lock file with its pid already inside. A filesystem
