@@ -199,9 +199,10 @@ async function executeInPreparedWorkspace(
 	const startedAt = new Date().toISOString();
 	const timeoutMs = budgetMinutes * 60_000;
 	let handleRecord = null;
+	let spawned = null;
 	try {
 		const spawnArgv = toSpawnArgv(argv);
-		const spawned = spawn(spawnArgv[0], spawnArgv.slice(1), {
+		spawned = spawn(spawnArgv[0], spawnArgv.slice(1), {
 			shell: false,
 			cwd: workspacePath,
 			// Detached gives the child its own process group, so a cancellation
@@ -247,6 +248,13 @@ async function executeInPreparedWorkspace(
 			stderr,
 		};
 	} catch (error) {
+		// A concurrent caller can win the handle-file create between our
+		// liveness pre-check and persistExecutionHandle's exclusive write. The
+		// child has already been spawned in that window, but has no governable
+		// handle; terminate it before returning the persistence error so a
+		// failed admission cannot leak an unowned process.
+		if (spawned && !handleRecord && Number.isInteger(spawned.pid))
+			signalPidTree(spawned.pid, "SIGTERM");
 		const finishedAt = new Date().toISOString();
 		result = {
 			command,

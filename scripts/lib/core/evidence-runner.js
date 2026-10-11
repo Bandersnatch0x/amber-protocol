@@ -7,7 +7,7 @@
 // needs no approval: collecting evidence is not a mutating action. It keeps the
 // policy gate (only allow-listed commands run) and the hash-chain ledger, sharing
 // loop-policy + loop-ledger with governed-runner.
-const { spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
 const {
 	evaluateVerifyPolicy,
@@ -89,20 +89,46 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	let exec;
 	try {
 		const argv = toSpawnArgv(parseGovernedArgv(command));
-		const res = spawnSync(argv[0], argv.slice(1), {
-			shell: false,
-			cwd: targetRoot,
-			encoding: "utf8",
-			timeout: resolveBudgetMinutes(budgetMinutes) * 60_000,
+		const timeoutMs = resolveBudgetMinutes(budgetMinutes) * 60_000;
+		const res = await new Promise((resolve) => {
+			const child = spawn(argv[0], argv.slice(1), {
+				shell: false,
+				cwd: targetRoot,
+				detached: process.platform !== "win32",
+				stdio: ["ignore", "pipe", "pipe"],
+			});
+			const out = [],
+				err = [];
+			let timedOut = false;
+			const timer = setTimeout(() => {
+				timedOut = true;
+				try {
+					process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGTERM");
+				} catch {
+					// The process may have exited between the timeout and kill attempt.
+				}
+			}, timeoutMs);
+			child.stdout.on("data", (b) => out.push(Buffer.from(b)));
+			child.stderr.on("data", (b) => err.push(Buffer.from(b)));
+			child.on("error", (e) => {
+				clearTimeout(timer);
+				resolve({ status: -1, stdout: "", stderr: e.message });
+			});
+			child.on("close", (code, _signal) => {
+				clearTimeout(timer);
+				resolve({
+					status: timedOut ? -1 : (code ?? -1),
+					stdout: Buffer.concat(out).toString(),
+					stderr: Buffer.concat(err).toString(),
+				});
+			});
 		});
-		// A null status means the process was killed (e.g. timeout/signal); treat as
-		// failure (-1) so a timed-out verify never records as passed.
-		const exitCode = res.status === null ? -1 : res.status;
+		const exitCode = res.status;
 		exec = {
 			command,
 			exitCode,
-			stdoutTail: (res.stdout || "").slice(-STDOUT_CAP),
-			stderrTail: (res.stderr || "").slice(-STDERR_CAP),
+			stdoutTail: res.stdout.slice(-STDOUT_CAP),
+			stderrTail: res.stderr.slice(-STDERR_CAP),
 		};
 	} catch (e) {
 		exec = {
