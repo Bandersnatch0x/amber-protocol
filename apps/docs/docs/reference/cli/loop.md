@@ -96,6 +96,6 @@ amber loop validate-loop --contract path/to/contract.json --json
 
 ## Boundaries & Safety
 
-- `--target <path>` selects repository state. Amber confines the paths it resolves for the target: `..` and symlink escapes are refused before the file is read or written.
-- Path validation is not OS sandboxing: a governed or verification command still runs with your user's file permissions and can write outside the target.
+- `--target <path>` selects repository state. Amber confines these target-relative paths, refusing `..` and symlink escapes before reading or writing: plan and scaffold destinations (including `accept --plan`), memory and context payloads, harness inputs, adapter allow-lists, workflow reports and their output directory, ledger exports, execution readiness plans, session and worktree state.
+- Path validation is not OS sandboxing, and the confinement above covers only the surfaces it names. `governance report --output`, `wiki export --output-dir`, and `handoff bundle --output-dir` resolve against the target yet still accept `..` or an absolute path, and `governance audit --output`, `governance readiness --output`, `security audit --output`, `loop record --output`, and `explain --markdown` resolve against the working directory instead of `--target`. A path flag not listed here is confined only when the command that reads it routes through the boundary. A governed or verification command still runs with your user's file permissions.
 - **Fail-Closed Behavior**: Corrupt governance state or invalid schema parameters immediately halt execution with non-zero exit codes.
