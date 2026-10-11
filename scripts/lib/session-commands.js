@@ -1270,4 +1270,5 @@ module.exports = {
 	requireSession,
 	findMostRecentSession,
 	validateSessionId,
+	validateSessionIdForLookup,
 };

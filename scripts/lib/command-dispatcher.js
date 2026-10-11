@@ -413,6 +413,17 @@ function handleAccept(args) {
 	// feature. Only block on a definite mismatch (both known and different) —
 	// an unreadable session/plan falls through and is reported downstream.
 	if (args.session) {
+		const shape = require("./session-commands").validateSessionIdForLookup(args.session);
+		if (!shape.valid) {
+			return {
+				result: {
+					target: args.target,
+					accepted: false,
+					errors: [`${shape.error}: ${args.session}`],
+					warnings: [],
+				},
+			};
+		}
 		const targetRoot = require("./command-helpers").resolveTarget(args);
 		const sessionFeature = require("./core/feature-attribution").resolveSessionFeature(
 			targetRoot,

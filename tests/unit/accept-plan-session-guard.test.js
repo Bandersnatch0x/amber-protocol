@@ -100,6 +100,27 @@ test("accept without --session is unaffected by the guard", () => {
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// accept rewrites feature_list.json, so a --session that is not a bare id is
+// refused at the boundary: reading a manifest outside the target, then falling
+// through to the mutation, is neither a mismatch nor an authorisation.
+test("accept refuses a --session that traverses outside the target state dir", () => {
+	const { dir, planRel } = setup({ planFeature: "F001", sessionFeature: "F002" });
+	const before = fs.readFileSync(path.join(dir, "feature_list.json"), "utf8");
+	for (const bad of ["..", "../outside", "a/b", path.join("..", "..", "x")]) {
+		const { result } = dispatch("accept", { target: dir, plan: planRel, session: bad });
+		assert.equal(result.accepted, false, `no accept for ${bad}`);
+		assert.ok(
+			(result.errors || []).some((e) => /Invalid session ID format/.test(e)),
+			`the malformed id is surfaced for ${bad}`,
+		);
+	}
+	assert.equal(
+		fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"),
+		before,
+		"the refusal leaves feature_list.json untouched",
+	);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
 // The older plans record their header in the bold style. `accept` must READ it — or such
 // a plan is invisible to every gate — and rewrite that line in place with its markers.
 test("accept reads and rewrites the older bold plan header style", () => {
