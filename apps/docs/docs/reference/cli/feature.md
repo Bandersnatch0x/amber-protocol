@@ -103,5 +103,6 @@ amber feature paths --target . --feature F001 --path src/new.js
 
 ## Boundaries & Safety
 
-- `--target <path>` selects repository state; it does not provide filesystem containment. Absolute-path writes can escape a worktree without OS sandboxing.
+- `--target <path>` selects repository state. Amber confines the paths it resolves for the target: `..` and symlink escapes are refused before the file is read or written.
+- Path validation is not OS sandboxing: a governed or verification command still runs with your user's file permissions and can write outside the target.
 - **Fail-Closed Behavior**: Corrupt governance state or invalid schema parameters immediately halt execution with non-zero exit codes.
