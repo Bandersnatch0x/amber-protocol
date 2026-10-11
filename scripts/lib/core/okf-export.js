@@ -8,7 +8,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { pathExists, readText, relativeSlash, resolveTarget, walkFiles } = require("./fs-utils");
+const {
+	pathExists,
+	readText,
+	relativeSlash,
+	resolvePathWithin,
+	resolveTarget,
+	walkFiles,
+} = require("./fs-utils");
 const { extractMarkdownLinks, isExternalLink, stripAnchorAndQuery } = require("./text-utils");
 const { parseOkfFrontmatter, OKF_VERSION } = require("./okf-frontmatter");
 
@@ -159,7 +166,11 @@ function exportOkfBundle(target, options = {}) {
 	}
 
 	const outputDir = options.outputDir
-		? path.resolve(targetRoot, options.outputDir)
+		? resolvePathWithin(targetRoot, options.outputDir, {
+				label: "Wiki export output directory",
+				allowRoot: true,
+				canonicalExisting: true,
+			})
 		: path.join(targetRoot, "docs", "okf-bundle");
 
 	fs.mkdirSync(outputDir, { recursive: true });

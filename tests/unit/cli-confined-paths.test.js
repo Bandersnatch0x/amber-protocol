@@ -92,6 +92,69 @@ test("ledger export still writes an in-target --out (the guard is not a blanket 
 	}
 });
 
+// Three surfaces resolve their destination against --target and used to accept any
+// value, so a governed artifact landed outside the repository the command named.
+test("wiki export refuses an --output-dir that escapes the target and writes nothing", async () => {
+	const target = tempDir("wiki-export");
+	const outside = tempDir("wiki-export-out");
+	const dest = path.join(outside, "bundle");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		await assert.rejects(
+			() => run(["wiki", "export", "--target", target, "--output-dir", dest]),
+			/outside the target root/,
+		);
+		assert.equal(fs.existsSync(dest), false, "the refusal precedes the mkdir");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("handoff bundle refuses an --output-dir that escapes the target", async () => {
+	const target = tempDir("bundle-dir");
+	const outside = tempDir("bundle-dir-out");
+	const dest = path.join(outside, "hb");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		await assert.rejects(
+			() => run(["handoff", "bundle", "--target", target, "--output-dir", dest]),
+			/outside the target root/,
+		);
+		assert.equal(fs.existsSync(dest), false, "no bundle bytes outside the target");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+// The report body is guarded, so the refusal is a result error rather than a throw.
+test("governance report refuses an --output that escapes the target", async () => {
+	const { governanceDispatch } = require("../../scripts/lib/governance-commands");
+	const target = tempDir("gov-report");
+	const outside = tempDir("gov-report-out");
+	const dest = path.join(outside, "report.md");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		const result = governanceDispatch("report", target, { output: dest });
+		assert.match(
+			(result.errors || []).join("\n"),
+			/outside the target root/,
+			"the escape is refused with a named label",
+		);
+		assert.equal(fs.existsSync(dest), false, "the refusal precedes the write");
+		const inside = governanceDispatch("report", target, { output: "governance-report.md" });
+		assert.deepEqual(inside.errors || [], [], "an in-target destination still works");
+		assert.ok(
+			fs.existsSync(path.join(target, "governance-report.md")),
+			"the guard is not a blanket refusal",
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 test("execution readiness refuses a --plan outside the target", async () => {
 	const target = tempDir("plan");
 	const outside = tempDir("plan-out");

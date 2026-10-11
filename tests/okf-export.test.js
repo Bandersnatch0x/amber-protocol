@@ -64,7 +64,7 @@ test("buildOkfGraph derives nodes from wiki pages and edges from internal links"
 test("exportOkfBundle writes an okf.json manifest, copies pages, and emits a graph visualizer", () => {
 	const target = tempDir("bundle");
 	smallWiki(target);
-	const outputDir = path.join(tempDir("out"), "bundle");
+	const outputDir = path.join(target, "out", "bundle");
 
 	const result = exportOkfBundle(target, { outputDir });
 
