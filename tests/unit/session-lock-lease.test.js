@@ -17,6 +17,16 @@ const HOUR_AGO = Date.now() - 3_600_000;
 function acquireInChild(root) {
 	const script = `process.stdout.write(JSON.stringify(require(${JSON.stringify(LOCK_MODULE)}).acquireLock(${JSON.stringify(root)}, ${JSON.stringify(SESSION)})))`;
 	const child = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+	// A crashed child prints nothing, and parsing that reads as "unexpected end of
+	// JSON input": a crashed process reported as a lock defect (issue 344).
+	if (child.status !== 0 || !child.stdout) {
+		throw new Error(
+			"child acquire failed (status " +
+				child.status +
+				"): " +
+				(child.stdout || child.stderr || "<no output>"),
+		);
+	}
 	return { pid: child.pid, result: JSON.parse(child.stdout) };
 }
 
@@ -170,7 +180,13 @@ describe("session lock lease", () => {
 				child.stdout.on("data", (chunk) => {
 					out += chunk;
 				});
-				child.on("close", () => resolve(JSON.parse(out)));
+				child.on("close", (code) => {
+					if (code !== 0 || !out) {
+						resolve({ success: false, crashed: true, exitCode: code, output: out });
+						return;
+					}
+					resolve(JSON.parse(out));
+				});
 			});
 		});
 		setTimeout(() => fs.writeFileSync(gate, "go"), 300);
