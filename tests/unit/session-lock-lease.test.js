@@ -196,6 +196,52 @@ describe("session lock lease", () => {
 		assert.strictEqual(results.filter((r) => r.success).length, 1, JSON.stringify(results));
 	});
 
+	// The ten-taker case above only enters the race about once in three runs, so it cannot be
+	// the guard's regression test: issue 343 asked for a reproduction that fails every time.
+	// Here the stale snapshot is handed over on purpose, so this taker is inside the window by
+	// construction, and all that is left to prove is that it refuses to unlink the lease it did
+	// not read. Delete the byte check in removeStale and this fails on the first run.
+	it("a taker holding a stale snapshot never unlinks the lease that replaced it", () => {
+		const held = acquireLock(root, SESSION);
+		assert.strictEqual(held.success, true, JSON.stringify(held));
+		const stale = JSON.stringify({
+			leaseId: "stale",
+			pid: deadPid(),
+			startTime: "1",
+			acquiredAt: new Date().toISOString(),
+		});
+
+		const realRead = fs.readFileSync;
+		let handed = 0;
+		fs.readFileSync = (file, ...rest) => {
+			const name = String(file);
+			if (!name.includes(".takeover-") && name.endsWith(".lock") && handed === 0) {
+				handed++;
+				return stale;
+			}
+			return realRead(file, ...rest);
+		};
+		let result;
+		try {
+			result = acquireLock(root, SESSION);
+		} finally {
+			fs.readFileSync = realRead;
+		}
+
+		assert.strictEqual(handed, 1, "the stale snapshot has to have been the one acted on");
+		assert.strictEqual(result.success, false, JSON.stringify(result));
+		assert.strictEqual(
+			JSON.parse(realRead(lockPath, "utf8")).leaseId,
+			held.leaseId,
+			"the live lease survived a taker that misjudged it",
+		);
+		assert.deepEqual(
+			fs.readdirSync(path.dirname(lockPath)).filter((name) => name.includes(".takeover-")),
+			[],
+			"the takeover guard is released",
+		);
+		releaseLock(root, SESSION, held.leaseId);
+	});
 	// A read can be refused for a moment on Windows while another process creates the same
 	// path. The takeover guard is named after the stale lock's bytes, so two takers target
 	// one path by design and the loser's read of it races the winner's create. That used to

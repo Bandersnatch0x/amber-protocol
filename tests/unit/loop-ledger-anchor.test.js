@@ -344,6 +344,61 @@ test("eight writers released at once reclaim one stale lock and leave one chain"
 	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 8 });
 });
 
+// The gate-released writers above still enter the race only about five times in six, which does
+// not pin a guard that fails one run in six. Here the two reclaimers are pinned by hand: the
+// slower one reads the dead holder, parks itself before taking the takeover guard, and continues
+// only once the faster one is inside the critical section. That is the exact sequence issue 342
+// describes, so nothing but the byte check decides the outcome. Delete it and this fails on the
+// first run, at any load, on any machine.
+test("a slow reclaimer parked past the fast one still leaves its lock alone", async () => {
+	const lp = raceDir("amber-anchor-pinned-");
+	const ready = `${lp}.ready`;
+	const inside = `${lp}.inside`;
+	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+
+	const holder = `
+		const fs = require("node:fs");
+		const realAppend = fs.appendFileSync;
+		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		while (!fs.existsSync(${JSON.stringify(ready)})) {}
+		fs.appendFileSync = (file, data, ...rest) => {
+			if (file === ${JSON.stringify(lp)}) {
+				fs.writeFileSync(${JSON.stringify(inside)}, "in", "utf8");
+				const until = Date.now() + 600;
+				while (Date.now() < until) {}
+			}
+			return realAppend.call(fs, file, data, ...rest);
+		};
+		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", who: "fast" });
+	`;
+	const slower = `
+		const fs = require("node:fs");
+		const realLink = fs.linkSync;
+		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		fs.linkSync = (from, to) => {
+			if (to.endsWith(".lock.takeover") && !fs.existsSync(${JSON.stringify(ready)})) {
+				fs.writeFileSync(${JSON.stringify(ready)}, "read", "utf8");
+				const until = Date.now() + 8000;
+				while (!fs.existsSync(${JSON.stringify(inside)}) && Date.now() < until) {}
+			}
+			return realLink.call(fs, from, to);
+		};
+		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", who: "slow" });
+	`;
+	const exits = await Promise.all(
+		[holder, slower].map(
+			(code) =>
+				new Promise((resolve) => {
+					spawn(process.execPath, ["-e", code], { stdio: "ignore" }).on("exit", resolve);
+				}),
+		),
+	);
+
+	assert.deepEqual(exits, [0, 0], "both writers are served, neither times out on the lock");
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false, "no lock is left behind");
+});
+
 // Hard links are what publish a lock file with its pid already inside. A filesystem
 // without them must fall back to an exclusive create rather than failing every
 // append, and the grace period on an unparseable lock is what keeps that fallback's
