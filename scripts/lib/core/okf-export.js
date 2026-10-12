@@ -165,13 +165,14 @@ function exportOkfBundle(target, options = {}) {
 		};
 	}
 
-	const outputDir = options.outputDir
-		? resolvePathWithin(targetRoot, options.outputDir, {
-				label: "Wiki export output directory",
-				allowRoot: true,
-				canonicalExisting: true,
-			})
-		: path.join(targetRoot, "docs", "okf-bundle");
+	const outputDir = resolvePathWithin(
+		targetRoot,
+		options.outputDir || path.join(targetRoot, "docs", "okf-bundle"),
+		{
+			label: "Wiki export output directory",
+			canonicalExisting: true,
+		},
+	);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const files = [];

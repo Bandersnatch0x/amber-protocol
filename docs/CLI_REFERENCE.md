@@ -1901,6 +1901,10 @@ node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/la
 
 The bundle contains `README.md`, `session-summary.md`, `verification-evidence.md`, `next-actions.md`, `risks.md`, `recovery-commands.md`, and `manifest.json`.
 
+`handoff bundle` rejects output at the target root, including `.`, an absolute root path,
+`nested/..`, and symlink or junction aliases of the root. Its default and subdirectory outputs
+are unchanged. `handoff validate --bundle-dir .` still reads a root-level bundle.
+
 ## Maintenance Commands
 
 ### maintenance inspect
@@ -2615,6 +2619,10 @@ and cwd-bound Claude host transcripts, capped to the newest 20 transcript files)
 `--no-sessions`; `findings` / `plan` / `compare` operate on prior report files. `assess` writes a
 report file only when `--output-dir` is given. Diagnostics go to **stderr**; stdout stays
 parser-safe JSON (or Markdown for assess).
+
+`assess --output-dir` rejects the target root, including `.`, an absolute root path, `nested/..`,
+and symlink or junction aliases of the root. Subdirectory outputs and the stdout-only default
+are unchanged. `assess --handoff-bundle-dir .` still accepts a root-level bundle as read-only input.
 
 ```bash
 # Build a report (stdout JSON by default)

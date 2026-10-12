@@ -5,7 +5,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const { validateHandoff } = require("./audit");
-const { resolveTarget } = require("./fs-utils");
+const { resolvePathWithin, resolveTarget } = require("./fs-utils");
 const { buildGovernanceReport } = require("./governance-report");
 const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
@@ -546,7 +546,14 @@ function buildReplayBundle(targetRoot, replayScope) {
 function writeHandoffBundle(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
-	const outputDir = resolveTargetRelativePath(targetRoot, options.outputDir || options.bundleDir);
+	const outputDir = resolvePathWithin(
+		targetRoot,
+		options.outputDir || options.bundleDir || defaultBundleDir(targetRoot),
+		{
+			label: "Handoff bundle directory",
+			canonicalExisting: true,
+		},
+	);
 	const generatedAt = options.generatedAt || new Date().toISOString();
 	const report = buildGovernanceReport(targetRoot, { targetDisplay });
 	const handoffContent = renderHandoff(targetRoot);
