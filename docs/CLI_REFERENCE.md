@@ -1904,6 +1904,11 @@ The bundle contains `README.md`, `session-summary.md`, `verification-evidence.md
 `handoff bundle` rejects output at the target root, including `.`, an absolute root path,
 `nested/..`, and symlink or junction aliases of the root. Its default and subdirectory outputs
 are unchanged. `handoff validate --bundle-dir .` still reads a root-level bundle.
+Explicit validation paths outside `--target` are refused. To validate a relocated bundle,
+select its directory as `--target` and use `--bundle-dir .`.
+
+The output-directory check does not validate every child path. Existing child symlinks
+in wiki export or handoff bundle output directories can still direct writes outside the target.
 
 ## Maintenance Commands
 
