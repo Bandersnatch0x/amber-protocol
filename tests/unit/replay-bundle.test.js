@@ -200,6 +200,44 @@ describe("R0 replay bundle (governance contract §9.1)", () => {
 			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
+
+	it("writeHandoffBundle preflights replay output links before any bundle write", async () => {
+		const root = makeTarget();
+		const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-replay-links-out-"));
+		try {
+			await runOnceToSettlement(root);
+			const outsideFile = path.join(outside, "victim");
+			fs.writeFileSync(outsideFile, "user outside\n");
+			for (const rel of [
+				"replay-slices.json",
+				"replay/policy.json",
+				"replay/manifest.json",
+				"replay",
+			]) {
+				const outDir = path.join(root, "out", rel.replaceAll("/", "-"));
+				fs.mkdirSync(path.dirname(path.join(outDir, rel)), { recursive: true });
+				fs.writeFileSync(path.join(outDir, "README.md"), "user readme\n");
+				fs.symlinkSync(
+					rel === "replay" ? outside : outsideFile,
+					path.join(outDir, rel),
+					rel === "replay" ? (process.platform === "win32" ? "junction" : "dir") : "file",
+				);
+				const before = fs.readdirSync(outDir).sort();
+				const outsideBefore = fs.readdirSync(outside).sort();
+				assert.throws(
+					() => handoffBundle.writeHandoffBundle(root, { outputDir: outDir, replayScope: "s1" }),
+					/outside the target root/,
+				);
+				assert.equal(fs.readFileSync(path.join(outDir, "README.md"), "utf8"), "user readme\n");
+				assert.deepEqual(fs.readdirSync(outDir).sort(), before);
+				assert.deepEqual(fs.readdirSync(outside).sort(), outsideBefore);
+				assert.equal(fs.readFileSync(outsideFile, "utf8"), "user outside\n");
+			}
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+			fs.rmSync(outside, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		}
+	});
 });
 
 describe("R1 decision replay (governance contract §9.2)", () => {

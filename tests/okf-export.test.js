@@ -85,3 +85,49 @@ test("exportOkfBundle writes an okf.json manifest, copies pages, and emits a gra
 	assert.ok(html.includes("Alpha"), "visualizer should embed page titles");
 	assert.ok(/<html/i.test(html), "visualizer should be a self-contained HTML document");
 });
+
+for (const { rel, directory, missing } of [
+	{ rel: "a.md" },
+	{ rel: "okf.json" },
+	{ rel: "graph.html" },
+	{ rel: "okf.json", missing: true },
+	{ rel: "nested", directory: true },
+]) {
+	test(`exportOkfBundle preflights the ${rel} output link${missing ? " to a missing file" : ""}`, () => {
+		const target = tempDir("child-link");
+		const outside = tempDir("child-link-out");
+		smallWiki(target);
+		writeFile(target, "docs/wiki/nested/deep/page.md", "# Nested page\n");
+		const outputDir = path.join(target, "out");
+		fs.mkdirSync(outputDir, { recursive: true });
+		fs.writeFileSync(path.join(outputDir, "index.md"), "user index\n");
+		const outsideFile = path.join(outside, "victim");
+		if (!missing) fs.writeFileSync(outsideFile, "user outside\n");
+		fs.symlinkSync(
+			directory ? outside : outsideFile,
+			path.join(outputDir, rel),
+			directory ? (process.platform === "win32" ? "junction" : "dir") : "file",
+		);
+		const before = fs.readdirSync(outputDir).sort();
+		const outsideBefore = fs.readdirSync(outside).sort();
+
+		assert.throws(() => exportOkfBundle(target, { outputDir }), /outside the target root/);
+		assert.equal(fs.readFileSync(path.join(outputDir, "index.md"), "utf8"), "user index\n");
+		assert.deepEqual(fs.readdirSync(outputDir).sort(), before);
+		assert.deepEqual(fs.readdirSync(outside).sort(), outsideBefore);
+		if (!missing) assert.equal(fs.readFileSync(outsideFile, "utf8"), "user outside\n");
+	});
+}
+
+test("exportOkfBundle permits an output child link to a file inside the target", () => {
+	const target = tempDir("in-target-link");
+	smallWiki(target);
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir, { recursive: true });
+	const manifestFile = path.join(target, "manifest-copy.json");
+	fs.writeFileSync(manifestFile, "old\n");
+	fs.symlinkSync(manifestFile, path.join(outputDir, "okf.json"), "file");
+	const result = exportOkfBundle(target, { outputDir });
+	assert.deepEqual(result.errors, []);
+	assert.equal(JSON.parse(fs.readFileSync(manifestFile, "utf8")).okfVersion, OKF_VERSION);
+});
