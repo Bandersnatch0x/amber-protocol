@@ -1907,8 +1907,11 @@ are unchanged. `handoff validate --bundle-dir .` still reads a root-level bundle
 Explicit validation paths outside `--target` are refused. To validate a relocated bundle,
 select its directory as `--target` and use `--bundle-dir .`.
 
-The output-directory check does not validate every child path. Existing child symlinks
-in wiki export or handoff bundle output directories can still direct writes outside the target.
+Wiki export and handoff bundle check all planned file destinations and their parent directories
+before the first write, including copied wiki pages and optional replay files. Existing child
+symlinks or junctions outside the target refuse the export without changing output files.
+Links to other paths inside the target remain allowed. These checks do not prevent concurrent
+link replacement or provide OS sandboxing.
 
 ## Maintenance Commands
 
