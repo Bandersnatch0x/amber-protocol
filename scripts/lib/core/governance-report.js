@@ -5,7 +5,7 @@ const path = require("node:path");
 
 const { inspect: inspectMaintenance } = require("../maintenance");
 const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
-const { readJsonSafe, resolveTarget } = require("./fs-utils");
+const { assertExclusiveLeaf, readJsonSafe, resolveTarget } = require("./fs-utils");
 const { readJSONL } = require("./jsonl");
 const { resolveStateDirForRead, statePath } = require("../state-dir-resolver");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
@@ -536,6 +536,9 @@ function renderGovernanceReportText(report) {
 function writeGovernanceReportMarkdown(report, outputPath) {
 	const output = path.resolve(outputPath);
 	fs.mkdirSync(path.dirname(output), { recursive: true });
+	// A hard link is an ordinary in-target file to every path check, yet writing it
+	// replaces the bytes of every other name sharing that inode, including outside names.
+	assertExclusiveLeaf("Governance report destination", output);
 	fs.writeFileSync(output, renderGovernanceReportMarkdown(report));
 	return output;
 }

@@ -156,6 +156,59 @@ test("governance report refuses an --output that escapes the target", async () =
 	}
 });
 
+test("governance report refuses an --output hard-linked outside the target", async (t) => {
+	const { governanceDispatch } = require("../../scripts/lib/governance-commands");
+	const target = tempDir("gov-leaf");
+	const outside = tempDir("gov-leaf-out");
+	const victim = path.join(outside, "victim.md");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(victim, "user outside\n");
+		fs.linkSync(victim, path.join(target, "report.md"));
+	} catch (error) {
+		return t.skip(`hard link creation unavailable: ${error.code}`);
+	}
+	try {
+		const result = governanceDispatch("report", target, { output: "report.md" });
+		assert.match(
+			(result.errors || []).join("\n"),
+			/hard-linked/,
+			"the shared inode is refused with a named label",
+		);
+		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the refusal changes no bytes");
+		assert.equal(
+			fs.statSync(path.join(target, "report.md")).nlink,
+			2,
+			"the destination is left as the shared link",
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("workflow assess refuses an --output-dir leaf hard-linked outside the target", async (t) => {
+	const target = tempDir("assess-leaf");
+	const outside = tempDir("assess-leaf-out");
+	const victim = path.join(outside, "victim.json");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(victim, "user outside\n");
+		const outputDir = path.join(target, "wout");
+		fs.mkdirSync(outputDir, { recursive: true });
+		fs.linkSync(victim, path.join(outputDir, "workflow-assessment.json"));
+	} catch (error) {
+		return t.skip(`hard link creation unavailable: ${error.code}`);
+	}
+	try {
+		assert.equal(await run(["workflow", "assess", "--target", target, "--output-dir", "wout"]), 1);
+		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the refusal changes no bytes");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 const rootOutputCases = [
 	{
 		command: ["wiki", "export"],
