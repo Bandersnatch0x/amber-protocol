@@ -119,6 +119,25 @@ test("writeHandoffBundle refuses a planned leaf hard-linked outside the target",
 	assert.deepEqual(fs.readdirSync(outputDir).sort(), before);
 });
 
+test("writeHandoffBundle refuses an in-target link to a file hard-linked outside the target", (t) => {
+	const target = tempDir("link-chain");
+	const outside = tempDir("link-chain-out");
+	scaffoldHarness(target);
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir, { recursive: true });
+	const referent = path.join(target, "shared.bin");
+	const victim = path.join(outside, "victim.bin");
+	fs.writeFileSync(victim, "user outside\n");
+	try {
+		fs.linkSync(victim, referent);
+	} catch (error) {
+		return t.skip(`hard link creation unavailable: ${error.code}`);
+	}
+	fs.symlinkSync(referent, path.join(outputDir, "README.md"), "file");
+	assert.throws(() => writeHandoffBundle(target, { outputDir }), /hard-linked/);
+	assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n");
+});
+
 test("writeHandoffBundle keeps new and existing outputs working under an aliased target ancestor", () => {
 	const root = tempDir("alias-real");
 	const aliases = tempDir("alias-links");

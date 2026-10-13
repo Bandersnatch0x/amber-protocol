@@ -152,6 +152,27 @@ test("exportOkfBundle refuses a planned leaf hard-linked outside the target", (t
 	assert.deepEqual(fs.readdirSync(outputDir).sort(), ["okf.json"]);
 });
 
+// The write goes to the referent, so an in-target symlink whose file is hard-linked
+// outside the target escapes exactly like a hard-linked leaf.
+test("exportOkfBundle refuses an in-target link to a file hard-linked outside the target", (t) => {
+	const target = tempDir("link-chain");
+	const outside = tempDir("link-chain-out");
+	smallWiki(target);
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir, { recursive: true });
+	const referent = path.join(target, "shared.bin");
+	const victim = path.join(outside, "victim.bin");
+	fs.writeFileSync(victim, "user outside\n");
+	try {
+		fs.linkSync(victim, referent);
+	} catch (error) {
+		return t.skip(`hard link creation unavailable: ${error.code}`);
+	}
+	fs.symlinkSync(referent, path.join(outputDir, "okf.json"), "file");
+	assert.throws(() => exportOkfBundle(target, { outputDir }), /hard-linked/);
+	assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n");
+});
+
 test("exportOkfBundle refuses an external copied-page parent even when its leaf links back inside", () => {
 	const target = tempDir("outside-parent");
 	const outside = tempDir("outside-parent-out");

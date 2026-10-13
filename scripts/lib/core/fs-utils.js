@@ -49,7 +49,15 @@ function lstatIfPresent(filePath) {
 // yet writing it replaces the bytes of every other name sharing that inode —
 // including names outside the target. Writers check their planned leaves.
 function assertExclusiveLeaf(label, filePath) {
-	const stat = lstatIfPresent(filePath);
+	// Follow links: the write goes to the referent, so an in-target symlink whose
+	// referent is hard-linked outside the target escapes exactly like the leaf.
+	let stat;
+	try {
+		stat = fs.statSync(filePath);
+	} catch (error) {
+		if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return;
+		throw error;
+	}
 	if (stat && stat.isFile() && stat.nlink > 1) {
 		throw new Error(
 			`${label} is hard-linked to ${stat.nlink} paths and would be written outside the target: ${filePath}`,
