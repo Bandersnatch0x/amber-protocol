@@ -132,6 +132,26 @@ test("exportOkfBundle permits an output child link to a file inside the target",
 	assert.equal(JSON.parse(fs.readFileSync(manifestFile, "utf8")).okfVersion, OKF_VERSION);
 });
 
+// A hard link is an ordinary in-target file, so no path or symlink check sees it,
+// yet writing it replaces the bytes of the name outside the target sharing the inode.
+test("exportOkfBundle refuses a planned leaf hard-linked outside the target", (t) => {
+	const target = tempDir("hardlink");
+	const outside = tempDir("hardlink-out");
+	smallWiki(target);
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir, { recursive: true });
+	const victim = path.join(outside, "victim.json");
+	fs.writeFileSync(victim, "user outside\n");
+	try {
+		fs.linkSync(victim, path.join(outputDir, "okf.json"));
+	} catch (error) {
+		return t.skip(`hard link creation unavailable: ${error.code}`);
+	}
+	assert.throws(() => exportOkfBundle(target, { outputDir }), /hard-linked/);
+	assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n");
+	assert.deepEqual(fs.readdirSync(outputDir).sort(), ["okf.json"]);
+});
+
 test("exportOkfBundle refuses an external copied-page parent even when its leaf links back inside", () => {
 	const target = tempDir("outside-parent");
 	const outside = tempDir("outside-parent-out");

@@ -1909,9 +1909,10 @@ select its directory as `--target` and use `--bundle-dir .`.
 
 Wiki export and handoff bundle check all planned file destinations and their parent directories
 before the first write, including copied wiki pages and optional replay files. Existing child
-symlinks or junctions outside the target refuse the export without changing output files.
-Links to other paths inside the target remain allowed. These checks do not prevent concurrent
-link replacement or provide OS sandboxing.
+symlinks, junctions, or hard links outside the target refuse the export without changing output
+files. A link to another path inside the target is still written through, so it replaces that
+file's bytes; a planned leaf hard-linked to another name is refused instead. These checks do not
+prevent concurrent link replacement or provide OS sandboxing.
 
 ## Maintenance Commands
 

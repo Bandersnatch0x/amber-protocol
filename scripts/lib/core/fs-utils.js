@@ -45,6 +45,18 @@ function lstatIfPresent(filePath) {
 	}
 }
 
+// A hard link is a real in-target file, so every path and symlink check passes,
+// yet writing it replaces the bytes of every other name sharing that inode —
+// including names outside the target. Writers check their planned leaves.
+function assertExclusiveLeaf(label, filePath) {
+	const stat = lstatIfPresent(filePath);
+	if (stat && stat.isFile() && stat.nlink > 1) {
+		throw new Error(
+			`${label} is hard-linked to ${stat.nlink} paths and would be written outside the target: ${filePath}`,
+		);
+	}
+}
+
 function realPathForPotential(filePath, seenLinks = new Set()) {
 	let existing = path.resolve(filePath);
 	const missingSegments = [];
@@ -312,6 +324,7 @@ module.exports = {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
 	resolvePathWithin,
+	assertExclusiveLeaf,
 	realPathForPotential,
 	toPortablePath,
 	pathExists,

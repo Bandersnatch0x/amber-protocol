@@ -5,7 +5,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const { validateHandoff } = require("./audit");
-const { resolvePathWithin, resolveTarget } = require("./fs-utils");
+const { assertExclusiveLeaf, resolvePathWithin, resolveTarget } = require("./fs-utils");
 const { buildGovernanceReport } = require("./governance-report");
 const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
@@ -603,6 +603,8 @@ function writeHandoffBundle(target, options = {}) {
 		allowRoot: true,
 		canonicalExisting: true,
 	});
+	// Same reason as the wiki exporter: validation uses the requested output re-rooted
+	// on the canonical target, so an aliased ancestor cannot diverge the two names.
 	const validationDir = path.resolve(
 		validationRoot,
 		path.relative(targetRoot, path.resolve(targetRoot, requestedOutputDir)),
@@ -618,6 +620,7 @@ function writeHandoffBundle(target, options = {}) {
 			label: "Handoff bundle output",
 			allowRoot: true,
 		});
+		assertExclusiveLeaf("Handoff bundle output", filePath);
 	}
 	const files = Object.entries(contents).map(([rel, content]) => {
 		const filePath = path.join(outputDir, rel);

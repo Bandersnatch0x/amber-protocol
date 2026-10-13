@@ -9,6 +9,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {
+	assertExclusiveLeaf,
 	pathExists,
 	readText,
 	relativeSlash,
@@ -189,6 +190,9 @@ function exportOkfBundle(target, options = {}) {
 		allowRoot: true,
 		canonicalExisting: true,
 	});
+	// validationDir is the requested output re-rooted on the canonical target, not
+	// outputDir: outputDir is only canonicalized when it already exists, so an
+	// aliased target ancestor would make the checked and written names diverge.
 	const validationDir = path.resolve(
 		validationRoot,
 		path.relative(targetRoot, path.resolve(targetRoot, requestedOutputDir)),
@@ -203,6 +207,7 @@ function exportOkfBundle(target, options = {}) {
 			label: "Wiki export output parent",
 			allowRoot: true,
 		});
+		assertExclusiveLeaf("Wiki export output file", dest);
 	}
 
 	// shortcut: preflight cannot prevent TOCTOU path swaps, use race-safe writes for hostile concurrent mutation.

@@ -98,6 +98,27 @@ test("writeHandoffBundle permits an output child link to a file inside the targe
 	assert.match(fs.readFileSync(readmeFile, "utf8"), /Handoff Bundle/);
 });
 
+// Same shape as the wiki case: a hard link is a plain in-target file to every
+// path check, but writing it reaches the outside name sharing the inode.
+test("writeHandoffBundle refuses a planned leaf hard-linked outside the target", (t) => {
+	const target = tempDir("hardlink");
+	const outside = tempDir("hardlink-out");
+	scaffoldHarness(target);
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir, { recursive: true });
+	const victim = path.join(outside, "victim.md");
+	fs.writeFileSync(victim, "user outside\n");
+	try {
+		fs.linkSync(victim, path.join(outputDir, "README.md"));
+	} catch (error) {
+		return t.skip(`hard link creation unavailable: ${error.code}`);
+	}
+	const before = fs.readdirSync(outputDir).sort();
+	assert.throws(() => writeHandoffBundle(target, { outputDir }), /hard-linked/);
+	assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n");
+	assert.deepEqual(fs.readdirSync(outputDir).sort(), before);
+});
+
 test("writeHandoffBundle keeps new and existing outputs working under an aliased target ancestor", () => {
 	const root = tempDir("alias-real");
 	const aliases = tempDir("alias-links");
