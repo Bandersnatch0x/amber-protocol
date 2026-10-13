@@ -56,6 +56,71 @@ test("writeHandoffBundle creates the complete continuation artifact set", () => 
 	assert.deepEqual(validation.errors, []);
 });
 
+for (const { rel, missing } of [
+	{ rel: "README.md" },
+	{ rel: "manifest.json" },
+	{ rel: "manifest.json", missing: true },
+]) {
+	test(`writeHandoffBundle preflights the ${rel} output link${missing ? " to a missing file" : ""}`, () => {
+		const target = tempDir("child-link");
+		const outside = tempDir("child-link-out");
+		scaffoldHarness(target);
+		const outputDir = path.join(target, "out");
+		fs.mkdirSync(outputDir, { recursive: true });
+		fs.writeFileSync(path.join(outputDir, "user-note.md"), "user note\n");
+		if (rel !== "README.md") fs.writeFileSync(path.join(outputDir, "README.md"), "user readme\n");
+		const outsideFile = path.join(outside, "victim");
+		if (!missing) fs.writeFileSync(outsideFile, "user outside\n");
+		fs.symlinkSync(outsideFile, path.join(outputDir, rel), "file");
+		const before = fs.readdirSync(outputDir).sort();
+		const outsideBefore = fs.readdirSync(outside).sort();
+
+		assert.throws(() => writeHandoffBundle(target, { outputDir }), /outside the target root/);
+		assert.deepEqual(fs.readdirSync(outputDir).sort(), before);
+		assert.deepEqual(fs.readdirSync(outside).sort(), outsideBefore);
+		assert.equal(fs.readFileSync(path.join(outputDir, "user-note.md"), "utf8"), "user note\n");
+		if (rel !== "README.md")
+			assert.equal(fs.readFileSync(path.join(outputDir, "README.md"), "utf8"), "user readme\n");
+		if (!missing) assert.equal(fs.readFileSync(outsideFile, "utf8"), "user outside\n");
+	});
+}
+
+test("writeHandoffBundle permits an output child link to a file inside the target", () => {
+	const target = tempDir("in-target-link");
+	scaffoldHarness(target);
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir, { recursive: true });
+	const readmeFile = path.join(target, "readme-copy.md");
+	fs.writeFileSync(readmeFile, "old\n");
+	fs.symlinkSync(readmeFile, path.join(outputDir, "README.md"), "file");
+	const result = writeHandoffBundle(target, { outputDir });
+	assert.equal(result.structureValid, true);
+	assert.match(fs.readFileSync(readmeFile, "utf8"), /Handoff Bundle/);
+});
+
+test("writeHandoffBundle keeps new and existing outputs working under an aliased target ancestor", () => {
+	const root = tempDir("alias-real");
+	const aliases = tempDir("alias-links");
+	const target = path.join(root, "repo");
+	fs.mkdirSync(target);
+	scaffoldHarness(target);
+	const alias = path.join(aliases, "parent");
+	fs.symlinkSync(root, alias, process.platform === "win32" ? "junction" : "dir");
+	const logicalTarget = path.join(alias, "repo");
+	fs.mkdirSync(path.join(target, "existing"));
+	for (const outputDir of [undefined, "existing", "new/deep"]) {
+		const result = writeHandoffBundle(logicalTarget, { outputDir });
+		assert.equal(result.structureValid, true);
+		assert.equal(result.target, logicalTarget);
+		const physicalOutput = path.join(target, outputDir || ".amber/handoff/latest");
+		assert.equal(
+			JSON.parse(fs.readFileSync(path.join(physicalOutput, "manifest.json"), "utf8")).target,
+			logicalTarget,
+		);
+		assert.match(fs.readFileSync(path.join(physicalOutput, "README.md"), "utf8"), /Handoff Bundle/);
+	}
+});
+
 test("validateHandoffBundle reports missing required files", () => {
 	const target = tempDir("validate");
 	const bundleDir = path.join(target, ".amber", "handoff", "latest");

@@ -313,24 +313,90 @@ test("a takeover chain deeper than the bound is refused with the files to remove
 // to reclaim it. Exactly one may remove it, and the other must not remove the lock
 // the first one created. This one guards the guard itself, added when the reclaim
 // was first serialized, not the depth change that followed it.
-test("two writers reclaiming one stale lock both append and leave one chain", async () => {
+test("eight writers released at once reclaim one stale lock and leave one chain", async () => {
 	const lp = raceDir("amber-anchor-reclaimrace-");
+	const gate = `${lp}.gate`;
 	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+	// Two staggered writers rarely overlap in the reclaim read, so the old pair passed
+	// even with the byte guard removed. Every writer spins on one gate file instead, so
+	// they reach the stale lock at the same instant and only the guard keeps them out of
+	// each other's critical section.
 	const script = `
+		const fs = require("node:fs");
+		while (!fs.existsSync(${JSON.stringify(gate)})) {}
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
 		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", pid: process.pid });
 	`;
+	const pending = [1, 2, 3, 4, 5, 6, 7, 8].map(
+		() =>
+			new Promise((resolve) => {
+				spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
+			}),
+	);
+	setTimeout(() => fs.writeFileSync(gate, "go"), 400);
+	const exits = await Promise.all(pending);
+
+	assert.deepEqual(
+		exits,
+		[0, 0, 0, 0, 0, 0, 0, 0],
+		"every writer is served, none times out on the lock",
+	);
+	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 8 });
+});
+
+// The gate-released writers above still enter the race only about five times in six, which does
+// not pin a guard that fails one run in six. Here the two reclaimers are pinned by hand: the
+// slower one reads the dead holder, parks itself before taking the takeover guard, and continues
+// only once the faster one is inside the critical section. That is the exact sequence issue 342
+// describes, so nothing but the byte check decides the outcome. Delete it and this fails on the
+// first run, at any load, on any machine.
+test("a slow reclaimer parked past the fast one still leaves its lock alone", async () => {
+	const lp = raceDir("amber-anchor-pinned-");
+	const ready = `${lp}.ready`;
+	const inside = `${lp}.inside`;
+	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
+
+	const holder = `
+		const fs = require("node:fs");
+		const realAppend = fs.appendFileSync;
+		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		while (!fs.existsSync(${JSON.stringify(ready)})) {}
+		fs.appendFileSync = (file, data, ...rest) => {
+			if (file === ${JSON.stringify(lp)}) {
+				fs.writeFileSync(${JSON.stringify(inside)}, "in", "utf8");
+				const until = Date.now() + 600;
+				while (Date.now() < until) {}
+			}
+			return realAppend.call(fs, file, data, ...rest);
+		};
+		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", who: "fast" });
+	`;
+	const slower = `
+		const fs = require("node:fs");
+		const realLink = fs.linkSync;
+		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		fs.linkSync = (from, to) => {
+			if (to.endsWith(".lock.takeover") && !fs.existsSync(${JSON.stringify(ready)})) {
+				fs.writeFileSync(${JSON.stringify(ready)}, "read", "utf8");
+				const until = Date.now() + 8000;
+				while (!fs.existsSync(${JSON.stringify(inside)}) && Date.now() < until) {}
+			}
+			return realLink.call(fs, from, to);
+		};
+		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", who: "slow" });
+	`;
 	const exits = await Promise.all(
-		[1, 2].map(
-			() =>
+		[holder, slower].map(
+			(code) =>
 				new Promise((resolve) => {
-					spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
+					spawn(process.execPath, ["-e", code], { stdio: "ignore" }).on("exit", resolve);
 				}),
 		),
 	);
 
-	assert.deepEqual(exits, [0, 0]);
+	assert.deepEqual(exits, [0, 0], "both writers are served, neither times out on the lock");
 	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
+	assert.equal(fs.existsSync(`${lp}.lock`), false, "no lock is left behind");
 });
 
 // Hard links are what publish a lock file with its pid already inside. A filesystem

@@ -1901,6 +1901,18 @@ node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/la
 
 The bundle contains `README.md`, `session-summary.md`, `verification-evidence.md`, `next-actions.md`, `risks.md`, `recovery-commands.md`, and `manifest.json`.
 
+`handoff bundle` rejects output at the target root, including `.`, an absolute root path,
+`nested/..`, and symlink or junction aliases of the root. Its default and subdirectory outputs
+are unchanged. `handoff validate --bundle-dir .` still reads a root-level bundle.
+Explicit validation paths outside `--target` are refused. To validate a relocated bundle,
+select its directory as `--target` and use `--bundle-dir .`.
+
+Wiki export and handoff bundle check all planned file destinations and their parent directories
+before the first write, including copied wiki pages and optional replay files. Existing child
+symlinks or junctions outside the target refuse the export without changing output files.
+Links to other paths inside the target remain allowed. These checks do not prevent concurrent
+link replacement or provide OS sandboxing.
+
 ## Maintenance Commands
 
 ### maintenance inspect
@@ -2615,6 +2627,10 @@ and cwd-bound Claude host transcripts, capped to the newest 20 transcript files)
 `--no-sessions`; `findings` / `plan` / `compare` operate on prior report files. `assess` writes a
 report file only when `--output-dir` is given. Diagnostics go to **stderr**; stdout stays
 parser-safe JSON (or Markdown for assess).
+
+`assess --output-dir` rejects the target root, including `.`, an absolute root path, `nested/..`,
+and symlink or junction aliases of the root. Subdirectory outputs and the stdout-only default
+are unchanged. `assess --handoff-bundle-dir .` still accepts a root-level bundle as read-only input.
 
 ```bash
 # Build a report (stdout JSON by default)
