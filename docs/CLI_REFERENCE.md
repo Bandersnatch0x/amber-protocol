@@ -1913,8 +1913,10 @@ symlinks or junctions outside the target refuse the export without changing outp
 planned file that shares its bytes with another name — a hard link, or a link to one — is refused
 too, even when both names stay inside the target; `workflow assess --output-dir` and
 `governance report --output` apply the same leaf check. A link to a single in-target file is
-still written through, so it replaces that file's bytes. These checks do not prevent concurrent
-link replacement or provide OS sandboxing.
+still written through, so it replaces that file's bytes — except for `workflow assess`, which
+confines its output file to `--output-dir` and therefore refuses a link whose referent sits
+elsewhere in the target. These checks do not prevent concurrent link replacement or provide
+OS sandboxing.
 
 ## Maintenance Commands
 

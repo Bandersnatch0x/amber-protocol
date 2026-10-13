@@ -188,6 +188,7 @@ test("governance report refuses an --output hard-linked outside the target", asy
 });
 
 test("workflow assess refuses an --output-dir leaf hard-linked outside the target", async (t) => {
+	const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/adapters/command");
 	const target = tempDir("assess-leaf");
 	const outside = tempDir("assess-leaf-out");
 	const victim = path.join(outside, "victim.json");
@@ -201,8 +202,20 @@ test("workflow assess refuses an --output-dir leaf hard-linked outside the targe
 		return t.skip(`hard link creation unavailable: ${error.code}`);
 	}
 	try {
-		assert.equal(await run(["workflow", "assess", "--target", target, "--output-dir", "wout"]), 1);
+		const leaf = path.join(target, "wout", "workflow-assessment.json");
+		const result = workflowDispatch("assess", target, { target, outputDir: "wout" });
+		assert.match(
+			(result.errors || []).join("\n"),
+			/hard-linked/,
+			"the shared inode is refused with a named label, not a wrong-reason exit",
+		);
 		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the refusal changes no bytes");
+		assert.equal(fs.statSync(leaf).nlink, 2, "the destination is left as the shared link");
+		assert.equal(
+			await run(["workflow", "assess", "--target", target, "--output-dir", "wout"]),
+			1,
+			"the CLI surfaces the refusal as an error exit",
+		);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 		fs.rmSync(outside, { recursive: true, force: true });
@@ -229,9 +242,26 @@ const rootOutputCases = [
 		files: ["workflow-assessment.json"],
 		guarded: true,
 	},
+	{
+		command: ["governance", "report"],
+		flag: "--output",
+		files: ["report.md"],
+		guarded: true,
+		// This flag names a file, not a directory, and the typed mutation needs approval.
+		leafOutput: true,
+		extraArgs: ["--yes"],
+	},
 ];
 
-for (const { command, flag, files, guarded, defaultDir } of rootOutputCases) {
+for (const {
+	command,
+	flag,
+	files,
+	guarded,
+	defaultDir,
+	leafOutput,
+	extraArgs,
+} of rootOutputCases) {
 	test(
 		command.join(" ") +
 			" refuses " +
@@ -239,6 +269,14 @@ for (const { command, flag, files, guarded, defaultDir } of rootOutputCases) {
 			" resolving to the repository root without changing user files",
 		async () => {
 			const target = tempDir("root-output");
+			const argvFor = (output) => [
+				...command,
+				"--target",
+				target,
+				flag,
+				output,
+				...(extraArgs || []),
+			];
 			try {
 				assert.equal(await run(["init", "--target", target, "--yes"]), 0);
 				for (const name of files) fs.writeFileSync(path.join(target, name), "user:" + name);
@@ -246,7 +284,7 @@ for (const { command, flag, files, guarded, defaultDir } of rootOutputCases) {
 				fs.symlinkSync(target, rootLink, process.platform === "win32" ? "junction" : "dir");
 				const before = fs.readdirSync(target).sort();
 				for (const output of [".", target, "nested/..", "root-link"]) {
-					const argv = [...command, "--target", target, flag, output];
+					const argv = argvFor(output);
 					if (guarded) assert.equal(await run(argv), 1);
 					else await assert.rejects(() => run(argv), /outside the target root/);
 					for (const name of files) {
@@ -267,8 +305,15 @@ for (const { command, flag, files, guarded, defaultDir } of rootOutputCases) {
 					}
 				}
 				for (const output of ["exports", path.join(target, "absolute-export")]) {
-					assert.equal(await run([...command, "--target", target, flag, output]), 0);
-					assert.ok(fs.existsSync(path.resolve(target, output, files[0])));
+					const destination = leafOutput ? path.join(output, files[0]) : output;
+					assert.equal(await run(argvFor(destination)), 0);
+					assert.ok(
+						fs.existsSync(
+							leafOutput
+								? path.resolve(target, destination)
+								: path.resolve(target, output, files[0]),
+						),
+					);
 				}
 			} finally {
 				fs.rmSync(target, { recursive: true, force: true });
