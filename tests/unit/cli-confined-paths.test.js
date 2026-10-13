@@ -6,6 +6,7 @@ const path = require("node:path");
 
 const L = require("../../scripts/lib/core/loop-ledger");
 const { run } = require("../../scripts/amber");
+const { REQUIRED_BUNDLE_FILES } = require("../../scripts/lib/core/handoff-layout");
 
 // The path-confinement sweep routes CLI-supplied paths through
 // resolvePathWithin. These are the last seams it reached: the places where a
@@ -152,6 +153,100 @@ test("governance report refuses an --output that escapes the target", async () =
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+const rootOutputCases = [
+	{
+		command: ["wiki", "export"],
+		flag: "--output-dir",
+		files: ["index.md", "okf.json", "graph.html"],
+		defaultDir: ["docs", "okf-bundle"],
+	},
+	{
+		command: ["handoff", "bundle"],
+		flag: "--output-dir",
+		files: ["README.md", "manifest.json"],
+		defaultDir: [".amber", "handoff", "latest"],
+	},
+	{ command: ["handoff", "bundle"], flag: "--bundle-dir", files: ["README.md", "manifest.json"] },
+	{
+		command: ["workflow", "assess"],
+		flag: "--output-dir",
+		files: ["workflow-assessment.json"],
+		guarded: true,
+	},
+];
+
+for (const { command, flag, files, guarded, defaultDir } of rootOutputCases) {
+	test(
+		command.join(" ") +
+			" refuses " +
+			flag +
+			" resolving to the repository root without changing user files",
+		async () => {
+			const target = tempDir("root-output");
+			try {
+				assert.equal(await run(["init", "--target", target, "--yes"]), 0);
+				for (const name of files) fs.writeFileSync(path.join(target, name), "user:" + name);
+				const rootLink = path.join(target, "root-link");
+				fs.symlinkSync(target, rootLink, process.platform === "win32" ? "junction" : "dir");
+				const before = fs.readdirSync(target).sort();
+				for (const output of [".", target, "nested/..", "root-link"]) {
+					const argv = [...command, "--target", target, flag, output];
+					if (guarded) assert.equal(await run(argv), 1);
+					else await assert.rejects(() => run(argv), /outside the target root/);
+					for (const name of files) {
+						assert.equal(fs.readFileSync(path.join(target, name), "utf8"), "user:" + name);
+					}
+					assert.deepEqual(fs.readdirSync(target).sort(), before, "refusal leaves no export files");
+				}
+				if (defaultDir) {
+					const destination = path.join(target, ...defaultDir);
+					fs.mkdirSync(path.dirname(destination), { recursive: true });
+					fs.symlinkSync(target, destination, process.platform === "win32" ? "junction" : "dir");
+					await assert.rejects(
+						() => run([...command, "--target", target]),
+						/outside the target root/,
+					);
+					for (const name of files) {
+						assert.equal(fs.readFileSync(path.join(target, name), "utf8"), "user:" + name);
+					}
+				}
+				for (const output of ["exports", path.join(target, "absolute-export")]) {
+					assert.equal(await run([...command, "--target", target, flag, output]), 0);
+					assert.ok(fs.existsSync(path.resolve(target, output, files[0])));
+				}
+			} finally {
+				fs.rmSync(target, { recursive: true, force: true });
+			}
+		},
+	);
+}
+
+test("handoff validate can read an existing root bundle without changing it", async () => {
+	const target = tempDir("root-bundle-input");
+	try {
+		assert.equal(await run(["init", "--target", target, "--yes"]), 0);
+		assert.equal(
+			await run(["handoff", "bundle", "--target", target, "--output-dir", "exports"]),
+			0,
+		);
+		for (const name of REQUIRED_BUNDLE_FILES) {
+			fs.copyFileSync(path.join(target, "exports", name), path.join(target, name));
+		}
+		const before = fs.readdirSync(target).sort();
+		const contents = REQUIRED_BUNDLE_FILES.map((name) =>
+			fs.readFileSync(path.join(target, name), "utf8"),
+		);
+		assert.equal(await run(["handoff", "validate", "--target", target, "--bundle-dir", "."]), 0);
+		assert.deepEqual(fs.readdirSync(target).sort(), before);
+		assert.deepEqual(
+			REQUIRED_BUNDLE_FILES.map((name) => fs.readFileSync(path.join(target, name), "utf8")),
+			contents,
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
 	}
 });
 

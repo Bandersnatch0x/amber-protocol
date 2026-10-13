@@ -72,7 +72,7 @@ function assessWorkflow(args) {
 		try {
 			outputDir = resolvePathWithin(targetRoot, args.outputDir, {
 				label: "Workflow assessment output directory",
-				allowRoot: true,
+				allowRoot: false,
 				canonicalExisting: true,
 			});
 		} catch (error) {
