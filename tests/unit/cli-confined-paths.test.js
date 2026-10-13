@@ -161,14 +161,15 @@ test("governance report refuses an --output hard-linked outside the target", asy
 	const target = tempDir("gov-leaf");
 	const outside = tempDir("gov-leaf-out");
 	const victim = path.join(outside, "victim.md");
+	const leaf = path.join(target, "report.md");
 	try {
 		await run(["init", "--target", target, "--yes"]);
 		fs.writeFileSync(victim, "user outside\n");
-		fs.linkSync(victim, path.join(target, "report.md"));
-	} catch (error) {
-		return t.skip(`hard link creation unavailable: ${error.code}`);
-	}
-	try {
+		try {
+			fs.linkSync(victim, leaf);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
 		const result = governanceDispatch("report", target, { output: "report.md" });
 		assert.match(
 			(result.errors || []).join("\n"),
@@ -176,14 +177,42 @@ test("governance report refuses an --output hard-linked outside the target", asy
 			"the shared inode is refused with a named label",
 		);
 		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the refusal changes no bytes");
+		assert.equal(fs.statSync(leaf).nlink, 2, "the destination is left as the shared link");
 		assert.equal(
-			fs.statSync(path.join(target, "report.md")).nlink,
-			2,
-			"the destination is left as the shared link",
+			await run(["governance", "report", "--target", target, "--output", "report.md", "--yes"]),
+			1,
+			"the CLI surfaces the refusal as an error exit",
 		);
+		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the CLI exit is inert");
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+// The docs claim a link to a single in-target file is written through, so that is pinned here
+// rather than left as an untested sentence: the referent's bytes are replaced, no refusal.
+test("governance report writes through an --output link to one in-target file", async (t) => {
+	const { governanceDispatch } = require("../../scripts/lib/governance-commands");
+	const target = tempDir("gov-through");
+	const referent = path.join(target, "shared.md");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(referent, "old\n");
+		try {
+			fs.symlinkSync(referent, path.join(target, "report.md"), "file");
+		} catch (error) {
+			return t.skip(`symlink creation unavailable: ${error.code}`);
+		}
+		const result = governanceDispatch("report", target, { output: "report.md" });
+		assert.deepEqual(result.errors || [], [], "the documented write-through is not refused");
+		assert.match(
+			fs.readFileSync(referent, "utf8"),
+			/^# Amber Governance Report/,
+			"the referent received the report bytes",
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
 	}
 });
 
@@ -192,17 +221,17 @@ test("workflow assess refuses an --output-dir leaf hard-linked outside the targe
 	const target = tempDir("assess-leaf");
 	const outside = tempDir("assess-leaf-out");
 	const victim = path.join(outside, "victim.json");
+	const leaf = path.join(target, "wout", "workflow-assessment.json");
 	try {
 		await run(["init", "--target", target, "--yes"]);
 		fs.writeFileSync(victim, "user outside\n");
 		const outputDir = path.join(target, "wout");
 		fs.mkdirSync(outputDir, { recursive: true });
-		fs.linkSync(victim, path.join(outputDir, "workflow-assessment.json"));
-	} catch (error) {
-		return t.skip(`hard link creation unavailable: ${error.code}`);
-	}
-	try {
-		const leaf = path.join(target, "wout", "workflow-assessment.json");
+		try {
+			fs.linkSync(victim, leaf);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
 		const result = workflowDispatch("assess", target, { target, outputDir: "wout" });
 		assert.match(
 			(result.errors || []).join("\n"),
@@ -219,6 +248,32 @@ test("workflow assess refuses an --output-dir leaf hard-linked outside the targe
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+// workflow assess confines its output file to --output-dir, so unlike the other three surfaces it
+// refuses a link whose referent stays inside the target. Pinned: the docs name this exception.
+test("workflow assess refuses an --output-dir link to a file outside that directory", async (t) => {
+	const target = tempDir("assess-dir-scope");
+	const referent = path.join(target, "shared.json");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(referent, "OLD\n");
+		const outputDir = path.join(target, "wout");
+		fs.mkdirSync(outputDir, { recursive: true });
+		try {
+			fs.symlinkSync(referent, path.join(outputDir, "workflow-assessment.json"), "file");
+		} catch (error) {
+			return t.skip(`symlink creation unavailable: ${error.code}`);
+		}
+		assert.equal(
+			await run(["workflow", "assess", "--target", target, "--output-dir", "wout"]),
+			1,
+			"the in-target referent outside the output directory is refused",
+		);
+		assert.equal(fs.readFileSync(referent, "utf8"), "OLD\n", "the refusal changes no bytes");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
 	}
 });
 
