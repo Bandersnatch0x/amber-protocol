@@ -131,3 +131,67 @@ test("exportOkfBundle permits an output child link to a file inside the target",
 	assert.deepEqual(result.errors, []);
 	assert.equal(JSON.parse(fs.readFileSync(manifestFile, "utf8")).okfVersion, OKF_VERSION);
 });
+
+test("exportOkfBundle refuses an external copied-page parent even when its leaf links back inside", () => {
+	const target = tempDir("outside-parent");
+	const outside = tempDir("outside-parent-out");
+	smallWiki(target);
+	writeFile(target, "docs/wiki/nested/deep/page.md", "# Nested page\n");
+	const outputDir = path.join(target, "out");
+	fs.mkdirSync(outputDir);
+	fs.writeFileSync(path.join(outputDir, "index.md"), "user index\n");
+	const leaf = path.join(target, "page-copy.md");
+	fs.writeFileSync(leaf, "user page\n");
+	fs.mkdirSync(path.join(outside, "deep"));
+	fs.symlinkSync(leaf, path.join(outside, "deep/page.md"), "file");
+	fs.symlinkSync(
+		outside,
+		path.join(outputDir, "nested"),
+		process.platform === "win32" ? "junction" : "dir",
+	);
+	const before = fs.readdirSync(outputDir).sort();
+	assert.throws(() => exportOkfBundle(target, { outputDir }), /outside the target root/);
+	assert.equal(fs.readFileSync(leaf, "utf8"), "user page\n");
+	assert.equal(fs.readFileSync(path.join(outputDir, "index.md"), "utf8"), "user index\n");
+	assert.deepEqual(fs.readdirSync(outputDir).sort(), before);
+});
+
+test("exportOkfBundle permits a copied-page directory link elsewhere inside the target", () => {
+	const target = tempDir("in-target-dir-link");
+	smallWiki(target);
+	writeFile(target, "docs/wiki/nested/deep/page.md", "# Nested page\n");
+	const outputDir = path.join(target, "out");
+	const pagesDir = path.join(target, "page-copies");
+	fs.mkdirSync(outputDir);
+	fs.mkdirSync(pagesDir);
+	fs.symlinkSync(
+		pagesDir,
+		path.join(outputDir, "nested"),
+		process.platform === "win32" ? "junction" : "dir",
+	);
+	const result = exportOkfBundle(target, { outputDir });
+	assert.equal(result.nodeCount, 3);
+	assert.equal(fs.readFileSync(path.join(pagesDir, "deep/page.md"), "utf8"), "# Nested page\n");
+});
+
+test("exportOkfBundle keeps new and existing outputs working under an aliased target ancestor", () => {
+	const root = tempDir("alias-real");
+	const aliases = tempDir("alias-links");
+	const target = path.join(root, "repo");
+	smallWiki(target);
+	const alias = path.join(aliases, "parent");
+	fs.symlinkSync(root, alias, process.platform === "win32" ? "junction" : "dir");
+	const logicalTarget = path.join(alias, "repo");
+	fs.mkdirSync(path.join(target, "existing"));
+	for (const outputDir of [undefined, "existing", "new/deep"]) {
+		const result = exportOkfBundle(logicalTarget, { outputDir });
+		assert.deepEqual(result.errors, []);
+		assert.equal(result.target, logicalTarget);
+		const physicalOutput = path.join(target, outputDir || "docs/okf-bundle");
+		assert.equal(
+			JSON.parse(fs.readFileSync(path.join(physicalOutput, "okf.json"), "utf8")).concepts.length,
+			2,
+		);
+		assert.match(fs.readFileSync(path.join(physicalOutput, "graph.html"), "utf8"), /Alpha/);
+	}
+});

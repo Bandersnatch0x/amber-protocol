@@ -238,6 +238,50 @@ describe("R0 replay bundle (governance contract §9.1)", () => {
 			fs.rmSync(outside, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 		}
 	});
+
+	it("writeHandoffBundle permits in-target replay directory links and ignores unrequested replay outputs", async () => {
+		const root = makeTarget();
+		const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-replay-unused-out-"));
+		try {
+			await runOnceToSettlement(root);
+			const outDir = path.join(root, "out");
+			fs.mkdirSync(outDir);
+			fs.writeFileSync(path.join(outside, "sentinel"), "user outside\n");
+			const replayDir = path.join(outDir, "replay");
+			fs.symlinkSync(outside, replayDir, process.platform === "win32" ? "junction" : "dir");
+			const withoutReplay = handoffBundle.writeHandoffBundle(root, { outputDir: outDir });
+			assert.equal(withoutReplay.structureValid, true);
+			const unknownScope = handoffBundle.writeHandoffBundle(root, {
+				outputDir: outDir,
+				replayScope: "unknown-session",
+			});
+			assert.equal(unknownScope.structureValid, true);
+			assert.ok(
+				unknownScope.errors.some((message) =>
+					message.includes("no session ledger exists for scope unknown-session"),
+				),
+			);
+			assert.deepEqual(fs.readdirSync(outside), ["sentinel"]);
+			assert.equal(fs.readFileSync(path.join(outside, "sentinel"), "utf8"), "user outside\n");
+			fs.unlinkSync(replayDir);
+			const copies = path.join(root, "replay-copies");
+			fs.mkdirSync(copies);
+			fs.symlinkSync(copies, replayDir, process.platform === "win32" ? "junction" : "dir");
+			const withReplay = handoffBundle.writeHandoffBundle(root, {
+				outputDir: outDir,
+				replayScope: "s1",
+			});
+			assert.equal(withReplay.structureValid, true);
+			assert.equal(
+				JSON.parse(fs.readFileSync(path.join(copies, "manifest.json"), "utf8")).artifactType,
+				"amber-replay-bundle",
+			);
+			assert.match(fs.readFileSync(path.join(copies, "policy.json"), "utf8"), /rules/);
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+			fs.rmSync(outside, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+		}
+	});
 });
 
 describe("R1 decision replay (governance contract §9.2)", () => {

@@ -165,37 +165,56 @@ function exportOkfBundle(target, options = {}) {
 		};
 	}
 
-	const outputDir = resolvePathWithin(
-		targetRoot,
-		options.outputDir || path.join(targetRoot, "docs", "okf-bundle"),
-		{
-			label: "Wiki export output directory",
-			canonicalExisting: true,
-		},
-	);
-
-	fs.mkdirSync(outputDir, { recursive: true });
-	const files = [];
-
-	for (const filePath of listWikiFiles(wikiRoot)) {
-		const rel = relativeSlash(wikiRoot, filePath);
-		const dest = path.join(outputDir, rel);
-		fs.mkdirSync(path.dirname(dest), { recursive: true });
-		fs.copyFileSync(filePath, dest);
-		files.push(rel);
-	}
-
+	const requestedOutputDir = options.outputDir || path.join(targetRoot, "docs", "okf-bundle");
+	const outputDir = resolvePathWithin(targetRoot, requestedOutputDir, {
+		label: "Wiki export output directory",
+		canonicalExisting: true,
+	});
+	const copiedPages = listWikiFiles(wikiRoot).map((source) => ({
+		source,
+		rel: relativeSlash(wikiRoot, source),
+	}));
 	const manifest = {
 		okfVersion: OKF_VERSION,
 		generatedBy: "amber wiki export --okf",
 		concepts: graph.nodes.map((node) => ({ id: node.id, type: node.type, title: node.title })),
 		links: graph.edges,
 	};
-	fs.writeFileSync(path.join(outputDir, "okf.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-	files.push("okf.json");
+	const generatedFiles = new Map([
+		["okf.json", `${JSON.stringify(manifest, null, 2)}\n`],
+		["graph.html", buildVisualizerHtml(graph)],
+	]);
+	const files = [...copiedPages.map(({ rel }) => rel), ...generatedFiles.keys()];
+	const validationRoot = resolvePathWithin(targetRoot, ".", {
+		allowRoot: true,
+		canonicalExisting: true,
+	});
+	const validationDir = path.resolve(
+		validationRoot,
+		path.relative(targetRoot, path.resolve(targetRoot, requestedOutputDir)),
+	);
+	for (const rel of files) {
+		const dest = path.join(validationDir, rel);
+		resolvePathWithin(validationRoot, dest, {
+			label: "Wiki export output file",
+			allowRoot: true,
+		});
+		resolvePathWithin(validationRoot, path.dirname(dest), {
+			label: "Wiki export output parent",
+			allowRoot: true,
+		});
+	}
 
-	fs.writeFileSync(path.join(outputDir, "graph.html"), buildVisualizerHtml(graph));
-	files.push("graph.html");
+	// shortcut: preflight cannot prevent TOCTOU path swaps, use race-safe writes for hostile concurrent mutation.
+	fs.mkdirSync(outputDir, { recursive: true });
+	for (const { source, rel } of copiedPages) {
+		const dest = path.join(outputDir, rel);
+		fs.mkdirSync(path.dirname(dest), { recursive: true });
+		fs.copyFileSync(source, dest);
+	}
+	for (const [rel, content] of generatedFiles) {
+		fs.writeFileSync(path.join(outputDir, rel), content);
+	}
 
 	return {
 		target: targetRoot,
