@@ -3,7 +3,7 @@
 const path = require("node:path");
 
 const { pathExists, relativeSlash, resolveTarget, walkFiles } = require("../../core/fs-utils");
-const { KNOWLEDGE_PLAN_RELATIVE, loadKnowledgePlan } = require("./load");
+const { loadKnowledgePlan } = require("./load");
 
 /**
  * Simple coverage heuristic: does a wiki document with a similar title exist?
@@ -73,7 +73,9 @@ function buildKnowledgeReport(target) {
 	const report = {
 		target: targetRoot,
 		planFound: loaded.found,
-		planPath: loaded.found ? KNOWLEDGE_PLAN_RELATIVE : null,
+		// issues/0366: name the file actually loaded. `wiki knowledge plan` prefers YAML,
+		// so the JSON constant pointed at a path that does not exist.
+		planPath: loaded.found && loaded.source ? relativeSlash(targetRoot, loaded.source) : null,
 		errors: [...loaded.errors],
 		warnings: [...loaded.warnings],
 		plan: null,
