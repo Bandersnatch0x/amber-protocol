@@ -501,6 +501,32 @@ for (const { name, write } of sharedWriteHelpers) {
 	});
 }
 
+// Pins the conservative half of the source rule: the check refuses on nlink alone, so a pair of
+// pages that both stay inside the target is refused too. The docs name this, so it needs a test.
+test("wiki export refuses a page hard-linked to another in-target page", async (t) => {
+	const target = tempDir("wiki-pair");
+	const wikiDir = path.join(target, "docs", "wiki");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.mkdirSync(wikiDir, { recursive: true });
+		fs.writeFileSync(path.join(wikiDir, "a.md"), "# A\n\nshared text\n");
+		try {
+			fs.linkSync(path.join(wikiDir, "a.md"), path.join(wikiDir, "b.md"));
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		fs.writeFileSync(path.join(wikiDir, "home.md"), "# Home\n\n[[a]] [[b]]\n");
+		await assert.rejects(
+			() => run(["wiki", "export", "--target", target, "--output-dir", "bundle"]),
+			/hard-linked to 2 paths/,
+			"an inode shared between two in-target pages is refused",
+		);
+		assert.equal(fs.existsSync(path.join(target, "bundle")), false, "no bundle is created");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
 const rootOutputCases = [
 	{
 		command: ["wiki", "export"],
