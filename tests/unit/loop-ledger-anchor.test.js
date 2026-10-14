@@ -18,6 +18,77 @@ const { sealLedger, verifyAnchoring } = require("../../scripts/lib/core/ledger-s
 
 const LEDGER_MODULE = path.resolve(__dirname, "../../scripts/lib/core/loop-ledger.js");
 
+// Multi-process rendezvous bounds. A child that parks on a marker file is only safe to
+// wait on if a stage that never arrives becomes a failure with a cause: an unbounded spin
+// hangs the run and leaves cleanup unable to remove the directory while a live child still
+// holds a handle (Windows). Every child is therefore killed and awaited at a deadline, its
+// stderr kept for the message, and each rendezvous stage has its own exit code.
+const STAGE_DEADLINE_MS = 5000;
+const CHILD_DEADLINE_MS = 90000;
+const STAGE_CODES = { gate: 31, ready: 32, inside: 33, guardDone: 34 };
+
+// Children cannot require parent-side helpers, so the waiter is interpolated into each script.
+function childPrelude() {
+	return `
+	const __buf = new Int32Array(new SharedArrayBuffer(4));
+	const waitStage = (label, code, ready) => {
+		const until = Date.now() + ${STAGE_DEADLINE_MS};
+		for (;;) {
+			if (ready()) return;
+			if (Date.now() > until) {
+				console.error("missed rendezvous stage: " + label);
+				process.exit(code);
+			}
+			Atomics.wait(__buf, 0, 0, 5);
+		}
+	};
+`;
+}
+
+function stageFor(code) {
+	return Object.keys(STAGE_CODES).find((stage) => STAGE_CODES[stage] === code);
+}
+
+// Spawn a writer and settle on a bounded outcome: a spawn error, a nonzero exit, and a hung
+// child (killed, then awaited so its handles close before cleanup) all come back as data.
+function spawnWriter(code, tag) {
+	return new Promise((resolve) => {
+		const child = spawn(process.execPath, ["-e", code], { stdio: ["ignore", "ignore", "pipe"] });
+		let stderr = "";
+		child.stderr.setEncoding("utf8");
+		child.stderr.on("data", (chunk) => {
+			stderr = (stderr + chunk).slice(-2000);
+		});
+		const timer = setTimeout(() => child.kill(), CHILD_DEADLINE_MS);
+		child.once("error", (error) => {
+			clearTimeout(timer);
+			resolve({ kind: "spawn-error", tag, message: error.message, stderr });
+		});
+		child.once("exit", (exitCode, signal) => {
+			clearTimeout(timer);
+			// "close" fires once the pipes drain, so stderr is complete by then.
+			child.once("close", () => resolve({ kind: "exit", tag, exitCode, signal, stderr }));
+		});
+	});
+}
+
+function assertServed(exits, detail) {
+	for (const { tag, kind, exitCode, signal, stderr, message } of exits) {
+		assert.equal(kind, "exit", `${tag} could not be spawn (${detail}): ${message}`);
+		assert.equal(
+			signal,
+			null,
+			`${tag} hit the ${CHILD_DEADLINE_MS} ms deadline and was killed (${detail}): ${stderr}`,
+		);
+		const stage = stageFor(exitCode);
+		assert.equal(
+			exitCode,
+			0,
+			`${tag} exited ${exitCode}${stage ? `, missing the "${stage}" rendezvous` : ""} (${detail}): ${stderr}`,
+		);
+	}
+}
+
 const ALLOW_NODE = {
 	schemaVersion: 1,
 	defaultAction: "deny",
@@ -205,7 +276,8 @@ test(
 		// A concurrent writer is refused once the lock wait budget expires, and the
 		// caller retries; that is the documented contract, not a failure. Retrying here
 		// keeps this test about the chain, which is what it is for, instead of about how
-		// quickly a loaded machine hands the lock over. Any other error still exits 1.
+		// quickly a loaded machine hands the lock over. Any other error is printed and exits 1,
+		// and the parent keeps stderr so the failure names itself instead of being an exit code.
 		const script = `
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
 		const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -227,16 +299,9 @@ test(
 			process.exit(1);
 		});
 	`;
-		const exits = await Promise.all(
-			[1, 2, 3, 4].map(
-				() =>
-					new Promise((resolve) => {
-						spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
-					}),
-			),
-		);
+		const exits = await Promise.all([1, 2, 3, 4].map((n) => spawnWriter(script, `writer ${n}`)));
 
-		assert.deepEqual(exits, [0, 0, 0, 0]);
+		assertServed(exits, "four writers keeping one chain");
 		assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 160 });
 	},
 );
@@ -313,6 +378,11 @@ test("a takeover chain deeper than the bound is refused with the files to remove
 // to reclaim it. Exactly one may remove it, and the other must not remove the lock
 // the first one created. This one guards the guard itself, added when the reclaim
 // was first serialized, not the depth change that followed it.
+// Concurrent coverage, not a guaranteed stale-snapshot overlap: gate-released writers reach the
+// reclaim read at roughly the same instant, which is what keeps the chain intact under contention,
+// but only the pinned test below proves the byte guard is what saves them. The gate is released on
+// a timer and every wait past it is bounded, so a writer that never gets released fails by name
+// instead of spinning until the job times out with a live handle on the directory.
 test("eight writers released at once reclaim one stale lock and leave one chain", async () => {
 	const lp = raceDir("amber-anchor-reclaimrace-");
 	const gate = `${lp}.gate`;
@@ -323,78 +393,88 @@ test("eight writers released at once reclaim one stale lock and leave one chain"
 	// each other's critical section.
 	const script = `
 		const fs = require("node:fs");
-		while (!fs.existsSync(${JSON.stringify(gate)})) {}
+		${childPrelude()}
+		waitStage("gate", ${STAGE_CODES.gate}, () => fs.existsSync(${JSON.stringify(gate)}));
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
 		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", pid: process.pid });
 	`;
-	const pending = [1, 2, 3, 4, 5, 6, 7, 8].map(
-		() =>
-			new Promise((resolve) => {
-				spawn(process.execPath, ["-e", script], { stdio: "ignore" }).on("exit", resolve);
-			}),
-	);
-	setTimeout(() => fs.writeFileSync(gate, "go"), 400);
-	const exits = await Promise.all(pending);
+	const release = setTimeout(() => fs.writeFileSync(gate, "go"), 400);
+	let exits;
+	try {
+		exits = await Promise.all(
+			[1, 2, 3, 4, 5, 6, 7, 8].map((n) => spawnWriter(script, `writer ${n}`)),
+		);
+	} finally {
+		clearTimeout(release);
+	}
 
-	assert.deepEqual(
-		exits,
-		[0, 0, 0, 0, 0, 0, 0, 0],
-		"every writer is served, none times out on the lock",
-	);
+	assertServed(exits, "eight writers on one gate");
 	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 8 });
 });
 
 // The gate-released writers above still enter the race only about five times in six, which does
 // not pin a guard that fails one run in six. Here the two reclaimers are pinned by hand: the
-// slower one reads the dead holder, parks itself before taking the takeover guard, and continues
-// only once the faster one is inside the critical section. That is the exact sequence issue 342
-// describes, so nothing but the byte check decides the outcome. Delete it and this fails on the
-// first run, at any load, on any machine.
+// slower one reads the dead holder, parks before taking the takeover guard, and continues only
+// once the faster one is inside the critical section. The faster one then parks until the slower
+// one has completed the read of the LOCK file whose bytes decide the takeover, so the overlap is
+// a fact rather than a probability: the fast holder is provably still the owner at the instant the
+// slow reclaimer compares. That is exactly the sequence issue 342 describes, and nothing but the
+// byte check decides the outcome - delete it and this fails on the first run, at any load, on any
+// machine. Every hand below is a bounded wait that exits with its own code, so a stage that never
+// arrives names itself instead of hanging the run or passing silently.
 test("a slow reclaimer parked past the fast one still leaves its lock alone", async () => {
 	const lp = raceDir("amber-anchor-pinned-");
 	const ready = `${lp}.ready`;
 	const inside = `${lp}.inside`;
+	const judged = `${lp}.judged`;
 	fs.writeFileSync(`${lp}.lock`, String(deadPid()));
 
-	const holder = `
+	const fast = `
 		const fs = require("node:fs");
-		const realAppend = fs.appendFileSync;
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
-		while (!fs.existsSync(${JSON.stringify(ready)})) {}
+		${childPrelude()}
+		const realAppend = fs.appendFileSync;
+		waitStage("ready", ${STAGE_CODES.ready}, () => fs.existsSync(${JSON.stringify(ready)}));
 		fs.appendFileSync = (file, data, ...rest) => {
 			if (file === ${JSON.stringify(lp)}) {
+				// Inside the critical section, still holding the lock we just reclaimed.
 				fs.writeFileSync(${JSON.stringify(inside)}, "in", "utf8");
-				const until = Date.now() + 600;
-				while (Date.now() < until) {}
+				waitStage("judged", ${STAGE_CODES.judged}, () => fs.existsSync(${JSON.stringify(judged)}));
 			}
 			return realAppend.call(fs, file, data, ...rest);
 		};
 		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", who: "fast" });
 	`;
-	const slower = `
+	const slow = `
 		const fs = require("node:fs");
-		const realLink = fs.linkSync;
 		const L = require(${JSON.stringify(LEDGER_MODULE)});
+		${childPrelude()}
+		let underGuard = false;
+		const realLink = fs.linkSync;
 		fs.linkSync = (from, to) => {
-			if (to.endsWith(".lock.takeover") && !fs.existsSync(${JSON.stringify(ready)})) {
+			if (to.endsWith(".lock.takeover") && !underGuard) {
+				// We have read the stale lock; say so, then wait until the fast holder is inside.
 				fs.writeFileSync(${JSON.stringify(ready)}, "read", "utf8");
-				const until = Date.now() + 8000;
-				while (!fs.existsSync(${JSON.stringify(inside)}) && Date.now() < until) {}
+				waitStage("inside", ${STAGE_CODES.inside}, () => fs.existsSync(${JSON.stringify(inside)}));
+				underGuard = true;
 			}
 			return realLink.call(fs, from, to);
 		};
+		const realRead = fs.readFileSync;
+		fs.readFileSync = (file, ...rest) => {
+			const value = realRead.call(fs, file, ...rest);
+			// The read whose bytes decide the takeover. Publish it before the comparison so the
+			// fast holder only releases once the judgement has happened against its own lock.
+			if (underGuard && String(file) === ${JSON.stringify(`${lp}.lock`)}) {
+				fs.writeFileSync(${JSON.stringify(judged)}, "judged", "utf8");
+			}
+			return value;
+		};
 		L.appendLedgerRecord(${JSON.stringify(lp)}, { kind: "note", who: "slow" });
 	`;
-	const exits = await Promise.all(
-		[holder, slower].map(
-			(code) =>
-				new Promise((resolve) => {
-					spawn(process.execPath, ["-e", code], { stdio: "ignore" }).on("exit", resolve);
-				}),
-		),
-	);
+	const exits = await Promise.all([spawnWriter(fast, "fast"), spawnWriter(slow, "slow")]);
 
-	assert.deepEqual(exits, [0, 0], "both writers are served, neither times out on the lock");
+	assertServed(exits, "pinned takeover");
 	assert.deepEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
 	assert.equal(fs.existsSync(`${lp}.lock`), false, "no lock is left behind");
 });
