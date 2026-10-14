@@ -37,10 +37,14 @@ function readReportFile(targetRoot, filePath) {
 function assessWorkflow(args) {
 	const targetRoot = resolveTarget(args.target);
 	const format = args.format === "markdown" ? "markdown" : "json";
-	let handoffBundleDir = args.handoffBundleDir;
+	const handoffBundleDir = args.handoffBundleDir;
 	if (handoffBundleDir !== undefined && handoffBundleDir !== null) {
 		try {
-			handoffBundleDir = resolvePathWithin(targetRoot, handoffBundleDir, {
+			// Validated here for the error shape, but the ORIGINAL value is what goes down:
+			// re-resolving this guard's own output against the same root is what broke a
+			// junction-reached target, where the guard returns the physical path while
+			// targetRoot stays lexical (issues/0354). One canonicalization, in collectHandoff.
+			resolvePathWithin(targetRoot, handoffBundleDir, {
 				label: "Workflow handoff bundle",
 				allowRoot: true,
 				canonicalExisting: true,
