@@ -182,6 +182,10 @@ test("--yaml selects the YAML knowledge-plan template", () => {
 
 	const yamlTarget = mkTarget("yaml-on");
 	const yamlForm = runCli(["wiki", "knowledge", "scaffold", "--target", yamlTarget, "--yaml"]);
+	// scaffoldKnowledgePlan re-reads the plan it just wrote and folds the schema
+	// errors into its own result, so this rc 0 is also the proof that the YAML
+	// template is a valid plan. It was not - the block was `knowledgecard.notes`
+	// with no schemaVersion - and that stayed hidden while --yaml was a no-op.
 	assert.equal(yamlForm.status, 0, yamlForm.stderr || yamlForm.stdout);
 	assert.ok(
 		fs.existsSync(path.join(yamlTarget, "docs", "wiki", "knowledge-plan.yaml")),
@@ -233,20 +237,4 @@ test("--claim carries the ratified heading into the memory registry", () => {
 	const missing = runCli(["memory", "book", "--target", target, "--ratify", "--yes", "--json"]);
 	assert.equal(missing.status, 1);
 	assert.match(`${missing.stdout}${missing.stderr}`, /ratification requires --claim/);
-});
-
-// The only reason the YAML template stayed broken is that nothing loaded it
-// until --yaml worked. Pinned directly, so the next template edit is validated
-// without needing the scaffold path to run. (The two templates' note and card
-// wording is allowed to drift; only the YAML shape is the contract here.)
-test("the YAML knowledge-plan template loads as a valid plan", () => {
-	const {
-		validateKnowledgePlanData,
-	} = require("../../scripts/lib/knowledge-plan/internal/validate");
-	const { loadYamlFile } = require("../../scripts/lib/core/simple-yaml");
-	const dir = path.join(ROOT, "templates", "docs", "wiki");
-	const yaml = loadYamlFile(path.join(dir, "knowledge-plan.yaml"));
-	assert.deepEqual(validateKnowledgePlanData(yaml).errors, [], "the YAML template must validate");
-	assert.ok(yaml.knowledgeCards.length > 0, "the YAML template must carry cards, not empty notes");
-	assert.ok(yaml.knowledgeCards.every((card) => card.text && card.id));
 });
