@@ -1,0 +1,65 @@
+name: Commit identity (branch push)
+
+# issues/0347: ci.yml only runs the identity gate on master/main/codex/** pushes, so a bad
+# identity on the `fix/*` and `feat/*` branches this repo actually uses stayed invisible until
+# PR time - the one moment where fixing it costs a history rewrite plus a force-push over
+# commits other branches already reference. This workflow runs the same checker where the
+# commit is minted. It never gates a merge: it reports.
+
+on:
+  push:
+    branches-ignore:
+      # ci.yml already covers these pushes, so this workflow stays off them and adds no duplicate.
+      - master
+      - main
+      - "codex/**"
+
+permissions:
+  contents: read
+
+jobs:
+  identity:
+    name: Commit identity (branch push)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout commit history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20.x
+
+      - name: Validate introduced commit identities
+        env:
+          HEAD_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          zero_sha="0000000000000000000000000000000000000000"
+          # Never validate an EMPTY range: `git log` prints nothing for one, so the checker
+          # would filter an empty list and pass over zero commits. Fall back to the head commit.
+          validate() {
+            if [ "$(git rev-list --count "$1")" = "0" ]; then
+              node scripts/validate-git-identity.js --commit "$HEAD_SHA"
+            else
+              node scripts/validate-git-identity.js --range "$1"
+            fi
+          }
+          if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "$zero_sha" ] && git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            # Commits introduced by this push.
+            validate "$BEFORE_SHA..$HEAD_SHA"
+          else
+            # New branch (BEFORE_SHA is the zero SHA) or a force-push whose tip is unreachable:
+            # validate what the branch introduces against the default branch, else just the head.
+            base="$(git merge-base "origin/$DEFAULT_BRANCH" "$HEAD_SHA" 2>/dev/null || true)"
+            if [ -n "$base" ]; then
+              validate "$base..$HEAD_SHA"
+            else
+              node scripts/validate-git-identity.js --commit "$HEAD_SHA"
+            fi
+          fi

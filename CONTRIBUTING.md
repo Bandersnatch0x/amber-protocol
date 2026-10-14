@@ -64,7 +64,19 @@ npm run dev:hooks:install   # points core.hooksPath at .githooks (pre-commit ide
 npm run identity:check      # validate the effective author/committer now
 ```
 
-CI runs the same checker on introduced commits (`identity` job). Release jobs and the test matrix wait on it.
+`npm install` also runs `scripts/ensure-dev-hooks.js` (through the `prepare` script), which wires
+`core.hooksPath` to `.githooks` when it is unset, so a fresh clone gets the gate without anyone
+remembering to install it. It never overwrites a `core.hooksPath` you or another tool already set -
+it reports that instead - and it exits 0 outside a git checkout, so installing the published
+package is unaffected. `npm run dev:hooks:check` fails when the wiring is missing; it is not a
+required status check, because the gate that blocks a merge is the CI one below.
+
+CI runs the same checker on introduced commits. In `ci.yml` the `identity` job gates master/main/codex/**
+pushes and every pull request, and the release jobs and test matrix wait on it. `commit-identity.yml`
+runs the same checker on pushes to any other branch - the `fix/*` and `feat/*` names this repo actually
+uses - so a wrong identity surfaces where the commit was made rather than at delivery time. That branch
+report is deliberately not a merge gate; it exists to make the failure cheap, not to add another
+required check.
 
 **Platform exceptions (CI only):** when validating already-made commits (`--range` / `--commit`), the checker accepts exact name+email pairs for Dependabot, GitHub’s bot committer, and `github-actions[bot]`. It also accepts GitHub's account display name as the author when the commit uses this repository's exact noreply email and was committed by the exact GitHub bot identity — covering GitHub-generated merge AND squash-merge commits (squash-merges carry a single parent; the trust anchor is the owner's noreply address plus GitHub's own committer identity, which only holds when the owner produced the commit through GitHub). Local pre-commit (`npm run identity:check` with no args) stays human-only so platform or bot identities cannot land from a workstation.
 
