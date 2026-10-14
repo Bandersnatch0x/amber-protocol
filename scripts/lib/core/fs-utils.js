@@ -178,6 +178,10 @@ function readJsonSafe(filePath) {
 
 function writeJson(filePath, data) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	// Every caller of this writer overwrites the leaf in place, so the shared-inode check
+	// belongs here rather than at each caller. writeJsonPrettier needs none: rename swaps
+	// the name's inode and leaves any other name pointing at the old bytes untouched.
+	assertExclusiveLeaf("JSON destination", filePath);
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
