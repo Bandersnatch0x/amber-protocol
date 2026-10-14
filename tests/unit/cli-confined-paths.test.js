@@ -384,6 +384,36 @@ test("gate --plan refuses a plan hard-linked to a name outside the target", asyn
 	}
 });
 
+// A wiki page that shares its bytes with a name outside the target is published into the
+// bundle by the page copy and by its derived title. This is the confidentiality direction of
+// the shared-inode bug: the write-side check in #355 cannot see it, so sources are checked too.
+test("wiki export refuses a source page hard-linked outside the target", async (t) => {
+	const target = tempDir("wiki-src");
+	const outside = tempDir("wiki-src-out");
+	const victim = path.join(outside, "secret.md");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		const wikiDir = path.join(target, "docs", "wiki");
+		fs.mkdirSync(wikiDir, { recursive: true });
+		fs.writeFileSync(victim, "TOP-SECRET outside bytes\n");
+		fs.writeFileSync(path.join(wikiDir, "home.md"), "# Home\n\n[[secret]]\n");
+		try {
+			fs.linkSync(victim, path.join(wikiDir, "secret.md"));
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		await assert.rejects(
+			() => run(["wiki", "export", "--target", target, "--output-dir", "bundle"]),
+			/hard-linked to 2 paths and would be written through a shared inode/,
+			"the shared-inode page is refused by name",
+		);
+		assert.equal(fs.existsSync(path.join(target, "bundle")), false, "no bundle is created");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
 test("handoff refuses a session-handoff.md that shares its bytes outside the target", async (t) => {
 	const target = tempDir("handoff-leaf");
 	const outside = tempDir("handoff-leaf-out");

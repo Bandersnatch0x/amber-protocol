@@ -209,6 +209,11 @@ function exportOkfBundle(target, options = {}) {
 		});
 		assertExclusiveLeaf("Wiki export output file", dest);
 	}
+	// A page that shares its bytes with another name publishes those bytes into the
+	// bundle. A hard link is an ordinary in-target file to every containment check.
+	for (const { source } of copiedPages) {
+		assertExclusiveLeaf("Wiki export source page", source);
+	}
 
 	// shortcut: preflight cannot prevent TOCTOU path swaps, use race-safe writes for hostile concurrent mutation.
 	fs.mkdirSync(outputDir, { recursive: true });
