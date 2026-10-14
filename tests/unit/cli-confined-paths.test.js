@@ -277,6 +277,68 @@ test("workflow assess refuses an --output-dir link to a file outside that direct
 	}
 });
 
+// The two user-reachable confined writers found by sweeping every resolvePathWithin call whose
+// destination comes from a CLI flag: both wrote the resolved leaf without the shared-inode check.
+test("ledger export refuses an --out leaf hard-linked outside the target", async (t) => {
+	const target = tempDir("ledger-leaf");
+	const outside = tempDir("ledger-leaf-out");
+	const victim = path.join(outside, "victim.json");
+	const leaf = path.join(target, "led", "ledger.json");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(victim, "user outside\n");
+		fs.mkdirSync(path.dirname(leaf), { recursive: true });
+		try {
+			fs.linkSync(victim, leaf);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		await assert.rejects(
+			() => run(["ledger", "export", "--target", target, "--out", "led/ledger.json", "--yes"]),
+			/hard-linked to 2 paths and would be written through a shared inode/,
+			"the shared inode is refused before any payload byte is written",
+		);
+		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the refusal changes no bytes");
+		assert.equal(fs.statSync(leaf).nlink, 2, "the destination is left as the shared link");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("knowledge context-review-sample refuses an --output leaf hard-linked outside the target", async (t) => {
+	const target = tempDir("know-leaf");
+	const outside = tempDir("know-leaf-out");
+	const victim = path.join(outside, "victim.json");
+	const leaf = path.join(target, "kn", "report.json");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(victim, "user outside\n");
+		fs.mkdirSync(path.dirname(leaf), { recursive: true });
+		try {
+			fs.linkSync(victim, leaf);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		await assert.rejects(
+			() =>
+				run([
+					"knowledge",
+					"context-review-sample",
+					"--target",
+					target,
+					"--output",
+					"kn/report.json",
+				]),
+			/hard-linked to 2 paths and would be written through a shared inode/,
+			"the shared inode is refused even when the projection itself reports an error",
+		);
+		assert.equal(fs.readFileSync(victim, "utf8"), "user outside\n", "the refusal changes no bytes");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
 const rootOutputCases = [
 	{
 		command: ["wiki", "export"],
