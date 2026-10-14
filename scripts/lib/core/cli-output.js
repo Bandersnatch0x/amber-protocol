@@ -57,6 +57,9 @@ const FLAG_SPECS = {
 	"--out": { key: "out" },
 	"--format": { key: "format" },
 	"--scope": { key: "scope" },
+	// issues/357: advertised by `amber help handoff` since Slice 5 but never
+	// registered, so parseArgs dropped it and every bundle silently ignored it.
+	"--replay-scope": { key: "replayScope" },
 	"--query": { key: "query" },
 	"--suite": { key: "suite" },
 	"--definition-id": { key: "definitionIdentity" },
@@ -126,6 +129,9 @@ const FLAG_SPECS = {
 	"--entry-id": { key: "entryId" },
 	"--entry": { key: "entry" },
 	"--ratify": { key: "ratify", kind: "boolean" },
+	// issues/357: the ratification track reads args.claim; unregistered, it could
+	// never be set, so `memory book --ratify --claim` always refused (ADR-0018 §5.5).
+	"--claim": { key: "claim" },
 	"--reason": { key: "reason" },
 	"--run": { key: "run" },
 	// F080 H7 bounded maintenance runtime.
@@ -346,6 +352,12 @@ const FLAG_SPECS = {
 	"--strict": { key: "strict", kind: "boolean" },
 	"--fix-markers": { key: "fixMarkers", kind: "boolean" },
 	"--okf": { key: "okf", kind: "boolean" },
+	// issues/357: `wiki knowledge scaffold --yaml` selects the YAML template;
+	// unregistered, the scaffold always wrote JSON and reported success.
+	"--yaml": { key: "yaml", kind: "boolean" },
+	// The knowledge adapter's documented internal alias (args.yml) had no spec
+	// either, so `--yml` was dropped the same way.
+	"--yml": { key: "yml", kind: "boolean" },
 	"--markdown": { key: "markdown" },
 	"--framework": { key: "framework" },
 	"--execute": { key: "execute", kind: "boolean" },
