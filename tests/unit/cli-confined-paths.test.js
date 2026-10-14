@@ -7,6 +7,8 @@ const path = require("node:path");
 const L = require("../../scripts/lib/core/loop-ledger");
 const { run } = require("../../scripts/amber");
 const { REQUIRED_BUNDLE_FILES } = require("../../scripts/lib/core/handoff-layout");
+const { writeJson } = require("../../scripts/lib/core/fs-utils");
+const { appendJSONL } = require("../../scripts/lib/core/jsonl");
 
 // The path-confinement sweep routes CLI-supplied paths through
 // resolvePathWithin. These are the last seams it reached: the places where a
@@ -339,6 +341,136 @@ test("knowledge context-review-sample refuses an --output leaf hard-linked outsi
 		fs.rmSync(outside, { recursive: true, force: true });
 	}
 });
+// Two confined writers the flag-derived sweep missed, both reproduced: the destination reaches the
+// write through a rebinding (planPath off a resolver result object) or not at all (session-handoff.md
+// is a fixed name), so no textual link exists between resolver and sink for a file-level rule to see.
+test("gate --plan refuses a plan hard-linked to a name outside the target", async (t) => {
+	const target = tempDir("plan-leaf");
+	const outside = tempDir("plan-leaf-out");
+	const victim = path.join(outside, "notes.md");
+	const leaf = path.join(target, "docs", "plans", "F001-probe.md");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(victim, "# private notes\n\nUser Confirmation: pending\n");
+		fs.mkdirSync(path.dirname(leaf), { recursive: true });
+		try {
+			fs.linkSync(victim, leaf);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		// Asserted at the module seam so a missing-plan error cannot pass for the wrong reason,
+		// and at the CLI so the refusal really reaches an exit code.
+		const { confirmPlanGate } = require("../../scripts/lib/core/planning");
+		const result = confirmPlanGate(target, "docs/plans/F001-probe.md");
+		assert.match(
+			(result.errors || []).join("\n"),
+			/hard-linked to 2 paths and would be written through a shared inode/,
+			"the shared inode is refused before the confirmation edit",
+		);
+		assert.equal(result.confirmed, false, "nothing is confirmed");
+		assert.equal(
+			await run(["gate", "--target", target, "--plan", "docs/plans/F001-probe.md", "--confirm"]),
+			1,
+			"the CLI surfaces the refusal as an error exit",
+		);
+		assert.equal(
+			fs.readFileSync(victim, "utf8"),
+			"# private notes\n\nUser Confirmation: pending\n",
+			"the refusal changes no bytes",
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("handoff refuses a session-handoff.md that shares its bytes outside the target", async (t) => {
+	const target = tempDir("handoff-leaf");
+	const outside = tempDir("handoff-leaf-out");
+	const victim = path.join(outside, "user-notes.md");
+	const leaf = path.join(target, "session-handoff.md");
+	try {
+		await run(["init", "--target", target, "--yes"]);
+		fs.writeFileSync(victim, "PRIVATE handoff bytes\n");
+		fs.rmSync(leaf, { force: true });
+		try {
+			fs.linkSync(victim, leaf);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		await assert.rejects(
+			() => run(["handoff", "--target", target]),
+			/Handoff file is hard-linked to 2 paths/,
+			"the fixed overwrite name is refused",
+		);
+		assert.equal(
+			fs.readFileSync(victim, "utf8"),
+			"PRIVATE handoff bytes\n",
+			"the refusal changes no bytes",
+		);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("hooks install refuses a pre-commit hook that shares its bytes outside the target", async (t) => {
+	const target = tempDir("hook-leaf");
+	const outside = tempDir("hook-leaf-out");
+	const victim = path.join(outside, "victim.txt");
+	const hook = path.join(target, ".git", "hooks", "pre-commit");
+	try {
+		fs.mkdirSync(path.dirname(hook), { recursive: true });
+		fs.writeFileSync(victim, "PRIVATE\n");
+		try {
+			fs.linkSync(victim, hook);
+		} catch (error) {
+			return t.skip(`hard link creation unavailable: ${error.code}`);
+		}
+		await assert.rejects(
+			() => run(["hooks", "install", "--target", target]),
+			/Pre-commit hook is hard-linked to 2 paths/,
+			"the fixed overwrite name is refused",
+		);
+		assert.equal(fs.readFileSync(victim, "utf8"), "PRIVATE\n", "the refusal changes no bytes");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+// The two shared state-write helpers overwrite or append to a leaf they never created, so every
+// .amber/ writer built on them inherited the escape. Asserted at the helper itself: no CLI surface
+// reaches these names with a planted link, and the check belongs where all the callers meet.
+const sharedWriteHelpers = [
+	{ name: "writeJson", write: (p) => writeJson(p, { ok: true }) },
+	{ name: "appendJSONL", write: (p) => appendJSONL(p, { ok: true }) },
+];
+
+for (const { name, write } of sharedWriteHelpers) {
+	test(`${name} refuses a leaf that shares its bytes outside the target`, (t) => {
+		const dir = tempDir(`helper-${name}`);
+		const victim = path.join(dir, "victim.txt");
+		const leaf = path.join(dir, "state", `${name}.json`);
+		try {
+			fs.writeFileSync(victim, "PRIVATE\n");
+			fs.mkdirSync(path.dirname(leaf), { recursive: true });
+			try {
+				fs.linkSync(victim, leaf);
+			} catch (error) {
+				return t.skip(`hard link creation unavailable: ${error.code}`);
+			}
+			assert.throws(() => write(leaf), /hard-linked to 2 paths/);
+			assert.equal(fs.readFileSync(victim, "utf8"), "PRIVATE\n", "the refusal changes no bytes");
+			const plain = path.join(dir, "plain.json");
+			write(plain);
+			assert.ok(fs.readFileSync(plain, "utf8").includes("ok"), "normal writes proceed");
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+}
+
 const rootOutputCases = [
 	{
 		command: ["wiki", "export"],

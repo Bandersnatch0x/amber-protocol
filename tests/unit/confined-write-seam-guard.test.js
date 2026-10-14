@@ -9,6 +9,13 @@
  * names outside the target. assertExclusiveLeaf is called per writer today, so this
  * guard turns "a new surface forgot the check" from an escape into a test failure.
  *
+ * What this rule does NOT cover: a destination that reaches its write through an object
+ * field or a call in another module (gate/accept --plan), or a writer that overwrites a
+ * fixed name it built itself without calling the resolver (handoff-command.js,
+ * session-handoff.md). Neither has a textual link between resolver and sink for a
+ * file-level rule to see, so both are covered by behavior tests in
+ * tests/unit/cli-confined-paths.test.js instead.
+ *
  * Exempt: scripts/lib/core/fs-utils.js owns the resolver and the guard itself.
  * shortcut: only destinations written by name are covered; a flag-derived output
  * directory (wiki export, handoff bundle) is guarded per file inside the writer.
