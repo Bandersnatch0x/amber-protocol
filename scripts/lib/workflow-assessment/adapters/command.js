@@ -1,7 +1,12 @@
 "use strict";
 
 const fs = require("node:fs");
-const { isMissingPath, resolvePathWithin, resolveTarget } = require("../../core/fs-utils");
+const {
+	assertExclusiveLeaf,
+	isMissingPath,
+	resolvePathWithin,
+	resolveTarget,
+} = require("../../core/fs-utils");
 const { defineCommand } = require("../../subcommand-dispatcher");
 const { assess, buildDraft, compare, findings } = require("..");
 const { renderJson, renderMarkdown } = require("./renderers");
@@ -76,7 +81,7 @@ function assessWorkflow(args) {
 		try {
 			outputDir = resolvePathWithin(targetRoot, args.outputDir, {
 				label: "Workflow assessment output directory",
-				allowRoot: true,
+				allowRoot: false,
 				canonicalExisting: true,
 			});
 		} catch (error) {
@@ -91,6 +96,12 @@ function assessWorkflow(args) {
 				label: "Workflow assessment output",
 				canonicalExisting: true,
 			});
+		} catch (error) {
+			result.errors.push(error.message || String(error));
+			return result;
+		}
+		try {
+			assertExclusiveLeaf("Workflow assessment output", outputPath);
 		} catch (error) {
 			result.errors.push(error.message || String(error));
 			return result;

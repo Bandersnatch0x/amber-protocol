@@ -236,3 +236,22 @@ test("workflow assessment handoff bundle reads refuse outside directories", () =
 		fs.rmSync(outside, { recursive: true, force: true });
 	}
 });
+
+test("workflow assessment can read a root handoff bundle without writing to the repository", () => {
+	const root = fs.realpathSync.native(tmpRoot());
+	try {
+		fs.writeFileSync(path.join(root, "README.md"), "user readme");
+		const before = fs.readdirSync(root).sort();
+		const result = workflowDispatch("assess", root, {
+			target: root,
+			noSessions: true,
+			handoffBundleDir: ".",
+		});
+		assert.deepEqual(result.errors, []);
+		assert.ok(result.report);
+		assert.equal(fs.readFileSync(path.join(root, "README.md"), "utf8"), "user readme");
+		assert.deepEqual(fs.readdirSync(root).sort(), before);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
