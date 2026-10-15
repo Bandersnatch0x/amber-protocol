@@ -25,13 +25,17 @@ const LEDGER_MODULE = path.resolve(__dirname, "../../scripts/lib/core/loop-ledge
 // stderr kept for the message, and each rendezvous stage has its own exit code.
 const STAGE_DEADLINE_MS = 5000;
 const CHILD_DEADLINE_MS = 90000;
-const STAGE_CODES = { gate: 31, ready: 32, inside: 33, guardDone: 34 };
+const STAGE_CODES = { gate: 31, ready: 32, inside: 33, judged: 34 };
 
 // Children cannot require parent-side helpers, so the waiter is interpolated into each script.
 function childPrelude() {
 	return `
 	const __buf = new Int32Array(new SharedArrayBuffer(4));
 	const waitStage = (label, code, ready) => {
+		if (!Number.isInteger(code) || code <= 0 || ${JSON.stringify(STAGE_CODES)}[label] !== code) {
+			console.error("unregistered rendezvous stage: " + label);
+			process.exit(1);
+		}
 		const until = Date.now() + ${STAGE_DEADLINE_MS};
 		for (;;) {
 			if (ready()) return;
@@ -48,6 +52,38 @@ function childPrelude() {
 function stageFor(code) {
 	return Object.keys(STAGE_CODES).find((stage) => STAGE_CODES[stage] === code);
 }
+
+test("rendezvous failures use registered nonzero stage codes", async () => {
+	assert.equal(stageFor(34), "judged");
+	for (const [label, code] of [
+		...Object.entries(STAGE_CODES),
+		["unknown", undefined],
+		["judged", undefined],
+		["judged", 0],
+	]) {
+		const result = await spawnWriter(
+			`
+			${childPrelude()}
+			let now = 0;
+			Date.now = () => now += 6000;
+			waitStage(${JSON.stringify(label)}, ${code}, () => false);
+		`,
+			label,
+		);
+		assert.equal(result.kind, "exit");
+		assert.equal(result.signal, null);
+		assert.equal(
+			result.exitCode,
+			code > 0 && STAGE_CODES[label] === code ? code : 1,
+			result.stderr,
+		);
+		assert.match(result.stderr, /rendezvous stage/);
+	}
+	const labels = [...fs.readFileSync(__filename, "utf8").matchAll(/waitStage\("([a-z]+)"/g)].map(
+		(match) => match[1],
+	);
+	assert.deepEqual([...new Set(labels)].sort(), Object.keys(STAGE_CODES).sort());
+});
 
 // Spawn a writer and settle on a bounded outcome: a spawn error, a nonzero exit, and a hung
 // child (killed, then awaited so its handles close before cleanup) all come back as data.
