@@ -9,7 +9,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { readJson, resolvePathWithin } = require("./fs-utils");
+const { readJson, resolvePathWithin, writeJson } = require("./fs-utils");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 
@@ -101,7 +101,9 @@ function writePage(targetRoot, page, event = {}) {
 	const dir = pagesDir(targetRoot);
 	ensureDir(dir);
 	const file = pagePath(targetRoot, page.pageId);
-	fs.writeFileSync(file, JSON.stringify(page, null, 2) + "\n", "utf8");
+	// writeJson, not a raw write: the shared-inode check sits in the helper every
+	// in-place JSON overwrite now routes through.
+	writeJson(file, page);
 	regenerateIndex(targetRoot);
 	appendEvent(targetRoot, {
 		kind: "page-written",
