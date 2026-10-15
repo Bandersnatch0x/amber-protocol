@@ -8,6 +8,7 @@ const test = require("node:test");
 const ROOT = path.resolve(__dirname, "../..");
 const WORKFLOW = path.join(ROOT, ".github", "workflows", "ci.yml");
 const PACKAGES_WORKFLOW = path.join(ROOT, ".github", "workflows", "publish-github-packages.yml");
+const IDENTITY_WORKFLOW = path.join(ROOT, ".github", "workflows", "commit-identity.yml");
 
 function releaseJob(workflow) {
 	const start = workflow.search(/^ {2}release:/m);
@@ -26,6 +27,13 @@ function stepBody(workflow, name, nextName) {
 	assert.ok(end > start, `${name} must precede ${nextName}`);
 	return workflow.slice(start, end);
 }
+
+test("branch identity report skips deleted-branch push events", () => {
+	const workflow = fs.readFileSync(IDENTITY_WORKFLOW, "utf8");
+	const condition = workflow.indexOf("if: github.event.deleted != true");
+	const validation = workflow.indexOf("Validate introduced commit identities");
+	assert.ok(condition >= 0 && condition < validation);
+});
 
 test("stable release skips an already-published npm version and still reaches GitHub Release", () => {
 	const workflow = fs.readFileSync(WORKFLOW, "utf8");

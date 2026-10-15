@@ -6,6 +6,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -13,6 +14,7 @@ const { spawnSync } = require("node:child_process");
 
 const { HOOKS_DIR, ensureDevHooks, main } = require("../../scripts/ensure-dev-hooks");
 
+const ENSURE_DEV_HOOKS_MODULE = require.resolve("../../scripts/ensure-dev-hooks");
 const REPO_ROOT = path.join(__dirname, "..", "..");
 
 function shGit(args, cwd) {
@@ -95,6 +97,101 @@ test("a foreign hooks path is reported, never overwritten", (t) => {
 		// A setting made by the user or another tool survives an apply.
 		assert.equal(shGit(["config", "--local", "--get", "core.hooksPath"], dir), ".husky");
 	} finally {
+		cleanup(dir);
+	}
+});
+
+test("apply preserves an effective global hooks path", (t) => {
+	if (skipWithoutGit(t)) return;
+	const globalDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-dev-hooks-global-"));
+	const originalGlobal = process.env.GIT_CONFIG_GLOBAL;
+	const originalNoSystem = process.env.GIT_CONFIG_NOSYSTEM;
+	process.env.GIT_CONFIG_GLOBAL = path.join(globalDir, "config");
+	process.env.GIT_CONFIG_NOSYSTEM = "1";
+	let dir;
+	try {
+		dir = makeRepo();
+		shGit(["config", "--global", "core.hooksPath", "foreign hooks"], dir);
+		const report = ensureDevHooks({ apply: true, repoRoot: dir });
+		assert.equal(report.changed, false);
+		assert.equal(report.configured, "foreign hooks");
+		assert.equal(report.scope, "global");
+		assert.match(report.problems[0], /core\.hooksPath is "foreign hooks" at global scope/);
+		assert.equal(shGit(["config", "--get", "core.hooksPath"], dir), "foreign hooks");
+		assert.equal(
+			spawnSync("git", ["config", "--local", "--get", "core.hooksPath"], { cwd: dir }).status,
+			1,
+		);
+	} finally {
+		if (originalGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+		else process.env.GIT_CONFIG_GLOBAL = originalGlobal;
+		if (originalNoSystem === undefined) delete process.env.GIT_CONFIG_NOSYSTEM;
+		else process.env.GIT_CONFIG_NOSYSTEM = originalNoSystem;
+		if (dir) cleanup(dir);
+		cleanup(globalDir);
+	}
+});
+
+test("apply preserves an effective system hooks path", (t) => {
+	if (skipWithoutGit(t)) return;
+	const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-dev-hooks-system-"));
+	const originalSystem = process.env.GIT_CONFIG_SYSTEM;
+	const originalGlobal = process.env.GIT_CONFIG_GLOBAL;
+	const originalNoSystem = process.env.GIT_CONFIG_NOSYSTEM;
+	process.env.GIT_CONFIG_SYSTEM = path.join(configDir, "system-config");
+	process.env.GIT_CONFIG_GLOBAL = path.join(configDir, "global-config");
+	delete process.env.GIT_CONFIG_NOSYSTEM;
+	let dir;
+	try {
+		dir = makeRepo();
+		shGit(["config", "--system", "core.hooksPath", "foreign-system-hooks"], dir);
+		const report = ensureDevHooks({ apply: true, repoRoot: dir });
+		assert.equal(report.changed, false);
+		assert.equal(report.configured, "foreign-system-hooks");
+		assert.equal(report.scope, "system");
+		assert.match(report.problems[0], /core\.hooksPath is "foreign-system-hooks" at system scope/);
+		assert.equal(shGit(["config", "--get", "core.hooksPath"], dir), "foreign-system-hooks");
+		assert.equal(
+			spawnSync("git", ["config", "--local", "--get", "core.hooksPath"], { cwd: dir }).status,
+			1,
+		);
+	} finally {
+		if (originalSystem === undefined) delete process.env.GIT_CONFIG_SYSTEM;
+		else process.env.GIT_CONFIG_SYSTEM = originalSystem;
+		if (originalGlobal === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+		else process.env.GIT_CONFIG_GLOBAL = originalGlobal;
+		if (originalNoSystem === undefined) delete process.env.GIT_CONFIG_NOSYSTEM;
+		else process.env.GIT_CONFIG_NOSYSTEM = originalNoSystem;
+		if (dir) cleanup(dir);
+		cleanup(configDir);
+	}
+});
+
+test("apply refuses to write when git cannot read the effective hooks path", (t) => {
+	if (skipWithoutGit(t)) return;
+	const dir = makeRepo();
+	const cachedModule = require.cache[ENSURE_DEV_HOOKS_MODULE];
+	const originalSpawnSync = childProcess.spawnSync;
+	try {
+		childProcess.spawnSync = (command, args, options) => {
+			if (command === "git" && args[0] === "config" && args.includes("--show-scope")) {
+				return { status: 128, stdout: "", stderr: "fatal: bad config" };
+			}
+			return originalSpawnSync(command, args, options);
+		};
+		delete require.cache[ENSURE_DEV_HOOKS_MODULE];
+		const isolated = require(ENSURE_DEV_HOOKS_MODULE);
+		const report = isolated.ensureDevHooks({ apply: true, repoRoot: dir });
+		assert.equal(report.changed, false);
+		assert.deepEqual(report.problems, ["unable to read core.hooksPath: fatal: bad config"]);
+		assert.equal(
+			spawnSync("git", ["config", "--local", "--get", "core.hooksPath"], { cwd: dir }).status,
+			1,
+		);
+	} finally {
+		childProcess.spawnSync = originalSpawnSync;
+		delete require.cache[ENSURE_DEV_HOOKS_MODULE];
+		if (cachedModule) require.cache[ENSURE_DEV_HOOKS_MODULE] = cachedModule;
 		cleanup(dir);
 	}
 });
