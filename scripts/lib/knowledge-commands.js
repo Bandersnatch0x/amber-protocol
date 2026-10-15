@@ -147,7 +147,7 @@ const knowledgeDispatch = defineCliCommand({
 		"context-review-sample": (args) => {
 			const fs = require("node:fs");
 			const path = require("node:path");
-			const { resolvePathWithin } = require("./core/fs-utils");
+			const { assertExclusiveLeaf, resolvePathWithin } = require("./core/fs-utils");
 			const { buildHumanReviewSample } = require("./core/knowledge-projection");
 			const targetRoot = resolveTarget(args);
 			const result = buildHumanReviewSample(targetRoot, {
@@ -158,6 +158,7 @@ const knowledgeDispatch = defineCliCommand({
 				reportPath = resolvePathWithin(targetRoot, args.output, {
 					label: "Knowledge review sample",
 				});
+				assertExclusiveLeaf("Knowledge review sample destination", reportPath);
 				fs.mkdirSync(path.dirname(reportPath), { recursive: true });
 				fs.writeFileSync(reportPath, `${JSON.stringify(result.sample, null, 2)}\n`, "utf8");
 			}
