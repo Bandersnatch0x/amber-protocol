@@ -20,6 +20,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { assertExclusiveLeaf } = require("./fs-utils");
+
 /**
  * Read a JSONL file into an array of parsed objects.
  * @param {string} filePath - Absolute path.
@@ -56,6 +58,9 @@ function readJSONL(filePath, { onCorrupt = "skip", missing = "empty" } = {}) {
  */
 function appendJSONL(filePath, obj) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	// Appending to a leaf that shares its inode rewrites bytes under another name, so the
+	// check sits in the primitive every governed ledger append already routes through.
+	assertExclusiveLeaf("Ledger leaf", filePath);
 	fs.appendFileSync(filePath, JSON.stringify(obj) + "\n", "utf8");
 	return obj;
 }
@@ -71,6 +76,7 @@ function appendJSONL(filePath, obj) {
  */
 function writeJSONL(filePath, objs) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	assertExclusiveLeaf("Ledger leaf", filePath);
 	fs.writeFileSync(filePath, objs.map((o) => JSON.stringify(o)).join("\n") + "\n", "utf8");
 }
 

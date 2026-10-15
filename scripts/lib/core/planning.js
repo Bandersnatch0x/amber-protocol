@@ -6,6 +6,7 @@ const path = require("node:path");
 const { REPO_ROOT } = require("./constants");
 
 const {
+	assertExclusiveLeaf,
 	pathExists,
 	readJson,
 	readText,
@@ -119,14 +120,20 @@ function resolveRelativePlanPath(targetRoot, planRelativePath) {
 			allowRoot: true,
 			canonicalExisting: true,
 		});
-		return {
-			canonicalTarget,
-			planPath: resolvePathWithin(canonicalTarget, planRelativePath, {
+		let planPath;
+		try {
+			planPath = resolvePathWithin(canonicalTarget, planRelativePath, {
 				label: "Plan path",
 				canonicalExisting: true,
-			}),
-			error: null,
-		};
+			});
+			// Both callers of this resolver write the plan back in place, so the shared-inode
+			// check belongs here rather than at each sink: a plan that shares its bytes with
+			// another name would have those names' content replaced by the confirmation edit.
+			assertExclusiveLeaf("Plan path", planPath);
+		} catch (error) {
+			return { canonicalTarget: null, planPath: null, error: error.message };
+		}
+		return { canonicalTarget, planPath, error: null };
 	} catch (error) {
 		return { canonicalTarget: null, planPath: null, error: error.message };
 	}
