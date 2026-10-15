@@ -209,6 +209,14 @@ function exportOkfBundle(target, options = {}) {
 		});
 		assertExclusiveLeaf("Wiki export output file", dest);
 	}
+	// The write-side check cannot see this: a hard link is an ordinary in-target file to
+	// lstat, realpath and resolvePathWithin, so a page sharing its bytes with another name
+	// publishes them under a name the author did not choose. Refusing on nlink alone is
+	// deliberately conservative - the other names of an inode cannot be enumerated - so two
+	// in-target pages hard-linked to each other are refused too.
+	for (const { source } of copiedPages) {
+		assertExclusiveLeaf("Wiki export source page", source);
+	}
 
 	// shortcut: preflight cannot prevent TOCTOU path swaps, use race-safe writes for hostile concurrent mutation.
 	fs.mkdirSync(outputDir, { recursive: true });
