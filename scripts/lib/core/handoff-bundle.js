@@ -5,7 +5,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const { validateHandoff } = require("./audit");
-const { resolveTarget } = require("./fs-utils");
+const { assertExclusiveLeaf, resolvePathWithin, resolveTarget } = require("./fs-utils");
 const { buildGovernanceReport } = require("./governance-report");
 const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
@@ -176,13 +176,6 @@ function renderRecoveryCommands(targetDisplay) {
 		`- Validate bundle: \`node scripts/amber.js handoff validate --target ${t}\``,
 		"",
 	].join("\n");
-}
-
-function writeFile(outputDir, rel, content) {
-	const filePath = path.join(outputDir, rel);
-	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	fs.writeFileSync(filePath, content);
-	return filePath;
 }
 
 function buildManifest({ targetRoot, outputDir, generatedAt, report }) {
@@ -546,25 +539,28 @@ function buildReplayBundle(targetRoot, replayScope) {
 function writeHandoffBundle(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
-	const outputDir = resolveTargetRelativePath(targetRoot, options.outputDir || options.bundleDir);
+	const requestedOutputDir = options.outputDir || options.bundleDir || defaultBundleDir(targetRoot);
+	const outputDir = resolvePathWithin(targetRoot, requestedOutputDir, {
+		label: "Handoff bundle directory",
+		canonicalExisting: true,
+	});
 	const generatedAt = options.generatedAt || new Date().toISOString();
 	const report = buildGovernanceReport(targetRoot, { targetDisplay });
 	const handoffContent = renderHandoff(targetRoot);
 	const failedVerifications = collectFailedVerifications(targetRoot);
 
-	const files = [];
-	files.push(writeFile(outputDir, "README.md", renderReadme({ targetRoot, generatedAt, report })));
-	files.push(writeFile(outputDir, "session-summary.md", handoffContent));
-	files.push(
-		writeFile(
-			outputDir,
-			"verification-evidence.md",
-			renderVerificationEvidence(handoffContent, report, failedVerifications),
+	const contents = {
+		"README.md": renderReadme({ targetRoot, generatedAt, report }),
+		"session-summary.md": handoffContent,
+		"verification-evidence.md": renderVerificationEvidence(
+			handoffContent,
+			report,
+			failedVerifications,
 		),
-	);
-	files.push(writeFile(outputDir, "next-actions.md", renderNextActions(report)));
-	files.push(writeFile(outputDir, "risks.md", renderRisks(report)));
-	files.push(writeFile(outputDir, "recovery-commands.md", renderRecoveryCommands(targetDisplay)));
+		"next-actions.md": renderNextActions(report),
+		"risks.md": renderRisks(report),
+		"recovery-commands.md": renderRecoveryCommands(targetDisplay),
+	};
 
 	// Slice 5 (spec §9): an optional per-attempt replay-slices file for
 	// `--replay-scope <sessionId|runId>` — frozen values plus the replay
@@ -575,22 +571,17 @@ function writeHandoffBundle(target, options = {}) {
 		if (!slices.ok) {
 			bundleErrors.push(...slices.errors);
 		} else {
-			const replayPath = writeFile(
-				outputDir,
-				"replay-slices.json",
-				`${JSON.stringify(
-					{
-						schemaVersion: 1,
-						artifactType: "amber-replay-slices",
-						scope: options.replayScope,
-						sessionId: slices.sessionId,
-						slices: slices.slices,
-					},
-					null,
-					2,
-				)}\n`,
-			);
-			files.push(replayPath);
+			contents["replay-slices.json"] = `${JSON.stringify(
+				{
+					schemaVersion: 1,
+					artifactType: "amber-replay-slices",
+					scope: options.replayScope,
+					sessionId: slices.sessionId,
+					slices: slices.slices,
+				},
+				null,
+				2,
+			)}\n`;
 		}
 		// §9.1 R0: the nine-file `replay/` directory — the authorization chain
 		// rebuildable from replay/ alone, hash-pinned by replay/manifest.json.
@@ -600,25 +591,43 @@ function writeHandoffBundle(target, options = {}) {
 		} else {
 			for (const [name, content] of Object.entries(replayBundle.files)) {
 				if (content === null) continue;
-				files.push(writeFile(path.join(outputDir, "replay"), name, content));
+				contents[`replay/${name}`] = content;
 			}
-			files.push(
-				writeFile(
-					path.join(outputDir, "replay"),
-					"manifest.json",
-					`${JSON.stringify(replayBundle.manifest, null, 2)}\n`,
-				),
-			);
+			contents["replay/manifest.json"] = `${JSON.stringify(replayBundle.manifest, null, 2)}\n`;
 		}
 	}
 
-	files.push(
-		writeFile(
-			outputDir,
-			"manifest.json",
-			`${JSON.stringify(buildManifest({ targetRoot, outputDir, generatedAt, report }), null, 2)}\n`,
-		),
+	contents["manifest.json"] =
+		`${JSON.stringify(buildManifest({ targetRoot, outputDir, generatedAt, report }), null, 2)}\n`;
+	const validationRoot = resolvePathWithin(targetRoot, ".", {
+		allowRoot: true,
+		canonicalExisting: true,
+	});
+	// Same reason as the wiki exporter: validation uses the requested output re-rooted
+	// on the canonical target, so an aliased ancestor cannot diverge the two names.
+	const validationDir = path.resolve(
+		validationRoot,
+		path.relative(targetRoot, path.resolve(targetRoot, requestedOutputDir)),
 	);
+	// shortcut: preflight cannot stop concurrent link swaps, use OS isolation with hostile writers.
+	for (const rel of Object.keys(contents)) {
+		const filePath = path.join(validationDir, rel);
+		resolvePathWithin(validationRoot, path.dirname(filePath), {
+			label: "Handoff bundle output directory",
+			allowRoot: true,
+		});
+		resolvePathWithin(validationRoot, filePath, {
+			label: "Handoff bundle output",
+			allowRoot: true,
+		});
+		assertExclusiveLeaf("Handoff bundle output", filePath);
+	}
+	const files = Object.entries(contents).map(([rel, content]) => {
+		const filePath = path.join(outputDir, rel);
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		fs.writeFileSync(filePath, content);
+		return filePath;
+	});
 
 	const validation = validateHandoffBundle(outputDir);
 	const handoffValidation = validateHandoff(targetRoot);

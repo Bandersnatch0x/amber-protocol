@@ -2,9 +2,11 @@
 # This file declares the high-value architecture documentation and knowledge
 # cards that should exist for the repository.
 #
-# Amber can read this (or the .json variant), and also reads
-# Supports common external plan file formats for interoperability.
+# Amber can read this (or the .json variant); both forms carry the same
+# canonical shape declared in schemas/knowledge-plan.schema.json. Readers also
+# accept the external `knowledgecard` spelling for interoperability.
 
+schemaVersion: "1.0.0"
 version: 1
 
 scope:
@@ -68,13 +70,46 @@ knowledgePlan:
       goal: "Document the auxiliary security scanners and state migration tools in src/."
       hints: "Cover src/security/ (audit-report, dependency-scan, permission-review, secret-scan) and src/migration/ (dry-run, rollback, schema-validator)."
 
-knowledgecard:
-  notes:
-    - text: "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, scaffold, maintenance, and workflow-pack logic."
-    - text: "scripts/lib/*-commands.js files are thin CLI command handlers. They parse arguments and delegate to scripts/lib/core/ functions."
-    - text: "src/migration/ and src/security/ are auxiliary utility modules separate from the CLI core."
-    - text: "skills/ contains platform-agnostic skill definitions. Platform files are generated from skills/."
-    - text: "apps/web/ is a standalone React+Vite+tRPC application with its own package.json."
-    - text: "templates/ contains starter file templates that 'amber init' and 'amber wiki' scaffold."
-    - text: "schemas/ defines the authoritative JSON Schema contracts used by the CLI."
-    - text: "scripts/lib/command-dispatcher.js is the central command registry and router."
+# issues/357: this block was `knowledgecard.notes`, a shape the schema rejects
+# (knowledgeCards must be an array of cards) and schemaVersion was absent. Nobody
+# hit it because --yaml was a no-op until now, so this template was never loaded.
+knowledgeCards:
+  - id: "core-engine"
+    text: "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, scaffold, maintenance, and workflow-pack logic."
+    tags:
+      - "architecture"
+      - "core"
+  - id: "cli-wrappers"
+    text: "scripts/lib/*-commands.js files are thin CLI command handlers. They parse arguments and delegate to scripts/lib/core/ functions. Map each to its core counterpart."
+    tags:
+      - "cli"
+      - "architecture"
+  - id: "aux-modules"
+    text: "src/migration/ and src/security/ are auxiliary utility modules separate from the CLI core. Migration handles state schema upgrades; security provides read-only scanners (dependency, permission, secret)."
+    tags:
+      - "migration"
+      - "security"
+  - id: "skills-source-of-truth"
+    text: "skills/ contains the platform-agnostic journey skill definitions: amber (intent router), amber-delivery, amber-diagnosis-adoption, amber-context-continuity, and amber-continuous-improvement. Platform-specific files in .claude/, .agents/skills/, .gemini/commands/ are generated, never hand-edited. Run `npm run gen:agents` after changing skills/."
+    tags:
+      - "skills"
+      - "generation"
+  - id: "web-app-separate"
+    text: "apps/web/ is a standalone React+Vite+tRPC application with its own package.json. Its src/ uses TanStack Router for file-based routing and tRPC for type-safe API calls to an Express server."
+    tags:
+      - "web"
+      - "viewer"
+  - id: "templates-purpose"
+    text: "templates/ contains starter file templates that 'amber init' and 'amber wiki' scaffold into target repos. Includes AGENTS.md, CLAUDE.md, wiki skeleton, feature_list.json, and governance templates."
+    tags:
+      - "scaffolding"
+  - id: "schemas-contracts"
+    text: "schemas/ defines four JSON Schema contracts: loop-contract, route, session-manifest, timeline-event. These are the authoritative validation contracts used across the CLI (plus knowledge-plan)."
+    tags:
+      - "validation"
+      - "schema"
+  - id: "command-dispatcher"
+    text: "scripts/lib/command-dispatcher.js is the central command registry and router — all CLI commands flow through it."
+    tags:
+      - "cli"
+      - "core"
