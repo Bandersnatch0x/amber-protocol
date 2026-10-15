@@ -10,12 +10,6 @@
 //   2. a real-CLI behavior check per flag, so a registered-but-ignored flag is
 //      also caught (rule 1 only proves parseArgs keeps the token).
 //
-// What rule 1 does NOT see: it reads commandUsageLine + commandSummary, so a flag
-// documented only in docs/*.md, or only in a nested subcommand string that is not
-// projected into the command's own help, is invisible here. Neither rule proves a
-// flag is wired to the RIGHT args key - rule 2 does that only for the flags it
-// names. Adding a flag without adding its behavior case is the gap to watch.
-
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -41,6 +35,7 @@ const CLI = path.join(ROOT, "scripts", "amber.js");
 // (scripts/lib/hooks-commands.js, hooksBreadcrumbPlatform); args.platform is only
 // its fallback. Every other advertised flag must be registered.
 const FLAGS_PARSED_BY_A_HANDLER = new Set(["--platform"]);
+const DOCUMENTED_UNSUPPORTED_FLAGS = new Set(["--target-capability"]);
 
 function advertisedFlags() {
 	const flags = new Map();
@@ -50,6 +45,13 @@ function advertisedFlags() {
 			if (!flags.has(match[0])) flags.set(match[0], []);
 			flags.get(match[0]).push(command);
 		}
+	}
+	for (const match of fs
+		.readFileSync(path.join(ROOT, "docs", "CLI_REFERENCE.md"), "utf8")
+		.matchAll(/--[a-z][a-z0-9-]*/g)) {
+		if (DOCUMENTED_UNSUPPORTED_FLAGS.has(match[0])) continue;
+		if (!flags.has(match[0])) flags.set(match[0], []);
+		flags.get(match[0]).push("CLI_REFERENCE.md");
 	}
 	return flags;
 }
@@ -62,7 +64,7 @@ function runCli(args, cwd = ROOT) {
 	return spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8" });
 }
 
-test("every flag advertised by command help is registered in FLAG_SPECS", () => {
+test("every flag advertised by command help or CLI_REFERENCE.md is registered in FLAG_SPECS", () => {
 	const unregistered = [...advertisedFlags()]
 		.filter(([flag]) => !getFlagSpec(flag) && !FLAGS_PARSED_BY_A_HANDLER.has(flag))
 		.map(([flag, commands]) => `${flag} (${[...new Set(commands)].join(", ")})`);
@@ -106,7 +108,46 @@ test("the escape-hatch exemption stays narrow and really is handled by the comma
 	assert.equal(installed.status, 0, installed.stderr || installed.stdout);
 });
 
-// ── layer 2: each flag changes what the CLI actually does ────────────────────
+test("--handoff-bundle-dir reaches workflow assess and preserves containment", () => {
+	const target = mkTarget("handoff-bundle");
+	const bundle = path.join(target, "custom-bundle");
+	fs.mkdirSync(bundle);
+	fs.writeFileSync(path.join(bundle, "risks.md"), "# Risks\n\n- drift\n");
+	fs.writeFileSync(
+		path.join(bundle, "recovery-commands.md"),
+		"# Recovery Commands\n\n- npm test\n",
+	);
+	const assessed = runCli([
+		"workflow",
+		"assess",
+		"--target",
+		target,
+		"--no-sessions",
+		"--handoff-bundle-dir",
+		"custom-bundle",
+	]);
+	assert.equal(assessed.status, 0, assessed.stderr || assessed.stdout);
+	const report = JSON.parse(assessed.stdout);
+	const handoff = report.findings.find((finding) => finding.id === "di-1-handoff-complete");
+	assert.ok(handoff, "the report includes the handoff completeness finding");
+	const note = handoff.summary || handoff.note;
+	assert.match(note, /missing 5 required file/);
+	assert.doesNotMatch(note, /risks\.md|recovery-commands\.md/);
+	const escaped = runCli([
+		"workflow",
+		"assess",
+		"--target",
+		target,
+		"--no-sessions",
+		"--handoff-bundle-dir",
+		mkTarget("outside-bundle"),
+	]);
+	assert.equal(escaped.status, 1);
+	assert.match(
+		`${escaped.stdout}${escaped.stderr}`,
+		/Workflow handoff bundle.*outside the target root/i,
+	);
+});
 
 test("--replay-scope reaches writeHandoffBundle: real slices for a scope, error for none", () => {
 	const target = mkTarget("replay-scope");

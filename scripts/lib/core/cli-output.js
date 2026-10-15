@@ -68,6 +68,7 @@ const FLAG_SPECS = {
 	"--limit": { key: "limit" },
 	"--home": { key: "home" },
 	"--bundle-dir": { key: "bundleDir" },
+	"--handoff-bundle-dir": { key: "handoffBundleDir" },
 	"--report": { key: "report" },
 	"--finding": { key: "finding" },
 	"--baseline": { key: "baseline" },
