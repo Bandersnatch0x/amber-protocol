@@ -4,7 +4,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { escapeYaml } = require("../../core/simple-yaml");
-const { pathExists, readJson, relativeSlash, resolveTarget } = require("../../core/fs-utils");
+const {
+	assertExclusiveLeaf,
+	pathExists,
+	readJson,
+	relativeSlash,
+	resolveTarget,
+} = require("../../core/fs-utils");
 const { KNOWLEDGE_PLAN_YAML_RELATIVE, loadKnowledgePlan } = require("./load");
 
 /**
@@ -52,6 +58,9 @@ function proposeKnowledgePlan(target, options = {}) {
 		try {
 			const yamlText = planToSimpleYaml(suggested);
 			fs.mkdirSync(path.dirname(planPath), { recursive: true });
+			// A fixed in-target name this writer overwrites when --force, so a planted link
+			// here needs no caller-supplied path to replace another name's bytes.
+			assertExclusiveLeaf("Knowledge plan destination", planPath);
 			fs.writeFileSync(planPath, yamlText, "utf8");
 			result.created.push(relPath);
 		} catch (e) {
