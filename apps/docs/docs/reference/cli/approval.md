@@ -25,9 +25,9 @@ Grant, revoke, consume, and inspect Approvals — the human
 
 ```bash
 amber approval <grant|revoke|consume|show|list> --target <repo> [--json]
-       amber approval grant --target <repo> --id <id> --approver <human-principal> --subject <what> --valid-until <iso> [--scope <scope>] [--json]
+       amber approval grant --target <repo> --id <id> --approver <human-principal> --subject <what> --valid-until <iso> [--scope <scope>] [--yes] [--json]
        amber approval revoke --target <repo> --id <id> --revoker <human-principal> [--json]
-       amber approval consume --target <repo> --id <id> --decision-identity <identity> --body <markdown> [--trace decides:<type>:<identity>[@<revision>]] [--scope <scope>] [--json]
+       amber approval consume --target <repo> --id <id> --decision-identity <identity> --body <markdown> [--trace decides:<type>:<identity>[@<revision>]] [--scope <scope>] [--yes] [--json]
        amber approval show --target <repo> --id <id> [--json]
        amber approval list --target <repo> [--json]
 ```
@@ -107,10 +107,17 @@ Subcommands:
   show --id <id>        Show one derived record (status, decision
         binding when consumed).
   list                  List every derived record in grant order.
+Confirmation proof (issue #340): grant and consume require a human
+confirmation before any ledger write. In an interactive terminal
+answer the y/N prompt; everywhere else pass --yes to record a flag
+confirmation. Without either, the writer is refused loudly as
+AMBER_E_APPROVAL_CONFIRMATION_REQUIRED and nothing is written. The
+collected proof is recorded on the ledger event as
+confirmation.method ("flag (--yes)" or "user (interactive)").
 
 Examples:
-  amber approval grant --target . --id approval/login-42 --approver alice@example.com --subject spec/login@2 --valid-until 2027-01-31 --scope team-a --json
-  amber approval consume --target . --id approval/login-42 --decision-identity decision/login-approved --body 'Approved after review.' --trace decides:spec:spec/login --json
+  amber approval grant --target . --id approval/login-42 --approver alice@example.com --subject spec/login@2 --valid-until 2027-01-31 --scope team-a --yes --json
+  amber approval consume --target . --id approval/login-42 --decision-identity decision/login-approved --body 'Approved after review.' --trace decides:spec:spec/login --yes --json
   amber approval revoke --target . --id approval/login-42 --revoker alice@example.com --json
   amber approval show --target . --id approval/login-42 --json
   amber approval list --target . --json
@@ -119,11 +126,11 @@ Examples:
 ## Examples
 
 ```bash
-amber approval grant --target . --id approval/login-42 --approver alice@example.com --subject spec/login@2 --valid-until 2027-01-31 --scope team-a --json
+amber approval grant --target . --id approval/login-42 --approver alice@example.com --subject spec/login@2 --valid-until 2027-01-31 --scope team-a --yes --json
 ```
 
 ```bash
-amber approval consume --target . --id approval/login-42 --decision-identity decision/login-approved --body 'Approved after review.' --trace decides:spec:spec/login --json
+amber approval consume --target . --id approval/login-42 --decision-identity decision/login-approved --body 'Approved after review.' --trace decides:spec:spec/login --yes --json
 ```
 
 ```bash

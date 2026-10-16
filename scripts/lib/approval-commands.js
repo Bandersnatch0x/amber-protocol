@@ -12,10 +12,15 @@
 const { defineCliCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
+const { promptYesNo } = require("./prompt");
 
 // The readFailure FALLBACK for untyped crashes at the show/list seams, not a
 // corruption verdict (same naming discipline as the evidence command).
 const READ_FAILURE_CODE = "AMBER_E_APPROVAL_NOT_FOUND";
+
+// Issue #340 — a grant/consume that never saw a human confirmation proof is
+// refused with this stable code, never silently granted.
+const CONFIRMATION_REQUIRED_CODE = "AMBER_E_APPROVAL_CONFIRMATION_REQUIRED";
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -97,11 +102,54 @@ function requiredFlag(args, key, flag, example) {
 	return { value };
 }
 
+/**
+ * Issue #340 — an approval must bind to a proof the governed actor cannot
+ * produce silently. Before any ledger write the CLI seam collects that
+ * proof: `--yes` records a flag confirmation, an interactive terminal gets
+ * a typed y/N answer, and anything else is refused loudly (never silently
+ * granted) with AMBER_E_APPROVAL_CONFIRMATION_REQUIRED. The collected proof
+ * rides through to the core and lands on the granted/consumed ledger event
+ * as `confirmation.method`.
+ */
+async function resolveConfirmation(args, action) {
+	if (args.yes === true) {
+		return { method: "flag (--yes)" };
+	}
+	if (process.stdin.isTTY) {
+		const confirmed = await promptYesNo(`Confirm approval ${action}? [y/N] `);
+		if (confirmed) {
+			return { method: "user (interactive)" };
+		}
+		return {
+			refusal: {
+				text: "",
+				errors: [
+					`approval ${action} was declined at the interactive confirmation prompt; nothing was written`,
+				],
+				warnings: [],
+				exitCode: 1,
+				code: CONFIRMATION_REQUIRED_CODE,
+			},
+		};
+	}
+	return {
+		refusal: {
+			text: "",
+			errors: [
+				`approval ${action} needs a human confirmation proof: run it in an interactive terminal and answer the y/N prompt, or pass --yes to record a flag confirmation`,
+			],
+			warnings: [],
+			exitCode: 1,
+			code: CONFIRMATION_REQUIRED_CODE,
+		},
+	};
+}
+
 const approvalDispatch = defineCliCommand({
 	command: "approval",
 	actions: ["grant", "revoke", "consume", "show", "list"],
 	handlers: {
-		grant: (args) => {
+		grant: async (args) => {
 			const { grantApproval } = require("./core/approval-registry");
 			const truncated = missingValueFlag(args);
 			if (truncated) {
@@ -119,6 +167,8 @@ const approvalDispatch = defineCliCommand({
 			if (subject.error) return invalidArg(subject.error);
 			const validUntil = requiredFlag(args, "validUntil", "--valid-until", "2027-01-31");
 			if (validUntil.error) return invalidArg(validUntil.error);
+			const confirmation = await resolveConfirmation(args, "grant");
+			if (confirmation.refusal) return confirmation.refusal;
 			let result;
 			try {
 				result = grantApproval(target.value, {
@@ -127,6 +177,7 @@ const approvalDispatch = defineCliCommand({
 					scope: optionalString(args.scope),
 					subject: subject.value,
 					validUntil: validUntil.value,
+					confirmation: { method: confirmation.method },
 				});
 			} catch (err) {
 				return writeFailure(err);
@@ -170,7 +221,7 @@ const approvalDispatch = defineCliCommand({
 				...(result.code ? { code: result.code } : {}),
 			};
 		},
-		consume: (args) => {
+		consume: async (args) => {
 			const { consumeApproval } = require("./core/approval-registry");
 			const truncated = missingValueFlag(args);
 			if (truncated) {
@@ -195,6 +246,8 @@ const approvalDispatch = defineCliCommand({
 			// shared): `--trace decides:<targetType>:<identity>[@<revision>]`.
 			const traces = parseTraceFlags(args.traceArgs);
 			if (traces.error) return invalidArg(traces.error);
+			const confirmation = await resolveConfirmation(args, "consume");
+			if (confirmation.refusal) return confirmation.refusal;
 			let result;
 			try {
 				result = consumeApproval(target.value, {
@@ -203,6 +256,7 @@ const approvalDispatch = defineCliCommand({
 					body: body.value,
 					traces: traces.value,
 					scope: optionalString(args.scope),
+					confirmation: { method: confirmation.method },
 				});
 			} catch (err) {
 				return writeFailure(err);
