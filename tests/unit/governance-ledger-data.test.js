@@ -29,6 +29,8 @@ const { readJSONL } = require("../../scripts/lib/core/jsonl");
 const SCHEMA_NAME = "governance-event";
 const ROOT = path.join(__dirname, "..", "..");
 const LEDGER_PATH = path.join(ROOT, "docs", "governance", "governance-ledger.jsonl");
+const COMMITTED_TAIL_HASH =
+	"sha256:291f7a8793550d0c0aa374d900c04a5621bc39bba533794d47dad7e13b1466f1";
 
 /**
  * Chain hash of one event: sha256 over the canonical form of the event (its own
@@ -46,7 +48,7 @@ function readEvents(ledgerPath = LEDGER_PATH) {
 	return readJSONL(ledgerPath, { onCorrupt: "throw", missing: "throw" });
 }
 
-function verifyChain(events) {
+function verifyChain(events, expectedTailHash) {
 	const errors = [];
 	let prevHash = null;
 	events.forEach((event, index) => {
@@ -63,6 +65,9 @@ function verifyChain(events) {
 		}
 		prevHash = event.hash;
 	});
+	if (expectedTailHash !== undefined && prevHash !== expectedTailHash) {
+		errors.push("committed tail hash mismatch");
+	}
 	return { ok: errors.length === 0, errors };
 }
 
@@ -143,7 +148,7 @@ describe("committed governance ledger", () => {
 	});
 
 	it("the committed chain verifies end to end", () => {
-		const result = verifyChain(readEvents());
+		const result = verifyChain(readEvents(), COMMITTED_TAIL_HASH);
 		assert.ok(result.ok, `committed ledger chain is broken:\n${result.errors.join("\n")}`);
 	});
 
@@ -169,8 +174,20 @@ describe("chain gate discriminates tampering", () => {
 	it("reports a mismatch when only the hash field is rewritten", () => {
 		const events = readEvents();
 		const forged = events.map((event) => ({ ...event }));
-		forged[0] = { ...forged[0], hash: `sha256:${"0".repeat(64)}` };
-		assert.equal(verifyChain(forged).ok, false);
+		forged[forged.length - 1].hash = `sha256:${"0".repeat(64)}`;
+		const result = verifyChain(forged);
+		assert.equal(result.ok, false);
+		assert.deepEqual(result.errors, [
+			`event[${forged.length - 1}] ${forged.at(-1).id}: hash mismatch`,
+		]);
+	});
+
+	it("refuses a valid committed prefix that loses the pinned tail", () => {
+		const prefix = readEvents().slice(0, -1);
+		assert.equal(verifyChain(prefix).ok, true, "a valid prefix alone cannot detect truncation");
+		const result = verifyChain(prefix, COMMITTED_TAIL_HASH);
+		assert.equal(result.ok, false);
+		assert.deepEqual(result.errors, ["committed tail hash mismatch"]);
 	});
 
 	it("refuses a corrupted line instead of skipping it", () => {

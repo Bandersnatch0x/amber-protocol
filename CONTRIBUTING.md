@@ -64,21 +64,24 @@ npm run dev:hooks:install   # points core.hooksPath at .githooks (pre-commit ide
 npm run identity:check      # validate the effective author/committer now
 ```
 
-`npm install` also runs `scripts/ensure-dev-hooks.js` (through the `prepare` script), which wires
-`core.hooksPath` to `.githooks` when it is unset, so a fresh clone gets the gate without anyone
-remembering to install it. It never overwrites a `core.hooksPath` you or another tool already set -
-it reports that instead - and it exits 0 outside a git checkout, so installing the published
-package is unaffected. `npm run dev:hooks:check` fails when the wiring is missing; it is not a
-required status check, because the gate that blocks a merge is the CI one below.
+`npm install` runs `scripts/ensure-dev-hooks.js` through `prepare`. It points `core.hooksPath` at
+`.githooks` only when no effective value exists at any scope. If another hook manager owns the
+effective value, the script reports its scope, including local, worktree, global, system, or command,
+and leaves it in place. Run `npm run dev:hooks:install` to set `core.hooksPath` in the repository's
+local config. Worktree or command-scope values may still take precedence. The script exits 0 outside
+a git checkout, so installing the published package is unaffected.
 
-CI runs the same checker on introduced commits. In `ci.yml` the `identity` job gates master/main/codex/**
-pushes and every pull request, and the release jobs and test matrix wait on it. `commit-identity.yml`
-runs the same checker on pushes to any other branch - the `fix/*` and `feat/*` names this repo actually
-uses - so a wrong identity surfaces where the commit was made rather than at delivery time. That branch
-report is deliberately not a merge gate; it exists to make the failure cheap, not to add another
-required check.
+The pre-commit identity check is local feedback and can be bypassed. `npm run dev:hooks:check`
+reports the current checkout's effective hook configuration; it is not a required status check.
+CI runs `Commit identity` as an informational check; it is not required for merge.
 
-**Platform exceptions (CI only):** when validating already-made commits (`--range` / `--commit`), the checker accepts exact name+email pairs for Dependabot, GitHub’s bot committer, and `github-actions[bot]`. It also accepts GitHub's account display name as the author when the commit uses this repository's exact noreply email and was committed by the exact GitHub bot identity — covering GitHub-generated merge AND squash-merge commits (squash-merges carry a single parent; the trust anchor is the owner's noreply address plus GitHub's own committer identity, which only holds when the owner produced the commit through GitHub). Local pre-commit (`npm run identity:check` with no args) stays human-only so platform or bot identities cannot land from a workstation.
+CI runs the same checker on introduced commits. In `ci.yml` the `identity` job reports on master/main/codex/**
+pushes and every pull request; test, docs, and release jobs no longer depend on it. Release jobs still
+wait on their other validation jobs. `commit-identity.yml`
+runs the same checker on pushes to other branches as an early report. Neither identity job is a
+merge gate. Deleted-branch push events skip range validation because they carry a zero after SHA.
+
+**Platform exceptions (CI only):** when validating already-made commits (`--range` / `--commit`), the checker accepts exact name+email pairs for Dependabot, GitHub's bot committer, and `github-actions[bot]`. It also accepts any author name with this repository's exact noreply email when the committer is exactly `GitHub <noreply@github.com>`. GitHub's merge and squash buttons produce this pair. The fields are commit metadata; the checker does not verify a cryptographic signature. Existing commits with this pair pass through the same rule and have no separate grandfather list. Local pre-commit (`npm run identity:check` with no args) stays human-only so platform or bot identities cannot land from a workstation.
 
 CLI:
 
@@ -240,10 +243,12 @@ CLI reference pages under `apps/docs/docs/reference/cli/` are generated from `sc
   rollback responsibility are not separated while there is one maintainer). The mechanical release gates
   are listed in the Release Process section; rollback steps are in
   [docs/quality/rollback-procedures.md](./docs/quality/rollback-procedures.md).
-- **Merge gating (confirmed 2026-09-27):** the `master` branch is protected on GitHub. Pull requests are
+- **Merge gating (confirmed 2026-09-27; required checks updated 2026-10-15):** the `master` branch is
+  protected on GitHub. Pull requests are
   required to merge; at least **1 approving review** and **CODEOWNERS review** are required (stale
   approvals are dismissed on new pushes); the required status checks that must pass before merge are
-  **Commit identity**, **Node 20.x**, **Node 22.x**, and **Coverage** (strict / branch-up-to-date);
+  **Node 20.x**, **Node 22.x**, and **Coverage** (strict / branch-up-to-date). `Commit identity` still
+  runs as an informational CI check but is not required for merge;
   conversation resolution is required; force-pushes and branch deletion are blocked. `enforce_admins` is
   **off**, so the single maintainer retains an admin bypass (necessary while there is one reviewer). A
   green workflow on `master` is therefore now **evidence of a merge-blocking gate**, not merely a passing

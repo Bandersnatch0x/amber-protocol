@@ -20,6 +20,7 @@ permissions:
 jobs:
   identity:
     name: Commit identity (branch push)
+    if: github.event.deleted != true
     runs-on: ubuntu-latest
 
     steps:

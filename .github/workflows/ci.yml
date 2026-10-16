@@ -77,7 +77,6 @@ jobs:
   test:
     name: Node ${{ matrix.node-version }}
     runs-on: ubuntu-latest
-    needs: identity
 
     strategy:
       fail-fast: false
@@ -261,7 +260,6 @@ jobs:
   docs:
     name: Public Documentation Site
     runs-on: ubuntu-latest
-    needs: identity
 
     strategy:
       fail-fast: false
@@ -310,7 +308,6 @@ jobs:
     name: Release dry-run
     runs-on: ubuntu-latest
     needs:
-      - identity
       - test
       - coverage
       - security
@@ -345,7 +342,6 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs:
-      - identity
       - test
       - coverage
       - security

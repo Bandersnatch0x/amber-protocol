@@ -663,7 +663,7 @@ function sessionDriftFold(targetRoot, sessionId) {
 		const { replayPolicyDecisions } = require("./core/handoff-bundle");
 		const outcome = replayPolicyDecisions(targetRoot, sessionId);
 		if (!outcome.ok || !outcome.report || outcome.report.evaluated === 0) return null;
-		const { drifted, nonReplayable, compatible, exact } = outcome.report;
+		const { drifted, compatible, exact } = outcome.report;
 		let state = "NON_REPLAYABLE";
 		if (drifted > 0) state = "DRIFTED";
 		else if (compatible > 0) state = "COMPATIBLE";

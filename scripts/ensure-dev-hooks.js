@@ -19,10 +19,18 @@ function runGit(args, cwd) {
 	return spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
 }
 
-function localHooksPath(repoRoot) {
-	const result = runGit(["config", "--local", "--get", "core.hooksPath"], repoRoot);
-	if (result.status !== 0) return null; // unset: git exits 1
-	return String(result.stdout || "").trim();
+function effectiveHooksPath(repoRoot) {
+	const result = runGit(["config", "--show-scope", "--get", "core.hooksPath"], repoRoot);
+	if (result.status !== 0) {
+		const error = result.error?.message || String(result.stderr || "").trim();
+		if (result.status === 1 && !error) return null;
+		return { error: error || `git exited with status ${result.status}` };
+	}
+	const output = String(result.stdout || "").replace(/\r?\n$/, "");
+	const separator = output.indexOf("\t");
+	return separator === -1
+		? { scope: "unknown", value: output }
+		: { scope: output.slice(0, separator), value: output.slice(separator + 1) };
 }
 
 /**
@@ -45,8 +53,14 @@ function ensureDevHooks(options = {}) {
 		return report;
 	}
 
-	const configured = localHooksPath(repoRoot);
+	const current = effectiveHooksPath(repoRoot);
+	if (current?.error) {
+		report.problems.push(`unable to read core.hooksPath: ${current.error}`);
+		return report;
+	}
+	const configured = current?.value ?? null;
 	report.configured = configured;
+	report.scope = current?.scope ?? null;
 
 	if (configured === HOOKS_DIR) return report;
 
@@ -64,14 +78,15 @@ function ensureDevHooks(options = {}) {
 		}
 		report.changed = true;
 		report.configured = HOOKS_DIR;
+		report.scope = "local";
 		return report;
 	}
 
 	// Something else owns hooksPath (another hook manager). That is a deliberate choice
 	// by the user or a tool: report it, but neither overwrite it nor fail an install.
 	report.problems.push(
-		`core.hooksPath is "${configured}", not "${HOOKS_DIR}", so the repo-local hooks are not running. ` +
-			`Fix (this replaces that setting): npm run dev:hooks:install`,
+		`core.hooksPath is "${configured}" at ${report.scope} scope, not "${HOOKS_DIR}", so the repo-local hooks are not running. ` +
+			`Set a repo-local override with: npm run dev:hooks:install`,
 	);
 	return report;
 }
