@@ -105,6 +105,9 @@ const GRANTED_EVENT_FIELDS = Object.freeze([
 	"at",
 	"approvalId",
 	"approver",
+	// Issue #340 — the human-confirmation proof the grant was bound to
+	// ({ method } or null; tolerated absent for legacy events).
+	"confirmation",
 	"scope",
 	"subject",
 	"validAt",
@@ -133,6 +136,9 @@ const CONSUMED_EVENT_FIELDS = Object.freeze([
 	"approvalId",
 	"decisionIdentity",
 	"decisionRevision",
+	// Issue #340 — the human-confirmation proof the consumption was bound
+	// to ({ method } or null; tolerated absent for legacy events).
+	"confirmation",
 	"clockSource",
 	"skewPolicy",
 	"prevHash",
@@ -156,6 +162,39 @@ function approvalCorrupt(message) {
 
 function isNullableNonEmptyString(value) {
 	return value === null || (typeof value === "string" && value.length > 0);
+}
+
+// Issue #340 — the stored confirmation proof: null (no proof claimed —
+// legacy events and internal writers), or { method: non-empty string } as
+// recorded by the CLI seam. Anything else is corruption on read.
+function storedConfirmationProblem(value, lineIndex) {
+	const confirmed = value ?? null;
+	if (confirmed === null) return null;
+	if (
+		typeof confirmed !== "object" ||
+		Array.isArray(confirmed) ||
+		typeof confirmed.method !== "string" ||
+		confirmed.method.length === 0
+	) {
+		return `approval registry event ${lineIndex} carries a confirmation that is neither null nor an object with a non-empty string "method"; got ${JSON.stringify(value)}`;
+	}
+	return null;
+}
+
+// Issue #340 — the write-side counterpart of storedConfirmationProblem:
+// a caller-supplied confirmation that is neither absent nor a
+// { method: non-empty string } is malformed input, never a silent write.
+function confirmationInputProblem(confirmation) {
+	if (confirmation === null || confirmation === undefined) return null;
+	if (
+		typeof confirmation !== "object" ||
+		Array.isArray(confirmation) ||
+		typeof confirmation.method !== "string" ||
+		confirmation.method.trim().length === 0
+	) {
+		return `confirmation must be null or an object with a non-empty string "method"; got ${JSON.stringify(confirmation)}`;
+	}
+	return null;
 }
 
 /**
@@ -347,6 +386,8 @@ function applyApprovalEvent(byId, event, lineIndex) {
 		}
 		const clockProblem = storedClockProblem(event, lineIndex, "granted");
 		if (clockProblem !== null) throw approvalCorrupt(clockProblem);
+		const confirmationProblem = storedConfirmationProblem(event.confirmation, lineIndex);
+		if (confirmationProblem !== null) throw approvalCorrupt(confirmationProblem);
 		if (byId.has(event.approvalId)) {
 			throw approvalCorrupt(
 				`approval registry event ${lineIndex} grants "${event.approvalId}" a second time; an approval id is granted exactly once (a re-grant is a new id), so the writers can never append this — the ledger was edited in place`,
@@ -355,6 +396,7 @@ function applyApprovalEvent(byId, event, lineIndex) {
 		byId.set(event.approvalId, {
 			id: event.approvalId,
 			approver: event.approver,
+			confirmation: event.confirmation ?? null,
 			scope: event.scope,
 			subject: event.subject,
 			validAt: event.validAt,
@@ -428,6 +470,8 @@ function applyApprovalEvent(byId, event, lineIndex) {
 		}
 		const clockProblem = storedClockProblem(event, lineIndex, "consumed");
 		if (clockProblem !== null) throw approvalCorrupt(clockProblem);
+		const confirmationProblem = storedConfirmationProblem(event.confirmation, lineIndex);
+		if (confirmationProblem !== null) throw approvalCorrupt(confirmationProblem);
 		const record = byId.get(event.approvalId);
 		if (record === undefined) {
 			throw approvalCorrupt(
@@ -645,15 +689,23 @@ function resolveActingHuman(cwd, principalId, label, now) {
  * the caller-declared expiry, and recordedAt is the write instant (distinct
  * fields, one clock). An approval id is granted at most once.
  * @param {string} cwd - Repository root.
- * @param {object} input - { id, approver, scope, subject, validUntil }.
+ * @param {object} input - { id, approver, scope, subject, validUntil,
+ *   confirmation } — confirmation is the #340 human-confirmation proof
+ *   ({ method: non-empty string }) the grant was bound to, or null.
  * @param {object} [opts] - { now } clock injection.
  * @returns {{ok: boolean, code: string|null, approval: object|null, errors: string[]}}
  */
-function grantApproval(cwd, { id, approver, scope = null, subject, validUntil }, opts = {}) {
+function grantApproval(
+	cwd,
+	{ id, approver, scope = null, subject, validUntil, confirmation = null },
+	opts = {},
+) {
 	const fail = (code, errors) => ({ ok: false, code, approval: null, errors });
 	const now = writeClockOf(opts);
 	const inputProblem = grantInputProblem({ id, approver, scope, subject, validUntil });
 	if (inputProblem !== null) return fail(INVALID_ARG_CODE, [inputProblem]);
+	const confirmationProblem = confirmationInputProblem(confirmation);
+	if (confirmationProblem !== null) return fail(INVALID_ARG_CODE, [confirmationProblem]);
 	// The half-open window must be non-empty: validUntil strictly after the
 	// grant instant (validAt is the write instant). A born-expired or
 	// inverted grant is malformed input, never a silently dead
@@ -682,12 +734,16 @@ function grantApproval(cwd, { id, approver, scope = null, subject, validUntil },
 	}
 
 	const at = now.toISOString();
+	// Issue #340 — the confirmation proof rides on the event only when a
+	// caller supplied one; a null proof is omitted so pre-#340 ledger bytes
+	// (and the byte-equivalence golden) stay stable for legacy write seams.
 	const body = {
 		kind: "granted",
 		schemaVersion: APPROVAL_SCHEMA_VERSION,
 		at,
 		approvalId: id,
 		approver: Object.freeze({ ...acting.principal }),
+		...(confirmation ? { confirmation } : {}),
 		scope,
 		subject,
 		// F050: validAt (when the window opens) and recordedAt (when the
@@ -856,14 +912,16 @@ function revokeApproval(cwd, { id, revoker }, opts = {}) {
  * nested admission cannot deadlock.
  *
  * @param {string} cwd - Repository root.
- * @param {object} input - { id, decisionIdentity, body, traces, scope }.
+ * @param {object} input - { id, decisionIdentity, body, traces, scope,
+ *   confirmation } — confirmation is the #340 human-confirmation proof
+ *   ({ method: non-empty string }) the consumption was bound to, or null.
  * @param {object} [opts] - { now } clock injection.
  * @returns {{ok: boolean, code: string|null, approval: object|null,
  *           receipt: object|null, errors: string[]}}
  */
 function consumeApproval(
 	cwd,
-	{ id, decisionIdentity, body, traces = [], scope = null },
+	{ id, decisionIdentity, body, traces = [], scope = null, confirmation = null },
 	opts = {},
 ) {
 	const fail = (code, errors) => ({ ok: false, code, approval: null, receipt: null, errors });
@@ -883,6 +941,8 @@ function consumeApproval(
 			`body is required: the settled Decision carries a human-readable Body; got ${JSON.stringify(body)}`,
 		]);
 	}
+	const confirmationProblem = confirmationInputProblem(confirmation);
+	if (confirmationProblem !== null) return fail(INVALID_ARG_CODE, [confirmationProblem]);
 
 	// Pre-lock: the lifecycle verdict and the scope confinement — before any
 	// durable state is touched. (The ceiling probe deliberately does NOT run
@@ -915,6 +975,7 @@ function consumeApproval(
 			approvalId: id,
 			decisionIdentity,
 			decisionRevision: admissionReceipt.revision,
+			...(confirmation ? { confirmation } : {}),
 			clockSource,
 			skewPolicy: SKEW_POLICY,
 		}),
@@ -946,6 +1007,7 @@ function consumeApproval(
 				approvalId: id,
 				decisionIdentity,
 				decisionRevision: 9_999_999_999,
+				confirmation: { method: "user (interactive)" },
 				clockSource,
 				skewPolicy: SKEW_POLICY,
 				prevHash: "0".repeat(64),

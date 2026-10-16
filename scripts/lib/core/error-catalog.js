@@ -1418,6 +1418,19 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_DECISION_HUMAN_SLOT_REQUIRED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
 	},
+	AMBER_E_APPROVAL_CONFIRMATION_REQUIRED: {
+		title: "Approval write attempted without a human confirmation proof",
+		cause:
+			"approval grant or consume reached the CLI seam without any human confirmation proof: not run in an interactive terminal to answer the y/N prompt, and no --yes flag confirmation supplied. An approval must bind to a proof the named approver can produce and the governed actor cannot produce silently (issue #340) — the writer refuses loudly instead of granting.",
+		remedy:
+			"Run the command in an interactive terminal and answer the y/N prompt, or pass --yes to record a flag confirmation. Without either, nothing is written to the approval registry.",
+		layer: "Governance",
+		related: [
+			"AMBER_E_APPROVAL_HUMAN_SLOT_REQUIRED",
+			"AMBER_E_APPROVAL_NOT_FOUND",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
 	AMBER_E_GATE_NOT_FOUND: {
 		title: "Gate artifact is not recorded",
 		cause:

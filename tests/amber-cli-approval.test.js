@@ -13,6 +13,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { PassThrough } = require("node:stream");
 const { GENESIS_HASH, chainHash } = require("../scripts/lib/core/approval-registry");
 const { writeJSONL } = require("../scripts/lib/core/jsonl");
 
@@ -88,6 +89,8 @@ function grantApproval(dir, id, extra = []) {
 			"spec/login@2",
 			"--valid-until",
 			"2027-08-01",
+			// Issue #340 — seeded grants record a flag confirmation proof.
+			"--yes",
 			...extra,
 			"--target",
 			dir,
@@ -130,6 +133,8 @@ function consumeApproval(dir, id, extra = []) {
 			"# Decision: login intent approved",
 			"--trace",
 			"decides:intent:intent/login@1",
+			// Issue #340 — seeded consumptions record a flag confirmation proof.
+			"--yes",
 			...extra,
 			"--target",
 			dir,
@@ -153,6 +158,7 @@ test("approval grant echoes the derived record; show and list round-trip it", ()
 	assert.equal(approval.approver.principalKind, "human");
 	assert.equal(approval.scope, "F050");
 	assert.equal(approval.subject, "spec/login@2");
+	assert.equal(approval.confirmation.method, "flag (--yes)");
 	assert.equal(approval.validUntil, "2027-08-01");
 	assert.equal(approval.validAt, approval.recordedAt);
 	assert.equal(approval.revokedAt, null);
@@ -330,6 +336,8 @@ test("grant requires a human approver; a service principal fails closed", () => 
 			"spec/login@2",
 			"--valid-until",
 			"2027-08-01",
+			// Issue #340 — pass the confirmation gate to reach the core's slot check.
+			"--yes",
 			"--target",
 			dir,
 			"--json",
@@ -351,6 +359,8 @@ test("grant requires a human approver; a service principal fails closed", () => 
 			"spec/login@2",
 			"--valid-until",
 			"2027-08-01",
+			// Issue #340 — pass the confirmation gate to reach the core's slot check.
+			"--yes",
 			"--target",
 			dir,
 			"--json",
@@ -368,6 +378,144 @@ test("a duplicate grant fails closed with its stable code", () => {
 	const dup = grantApproval(dir, "approval/login-42");
 	assert.equal(dup.status, 1);
 	assert.equal(envelope(dup).code, "AMBER_E_APPROVAL_ALREADY_GRANTED");
+});
+
+// ── The confirmation gate (issue #340) ──
+// A grant/consume that never saw a human confirmation proof is refused
+// loudly — never silently granted. spawnSync pipes the child's stdin, so the
+// subprocess tests exercise the non-TTY branch; the interactive branch is
+// tested in-process with a fake TTY stdin.
+
+test("a non-TTY grant without --yes is refused with the confirmation-required code", () => {
+	const dir = mkTarget("confirm-non-tty-grant");
+	seedPrincipals(dir);
+	const r = runCli(
+		[
+			"approval",
+			"grant",
+			"--id",
+			"approval/login-42",
+			"--approver",
+			"alice@example.com",
+			"--subject",
+			"spec/login@2",
+			"--valid-until",
+			"2027-08-01",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	assert.equal(envelope(r).code, "AMBER_E_APPROVAL_CONFIRMATION_REQUIRED");
+	assert.ok(envelope(r).errors[0].includes("human confirmation proof"));
+	assert.ok(
+		!fs.existsSync(path.join(dir, ".amber", "approvals", "registry.jsonl")),
+		"a refused grant writes nothing",
+	);
+});
+
+test("a non-TTY consume without --yes is refused with the confirmation-required code", () => {
+	const dir = mkTarget("confirm-non-tty-consume");
+	seedPrincipals(dir);
+	admitIntent(dir);
+	assert.equal(grantApproval(dir, "approval/login-42").status, 0);
+
+	const r = runCli(
+		[
+			"approval",
+			"consume",
+			"--id",
+			"approval/login-42",
+			"--decision-identity",
+			"decision/login-approved",
+			"--body",
+			"# Decision: login intent approved",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	assert.equal(envelope(r).code, "AMBER_E_APPROVAL_CONFIRMATION_REQUIRED");
+
+	const shown = payload(
+		runCli(["approval", "show", "--id", "approval/login-42", "--target", dir, "--json"], dir),
+	);
+	assert.equal(shown.status, "granted", "a refused consume settles nothing");
+});
+
+/**
+ * Issue #340 — run the approval dispatch in-process with a fake TTY stdin so
+ * the interactive y/N branch is reachable (spawnSync children are never TTY).
+ * The PassThrough is installed as process.stdin before dispatch: the handler
+ * reads isTTY synchronously and promptYesNo attaches readline to the same
+ * stream, so the answer can be written as soon as dispatch returns its
+ * promise.
+ */
+async function dispatchWithInteractiveStdin(args, answer) {
+	const fake = new PassThrough();
+	fake.isTTY = true;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(process, "stdin");
+	Object.defineProperty(process, "stdin", { configurable: true, value: fake });
+	try {
+		const { approvalDispatch } = require("../scripts/lib/approval-commands");
+		const dispatchPromise = approvalDispatch(args);
+		fake.write(answer);
+		return await dispatchPromise;
+	} finally {
+		if (stdinDescriptor) Object.defineProperty(process, "stdin", stdinDescriptor);
+		else delete process.stdin;
+	}
+}
+
+test("an interactive y confirms the grant and records the proof in the ledger event", async () => {
+	const dir = mkTarget("confirm-tty-yes");
+	seedPrincipals(dir);
+	const res = await dispatchWithInteractiveStdin(
+		{
+			_: ["grant"],
+			id: "approval/login-42",
+			approver: "alice@example.com",
+			subject: "spec/login@2",
+			validUntil: "2027-08-01",
+			target: dir,
+			json: true,
+		},
+		"y\n",
+	);
+	assert.equal(res.exitCode, 0, JSON.stringify(res.result.errors));
+	const events = fs
+		.readFileSync(path.join(dir, ".amber", "approvals", "registry.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.equal(events[0].confirmation.method, "user (interactive)");
+});
+
+test("an interactive n refuses loudly and writes nothing", async () => {
+	const dir = mkTarget("confirm-tty-no");
+	seedPrincipals(dir);
+	const res = await dispatchWithInteractiveStdin(
+		{
+			_: ["grant"],
+			id: "approval/login-42",
+			approver: "alice@example.com",
+			subject: "spec/login@2",
+			validUntil: "2027-08-01",
+			target: dir,
+			json: true,
+		},
+		"n\n",
+	);
+	assert.equal(res.exitCode, 1);
+	assert.equal(res.result.code, "AMBER_E_APPROVAL_CONFIRMATION_REQUIRED");
+	assert.ok(
+		!fs.existsSync(path.join(dir, ".amber", "approvals", "registry.jsonl")),
+		"a declined grant writes nothing",
+	);
 });
 
 // ── Arg discipline ──

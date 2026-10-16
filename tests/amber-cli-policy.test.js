@@ -182,6 +182,8 @@ function setupStrictContext(dir) {
 				SUBJECT,
 				"--valid-until",
 				"2999-01-01T00:00:00.000Z",
+				// Issue #340 — pass the confirmation gate; this fixture exercises policy.
+				"--yes",
 				"--target",
 				dir,
 				"--json",
@@ -202,6 +204,8 @@ function setupStrictContext(dir) {
 				"# Decision: approved",
 				"--trace",
 				"decides:intent:intent/login@1",
+				// Issue #340 — pass the confirmation gate; this fixture exercises policy.
+				"--yes",
 				"--target",
 				dir,
 				"--json",
