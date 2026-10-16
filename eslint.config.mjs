@@ -24,6 +24,7 @@ export default [
 			"test-reports/",
 			".scratch/",
 			".external-tool/worktrees/",
+			".amber/",
 			"upper-shell/",
 		],
 	},

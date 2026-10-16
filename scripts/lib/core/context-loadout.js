@@ -40,7 +40,6 @@
 // works before the write-path scope stamping lands).
 
 const fs = require("node:fs");
-const path = require("node:path");
 
 const { verifyPages } = require("./context-verify");
 const { listPages, readPage, readEvents, appendEvent } = require("./context-store");

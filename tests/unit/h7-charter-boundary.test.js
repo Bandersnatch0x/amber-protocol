@@ -8,7 +8,6 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -22,9 +21,6 @@ const AUTHORITY_TUPLE = [
 	"writesExternalSystems=false",
 ];
 
-function sha256(text) {
-	return `sha256:${crypto.createHash("sha256").update(text).digest("hex")}`;
-}
 test("F079 accepts ADR-0103 and keeps the bounded H7 authority consistent across boundary docs", () => {
 	const adr = read("docs/adr/0103-bounded-live-runtime-and-cancellation-authority.md");
 	assert.match(adr, /\*\*Status:\*\* Accepted/);

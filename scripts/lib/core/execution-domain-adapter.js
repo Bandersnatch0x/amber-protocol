@@ -16,7 +16,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
-const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { statePath } = require("../state-dir-resolver");
 const { codedError } = require("./error-catalog");
 const { parseGovernedArgv, toSpawnArgv } = require("./loop-policy");
 

@@ -18,7 +18,6 @@ const {
 	authorizeRunnerRequest,
 	prepareRunnerExecution,
 	settleRunnerExecution,
-	abortRunnerExecution,
 } = require("../../scripts/lib/core/runner-registry");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
