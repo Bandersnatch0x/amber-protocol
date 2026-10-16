@@ -45,6 +45,27 @@ function lstatIfPresent(filePath) {
 	}
 }
 
+// A hard link is a real in-target file, so every path and symlink check passes,
+// yet writing it replaces the bytes of every other name sharing that inode —
+// including names outside the target. Writers check their planned leaves.
+// shortcut: check-then-write, so a link swapped in after this call is not caught; race-safe writes needed for hostile concurrent mutation.
+function assertExclusiveLeaf(label, filePath) {
+	// Follow links: the write goes to the referent, so an in-target symlink whose
+	// referent is hard-linked outside the target escapes exactly like the leaf.
+	let stat;
+	try {
+		stat = fs.statSync(filePath);
+	} catch (error) {
+		if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return;
+		throw error;
+	}
+	if (stat && stat.isFile() && stat.nlink > 1) {
+		throw new Error(
+			`${label} is hard-linked to ${stat.nlink} paths and would be written through a shared inode: ${filePath}`,
+		);
+	}
+}
+
 function realPathForPotential(filePath, seenLinks = new Set()) {
 	let existing = path.resolve(filePath);
 	const missingSegments = [];
@@ -157,6 +178,10 @@ function readJsonSafe(filePath) {
 
 function writeJson(filePath, data) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	// Every caller of this writer overwrites the leaf in place, so the shared-inode check
+	// belongs here rather than at each caller. writeJsonPrettier needs none: rename swaps
+	// the name's inode and leaves any other name pointing at the old bytes untouched.
+	assertExclusiveLeaf("JSON destination", filePath);
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
@@ -312,6 +337,7 @@ module.exports = {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
 	resolvePathWithin,
+	assertExclusiveLeaf,
 	realPathForPotential,
 	toPortablePath,
 	pathExists,

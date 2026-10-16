@@ -234,6 +234,32 @@ describe("knowledge-plan facade: report", () => {
 		}
 	});
 
+	it("names the plan file it actually loaded (issues/0366)", () => {
+		const tmp = makeTempTarget();
+		try {
+			writeYamlPlan(
+				tmp,
+				[
+					'schemaVersion: "1.0.0"',
+					"knowledgePlan:",
+					'  template: "architecture"',
+					"  notes: []",
+					"  documents: []",
+					"knowledgeCards: []",
+					"",
+				].join("\n"),
+			);
+			const rep = report(tmp);
+			assert.equal(rep.planFound, true);
+			// The report must name an existing file, whichever variant was chosen.
+			const named = path.join(tmp, rep.planPath);
+			assert.equal(named.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml"), true);
+			assert.ok(fs.existsSync(named));
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
 	it("includes coverage and cards for a valid plan", () => {
 		const tmp = makeTempTarget();
 		try {

@@ -46,7 +46,7 @@ const { verifyPages } = require("./context-verify");
 const { listPages, readPage, readEvents, appendEvent } = require("./context-store");
 const { sha256, canonicalJson } = require("./context-hash");
 const { statePathForCreate } = require("../state-dir-resolver");
-const { relativeSlash, resolvePathWithin } = require("./fs-utils");
+const { relativeSlash, resolvePathWithin, writeJson } = require("./fs-utils");
 const {
 	CLASSIFICATIONS,
 	effectiveClassificationOf,
@@ -760,8 +760,9 @@ function persistLoadout(targetRoot, loadout, route, feature) {
 		}
 	}
 	if (!cached) {
-		fs.mkdirSync(path.dirname(loadoutPath), { recursive: true });
-		fs.writeFileSync(loadoutPath, serialized, "utf8");
+		// writeJson, not a raw write: the leaf is overwritten in place whenever it differs
+		// from what was built, and the shared-inode check sits in that helper.
+		writeJson(loadoutPath, loadout);
 		appendEvent(targetRoot, {
 			kind: "loadout-written",
 			route,

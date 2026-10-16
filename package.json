@@ -68,6 +68,8 @@
 		"test:governance-loop": "node scripts/demo/e2e-governance-loop-verify.js",
 		"identity:check": "node scripts/validate-git-identity.js",
 		"dev:hooks:install": "git config --local core.hooksPath .githooks",
+		"dev:hooks:check": "node scripts/ensure-dev-hooks.js --check",
+		"prepare": "node scripts/ensure-dev-hooks.js",
 		"gen:agents": "node scripts/gen-agent-commands.js",
 		"gen:agents:check": "node scripts/gen-agent-commands.js --check",
 		"lint": "eslint .",

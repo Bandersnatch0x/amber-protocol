@@ -13,6 +13,14 @@ const path = require("node:path");
 
 const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/adapters/command");
 
+// The di-1 finding note carries the missing-file count and list, so it proves the
+// bundle was actually read rather than merely accepted.
+function handoffCompletenessNote(body) {
+	const finding = (body.report.findings || []).find((f) => f.id === "di-1-handoff-complete");
+	assert.ok(finding, "expected a di-1-handoff-complete finding");
+	return finding.summary || finding.note || "";
+}
+
 function tmpRoot() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-wf-dispatch-"));
 }
@@ -145,6 +153,74 @@ test("workflow assessment output refuses outside directories and output-file sym
 	}
 });
 
+// issues/0354: the adapter validated the bundle path and then handed its RESULT to
+// collectHandoff, which ran the same guard a second time. On a target reached through
+// an ancestor junction the guard returns the PHYSICAL path while targetRoot stays
+// LEXICAL, so the second pass refused a bundle that sits inside the target itself.
+test("assess reads a handoff bundle in a target reached through an ancestor junction", (t) => {
+	const container = tmpRoot();
+	const real = path.join(container, "real");
+	const link = path.join(container, "link");
+	fs.mkdirSync(real, { recursive: true });
+	try {
+		fs.symlinkSync(real, link, process.platform === "win32" ? "junction" : "dir");
+	} catch (error) {
+		fs.rmSync(container, { recursive: true, force: true });
+		if (/EPERM|ENOSYS|not permitted/i.test(error.message)) {
+			t.skip(`directory links unavailable: ${error.message}`);
+			return;
+		}
+		throw error;
+	}
+	// The target is named through the junction, so lexical and physical paths differ.
+	const target = path.join(link, "proj");
+	const bundle = path.join(target, "bundle");
+	try {
+		fs.mkdirSync(bundle, { recursive: true });
+		assert.notEqual(fs.realpathSync.native(target), path.resolve(target));
+		fs.writeFileSync(path.join(bundle, "risks.md"), "# Risks\n\n- drift\n", "utf8");
+		fs.writeFileSync(
+			path.join(bundle, "recovery-commands.md"),
+			"# Recovery Commands\n\n- npm test\n",
+			"utf8",
+		);
+		const relative = workflowDispatch("assess", target, {
+			target,
+			noSessions: true,
+			handoffBundleDir: "bundle",
+		});
+		assert.deepEqual(relative.errors, []);
+		// Not just "no error": the two files written under the junction-reached target
+		// must be the ones the report stops listing as missing.
+		const note = handoffCompletenessNote(relative);
+		assert.match(note, /missing 5 required file/);
+		assert.ok(!/risks\.md/.test(note) && !/recovery-commands\.md/.test(note), note);
+		// The absolute lexical form must work too: that is what a caller passing
+		// --target and --handoff-bundle-dir <abs> actually sends.
+		const absolute = workflowDispatch("assess", target, {
+			target,
+			noSessions: true,
+			handoffBundleDir: bundle,
+		});
+		assert.deepEqual(absolute.errors, []);
+		assert.match(handoffCompletenessNote(absolute), /missing 5 required file/);
+		// Containment still holds: the same guard must still refuse a real escape.
+		const outside = tmpRoot();
+		try {
+			const escaped = workflowDispatch("assess", target, {
+				target,
+				noSessions: true,
+				handoffBundleDir: outside,
+			});
+			assert.match(escaped.errors[0], /outside the target root/i);
+		} finally {
+			fs.rmSync(outside, { recursive: true, force: true });
+		}
+	} finally {
+		fs.rmSync(container, { recursive: true, force: true });
+	}
+});
+
 test("workflow assessment handoff bundle reads refuse outside directories", () => {
 	const root = tmpRoot();
 	const outside = tmpRoot();
@@ -158,5 +234,24 @@ test("workflow assessment handoff bundle reads refuse outside directories", () =
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("workflow assessment can read a root handoff bundle without writing to the repository", () => {
+	const root = fs.realpathSync.native(tmpRoot());
+	try {
+		fs.writeFileSync(path.join(root, "README.md"), "user readme");
+		const before = fs.readdirSync(root).sort();
+		const result = workflowDispatch("assess", root, {
+			target: root,
+			noSessions: true,
+			handoffBundleDir: ".",
+		});
+		assert.deepEqual(result.errors, []);
+		assert.ok(result.report);
+		assert.equal(fs.readFileSync(path.join(root, "README.md"), "utf8"), "user readme");
+		assert.deepEqual(fs.readdirSync(root).sort(), before);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
 	}
 });
