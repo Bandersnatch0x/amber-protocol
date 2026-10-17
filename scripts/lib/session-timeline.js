@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { assertExclusiveLeaf } = require("./core/fs-utils");
 const { readJSONL } = require("./core/jsonl");
 
 // scripts/lib/session-timeline.js
@@ -67,6 +68,9 @@ function appendSessionEvent(sessionDir, event) {
 			...event,
 			timestamp: new Date().toISOString(),
 		}) + "\n";
+	// Same invariant as appendJSONL: a planted shared-inode leaf would rewrite
+	// bytes under another name, so the governed timeline append checks first.
+	assertExclusiveLeaf("Timeline leaf", path.join(sessionDir, FILENAME));
 	fs.appendFileSync(path.join(sessionDir, FILENAME), line);
 }
 

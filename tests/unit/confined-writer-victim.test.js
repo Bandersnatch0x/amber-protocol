@@ -2,12 +2,13 @@
 
 // Red-when-removed behavior tests for the shared-inode guard on the four
 // target-resolved write sites migrated to the confined writer seam
-// (issue #362, escapes A-D). Each test plants a hard link whose leaf is
-// inside the target but whose bytes are shared with a file outside the
-// target, runs the real command surface, and asserts the refusal both
-// happens (expected error) and is inert (outside victim bytes unchanged).
-// Remove the guard and the write goes through the shared inode, corrupting
-// the outside file — each test goes red.
+// (issue #362, escapes A-D), plus the session timeline append (0158, Site E).
+// Each test plants a hard link whose leaf is inside the target but whose
+// bytes are shared with a file outside the target, runs the real command
+// surface, and asserts the refusal both happens (expected error) and is
+// inert (outside victim bytes unchanged). Remove the guard and the write
+// goes through the shared inode, corrupting the outside file — each test
+// goes red.
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -23,6 +24,7 @@ const {
 	templateManagedFiles,
 } = require("../../scripts/lib/core/scaffold-provenance");
 const { acceptPlan } = require("../../scripts/lib/core/planning");
+const { appendSessionEvent } = require("../../scripts/lib/session-timeline");
 
 function tempDir(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-shared-inode-${label}-`));
@@ -351,6 +353,25 @@ test("accept plan refuses an evolution log hard-linked outside the target", () =
 		assertInertRefusal(() => acceptPlan(target, planRel), victim);
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+// Site E (0158): appendSessionEvent is the governed timeline ledger append;
+// its guard matches appendJSONL's. A planted link on the timeline.jsonl leaf
+// must be refused inertly.
+test("session timeline append refuses a timeline.jsonl hard-linked outside the session dir", () => {
+	const sessionDir = tempDir("timeline");
+	const outside = tempDir("timeline-out");
+	const victim = path.join(outside, "victim.jsonl");
+	try {
+		fs.writeFileSync(victim, "user outside\n", "utf8");
+		fs.mkdirSync(sessionDir, { recursive: true });
+		fs.linkSync(victim, path.join(sessionDir, "timeline.jsonl"));
+
+		assertInertRefusal(() => appendSessionEvent(sessionDir, { type: "session_created" }), victim);
+	} finally {
+		fs.rmSync(sessionDir, { recursive: true, force: true });
 		fs.rmSync(outside, { recursive: true, force: true });
 	}
 });
