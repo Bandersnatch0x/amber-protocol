@@ -220,7 +220,9 @@ function exportOkfBundle(target, options = {}) {
 		assertExclusiveLeaf("Wiki export source page", source);
 	}
 
-	// shortcut: preflight cannot prevent TOCTOU path swaps, use race-safe writes for hostile concurrent mutation.
+	// The preflight above is an early refusal only; the seam writers pin the destination
+	// fd and re-check nlink there, so a link swapped in after this scan cannot redirect
+	// the bytes (0159).
 	fs.mkdirSync(outputDir, { recursive: true });
 	for (const { source, rel } of copiedPages) {
 		// Preflight and the write share canonical names: validationRoot is the target's

@@ -48,7 +48,9 @@ function lstatIfPresent(filePath) {
 // A hard link is a real in-target file, so every path and symlink check passes,
 // yet writing it replaces the bytes of every other name sharing that inode —
 // including names outside the target. Writers check their planned leaves.
-// shortcut: check-then-write, so a link swapped in after this call is not caught; race-safe writes needed for hostile concurrent mutation.
+// Bare callers of this guard are still check-then-write; the seam writers below
+// pin the inode with an fd (writeFileExclusive) and hold that check through the
+// write, so a link swapped in after the path check cannot redirect the bytes.
 function assertExclusiveLeaf(label, filePath) {
 	// Follow links: the write goes to the referent, so an in-target symlink whose
 	// referent is hard-linked outside the target escapes exactly like the leaf.
@@ -176,13 +178,33 @@ function readJsonSafe(filePath) {
 	}
 }
 
-function writeJson(filePath, data) {
+// Race-safe counterpart to assertExclusiveLeaf: open the destination without
+// truncating, check the pinned fd's nlink, then write through that same fd. A
+// leaf swapped for a hard link after the path check cannot redirect the bytes —
+// the fd already refers to the inode the check approved. Opening without O_TRUNC
+// leaves the existing bytes untouched until the check passes.
+function writeFileExclusive(filePath, data, encoding, label) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	const fd = fs.openSync(filePath, fs.constants.O_WRONLY | fs.constants.O_CREAT);
+	try {
+		const stat = fs.fstatSync(fd);
+		if (stat.isFile() && stat.nlink > 1) {
+			throw new Error(
+				`${label} is hard-linked to ${stat.nlink} paths and would be written through a shared inode: ${filePath}`,
+			);
+		}
+		fs.ftruncateSync(fd, 0);
+		fs.writeFileSync(fd, data, encoding);
+	} finally {
+		fs.closeSync(fd);
+	}
+}
+
+function writeJson(filePath, data) {
 	// Every caller of this writer overwrites the leaf in place, so the shared-inode check
 	// belongs here rather than at each caller. writeJsonPrettier needs none: rename swaps
 	// the name's inode and leaves any other name pointing at the old bytes untouched.
-	assertExclusiveLeaf("JSON destination", filePath);
-	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
+	writeFileExclusive(filePath, `${JSON.stringify(data, null, 2)}\n`, undefined, "JSON destination");
 }
 
 // The confined-write seam: writers that take a target-relative path from flags
@@ -207,8 +229,7 @@ function writeFileWithinTarget(targetRoot, relativePath, data, options = {}) {
 		options.label || "Confined output",
 		options,
 	);
-	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	fs.writeFileSync(filePath, data, options.encoding);
+	writeFileExclusive(filePath, data, options.encoding, options.label || "Confined output");
 	return filePath;
 }
 
@@ -219,8 +240,15 @@ function copyFileWithinTarget(targetRoot, relativePath, sourcePath, options = {}
 		options.label || "Confined output",
 		options,
 	);
-	fs.mkdirSync(path.dirname(filePath), { recursive: true });
-	fs.copyFileSync(sourcePath, filePath);
+	// copyFileSync reopens the destination by path, which reintroduces the race the
+	// seam exists to close; read the (trusted) source and write through the pinned fd.
+	// File mode is not copied — every seam source is a content artifact, not an executable.
+	writeFileExclusive(
+		filePath,
+		fs.readFileSync(sourcePath),
+		undefined,
+		options.label || "Confined output",
+	);
 	return filePath;
 }
 
