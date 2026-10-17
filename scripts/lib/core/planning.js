@@ -947,6 +947,9 @@ function acceptPlan(target, planRelativePath, options = {}) {
 	].join("\n");
 
 	fs.mkdirSync(path.dirname(evolutionPath), { recursive: true });
+	// A fixed in-target name this writer overwrites or appends to, so a planted
+	// shared-inode link here needs no caller-supplied path to escape the target.
+	assertExclusiveLeaf("Evolution log", evolutionPath);
 	if (!pathExists(evolutionPath)) {
 		fs.writeFileSync(
 			evolutionPath,

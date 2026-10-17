@@ -2,7 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { assertExclusiveLeaf, resolveTarget, readJsonSafe, writeJson } = require("./core/fs-utils");
+const { confinedLeafPath, resolveTarget, readJsonSafe, writeJson } = require("./core/fs-utils");
 const { codedError } = require("./core/error-catalog");
 
 const COMPLETE_STATUSES = new Set(["passing", "accepted", "done"]);
@@ -106,16 +106,24 @@ function installHook(target, { warnOnly = false, force = false } = {}) {
 		const existing = fs.readFileSync(hookPath, "utf8");
 		if (!existing.includes(HOOK_MARKER) && !force) {
 			const backup = hookPath + ".amber-backup";
-			// Both names are fixed names this writer overwrites in place, so a planted link
-			// here needs no caller-supplied path to replace another name's bytes.
-			assertExclusiveLeaf("Hook backup", backup);
-			fs.writeFileSync(backup, existing);
+			// Both names are fixed names this writer overwrites in place. The seam's leaf
+			// check needs no caller-supplied path to refuse a planted shared-inode link.
+			fs.writeFileSync(
+				confinedLeafPath(
+					targetRoot,
+					path.join(".git", "hooks", "pre-commit.amber-backup"),
+					"Hook backup",
+				),
+				existing,
+			);
 			warnings.push(`Existing pre-commit hook backed up to ${path.basename(backup)}.`);
 		}
 	}
 
-	assertExclusiveLeaf("Pre-commit hook", hookPath);
-	fs.writeFileSync(hookPath, buildShim(targetRoot, { warnOnly }));
+	fs.writeFileSync(
+		confinedLeafPath(targetRoot, path.join(".git", "hooks", "pre-commit"), "Pre-commit hook"),
+		buildShim(targetRoot, { warnOnly }),
+	);
 	try {
 		fs.chmodSync(hookPath, 0o755);
 	} catch (_) {
@@ -146,8 +154,10 @@ function uninstallHook(target) {
 	}
 	const backup = hookPath + ".amber-backup";
 	if (fs.existsSync(backup)) {
-		assertExclusiveLeaf("Pre-commit hook", hookPath);
-		fs.writeFileSync(hookPath, fs.readFileSync(backup, "utf8"));
+		fs.writeFileSync(
+			confinedLeafPath(targetRoot, path.join(".git", "hooks", "pre-commit"), "Pre-commit hook"),
+			fs.readFileSync(backup, "utf8"),
+		);
 		fs.rmSync(backup, { force: true });
 		return {
 			target: targetRoot,

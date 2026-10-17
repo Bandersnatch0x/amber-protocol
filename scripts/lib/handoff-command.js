@@ -7,7 +7,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { assertExclusiveLeaf, resolveTarget } = require("./core/fs-utils");
+const { confinedLeafPath, resolveTarget } = require("./core/fs-utils");
 const { localIsoDate } = require("./core/text-utils");
 const { getRepoSnapshot } = require("./core/git-state");
 const { classifyDirtyPaths, renderDirtyPathsSection } = require("./core/dirty-paths");
@@ -265,10 +265,9 @@ function writeHandoff(target, options = {}) {
 	const existing = fs.existsSync(handoffPath) ? fs.readFileSync(handoffPath, "utf8") : null;
 	const changed = existing !== content;
 	if (changed && !options.dryRun) {
-		// session-handoff.md is a fixed name this writer overwrites in place, so a planted
-		// link here needs no caller-supplied path to replace another name's bytes.
-		assertExclusiveLeaf("Handoff file", handoffPath);
-		fs.writeFileSync(handoffPath, content);
+		// session-handoff.md is a fixed name this writer overwrites in place. The seam's
+		// leaf check needs no caller-supplied path to refuse a planted shared-inode link.
+		fs.writeFileSync(confinedLeafPath(targetRoot, "session-handoff.md", "Handoff file"), content);
 	}
 	return { path: handoffPath, changed };
 }

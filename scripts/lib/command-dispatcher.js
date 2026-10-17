@@ -33,12 +33,10 @@ function handleLedger(args) {
 		const result = exportLedger(targetRoot, { format: args.format, home: args.home });
 		if (args.out) {
 			const fs = require("node:fs");
-			const { assertExclusiveLeaf, resolvePathWithin } = require("./core/fs-utils");
-			const outputPath = resolvePathWithin(targetRoot, args.out, {
+			const { writeFileWithinTarget } = require("./core/fs-utils");
+			const outputPath = writeFileWithinTarget(targetRoot, args.out, result.payload + "\n", {
 				label: "Ledger export destination",
 			});
-			assertExclusiveLeaf("Ledger export destination", outputPath);
-			fs.writeFileSync(outputPath, result.payload + "\n");
 			return require("./command-helpers").shapeResult(args, {
 				text: `Wrote ${result.ledgers.length} ledger(s) to ${outputPath} (intact=${result.intactCount}, broken=${result.brokenCount})`,
 				errors: result.errors,

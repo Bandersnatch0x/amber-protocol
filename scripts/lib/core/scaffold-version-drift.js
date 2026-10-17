@@ -12,7 +12,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { TEMPLATE_ROOT } = require("./constants");
-const { pathExists, resolvePathWithin } = require("./fs-utils");
+const {
+	copyFileWithinTarget,
+	pathExists,
+	resolvePathWithin,
+	writeFileWithinTarget,
+} = require("./fs-utils");
 const {
 	computeTemplateHash,
 	templateManagedFiles,
@@ -111,9 +116,18 @@ function refreshAmberOwnedFiles(targetRoot, { templateRoot = TEMPLATE_ROOT } = {
 	for (const f of drift.files) {
 		if (f.classification !== "stale" || f.tier !== "controlled") continue;
 		const dest = staleDestinations.get(f.path);
-		const bak = dest + ".bak";
-		if (!pathExists(bak)) fs.copyFileSync(dest, bak);
-		fs.copyFileSync(path.join(templateRoot, f.path), dest);
+		// .bak keeps the canonicalized dest's bytes before the overwrite; the seam
+		// refuses a planted shared-inode link on either fixed name.
+		if (!pathExists(dest + ".bak")) {
+			writeFileWithinTarget(targetRoot, f.path + ".bak", fs.readFileSync(dest), {
+				label: "Scaffold refresh backup",
+				canonicalExisting: true,
+			});
+		}
+		copyFileWithinTarget(targetRoot, f.path, path.join(templateRoot, f.path), {
+			label: "Scaffold refresh destination",
+			canonicalExisting: true,
+		});
 		if (provenance) {
 			provenance.files[f.path] = { templateHash: computeTemplateHash(dest), tier: f.tier };
 			changed = true;
@@ -131,12 +145,15 @@ function refreshAmberOwnedFiles(targetRoot, { templateRoot = TEMPLATE_ROOT } = {
 				statePathForCreate(targetRoot, "maintenance", "proposals"),
 				{ label: "Scaffold proposal directory", allowRoot: true, canonicalExisting: true },
 			);
-			const proposalPath = resolvePathWithin(proposalDir, f.path.replace(/\//g, "__") + ".new", {
-				label: "Scaffold proposal",
-				canonicalExisting: true,
-			});
-			fs.mkdirSync(proposalDir, { recursive: true });
-			fs.copyFileSync(path.join(templateRoot, f.path), proposalPath);
+			copyFileWithinTarget(
+				proposalDir,
+				f.path.replace(/\//g, "__") + ".new",
+				path.join(templateRoot, f.path),
+				{
+					label: "Scaffold proposal",
+					canonicalExisting: true,
+				},
+			);
 			proposals.push(f.path);
 		}
 	}

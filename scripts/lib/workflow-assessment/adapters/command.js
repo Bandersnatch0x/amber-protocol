@@ -2,10 +2,10 @@
 
 const fs = require("node:fs");
 const {
-	assertExclusiveLeaf,
 	isMissingPath,
 	resolvePathWithin,
 	resolveTarget,
+	writeFileWithinTarget,
 } = require("../../core/fs-utils");
 const { defineCommand } = require("../../subcommand-dispatcher");
 const { assess, buildDraft, compare, findings } = require("..");
@@ -90,24 +90,21 @@ function assessWorkflow(args) {
 		}
 		fs.mkdirSync(outputDir, { recursive: true });
 		const extension = format === "markdown" ? "md" : "json";
-		let outputPath;
 		try {
-			outputPath = resolvePathWithin(outputDir, `workflow-assessment.${extension}`, {
-				label: "Workflow assessment output",
-				canonicalExisting: true,
-			});
+			result.outputPath = writeFileWithinTarget(
+				outputDir,
+				`workflow-assessment.${extension}`,
+				output,
+				{
+					label: "Workflow assessment output",
+					encoding: "utf8",
+					canonicalExisting: true,
+				},
+			);
 		} catch (error) {
 			result.errors.push(error.message || String(error));
 			return result;
 		}
-		try {
-			assertExclusiveLeaf("Workflow assessment output", outputPath);
-		} catch (error) {
-			result.errors.push(error.message || String(error));
-			return result;
-		}
-		fs.writeFileSync(outputPath, output, "utf8");
-		result.outputPath = outputPath;
 	}
 	return result;
 }

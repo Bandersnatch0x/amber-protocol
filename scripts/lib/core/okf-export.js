@@ -10,12 +10,14 @@ const path = require("node:path");
 
 const {
 	assertExclusiveLeaf,
+	copyFileWithinTarget,
 	pathExists,
 	readText,
 	relativeSlash,
 	resolvePathWithin,
 	resolveTarget,
 	walkFiles,
+	writeFileWithinTarget,
 } = require("./fs-utils");
 const { extractMarkdownLinks, isExternalLink, stripAnchorAndQuery } = require("./text-utils");
 const { parseOkfFrontmatter, OKF_VERSION } = require("./okf-frontmatter");
@@ -221,12 +223,24 @@ function exportOkfBundle(target, options = {}) {
 	// shortcut: preflight cannot prevent TOCTOU path swaps, use race-safe writes for hostile concurrent mutation.
 	fs.mkdirSync(outputDir, { recursive: true });
 	for (const { source, rel } of copiedPages) {
-		const dest = path.join(outputDir, rel);
-		fs.mkdirSync(path.dirname(dest), { recursive: true });
-		fs.copyFileSync(source, dest);
+		// Preflight and the write share canonical names: validationRoot is the target's
+		// own realpath, so the seam-relative stays clean under aliased ancestors (a
+		// logical-vs-realpath target or output spelling must never be mixed in one
+		// path.relative) and a leaf link landing inside the target still writes through.
+		copyFileWithinTarget(
+			validationRoot,
+			path.relative(validationRoot, path.join(validationDir, rel)),
+			source,
+			{ label: "Wiki export output file" },
+		);
 	}
 	for (const [rel, content] of generatedFiles) {
-		fs.writeFileSync(path.join(outputDir, rel), content);
+		writeFileWithinTarget(
+			validationRoot,
+			path.relative(validationRoot, path.join(validationDir, rel)),
+			content,
+			{ label: "Wiki export output file" },
+		);
 	}
 
 	return {

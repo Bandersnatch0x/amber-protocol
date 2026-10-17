@@ -5,7 +5,12 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const { validateHandoff } = require("./audit");
-const { assertExclusiveLeaf, resolvePathWithin, resolveTarget } = require("./fs-utils");
+const {
+	assertExclusiveLeaf,
+	resolvePathWithin,
+	resolveTarget,
+	writeFileWithinTarget,
+} = require("./fs-utils");
 const { buildGovernanceReport } = require("./governance-report");
 const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
@@ -623,10 +628,17 @@ function writeHandoffBundle(target, options = {}) {
 		assertExclusiveLeaf("Handoff bundle output", filePath);
 	}
 	const files = Object.entries(contents).map(([rel, content]) => {
-		const filePath = path.join(outputDir, rel);
-		fs.mkdirSync(path.dirname(filePath), { recursive: true });
-		fs.writeFileSync(filePath, content);
-		return filePath;
+		// Preflight and the write share canonical names: validationRoot is the target's
+		// own realpath, so the seam-relative stays clean under aliased ancestors (a
+		// logical-vs-realpath target or output spelling must never be mixed in one
+		// path.relative) and a leaf link landing inside the target still writes through.
+		writeFileWithinTarget(
+			validationRoot,
+			path.relative(validationRoot, path.join(validationDir, rel)),
+			content,
+			{ label: "Handoff bundle output" },
+		);
+		return path.join(outputDir, rel);
 	});
 
 	const validation = validateHandoffBundle(outputDir);

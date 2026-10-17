@@ -21,7 +21,7 @@ const {
 } = require("./core/governance-report");
 const { mapStandards } = require("./core/standards");
 const { DEFAULT_RULES, loadPolicyRules, evaluateGovernedPolicy } = require("./core/loop-policy");
-const { resolvePathWithin } = require("./core/fs-utils");
+const { resolveTarget } = require("./core/fs-utils");
 const { defineCommand } = require("./subcommand-dispatcher");
 
 const GOVERNANCE_ACTIONS = [
@@ -185,14 +185,7 @@ function inspectGovernanceReadinessBody(target, options = {}) {
 function generateGovernanceReportBody(target, options = {}) {
 	const report = buildGovernanceReport(target, { targetDisplay: options.targetDisplay || target });
 	const outputPath = options.output
-		? writeGovernanceReportMarkdown(
-				report,
-				resolvePathWithin(target, options.output, {
-					label: "Governance report destination",
-					allowRoot: false,
-					canonicalExisting: true,
-				}),
-			)
+		? writeGovernanceReportMarkdown(report, resolveTarget(target), options.output)
 		: undefined;
 
 	return {

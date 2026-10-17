@@ -5,7 +5,7 @@ const path = require("node:path");
 
 const { buildLoadout } = require("./context-loadout");
 const { canonicalJson, sha256 } = require("./context-hash");
-const { resolvePathWithin } = require("./fs-utils");
+const { resolvePathWithin, writeFileWithinTarget } = require("./fs-utils");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { compileSchema } = require("./schema-contract");
 
@@ -185,14 +185,12 @@ function loadFixture(targetRoot, fixturePath) {
 }
 
 function persistReport(targetRoot, fixtureId, report) {
-	const reportPath = resolvePathWithin(
+	return writeFileWithinTarget(
 		targetRoot,
 		statePathForCreate(targetRoot, "context", "benchmarks", `${fixtureId}.json`),
-		{ label: "Context benchmark report" },
+		`${JSON.stringify(report, null, 2)}\n`,
+		{ label: "Context benchmark report", encoding: "utf8" },
 	);
-	fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-	fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-	return reportPath;
 }
 
 function runBenchmark(targetRoot, options = {}) {

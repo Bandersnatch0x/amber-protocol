@@ -5,11 +5,11 @@ const path = require("node:path");
 
 const { escapeYaml } = require("../../core/simple-yaml");
 const {
-	assertExclusiveLeaf,
 	pathExists,
 	readJson,
 	relativeSlash,
 	resolveTarget,
+	writeFileWithinTarget,
 } = require("../../core/fs-utils");
 const { KNOWLEDGE_PLAN_YAML_RELATIVE, loadKnowledgePlan } = require("./load");
 
@@ -57,11 +57,12 @@ function proposeKnowledgePlan(target, options = {}) {
 	if (!dryRun && (!existing.found || force)) {
 		try {
 			const yamlText = planToSimpleYaml(suggested);
-			fs.mkdirSync(path.dirname(planPath), { recursive: true });
-			// A fixed in-target name this writer overwrites when --force, so a planted link
-			// here needs no caller-supplied path to replace another name's bytes.
-			assertExclusiveLeaf("Knowledge plan destination", planPath);
-			fs.writeFileSync(planPath, yamlText, "utf8");
+			// A fixed in-target name this writer overwrites when --force. The seam's leaf
+			// check needs no caller-supplied path to refuse a planted shared-inode link.
+			writeFileWithinTarget(targetRoot, KNOWLEDGE_PLAN_YAML_RELATIVE, yamlText, {
+				label: "Knowledge plan destination",
+				encoding: "utf8",
+			});
 			result.created.push(relPath);
 		} catch (e) {
 			result.errors.push(`Failed to write plan: ${e.message}`);

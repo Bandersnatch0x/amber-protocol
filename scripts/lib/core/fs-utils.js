@@ -185,6 +185,45 @@ function writeJson(filePath, data) {
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+// The confined-write seam: writers that take a target-relative path from flags
+// resolve, leaf-check, and write through here so the shared-inode check is not
+// per-caller. The resolved path is what gets written — no caller re-derives it.
+// `label` names the destination in refusals; pass `allowRoot`/`canonicalExisting`
+// only where the resolved writer already needs them (see resolvePathWithin).
+function confinedLeafPath(targetRoot, relativePath, label, options = {}) {
+	const resolved = resolvePathWithin(targetRoot, relativePath, {
+		label,
+		allowRoot: options.allowRoot === true,
+		canonicalExisting: options.canonicalExisting === true,
+	});
+	assertExclusiveLeaf(label, resolved);
+	return resolved;
+}
+
+function writeFileWithinTarget(targetRoot, relativePath, data, options = {}) {
+	const filePath = confinedLeafPath(
+		targetRoot,
+		relativePath,
+		options.label || "Confined output",
+		options,
+	);
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.writeFileSync(filePath, data, options.encoding);
+	return filePath;
+}
+
+function copyFileWithinTarget(targetRoot, relativePath, sourcePath, options = {}) {
+	const filePath = confinedLeafPath(
+		targetRoot,
+		relativePath,
+		options.label || "Confined output",
+		options,
+	);
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.copyFileSync(sourcePath, filePath);
+	return filePath;
+}
+
 // Prettier-compatible JSON layout. JSON.stringify never collapses containers, so its
 // output fails format:check on repos that Prettier-check their JSON. Rules mirror
 // Prettier's json printer: tab indent (tabWidth 2), printWidth 100, containers
@@ -347,6 +386,9 @@ module.exports = {
 	readJsonSafe,
 	writeJson,
 	writeJsonPrettier,
+	confinedLeafPath,
+	writeFileWithinTarget,
+	copyFileWithinTarget,
 	collectFilesBySuffix,
 	walkFiles,
 	isIgnoredAuditPath,
