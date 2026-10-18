@@ -149,6 +149,103 @@ describe("session-commands", () => {
 			assert.ok(fs.existsSync(path.join(sessionDir, "timeline.jsonl")));
 		});
 
+		it("derives the session goal from the bound feature title", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "add greeting feature", area: "core" });
+
+			const result = await startSession(TEST_ROOT, { feature: "F001" });
+
+			assert.strictEqual(result.exitCode, 0, result.text);
+			const { manifest } = readSessionArtifacts(TEST_ROOT, result.sessionId);
+			assert.strictEqual(manifest.goal, "add greeting feature");
+			assert.strictEqual(manifest.feature, "F001");
+		});
+
+		it("keeps an explicit goal when a feature is also bound", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "add greeting feature", area: "core" });
+
+			const result = await startSession(TEST_ROOT, {
+				goal: "explicit goal",
+				feature: "F001",
+			});
+
+			assert.strictEqual(result.exitCode, 0, result.text);
+			const { manifest } = readSessionArtifacts(TEST_ROOT, result.sessionId);
+			assert.strictEqual(manifest.goal, "explicit goal");
+		});
+
+		it("fails closed when the feature is not registered", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "registered feature", area: "core" });
+
+			const result = await startSession(TEST_ROOT, { feature: "NOPE" });
+
+			assert.strictEqual(result.exitCode, 1);
+			assert.match(result.text, /Feature NOPE was not found/);
+			assert.match(result.text, /amber feature add --id NOPE --title/);
+			const sessionsDir = path.join(TEST_ROOT, ".amber", "sessions");
+			assert.ok(!fs.existsSync(sessionsDir) || fs.readdirSync(sessionsDir).length === 0);
+		});
+
+		it("fails closed when an explicit goal binds an unregistered feature", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "registered feature", area: "core" });
+
+			const result = await startSession(TEST_ROOT, { goal: "explicit goal", feature: "NOPE" });
+
+			assert.strictEqual(result.exitCode, 1);
+			assert.match(result.text, /Feature NOPE was not found/);
+			const sessionsDir = path.join(TEST_ROOT, ".amber", "sessions");
+			assert.ok(!fs.existsSync(sessionsDir) || fs.readdirSync(sessionsDir).length === 0);
+		});
+
+		it("fails closed when feature_list.json cannot be read", async () => {
+			const result = await startSession(TEST_ROOT, { feature: "F001" });
+
+			assert.strictEqual(result.exitCode, 1);
+			assert.match(result.text, /Cannot read feature_list\.json:/);
+		});
+
+		it("requires either a goal or feature", async () => {
+			const result = await startSession(TEST_ROOT, {});
+
+			assert.strictEqual(result.exitCode, 1);
+			assert.match(result.text, /--goal/);
+			assert.match(result.text, /--feature/);
+		});
+
+		it("fails closed when the registered feature title is empty", async () => {
+			fs.writeFileSync(
+				path.join(TEST_ROOT, "feature_list.json"),
+				JSON.stringify({ features: [{ id: "F001", title: "  " }] }),
+			);
+
+			const result = await startSession(TEST_ROOT, { feature: "F001" });
+
+			assert.strictEqual(result.exitCode, 1);
+			assert.match(result.text, /pass --goal or fix the feature title/);
+		});
+
+		it("accepts --feature through the real CLI and prints the derived goal", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "add greeting feature", area: "core" });
+			const cliPath = path.resolve(__dirname, "../../scripts/amber.js");
+			const smoke = spawnSync(
+				process.execPath,
+				[
+					cliPath,
+					"session",
+					"start",
+					"--target",
+					TEST_ROOT,
+					"--feature",
+					"F001",
+					"--confirm",
+					"--json",
+				],
+				{ cwd: path.resolve(__dirname, "../.."), encoding: "utf8" },
+			);
+
+			assert.strictEqual(smoke.status, 0, smoke.stderr || smoke.stdout);
+			assert.match(smoke.stdout, /add greeting feature/);
+		});
+
 		it("falls back to feature-standard with a warning when no route matches", async () => {
 			const result = await startSession(TEST_ROOT, { goal: "tweak the footer" });
 			assert.strictEqual(result.exitCode, 0);

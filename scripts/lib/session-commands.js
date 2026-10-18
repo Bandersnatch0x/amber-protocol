@@ -9,6 +9,7 @@ const {
 	readAllSessionManifests,
 	writeSessionManifest,
 } = require("./session-manifest");
+const { findFeatureById } = require("./core/validators");
 const { appendSessionEvent, readSessionEvents } = require("./session-timeline");
 const { SessionStateMachine, STATES } = require("./session-state-machine");
 const { loadLatestCheckpoint, loadCheckpointByStage } = require("./checkpoint-manager");
@@ -168,7 +169,36 @@ function loadAllSessionManifests(projectRoot) {
 }
 
 async function startSession(projectRoot, options) {
-	const { goal, route: routeId, budget, worktree, mode, feature, agent } = options;
+	const { goal: requestedGoal, route: routeId, budget, worktree, mode, feature, agent } = options;
+	let goal = requestedGoal;
+
+	if (goal === undefined && !feature) {
+		return result('Error: Pass --goal "..." or --feature <id> to derive the session goal.', 1);
+	}
+
+	let registeredFeature;
+	if (feature) {
+		try {
+			registeredFeature = findFeatureById(projectRoot, feature);
+		} catch (error) {
+			return result(`Error: Cannot read feature_list.json: ${error.message}`, 1);
+		}
+		if (!registeredFeature) {
+			return result(
+				`Error: Feature ${feature} was not found in feature_list.json. Add it with: amber feature add --id ${feature} --title "..."`,
+				1,
+			);
+		}
+		if (typeof registeredFeature.title !== "string" || !registeredFeature.title.trim()) {
+			return result(
+				`Error: Feature ${feature} in feature_list.json has no non-empty title; pass --goal or fix the feature title.`,
+				1,
+			);
+		}
+	}
+	if (goal === undefined) {
+		goal = registeredFeature.title;
+	}
 
 	if (!goal) {
 		return result("Error: --goal is required", 1);

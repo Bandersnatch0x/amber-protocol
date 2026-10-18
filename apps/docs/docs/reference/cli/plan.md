@@ -24,7 +24,7 @@ Create a feature-linked vertical-slice plan from a registered feature.
 ## Usage
 
 ```bash
-amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]
+amber plan --target <repo> --feature <id> [--title <text>] [--json] [--dry-run]
 ```
 
 ## Execution Contract

@@ -63,12 +63,12 @@ learning write-back checkpoint (`amber learnings`) detects its triggers from the
 Create a feature-linked vertical-slice plan from a registered feature (the scaffold includes the Context manifests section: implement/review knowledge-surface lists, gate-validated — missing paths, escaping paths, and code paths are errors; `amber review` echoes the curated lists):
 
 ```bash
-node scripts/amber.js plan --target . --feature F001 --title "Small slice" [--dry-run]
+node scripts/amber.js plan --target . --feature F001 [--title "Small slice"] [--dry-run]
 ```
 
 **Options:**
 - `--feature`: Feature id (e.g. F001) — must already exist in `feature_list.json` (required)
-- `--title`: Short human-readable title for the plan (required)
+- `--title`: Optional short plan title; defaults to the feature title
 - `--dry-run`: Preview without writing files
 
 The scaffold includes a **Context manifests** section: `implement` and `review` role lists of
@@ -177,7 +177,8 @@ node scripts/amber.js session start \
 ```
 
 **Options:**
-- `--goal`: Session objective (required)
+- `--goal`: Session objective (required unless `--feature` is given)
+- `--feature <id>`: Bind the session to a registered feature; when `--goal` is omitted, derive it from the feature title
 - `--route`: Route ID (default: feature-standard)
 - `--budget`: Token limit (default: from route)
 - `--worktree`: Use git worktree isolation

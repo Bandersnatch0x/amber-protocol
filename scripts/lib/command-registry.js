@@ -197,8 +197,9 @@ const COMMAND_HELP = {
 		"Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.",
 		"",
 		"Subcommands:",
-		'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive] [--agent <id>]',
+		'  start (--goal "..." | --feature <id>) [--route <id>] [--budget <n>] [--worktree] [--mode interactive] [--agent <id>]',
 		"      Create a new session, write manifest + timeline, optionally create worktree.",
+		"      --feature binds a registered feature and derives the goal from its title when --goal is omitted.",
 		"  status [<id>]",
 		"      Show status of current session or specified session by ID.",
 		"  list",
@@ -2024,7 +2025,7 @@ const COMMAND_OUTPUT = {
 	wiki: { dryRun: true },
 	plan: {
 		dryRun: true,
-		usage: "Usage: amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]",
+		usage: "Usage: amber plan --target <repo> --feature <id> [--title <text>] [--json] [--dry-run]",
 	},
 	gate: {
 		usage: [

@@ -59,8 +59,9 @@ amber session <start|status|list|abort|continue|complete-check|verify|approve|ve
 Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.
 
 Subcommands:
-  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive] [--agent <id>]
+  start (--goal "..." | --feature <id>) [--route <id>] [--budget <n>] [--worktree] [--mode interactive] [--agent <id>]
       Create a new session, write manifest + timeline, optionally create worktree.
+      --feature binds a registered feature and derives the goal from its title when --goal is omitted.
   status [<id>]
       Show status of current session or specified session by ID.
   list
