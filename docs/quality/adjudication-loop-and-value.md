@@ -6,7 +6,7 @@
 **Machine summary:** [`adjudication-loop-and-value.json`](./adjudication-loop-and-value.json)  
 **Date:** 2026-07-11  
 
-> **Post-adjudication update (2026-07-14):** G1 (`next` last-mile) and G2 (template handoff) — the two gaps that block 完整 below — were subsequently **verified CLOSED** on a real non-product target repo via the weekly dogfood ritual (issue #54). See [`e2e-governance-loop-verify.md`](./e2e-governance-loop-verify.md) Findings G1/G2. The body below is the frozen 2026-07-11 adjudication; read it as the verdict at that date, not current status. The machine summary carries the matching `postAdjudicationClosures` note.
+> **Post-adjudication update (2026-07-14, extended 2026-10-18):** G1 (`next` last-mile) and G2 (template handoff) — the two gaps that block 完整 below — were subsequently **verified CLOSED** on a real non-product target repo via the weekly dogfood ritual (issue #54). See [`e2e-governance-loop-verify.md`](./e2e-governance-loop-verify.md) Findings G1/G2. N2 (multi-gate needs discovering `--gate`) and A1 (adoption path not wired into `next`) were fixed in the lifecycle model: N2 in `37778cf9` (`resolvePendingGate` + the approve remedy naming the concrete pending gate, guarded by `tests/integration/amber-next.test.js`), A1 in `59696754` (the read-only `audit` advisory step that `evaluateLifecycle` exposes and the init rationale names, deliberately non-blocking per #43). No closure is recorded for N1 (repeat-entry overhead) or W1 (web partial loop, by design); V1–V3 still require external pilots. The body below is the frozen 2026-07-11 adjudication; read it as the verdict at that date, not current status. The machine summary carries the matching `postAdjudicationClosures` note.
 
 ## Scope and rules
 
