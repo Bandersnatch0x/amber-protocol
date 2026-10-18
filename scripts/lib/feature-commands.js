@@ -45,7 +45,7 @@ function addFeature(target, options) {
 	const targetRoot = resolveTarget(target);
 	const { id, title, priority, area, paths, behavior, verify } = options;
 
-	if (!id) {
+	if (typeof id !== "string" || id.trim() === "") {
 		return {
 			target: targetRoot,
 			errors: ["feature add requires --id <feature-id>."],

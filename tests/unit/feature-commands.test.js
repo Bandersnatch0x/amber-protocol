@@ -71,6 +71,13 @@ test("addFeature rejects a whitespace-only title without writing", () => {
 	assert.deepStrictEqual(readFeatures(dir).features, []);
 });
 
+test("addFeature rejects a whitespace-only id without writing", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, { id: "   ", title: "T" });
+	assert.ok(r.errors.includes("feature add requires --id <feature-id>."));
+	assert.deepStrictEqual(readFeatures(dir).features, []);
+});
+
 test("addFeature stores user_visible_behavior from --behavior (#75)", () => {
 	const dir = tmpDir();
 	const r = addFeature(dir, {
