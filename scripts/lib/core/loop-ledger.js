@@ -75,6 +75,19 @@ function writeAnchor(ledgerPath, anchor) {
 	}
 }
 
+// A chain written before per-ledger anchoring existed (or whose anchor store was never
+// created) is not tampered: its hashes verify. `amber ledger seal` is the human decision
+// that adopts it by writing the anchor the chain would have had. Never call this before
+// the previous-seal drift check — adopting a chain that no longer extends its seal would
+// launder a truncation past verify.
+function adoptUnanchoredLedger(ledgerPath) {
+	const records = readLedger(ledgerPath);
+	if (records.length === 0) return null;
+	const head = records[records.length - 1];
+	writeAnchor(ledgerPath, { count: records.length, headHash: head.hash });
+	return { count: records.length, headHash: head.hash };
+}
+
 // The anchor may lag the file by the one record a crash interrupted between the
 // line append and the anchor write; a longer chain whose anchored record still
 // matches is a valid extension.
@@ -352,6 +365,7 @@ module.exports = {
 	hashRecord,
 	readLedger,
 	appendLedgerRecord,
+	adoptUnanchoredLedger,
 	consumeApproval,
 	verifyLedgerChain,
 	verifyLedgerOutcome,

@@ -7,7 +7,12 @@
 // rewriting git tag history too. Human-triggered; no push; no scheduling.
 const fs = require("node:fs");
 const { resolveTarget } = require("./fs-utils");
-const { walkLedgers, readLedger, verifyLedgerChain } = require("./loop-ledger");
+const {
+	walkLedgers,
+	readLedger,
+	verifyLedgerChain,
+	adoptUnanchoredLedger,
+} = require("./loop-ledger");
 const { codedError } = require("./error-catalog");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 // §5.5 row 6 split (governance contract G-9): the seal/verify LOGIC is
@@ -40,13 +45,16 @@ function collectTails(targetRoot) {
 	walkLedgers(stateDirAbs, ({ home, sub, ledgerPath }) => {
 		const records = readLedger(ledgerPath);
 		const tail = records.length ? records[records.length - 1].hash : null;
+		const verdict = verifyLedgerChain(ledgerPath);
 		tails.push({
 			home,
 			sub,
+			ledgerPath,
 			tailHash: tail,
 			recordCount: records.length,
 			hashes: records.map((r) => r.hash),
-			intact: verifyLedgerChain(ledgerPath).intact,
+			intact: verdict.intact,
+			reason: verdict.intact ? null : verdict.reason,
 		});
 	});
 	return { stateDir: stateDirAbs, tails };
@@ -91,7 +99,13 @@ function readLatestSeal(targetRoot) {
 function sealLedger(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	if (!defaultGitAdapter().gitOutput(targetRoot, ["rev-parse", "--is-inside-work-tree"])) {
-		return { target: targetRoot, sealed: false, errors: ["not a git repository"], warnings: [] };
+		return {
+			target: targetRoot,
+			sealed: false,
+			errors: ["not a git repository"],
+			warnings: [],
+			adopted: [],
+		};
 	}
 	const { stateDir, tails } = collectTails(targetRoot);
 	if (!stateDir) {
@@ -100,6 +114,7 @@ function sealLedger(target, options = {}) {
 			sealed: false,
 			errors: ["no Amber state directory"],
 			warnings: [],
+			adopted: [],
 		};
 	}
 	const refuse = (reason) => ({
@@ -107,10 +122,15 @@ function sealLedger(target, options = {}) {
 		sealed: false,
 		errors: [codedError("AMBER_E_LEDGER_RESEAL_REFUSED", reason)],
 		warnings: [],
+		adopted: [],
 	});
-	const broken = tails.filter((t) => !t.intact);
+	// A chain whose hashes verify but whose anchor is gone is legacy, not tampered. Any
+	// other failure is a real break and refuses the seal without adopting anything.
+	const broken = tails.filter((t) => !t.intact && t.reason !== "anchor-missing");
 	if (broken.length > 0) {
-		return refuse(`ledger chain broken: ${broken.map((t) => `${t.home}/${t.sub}`).join(", ")}`);
+		return refuse(
+			`ledger chain broken: ${broken.map((t) => `${t.home}/${t.sub} (${t.reason})`).join(", ")}`,
+		);
 	}
 	const previous = readLatestSeal(targetRoot);
 	if (previous.tagName) {
@@ -121,6 +141,14 @@ function sealLedger(target, options = {}) {
 				`ledger(s) no longer extend seal ${previous.tagName}: ${drift.map((d) => `${d.home}/${d.sub} ${d.status}`).join(", ")}`,
 			);
 		}
+	}
+	const adopted = [];
+	for (const t of tails) {
+		if (t.intact) continue;
+		const anchor = adoptUnanchoredLedger(t.ledgerPath);
+		if (anchor) adopted.push({ home: t.home, sub: t.sub, recordCount: anchor.count });
+		t.intact = true;
+		t.reason = null;
 	}
 	const head = defaultGitAdapter().gitOutput(targetRoot, ["rev-parse", "HEAD"]);
 	const headShort = head ? head.slice(0, 12) : "no-head";
@@ -142,6 +170,7 @@ function sealLedger(target, options = {}) {
 		ledgerCount: tails.length,
 		errors: [],
 		warnings: [],
+		adopted,
 	};
 }
 

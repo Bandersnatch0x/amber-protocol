@@ -55,8 +55,10 @@ function handleLedger(args) {
 	if (action === "seal") {
 		const { sealLedger } = require("./core/ledger-seal");
 		const result = sealLedger(targetRoot, { reviewer: args.reviewer });
+		const adoptedNote =
+			result.adopted?.length > 0 ? ` (adopted ${result.adopted.length} legacy unanchored)` : "";
 		const text = result.sealed
-			? `Sealed ${result.ledgerCount} ledger(s) to tag ${result.tagName} at HEAD ${result.head}.`
+			? `Sealed ${result.ledgerCount} ledger(s)${adoptedNote} to tag ${result.tagName} at HEAD ${result.head}.`
 			: `Seal failed: ${result.errors.join("; ")}`;
 		return require("./command-helpers").shapeResult(
 			args,

@@ -354,7 +354,7 @@ function collectFindings(sections) {
 			finding(
 				"error",
 				"ledger-tampered",
-				`Hash-chain ledger tampered: ${t.home}/${t.id} (broken at record ${t.brokenAt}: ${t.reason})`,
+				`Hash-chain ledger tampered: ${t.home}/${t.id} (broken at record ${t.brokenAt}: ${t.reason})${t.reason === "anchor-missing" ? " (missing anchor: a ledger written before per-ledger anchoring; amber ledger seal adopts it)" : ""}`,
 				{ ledgerHome: t.home, ledgerSub: t.id, brokenAt: t.brokenAt },
 			),
 		);
@@ -501,11 +501,11 @@ const ACTION_LIBRARY = {
 	"ledger-tampered": {
 		severity: "high",
 		summary:
-			"Investigate the flagged ledger record; restore it from version control if it was edited.",
-		why: "A tampered ledger means evidence continuity cannot be trusted.",
-		command: "node scripts/amber.js ledger verify-anchoring --target <repo>",
+			"Run ledger seal to adopt pre-anchoring (anchor-missing) ledgers; restore a broken hash chain.",
+		why: "Ledger seal adopts pre-anchoring (anchor-missing) ledgers, while a broken hash chain is still refused and must be restored.",
+		command: "node scripts/amber.js ledger seal --target <repo>",
 		expectedOutcome:
-			"Tampered ledger records are investigated and restored from version control if appropriate.",
+			"Pre-anchoring ledgers are adopted by seal; a broken hash chain is refused and restored from version control.",
 		blocks: ["evidence-score", "handoff-readiness"],
 	},
 };
