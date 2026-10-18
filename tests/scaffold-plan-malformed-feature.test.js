@@ -84,3 +84,21 @@ test("scaffoldPlan refuses a symlinked plans directory", () => {
 		fs.rmSync(outside, { recursive: true, force: true });
 	}
 });
+
+test("scaffoldPlan trims feature-title padding in the derived plan heading", () => {
+	const root = tempProject([
+		{
+			id: "f4",
+			title: "  Good Feature  ",
+			user_visible_behavior: "x",
+			verification: ["run npm test"],
+		},
+	]);
+	const result = scaffoldPlan(root, { feature: "f4" });
+	assert.deepEqual(result.errors, []);
+	assert.equal(result.created.length, 1);
+	const content = fs.readFileSync(path.join(root, result.created[0]), "utf8");
+	assert.equal(content.split(/\r?\n/)[0], "# Plan: Good Feature");
+	assert.match(path.basename(result.created[0]), /f4-Good-Feature\.md$/);
+	fs.rmSync(root, { recursive: true, force: true });
+});

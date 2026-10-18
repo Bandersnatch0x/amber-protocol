@@ -235,7 +235,7 @@ function scaffoldPlan(target, options = {}) {
 		return { target: targetRoot, created, skipped, errors, warnings };
 	}
 
-	const title = options.title || feature.title;
+	const title = options.title || feature.title.trim();
 	const relativePath = path.join("docs", "plans", `${feature.id}-${slugify(title)}.md`);
 	let destination;
 	try {
