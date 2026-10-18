@@ -24,7 +24,7 @@ Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emi
 ## Usage
 
 ```bash
-amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--json]
+amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--adopt-legacy] [--json]
 ```
 
 ## Execution Contract

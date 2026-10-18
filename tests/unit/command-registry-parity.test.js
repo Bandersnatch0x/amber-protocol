@@ -19,8 +19,12 @@ const {
 	COMMAND_DEFINITIONS,
 	COMMAND_TIERS,
 	COMMAND_STABILITIES,
+	TYPED_COMMANDS,
+	KNOWN_UNTYPED_SUBCOMMANDS,
 	bindCommandHandlers,
+	capabilityFor,
 	commandInvocationContract,
+	commandUsageLine,
 	knownSubcommands,
 	validateCommandRegistry,
 } = require("../../scripts/lib/command-registry.js");
@@ -325,4 +329,27 @@ test("learnings help and usage render canonical owner choices", () => {
 	}
 	assert.match(help, /--owner <id>/);
 	assert.match(definition.output.usage, /--owner <id>/);
+});
+
+// `ledger seal` was documented in its usage line and listed in the help, yet the typed
+// seam refused it before dispatch: it had no COMMAND_CAPABILITIES entry and was absent
+// from KNOWN_UNTYPED_SUBCOMMANDS, so the only remediation `amber ledger seal` ever
+// pointed at could not be run at all. The usage line is the advertised surface, so
+// every subcommand in it must be reachable one way or the other.
+test("every usage-line subcommand of a typed command is reachable through the CLI seam", () => {
+	const unreachable = [];
+	for (const command of TYPED_COMMANDS) {
+		const group = commandUsageLine(command).match(/amber\s+\S+\s+<([^>]+)>/);
+		if (!group) continue;
+		for (const subcommand of group[1].split("|").map((s) => s.trim())) {
+			if (capabilityFor(command, subcommand)) continue;
+			if (KNOWN_UNTYPED_SUBCOMMANDS.has(`${command}/${subcommand}`)) continue;
+			unreachable.push(`${command}/${subcommand}`);
+		}
+	}
+	assert.deepEqual(
+		unreachable,
+		[],
+		`documented subcommands the typed seam refuses before dispatch: ${unreachable.join(", ")}`,
+	);
 });

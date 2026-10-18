@@ -54,7 +54,10 @@ function handleLedger(args) {
 	}
 	if (action === "seal") {
 		const { sealLedger } = require("./core/ledger-seal");
-		const result = sealLedger(targetRoot, { reviewer: args.reviewer });
+		const result = sealLedger(targetRoot, {
+			reviewer: args.reviewer,
+			adoptLegacy: args.adoptLegacy,
+		});
 		const adoptedNote =
 			result.adopted?.length > 0 ? ` (adopted ${result.adopted.length} legacy unanchored)` : "";
 		const text = result.sealed

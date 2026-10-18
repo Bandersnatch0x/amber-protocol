@@ -117,10 +117,10 @@ function sealLedger(target, options = {}) {
 			adopted: [],
 		};
 	}
-	const refuse = (reason) => ({
+	const refuse = (reason, code = "AMBER_E_LEDGER_RESEAL_REFUSED") => ({
 		target: targetRoot,
 		sealed: false,
-		errors: [codedError("AMBER_E_LEDGER_RESEAL_REFUSED", reason)],
+		errors: [codedError(code, reason)],
 		warnings: [],
 		adopted: [],
 	});
@@ -142,9 +142,19 @@ function sealLedger(target, options = {}) {
 			);
 		}
 	}
+	// Adopting is deliberate, never implicit. Deleting an anchor and truncating the chain
+	// leaves a chain that still hashes, so an automatic adoption here would launder that
+	// truncation into an externally anchored ledger. The operator must ask for it, and the
+	// seal tag records which ledgers were adopted, so a verifier sees the provenance.
+	const unanchored = tails.filter((t) => !t.intact);
+	if (unanchored.length > 0 && options.adoptLegacy !== true) {
+		return refuse(
+			`unanchored ledger(s) need --adopt-legacy: ${unanchored.map((t) => `${t.home}/${t.sub}`).join(", ")}`,
+			"AMBER_E_LEDGER_ADOPT_REQUIRED",
+		);
+	}
 	const adopted = [];
-	for (const t of tails) {
-		if (t.intact) continue;
+	for (const t of unanchored) {
 		const anchor = adoptUnanchoredLedger(t.ledgerPath);
 		if (anchor) adopted.push({ home: t.home, sub: t.sub, recordCount: anchor.count });
 		t.intact = true;
@@ -159,7 +169,7 @@ function sealLedger(target, options = {}) {
 		tailHash,
 		recordCount,
 	}));
-	const message = JSON.stringify({ reviewer: options.reviewer || null, ledgers });
+	const message = JSON.stringify({ reviewer: options.reviewer || null, ledgers, adopted });
 	const res = defaultGitAdapter().gitRun(targetRoot, ["tag", "-a", tagName, "-m", message]);
 	if (!res.ok) return refuse(`git tag ${tagName} failed: ${res.stderr || "git error"}`);
 	return {

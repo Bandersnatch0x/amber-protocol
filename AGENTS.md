@@ -91,7 +91,8 @@ Default `amber` help projects the seven primary verbs — `audit`, `init`, `doct
   (`amber sync session push --execute --yes`) performs the local `git add` + `git commit` of sync
   envelopes behind identity, policy, single-use approval, path-and-state confinement, and a
   tamper-evident transport ledger. Two narrower non-push git writes exist behind their own
-  surfaces: the typed `ledger seal` tag and session worktree add/remove (`worktree-manager.js`);
+  surfaces: the `ledger seal` tag (a known untyped subcommand — it writes a git tag, not a governed
+  Action) and session worktree add/remove (`worktree-manager.js`);
   every other git interaction stays read-only. The only live `git push` in this repository
   belongs to the operator-run release helper `scripts/release-v1.0.0-rc.1.sh` — outside the
   `amber` command surface, behind an explicit interactive confirmation (`scripts/release.js`

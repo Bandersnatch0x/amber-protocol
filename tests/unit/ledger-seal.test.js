@@ -6,7 +6,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
-const { execSync } = require("node:child_process");
+const { execSync, execFileSync } = require("node:child_process");
 const L = require("../../scripts/lib/core/loop-ledger");
 const { sealLedger, verifyAnchoring } = require("../../scripts/lib/core/ledger-seal");
 
@@ -81,18 +81,39 @@ test("seal refuses on a non-git repo", () => {
 	assert.ok(seal.errors.length > 0);
 });
 
-test("seal adopts a legacy unanchored ledger", () => {
+test("seal adopts a legacy unanchored ledger with --adopt-legacy", () => {
 	const dir = mkHarnessWithLedger();
 	const lp = path.join(dir, ".amber", "sessions", "S1", "ledger.jsonl");
 	appendRecord(dir, "S1", "a2");
 	removeAnchor(lp);
 	commitChanges(dir);
 
-	const seal = sealLedger(dir);
+	const seal = sealLedger(dir, { adoptLegacy: true });
 	assert.strictEqual(seal.sealed, true);
 	assert.deepStrictEqual(seal.adopted, [{ home: "sessions", sub: "S1", recordCount: 2 }]);
 	assert.deepStrictEqual(L.verifyLedgerChain(lp), { intact: true, brokenAt: null, records: 2 });
 	assert.strictEqual(verifyAnchoring(dir).anchored, true);
+	// The tag carries the provenance, so a verifier sees which ledgers were adopted.
+	const message = execFileSync("git", ["tag", "-l", "--format=%(contents)", seal.tagName], {
+		cwd: dir,
+	})
+		.toString()
+		.trim();
+	assert.deepStrictEqual(JSON.parse(message).adopted, [
+		{ home: "sessions", sub: "S1", recordCount: 2 },
+	]);
+});
+
+test("seal refuses an unanchored ledger without --adopt-legacy and writes no anchor", () => {
+	const dir = mkHarnessWithLedger();
+	const lp = path.join(dir, ".amber", "sessions", "S1", "ledger.jsonl");
+	removeAnchor(lp);
+	commitChanges(dir);
+
+	const seal = sealLedger(dir);
+	assert.strictEqual(seal.sealed, false);
+	assert.match(seal.errors.join("; "), /AMBER_E_LEDGER_ADOPT_REQUIRED/);
+	assert.strictEqual(fs.existsSync(`${lp}.anchor`), false);
 });
 
 test("seal refuses a broken chain without creating its anchor", () => {
@@ -136,7 +157,7 @@ test("seal checks previous-seal drift before adopting a deleted anchor", () => {
 	removeAnchor(lp);
 	commitChanges(dir);
 
-	const seal = sealLedger(dir);
+	const seal = sealLedger(dir, { adoptLegacy: true });
 	assert.strictEqual(seal.sealed, false);
 	assert.strictEqual(fs.existsSync(`${lp}.anchor`), false);
 });

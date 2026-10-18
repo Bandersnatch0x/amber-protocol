@@ -17,7 +17,8 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const { trackTempDir } = require("../helpers/harness");
+const { trackTempDir, gitInit } = require("../helpers/harness");
+const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 const {
 	COMMANDS,
 	commandSummary,
@@ -244,6 +245,28 @@ test("--yaml selects the YAML knowledge-plan template", () => {
 	const aliasForm = runCli(["wiki", "knowledge", "scaffold", "--target", aliasTarget, "--yml"]);
 	assert.equal(aliasForm.status, 0, aliasForm.stderr || aliasForm.stdout);
 	assert.ok(fs.existsSync(path.join(aliasTarget, "docs", "wiki", "knowledge-plan.yaml")));
+});
+
+test("--adopt-legacy reaches sealLedger through the real CLI", () => {
+	const target = mkTarget("adopt-legacy");
+	gitInit(target);
+	const ledgerPath = path.join(target, ".amber", "sessions", "S1", "ledger.jsonl");
+	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "k1" });
+	fs.rmSync(`${ledgerPath}.anchor`, { recursive: true, force: true });
+	spawnSync("git", ["add", "-A"], { cwd: target });
+	spawnSync("git", ["commit", "-qm", "init"], { cwd: target });
+
+	// Without the flag the seal refuses instead of silently adopting an unanchored chain.
+	const bare = runCli(["ledger", "seal", "--target", target, "--json"]);
+	assert.equal(bare.status, 1, bare.stderr || bare.stdout);
+	assert.match(JSON.parse(bare.stdout).errors.join("; "), /AMBER_E_LEDGER_ADOPT_REQUIRED/);
+
+	const adopted = runCli(["ledger", "seal", "--target", target, "--adopt-legacy", "--json"]);
+	assert.equal(adopted.status, 0, adopted.stderr || adopted.stdout);
+	assert.deepEqual(JSON.parse(adopted.stdout).adopted, [
+		{ home: "sessions", sub: "S1", recordCount: 1 },
+	]);
+	assert.ok(fs.existsSync(`${ledgerPath}.anchor`), "the adopted ledger is anchored");
 });
 
 test("--claim carries the ratified heading into the memory registry", () => {

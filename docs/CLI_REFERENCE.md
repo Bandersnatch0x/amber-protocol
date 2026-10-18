@@ -2679,6 +2679,7 @@ node scripts/amber.js ledger export --target . --home sessions                # 
 
 # Git-anchor ledger tail hashes (closes the ADR-0003 full-rewrite gap)
 node scripts/amber.js ledger seal --target . --reviewer <name>
+node scripts/amber.js ledger seal --target . --adopt-legacy    # adopt pre-anchoring ledgers
 node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if a sealed record changed
 ```
 
@@ -2687,7 +2688,11 @@ node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if a seale
 so forging a ledger then requires rewriting git tag history. A seal anchors a prefix: records
 appended after it are a valid extension (`extended` in `--json`), and only a changed or removed
 sealed record is drift. `seal` never overwrites a tag and refuses (`AMBER_E_LEDGER_RESEAL_REFUSED`)
-while any ledger is broken or no longer extends the latest seal. No Ed25519 signing yet — deferred per
+while any ledger is broken or no longer extends the latest seal. A ledger with no anchor store — written
+before per-ledger anchoring existed, or with its anchor deleted — is refused with
+`AMBER_E_LEDGER_ADOPT_REQUIRED` until the operator passes `--adopt-legacy`, which writes the anchor the
+chain would have had and records the adopted ledgers in the tag message; a chain that no longer extends
+an existing seal is still refused, so adoption can never launder a truncation. No Ed25519 signing yet — deferred per
 the Phase 1 spec until key management (HSM / OS keystore) is a real capability rather than a key in
 the repo.
 

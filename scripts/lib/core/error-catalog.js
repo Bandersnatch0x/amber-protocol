@@ -243,6 +243,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_LEDGER_LOCKED"],
 	},
+	AMBER_E_LEDGER_ADOPT_REQUIRED: {
+		title: "Ledger seal needs --adopt-legacy",
+		cause:
+			"A ledger has no anchor store (written before per-ledger anchoring existed, or its anchor was deleted), so the seal cannot tell a legacy chain from a truncated one by itself.",
+		remedy:
+			"Re-run amber ledger seal --adopt-legacy to adopt the unanchored ledgers; the seal tag records which ledgers were adopted.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED", "AMBER_E_LEDGER_RESEAL_REFUSED"],
+	},
 	AMBER_E_LEDGER_RESEAL_REFUSED: {
 		title: "Ledger seal refused",
 		cause:

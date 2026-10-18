@@ -2066,7 +2066,7 @@ const COMMAND_OUTPUT = {
 	},
 	ledger: {
 		usage:
-			"Usage: amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--json]",
+			"Usage: amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--adopt-legacy] [--json]",
 	},
 	governance: {
 		usage: [
@@ -2663,6 +2663,7 @@ const KNOWN_UNTYPED_SUBCOMMANDS = Object.freeze(
 		"loop/record",
 		"loop/status",
 		"loop/validate-loop",
+		"ledger/seal",
 		"ledger/verify-anchoring",
 		"ledger/verify",
 		"memory/request",

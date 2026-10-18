@@ -364,6 +364,7 @@ const FLAG_SPECS = {
 	"--execute": { key: "execute", kind: "boolean" },
 	"--refresh-amber-owned": { key: "refreshAmberOwned", kind: "boolean" },
 	"--archive-legacy": { key: "archiveLegacy", kind: "boolean" },
+	"--adopt-legacy": { key: "adoptLegacy", kind: "boolean" },
 	"--refresh": { key: "refresh", kind: "boolean" },
 	"--yes": { key: "yes", kind: "boolean" },
 	"--warn-only": { key: "warnOnly", kind: "boolean" },
