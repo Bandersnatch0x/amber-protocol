@@ -102,3 +102,25 @@ test("scaffoldPlan trims feature-title padding in the derived plan heading", () 
 	assert.match(path.basename(result.created[0]), /f4-Good-Feature\.md$/);
 	fs.rmSync(root, { recursive: true, force: true });
 });
+
+test("scaffoldPlan rejects a whitespace-only explicit title", () => {
+	const root = tempProject([
+		{
+			id: "f5",
+			title: "Good Feature",
+			user_visible_behavior: "x",
+			verification: ["run npm test"],
+		},
+	]);
+	try {
+		const result = scaffoldPlan(root, { feature: "f5", title: "   " });
+		assert.ok(
+			result.errors.includes("--title must be a non-empty string when provided."),
+			`expected a title error, got: ${JSON.stringify(result.errors)}`,
+		);
+		assert.deepEqual(result.created, []);
+		assert.equal(fs.existsSync(path.join(root, "docs", "plans")), false);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});

@@ -235,6 +235,14 @@ function scaffoldPlan(target, options = {}) {
 		return { target: targetRoot, created, skipped, errors, warnings };
 	}
 
+	if (
+		options.title !== undefined &&
+		(typeof options.title !== "string" || options.title.trim() === "")
+	) {
+		errors.push("--title must be a non-empty string when provided.");
+		return { target: targetRoot, created, skipped, errors, warnings };
+	}
+
 	const title = options.title || feature.title.trim();
 	const relativePath = path.join("docs", "plans", `${feature.id}-${slugify(title)}.md`);
 	let destination;
