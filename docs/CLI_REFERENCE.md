@@ -2692,7 +2692,8 @@ while any ledger is broken or no longer extends the latest seal. A ledger with n
 before per-ledger anchoring existed, or with its anchor deleted — is refused with
 `AMBER_E_LEDGER_ADOPT_REQUIRED` until the operator passes `--adopt-legacy`, which writes the anchor the
 chain would have had and records the adopted ledgers in the tag message; a chain that no longer extends
-an existing seal is still refused, so adoption can never launder a truncation. No Ed25519 signing yet — deferred per
+an existing seal is still refused, so adoption can never launder a truncation. A seal that would cover
+zero ledgers is refused with `AMBER_E_LEDGER_SEAL_EMPTY` instead of writing an empty seal. No Ed25519 signing yet — deferred per
 the Phase 1 spec until key management (HSM / OS keystore) is a real capability rather than a key in
 the repo.
 

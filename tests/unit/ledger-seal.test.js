@@ -55,6 +55,23 @@ test("seal creates a tag and verifies anchored immediately after", () => {
 	assert.strictEqual(v.ledgerChangedSinceSeal, 0);
 });
 
+test("seal refuses an Amber state directory with no ledgers and creates no tag", () => {
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-seal-")));
+	execSync("git init -q", { cwd: dir });
+	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
+	fs.mkdirSync(path.join(dir, ".amber", "sessions"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "x"), "1");
+	execSync("git add -A && git commit -q -m init", { cwd: dir });
+
+	const seal = sealLedger(dir);
+	assert.strictEqual(seal.sealed, false);
+	assert.match(seal.errors.join("; "), /AMBER_E_LEDGER_SEAL_EMPTY/);
+	assert.strictEqual(
+		execFileSync("git", ["tag", "-l", "amber-ledger-seal-*"], { cwd: dir }).toString().trim(),
+		"",
+	);
+});
+
 test("editing a sealed record flips verify to not-anchored", () => {
 	const dir = mkHarnessWithLedger();
 	sealLedger(dir);

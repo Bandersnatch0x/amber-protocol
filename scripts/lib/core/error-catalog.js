@@ -252,6 +252,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_LEDGER_TAMPERED", "AMBER_E_LEDGER_RESEAL_REFUSED"],
 	},
+	AMBER_E_LEDGER_SEAL_EMPTY: {
+		title: "Ledger seal has no ledgers to cover",
+		cause:
+			"The Amber state directory exists but contains no ledgers, so an empty seal would not detect later ledger creation.",
+		remedy:
+			"Create or select a target containing at least one Amber ledger, then run amber ledger seal again.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_ADOPT_REQUIRED", "AMBER_E_LEDGER_RESEAL_REFUSED"],
+	},
 	AMBER_E_LEDGER_RESEAL_REFUSED: {
 		title: "Ledger seal refused",
 		cause:

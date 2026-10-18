@@ -160,6 +160,12 @@ function sealLedger(target, options = {}) {
 		t.intact = true;
 		t.reason = null;
 	}
+	if (tails.length === 0) {
+		return refuse(
+			`no ledgers found in Amber state directory ${stateDir}; there is no ledger to seal`,
+			"AMBER_E_LEDGER_SEAL_EMPTY",
+		);
+	}
 	const head = defaultGitAdapter().gitOutput(targetRoot, ["rev-parse", "HEAD"]);
 	const headShort = head ? head.slice(0, 12) : "no-head";
 	const tagName = `${SEAL_PREFIX}${headShort}`;
