@@ -201,6 +201,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 		);
 		assert.equal(step.id, "plan");
 		assert.match(step.remedy, /amber plan --target \. --feature F001/);
+		assert.doesNotMatch(step.remedy, /--title/);
 	});
 
 	it("recommends gate when the plan is pending", () => {
@@ -222,6 +223,8 @@ describe("inferNextStep (synthetic ctx)", () => {
 			}),
 		);
 		assert.equal(step.id, "feature-evidence");
+		assert.match(step.remedy, /--feature F001/);
+		assert.doesNotMatch(step.remedy, /--goal/);
 	});
 
 	it("recommends accept when plan confirmed and evidence recorded", () => {

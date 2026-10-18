@@ -242,7 +242,7 @@ const STEPS = [
 		isDone: (ctx) => Boolean(planFor(ctx)),
 		why: (ctx) => `feature ${ctx.focus.id} has no plan yet.`,
 		remedy: (ctx) =>
-			`amber plan --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id} --title "..."`,
+			`amber plan --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id}`,
 	},
 	{
 		id: "gate",
@@ -260,7 +260,7 @@ const STEPS = [
 		isDone: (ctx) => featureHasEvidence(ctx),
 		why: () => "no verification evidence is recorded for this feature yet.",
 		remedy: (ctx) =>
-			`amber session start --target ${shellQuote(ctx.targetDisplay)} --goal "..." --feature ${ctx.focus.id} --confirm`,
+			`amber session start --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id} --confirm`,
 	},
 	{
 		id: "verify",
