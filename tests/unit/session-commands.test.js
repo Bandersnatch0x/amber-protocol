@@ -160,6 +160,17 @@ describe("session-commands", () => {
 			assert.strictEqual(manifest.feature, "F001");
 		});
 
+		it("trims feature-title padding when deriving the goal", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "  fix login bug  ", area: "core" });
+
+			const result = await startSession(TEST_ROOT, { feature: "F001" });
+
+			assert.strictEqual(result.exitCode, 0, result.text);
+			const { manifest } = readSessionArtifacts(TEST_ROOT, result.sessionId);
+			assert.strictEqual(manifest.goal, "fix login bug");
+			assert.strictEqual(manifest.route.id, "bugfix-quick");
+		});
+
 		it("keeps an explicit goal when a feature is also bound", async () => {
 			addFeature(TEST_ROOT, { id: "F001", title: "add greeting feature", area: "core" });
 

@@ -197,7 +197,7 @@ async function startSession(projectRoot, options) {
 		}
 	}
 	if (goal === undefined) {
-		goal = registeredFeature.title;
+		goal = registeredFeature.title.trim();
 	}
 
 	if (!goal) {
