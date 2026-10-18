@@ -52,7 +52,7 @@ function addFeature(target, options) {
 			warnings: [],
 		};
 	}
-	if (!title) {
+	if (typeof title !== "string" || title.trim() === "") {
 		return {
 			target: targetRoot,
 			errors: ["feature add requires --title <text>."],

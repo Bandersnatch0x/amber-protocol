@@ -64,6 +64,13 @@ test("addFeature omits paths when not provided", () => {
 	assert.strictEqual("paths" in r.feature, false);
 });
 
+test("addFeature rejects a whitespace-only title without writing", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, { id: "F1", title: "   " });
+	assert.ok(r.errors.includes("feature add requires --title <text>."));
+	assert.deepStrictEqual(readFeatures(dir).features, []);
+});
+
 test("addFeature stores user_visible_behavior from --behavior (#75)", () => {
 	const dir = tmpDir();
 	const r = addFeature(dir, {
