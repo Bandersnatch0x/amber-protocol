@@ -29,6 +29,7 @@ test("browser verifier exports the row 7 & 10 gate functions", () => {
 		"runBrowserVerification",
 		"verifyBrowserAccessibility",
 		"verifyThemeRendering",
+		"verifySearchResolvesCommands",
 		"runAxe",
 		"startServer",
 	]) {
@@ -36,6 +37,7 @@ test("browser verifier exports the row 7 & 10 gate functions", () => {
 	}
 	assert.ok(Array.isArray(mod.REPRESENTATIVE_PAGES) && mod.REPRESENTATIVE_PAGES.length >= 4);
 	assert.deepEqual(mod.VIEWPORTS, [320, 375, 768]);
+	assert.deepEqual(mod.SEARCH_COMMAND_WORDS, ["audit", "doctor", "next"]);
 });
 
 test("browser verification passes end-to-end on the built site", gated, async () => {
@@ -128,6 +130,49 @@ test("the section-navigation check bites on a page with no section nav", gated, 
 			assert.ok(
 				errors.some((e) => e.includes("section nav")),
 				`expected a missing-section-nav error, got: ${errors.join("; ")}`,
+			);
+		} finally {
+			server.close();
+		}
+	} finally {
+		await browser.close();
+	}
+});
+
+// Trial 2 mechanical half (issues/0062). The human half needs a reader who did
+// not write the pages, but the search surface that reader uses is mechanical.
+// Prove the three command references resolve through the site's own search box,
+// and that a word with no reference still fails the check.
+test("the site search resolves the three command references", gated, async () => {
+	const browser = await chromium.launch();
+	try {
+		const server = await mod.startServer();
+		const origin = `http://localhost:${server.address().port}`;
+		try {
+			const errors = await mod.verifySearchResolvesCommands(browser, origin);
+			assert.deepEqual(
+				errors,
+				[],
+				`expected all three commands to resolve, got: ${errors.join("; ")}`,
+			);
+		} finally {
+			server.close();
+		}
+	} finally {
+		await browser.close();
+	}
+});
+
+test("the search check bites when a word resolves to no command reference", gated, async () => {
+	const browser = await chromium.launch();
+	try {
+		const server = await mod.startServer();
+		const origin = `http://localhost:${server.address().port}`;
+		try {
+			const errors = await mod.verifySearchResolvesCommands(browser, origin, ["zzzznotacommand"]);
+			assert.ok(
+				errors.some((e) => e.includes('search "zzzznotacommand"')),
+				`expected a failed-search error, got: ${errors.join("; ")}`,
 			);
 		} finally {
 			server.close();

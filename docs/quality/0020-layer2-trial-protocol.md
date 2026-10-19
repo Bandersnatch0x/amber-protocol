@@ -33,7 +33,7 @@ Tracking ticket: `issues/0062`.
 ```bash
 npm run docs:build
 npm run docs:verify              # 14 gates, incl. Scenario 1 + Gate 6 search-index parity
-npm run docs:verify:browser      # rows 7 & 10 + Gate 7b (needs chromium + axe-core in apps/docs)
+npm run docs:verify:browser      # rows 7 & 10 + Gate 7b + Trial 2 mechanical half (needs chromium + axe-core in apps/docs)
 ```
 
 Gate 12 (Scenario 1) already asserts the walkthrough's five steps, its `expectedSignal`s, its
@@ -86,9 +86,11 @@ three exact commands — `audit`, `doctor`, `next`.
 **Success criteria:** all three located via search; clicking the top `next` suggestion lands on the
 `next` command reference.
 
-**Note:** the mechanical half of this trial has already been run against the plugin's real client path
-(`tokenize` → `smartQueries` → per-group query → `sortSearchResults`), 3/3. What remains is the human
-half: a reader who did not write the pages.
+**Note:** the mechanical half of this trial is now a browser gate. `npm run docs:verify:browser`
+drives the site's own search box for `audit`, `doctor` and `next` and requires the top suggestion to
+land on each command's reference page (`verifySearchResolvesCommands` in
+`scripts/verify-public-docs-browser.js`, 3/3). What remains is the human half: a reader who did not
+write the pages.
 
 **Record:**
 
