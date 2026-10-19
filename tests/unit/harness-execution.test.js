@@ -190,6 +190,64 @@ test("execution contracts admit immutably; bad prefixes refuse in core", async (
 	}
 });
 
+test("a contract requiring enforcement above its provider's ceiling refuses at admission", async () => {
+	const target = tmpTarget("enforcement");
+	try {
+		// No `enforcement` field admits (backward compatible; defaults to the
+		// declared workspace.type's ceiling).
+		const omitted = await admitViaCli(target, writeContract(target, contractBody()));
+		assert.equal(omitted.exitCode, 0);
+
+		// An explicit level AT the ceiling admits.
+		const atCeiling = await admitViaCli(
+			target,
+			writeContract(
+				target,
+				contractBody({
+					metadata: { id: "exec-at-ceiling", version: "1" },
+					enforcement: "observed-only",
+				}),
+				"at-ceiling.json",
+			),
+		);
+		assert.equal(atCeiling.exitCode, 0);
+
+		// R-ET-1 (ADR-0104): `git-worktree`/`local` deliver at most `observed-only`,
+		// so a contract requiring `enforced` cannot be honored — admission refuses.
+		const refused = await admitViaCli(
+			target,
+			writeContract(
+				target,
+				contractBody({
+					metadata: { id: "exec-too-strong", version: "1" },
+					enforcement: "enforced",
+				}),
+				"too-strong.json",
+			),
+		);
+		assert.equal(refused.exitCode, 1);
+		assert.match(refused.result.errors[0], /delivers at most "observed-only"/);
+
+		// The same ceiling applies to the `local` provider.
+		const refusedLocal = await admitViaCli(
+			target,
+			writeContract(
+				target,
+				contractBody({
+					metadata: { id: "exec-local-too-strong", version: "1" },
+					workspace: { type: "local", base: "HEAD" },
+					enforcement: "enforced",
+				}),
+				"local-too-strong.json",
+			),
+		);
+		assert.equal(refusedLocal.exitCode, 1);
+		assert.match(refusedLocal.result.errors[0], /delivers at most "observed-only"/);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
+});
+
 test("the git-worktree adapter prepares a real workspace and reports the effective boundary", async () => {
 	const target = tmpTarget("worktree");
 	try {
@@ -477,6 +535,35 @@ test("the §13 fold: ok, violation, and unevaluated are deterministic", async ()
 
 	const unevaluated = compareBoundaries(declared, effective, []);
 	assert.equal(unevaluated.verdict, "unevaluated");
+
+	// R-ET-1 (ADR-0104): an observation claiming enforcement above the
+	// provider's effective level caps the verdict at `unevaluated`, never `ok`.
+	const overclaim = compareBoundaries(declared, effective, [
+		{ kind: "mutation", paths: ["src/a"], enforcement: "enforced", source: "ledger#7" },
+	]);
+	assert.equal(overclaim.verdict, "unevaluated");
+	assert.ok(overclaim.findings.some((f) => f.kind === "observation-exceeds-enforcement"));
+
+	// An observation AT the effective level still folds normally.
+	const atLevel = compareBoundaries(declared, effective, [
+		{ kind: "mutation", paths: ["src/a"], enforcement: "observed-only", source: "ledger#8" },
+	]);
+	assert.equal(atLevel.verdict, "ok");
+
+	// Enforcement is downgrade-only: effective above declared is drift.
+	const enforcementDrift = compareBoundaries(declared, { ...effective, enforcement: "enforced" }, [
+		{ kind: "mutation", paths: ["src/a"], source: "ledger#9" },
+	]);
+	assert.equal(enforcementDrift.verdict, "violation");
+	assert.ok(
+		enforcementDrift.findings.some((f) => f.kind === "effective-exceeds-declared-enforcement"),
+	);
+
+	// A sanctioned downgrade (effective below declared) is not a violation.
+	const downgraded = compareBoundaries(declared, { ...effective, enforcement: "unsupported" }, [
+		{ kind: "mutation", paths: ["src/a"], source: "ledger#10" },
+	]);
+	assert.equal(downgraded.verdict, "ok");
 });
 
 test("evaluate records the comparison, integrates the run, and BLOCKs on violation", async () => {

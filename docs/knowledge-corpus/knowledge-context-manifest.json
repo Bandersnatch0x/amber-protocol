@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 34,
+    "adr": 36,
     "wiki": 9,
     "architecture": 9,
-    "total": 52
+    "total": 54
   },
   "rows": [
     {
@@ -417,6 +417,30 @@
       }
     },
     {
+      "id": "knowledge:adr:0104",
+      "category": "adr",
+      "sourceNodeId": "adr:0104",
+      "pageId": "knowledge-adr-0104",
+      "sourcePath": "docs/adr/0104-provider-enforcement-level.md",
+      "title": "Provider Enforcement Level Is a Tri-State on the Declared/Effective Boundary",
+      "source": {
+        "rawHash": "sha256:b003f13ffaee905a2cf5dabc67c9d933aec97fd20f90a55849cdb69f042fa1aa",
+        "normHash": "sha256:d36457103de26aa95fcb282f3faba8580d49f4b404d52d624c29de72c9b577af"
+      }
+    },
+    {
+      "id": "knowledge:adr:0105",
+      "category": "adr",
+      "sourceNodeId": "adr:0105",
+      "pageId": "knowledge-adr-0105",
+      "sourcePath": "docs/adr/0105-held-out-evaluation-set-boundary.md",
+      "title": "Held-Out Evaluation Sets Live Outside the Run Workspace as Pinned Governed Artifacts",
+      "source": {
+        "rawHash": "sha256:6ee2cf3483286187788692d5afc4648bee62af83f541dd1379aa39c42ac01ee0",
+        "normHash": "sha256:acc8993237741e3a6ad7650315dc1f5ec5164d990f441c66a9b51eb73366471c"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -633,5 +657,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:9f1012a89f5512a0656425cae5e239f556e50d352246700758502fb321d5a34c"
+  "manifestHash": "sha256:0240a57f22b0d473360006e5a1032682974fc50aef4d07979854667906741e41"
 }
