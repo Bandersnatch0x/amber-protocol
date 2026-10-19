@@ -101,12 +101,19 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 		findings.set(`${surface}|${pointer}|${finding.needleHash}`, finding);
 	};
 
+	const eventNeedles = needles.map((needle) => ({
+		needle,
+		escaped: JSON.stringify(needle).slice(1, -1),
+	}));
 	const events = readRunEvents(targetRoot, runId);
 	for (const event of events) {
+		// The scan must not read its own output.
+		if (event.kind === "validation.completed") continue;
 		const serialized = JSON.stringify(event);
-		for (const needle of needles) {
-			if (serialized.includes(needle))
+		for (const { needle, escaped } of eventNeedles) {
+			if (serialized.includes(needle) || serialized.includes(escaped)) {
 				addFinding("event", `event:${event.kind}@${event.at}`, needle);
+			}
 		}
 	}
 
@@ -116,7 +123,7 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 		const entries = fs
 			.readdirSync(directory, { withFileTypes: true })
 			.filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-			.sort((a, b) => a.name.localeCompare(b.name));
+			.sort((a, b) => compareCodeUnits(a.name, b.name));
 		for (const entry of entries) {
 			let loadout;
 			try {

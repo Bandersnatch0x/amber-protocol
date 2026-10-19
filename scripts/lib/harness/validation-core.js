@@ -153,6 +153,7 @@ function receiptProblem(record) {
 	const hasEvalCheck = evalChecks.length === 1;
 	const hasHeldOut = record.heldOut !== undefined;
 	const heldOut = hasHeldOut ? record.heldOut : null;
+	let legacyHeldOut = false;
 	// R-ET-4.5: `not-run` is the requirement for an unbound held-out set,
 	// never a fallback that can turn an absent leak check into a pass.
 	if (hasHeldOut) {
@@ -190,9 +191,15 @@ function receiptProblem(record) {
 			return "validation receipt heldOut.leak is not an object";
 		}
 		const leakFields = Object.keys(leak).sort();
-		if (JSON.stringify(leakFields) !== JSON.stringify(["detail", "findings", "status"])) {
+		const isLegacyLeak =
+			JSON.stringify(leakFields) === JSON.stringify(["detail", "findings", "status"]);
+		if (
+			!isLegacyLeak &&
+			JSON.stringify(leakFields) !== JSON.stringify(["detail", "findings", "scanned", "status"])
+		) {
 			return `validation receipt heldOut.leak carries unknown or missing fields: ${leakFields.join(", ")}`;
 		}
+		legacyHeldOut = isLegacyLeak;
 		if (!CHECK_STATUSES.includes(leak.status)) {
 			return `validation receipt heldOut.leak.status must be pass|fail|not-run; got ${JSON.stringify(leak.status)}`;
 		}
@@ -201,6 +208,21 @@ function receiptProblem(record) {
 		}
 		if (!Array.isArray(leak.findings) || leak.findings.length > 5) {
 			return "validation receipt heldOut.leak.findings must be an array of at most 5 items";
+		}
+		if (!isLegacyLeak) {
+			const scanned = leak.scanned;
+			if (!scanned || typeof scanned !== "object" || Array.isArray(scanned)) {
+				return "validation receipt heldOut.leak.scanned is not an object";
+			}
+			const scannedFields = Object.keys(scanned).sort();
+			if (JSON.stringify(scannedFields) !== JSON.stringify(["events", "pages"])) {
+				return `validation receipt heldOut.leak.scanned carries unknown or missing fields: ${scannedFields.join(", ")}`;
+			}
+			for (const surface of ["events", "pages"]) {
+				if (!Number.isInteger(scanned[surface]) || scanned[surface] < 0) {
+					return `validation receipt heldOut.leak.scanned.${surface} must be a non-negative integer`;
+				}
+			}
 		}
 		for (const finding of leak.findings) {
 			if (!finding || typeof finding !== "object" || Array.isArray(finding)) {
@@ -359,8 +381,12 @@ function receiptProblem(record) {
 		) {
 			return "validation receipt axes disagree with its own checks (the axes are derived, never declared)";
 		}
-		const expectedVerdict = verdictFromChecks(checks);
-		if (record.verdict !== expectedVerdict) {
+		const expectedVerdicts = [
+			verdictFromChecks(checks, hasHeldOut ? heldOut : null, false),
+			...(legacyHeldOut ? [verdictFromChecks(checks, heldOut, true)] : []),
+		];
+		if (!expectedVerdicts.includes(record.verdict)) {
+			const expectedVerdict = expectedVerdicts[0];
 			return `validation receipt verdict ${JSON.stringify(record.verdict)} disagrees with its own checks (expected ${JSON.stringify(expectedVerdict)})`;
 		}
 		const expectedCompleteness = completenessFromAxes(expectedAxes);
@@ -667,11 +693,12 @@ function axesFromChecks(checks, binding) {
 
 // verdict: nothing evaluated at all is `not-run` (not a soft `incomplete`);
 // some evidence not gathered is `incomplete`; a failed check is `fail`.
-function verdictFromChecks(checks) {
+function verdictFromChecks(checks, heldOut, legacyHeldOut = false) {
 	const statuses = checks.map((check) => check.status);
 	const evaluated = statuses.filter((status) => status !== "not-run");
 	if (statuses.includes("fail")) return "fail";
 	if (evaluated.length === 0) return "not-run";
+	if (heldOut && heldOut.set === null && !legacyHeldOut) return "incomplete";
 	return statuses.includes("not-run") ? "incomplete" : "pass";
 }
 
@@ -684,7 +711,7 @@ function completenessFromAxes(axes) {
 // R-ET-2 (0172): the receipt-level verdict, the governed-gate verdict, the
 // completeness, and the five axes — all DERIVED from evidence already on the
 // run, never independently writable. Reads only what evaluateChecks reads.
-function deriveReceiptFields(targetRoot, { run, checks, bound }) {
+function deriveReceiptFields(targetRoot, { run, checks, bound, heldOut }) {
 	const axes = axesFromChecks(checks, bound === null ? null : bound.binding);
 
 	const executionRecord = readExecutionRecord(targetRoot, { runId: run.id });
@@ -714,7 +741,7 @@ function deriveReceiptFields(targetRoot, { run, checks, bound }) {
 						: "pass";
 
 	return {
-		verdict: verdictFromChecks(checks),
+		verdict: verdictFromChecks(checks, heldOut),
 		gateVerdict,
 		completeness: completenessFromAxes(axes),
 		axes,
@@ -764,6 +791,29 @@ function validateRun(targetRoot, { runId, now, evalResult, heldOut } = {}) {
 	const leak = held === null ? null : leakCheck(targetRoot, { runId, needles: held.needles });
 	const evaluation = evalCheck(bound, held, leak);
 	if (evaluation !== null) checks.push(evaluation);
+	const heldOutBlock =
+		held !== null || bound !== null
+			? {
+					set: held === null ? null : held.binding,
+					leak:
+						held === null
+							? {
+									status: "not-run",
+									detail: "no held-out set is bound to this validation",
+									findings: [],
+									scanned: { events: 0, pages: 0 },
+								}
+							: {
+									status: leak.status,
+									detail:
+										leak.status === "fail"
+											? "held-out content appears in the run's accessible context or events"
+											: "no held-out content appears in the run's accessible context or events",
+									findings: leak.findings,
+									scanned: leak.scanned,
+								},
+				}
+			: null;
 	const failed = checks.filter((check) => check.status === "fail");
 	const status = failed.length === 0 ? "accepted" : "rejected";
 	// Content-addressed identity: same run content + same checks → same id →
@@ -786,32 +836,11 @@ function validateRun(targetRoot, { runId, now, evalResult, heldOut } = {}) {
 		state: run.state,
 		checks,
 		result: { status },
-		...deriveReceiptFields(targetRoot, { run, checks, bound }),
+		...deriveReceiptFields(targetRoot, { run, checks, bound, heldOut: heldOutBlock }),
 		releaseManifest,
 		releaseManifestSha256: manifestSha256(releaseManifest),
 		...(bound !== null ? { evalResult: bound.binding } : {}),
-		...(held !== null || bound !== null
-			? {
-					heldOut: {
-						set: held === null ? null : held.binding,
-						leak:
-							held === null
-								? {
-										status: "not-run",
-										detail: "no held-out set is bound to this validation",
-										findings: [],
-									}
-								: {
-										status: leak.status,
-										detail:
-											leak.status === "fail"
-												? "held-out content appears in the run's accessible context or events"
-												: "no held-out content appears in the run's accessible context or events",
-										findings: leak.findings,
-									},
-					},
-				}
-			: {}),
+		...(heldOutBlock !== null ? { heldOut: heldOutBlock } : {}),
 	};
 	const problem = receiptProblem(receipt);
 	if (problem) throw typedError(CODE_CORRUPT, `refusing to store a malformed receipt: ${problem}`);

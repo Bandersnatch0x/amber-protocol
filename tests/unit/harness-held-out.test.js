@@ -171,6 +171,29 @@ test("held-out leaks on the pages surface reject through a run-scoped loadout", 
 	}
 });
 
+test("quoted held-out needles are detected on the events surface", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-quoted-event";
+		const needle = 'held-out event says "quoted"';
+		const set = admitEvalSet(target, "eval-set/held-out-quoted", `padding line\n${needle}\n`);
+		admitAndStart(target, runId);
+		emitHarnessEvent(target, {
+			kind: "run.created",
+			schemaVersion: 1,
+			at: "2026-10-20T00:00:00.000Z",
+			runId,
+			actor: "worker",
+			reason: needle,
+		});
+		const { receipt } = validateRun(target, { runId, heldOut: set.pin });
+		assert.equal(receipt.heldOut.leak.status, "fail");
+		assert.ok(receipt.heldOut.leak.findings.some((finding) => finding.surface === "event"));
+	} finally {
+		cleanup(target);
+	}
+});
+
 test("a clean held-out set passes its leak check but cannot claim a suite verdict", () => {
 	const target = tmpTarget();
 	try {
@@ -182,11 +205,52 @@ test("a clean held-out set passes its leak check but cannot claim a suite verdic
 		assert.equal(receipt.heldOut.set.revision, set.pin.revision);
 		assert.equal(receipt.heldOut.set.contentHash, set.receipt.contentHash);
 		assert.equal(receipt.heldOut.leak.status, "pass");
+		assert.equal(receipt.heldOut.leak.scanned.events > 0, true);
+		assert.equal(receipt.heldOut.leak.scanned.pages, 0);
 		const evaluation = receipt.checks.find((check) => check.name === "eval");
 		assert.equal(evaluation.status, "not-run");
 		assert.match(evaluation.detail, /no eval-result is bound/);
 		assert.equal(receipt.result.status, "accepted");
 		assert.equal(receipt.verdict, "incomplete");
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("held-out receipt records page scan coverage", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-page-coverage";
+		const pageId = "held-page-coverage";
+		const set = admitEvalSet(
+			target,
+			"eval-set/held-out-page-coverage",
+			"clean held-out page content\n",
+		);
+		admitAndStart(target, runId);
+		pageWithNeedle(target, pageId, "accessible page content");
+		scopeLoadoutToPage(target, runId, pageId);
+		const { receipt } = validateRun(target, { runId, heldOut: set.pin });
+		assert.equal(receipt.heldOut.leak.status, "pass");
+		assert.equal(receipt.heldOut.leak.scanned.pages, 1);
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("a self-referential held-out line stays stable across validation", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-self";
+		const identity = "eval-set/held-out-self";
+		const set = admitEvalSet(target, identity, `${identity}\n`);
+		admitAndStart(target, runId);
+		const first = validateRun(target, { runId, heldOut: set.pin });
+		const second = validateRun(target, { runId, heldOut: set.pin });
+		assert.equal(first.receipt.heldOut.leak.status, "pass");
+		assert.equal(second.receipt.heldOut.leak.status, "pass");
+		assert.equal(second.receipt.receiptId, first.receipt.receiptId);
+		assert.equal(listReceipts(target, { runId }).length, 1);
 	} finally {
 		cleanup(target);
 	}
@@ -202,6 +266,29 @@ test("an eval-result without a held-out set records leak status not-run, never p
 		assert.equal(receipt.heldOut.set, null);
 		assert.equal(receipt.heldOut.leak.status, "not-run");
 		assert.equal(receipt.checks.find((check) => check.name === "eval").status, "pass");
+		assert.notEqual(receipt.verdict, "pass");
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("harness eval --run lists the held-out eval-set pointer", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-eval-surface";
+		const set = admitEvalSet(
+			target,
+			"eval-set/held-out-eval-surface",
+			"clean eval surface content\n",
+		);
+		admitAndStart(target, runId);
+		validateRun(target, { runId, heldOut: set.pin });
+		const { dispatch } = require("../../scripts/lib/command-dispatcher");
+		const listed = dispatch("harness", { target, json: true, run: runId, _: ["eval"] });
+		assert.equal(listed.exitCode, 0, listed.result.errors?.join("; ") || listed.result.text);
+		assert.ok(
+			listed.result.evaluationPointers.includes(`eval-set/${set.pin.identity}@${set.pin.revision}`),
+		);
 	} finally {
 		cleanup(target);
 	}
@@ -340,6 +427,77 @@ test("tampering heldOut leak status fails closed when receipts are read", () => 
 				/heldOut\.leak pass requires no findings/.test(error.message),
 		);
 		assert.equal(receipt.heldOut.leak.findings.length > 0, true);
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("legacy held-out receipts remain readable without scan coverage", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-legacy-readable";
+		const set = admitEvalSet(target, "eval-set/held-out-legacy-readable", "clean legacy line\n");
+		admitAndStart(target, runId);
+		const { receipt, receiptFile } = validateRun(target, { runId, heldOut: set.pin });
+		const stored = JSON.parse(fs.readFileSync(receiptFile, "utf8"));
+		delete stored.heldOut.leak.scanned;
+		fs.writeFileSync(receiptFile, JSON.stringify(stored, null, "\t"), "utf8");
+		const listed = listReceipts(target, { runId });
+		assert.equal(listed.length, 1);
+		assert.equal(listed[0].receiptId, receipt.receiptId);
+		assert.equal("scanned" in listed[0].heldOut.leak, false);
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("legacy-shaped held-out failures cannot claim a pass verdict", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-legacy-fail";
+		const needle = "legacy held-out failure";
+		const set = admitEvalSet(target, "eval-set/held-out-legacy-fail", needle);
+		admitAndStart(target, runId);
+		emitHarnessEvent(target, {
+			kind: "run.created",
+			schemaVersion: 1,
+			at: "2026-10-20T00:00:00.000Z",
+			runId,
+			actor: "worker",
+			reason: needle,
+		});
+		const { receiptFile } = validateRun(target, { runId, heldOut: set.pin });
+		const stored = JSON.parse(fs.readFileSync(receiptFile, "utf8"));
+		delete stored.heldOut.leak.scanned;
+		stored.verdict = "pass";
+		fs.writeFileSync(receiptFile, JSON.stringify(stored, null, "\t"), "utf8");
+		assert.throws(
+			() => listReceipts(target, { runId }),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_VALIDATION_CORRUPT" &&
+				/verdict "pass" disagrees/.test(error.message),
+		);
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("new held-out receipts with scan coverage reject a forged pass verdict", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-new-strict";
+		admitAndStart(target, runId);
+		const evalResult = admitEvalResult(target, "eval-result/held-out-new-strict");
+		const { receiptFile } = validateRun(target, { runId, evalResult });
+		const stored = JSON.parse(fs.readFileSync(receiptFile, "utf8"));
+		stored.verdict = "pass";
+		fs.writeFileSync(receiptFile, JSON.stringify(stored, null, "\t"), "utf8");
+		assert.throws(
+			() => listReceipts(target, { runId }),
+			(error) =>
+				error.amberCode === "AMBER_E_HARNESS_VALIDATION_CORRUPT" &&
+				/verdict "pass" disagrees/.test(error.message),
+		);
 	} finally {
 		cleanup(target);
 	}

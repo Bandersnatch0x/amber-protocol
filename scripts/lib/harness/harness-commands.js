@@ -1043,10 +1043,7 @@ const harnessDispatch = defineCliCommand({
 			let result;
 			try {
 				if (args.run !== undefined) {
-					// With --run: the run's eval artifacts on record — read from
-					// the run's own event pointers (the closed eval/eval-result
-					// artifact-identity prefixes; never a substring over-match
-					// of caller-controlled fields). Report-only.
+					// With --run: read eval, eval-result, and eval-set pointers from the run trail.
 					if (args.run === undefined) {
 						return invalidArg("--run <id> requires a value");
 					}
@@ -1055,7 +1052,12 @@ const harnessDispatch = defineCliCommand({
 					const record = getRun(target, { runId: args.run }).run;
 					const pointers = readRunEvents(target, args.run)
 						.flatMap((event) => event.pointers || [])
-						.filter((pointer) => pointer.startsWith("eval/") || pointer.startsWith("eval-result/"));
+						.filter(
+							(pointer) =>
+								pointer.startsWith("eval/") ||
+								pointer.startsWith("eval-result/") ||
+								pointer.startsWith("eval-set/"),
+						);
 					result = {
 						ok: true,
 						runId: args.run,

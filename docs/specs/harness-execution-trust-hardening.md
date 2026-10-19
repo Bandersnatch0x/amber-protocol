@@ -164,7 +164,13 @@ read is denied; under `observed-only` a read is observable but not prevented.
 appears in the run's accessible context or events — the control that holds under
 `observed-only`. It shares the context-firewall seam rather than inventing a second surface.
 
-**R-ET-4.5** No held-out binding ⇒ the eval axis is `not-run`, never `pass`. In a ValidationReceipt this reads as `heldOut.leak.status === "not-run"` (R-ET-4.5); a bound set records `pass` or `fail` and never `not-run`.
+**R-ET-4.5** No held-out binding ⇒ the eval axis is `not-run`, never `pass`. In a
+ValidationReceipt this reads as `heldOut.leak.status === "not-run"` (R-ET-4.5); a bound set
+records `pass` or `fail` and never `not-run`.
+
+Here `checks[name="eval"]` is the suite verdict folded from the bound eval-result,
+`heldOut.leak.status` is the R-ET-4.5 axis, and the receipt-level `verdict` never reads `pass`
+while that axis is `not-run`.
 
 ### R-ET-5 — Release manifest integrity
 
