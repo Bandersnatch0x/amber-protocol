@@ -31,6 +31,14 @@
 
 本仓票据惯例的权威文本在 `docs/agents/issue-tracker.md`；上游已新增同义规则（“Closing an issue as complete”，remote `c2fade6`），本地尚未合入——合入后以该文件为准，本节不另立一套措辞。
 
+## 单人仓库的合并惯例
+
+分支保护要求 1 个批准评审，而本仓只有一名协作者（仓库所有者）。所有者自开的 PR 因此**永远无法**满足该门禁：`mergeStateStatus` 停在 `BLOCKED`、`reviewDecision` 停在 `REVIEW_REQUIRED`，即使 CI 全绿。这类 PR 用 `gh pr merge <n> --squash --admin` 合入。
+
+评审要求**保留**，不降为 0。它对非所有者来源的 PR 仍是真门禁：外部贡献者与 Dependabot 的 PR 由所有者给出真实批准（`reviewDecision=APPROVED`）后正常合入。
+
+`--admin` 绕过整条分支保护，评审与必需检查一起绕过。所以合入前必须自己确认 CI 全绿，门禁不再替你挡这一层。
+
 ## 全量测试纪律
 
 阶段 6→7 的门槛是**全量**测试：日志完整落盘到文件后整体读取，管道截断（`| tail` 之类）不算数。失败先归因——负载 flake 用空载复证、自伤清理后复证、既有红向历史溯源——再决定修复还是重锚。
