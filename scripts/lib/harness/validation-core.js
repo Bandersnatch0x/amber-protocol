@@ -47,6 +47,37 @@ const ALLOWED_CHECK_NAMES = Object.freeze([...CHECK_NAMES, EVAL_CHECK_NAME]);
 const CHECK_STATUSES = Object.freeze(["pass", "fail", "not-run"]);
 const EVAL_OVERALL = Object.freeze(["pass", "fail"]);
 
+// R-ET-2 (0172): the receipt-level verdict vocabulary. `verdict` answers "was
+// the evidence complete and correct"; `gateVerdict` answers "how strong was
+// the governed gate" — the split that keeps R-ET-3.2 (a mediated-only run can
+// still reach `pass`) and R-ET-2.4 (`observed-only` can never yield `pass`)
+// from contradicting. `unknown` is declared but never emitted by the current
+// derivation: it is reserved for a condition that is neither a check status
+// nor an evidence gap.
+const RECEIPT_VERDICTS = Object.freeze(["pass", "fail", "incomplete", "unknown", "not-run"]);
+const GATE_VERDICTS = Object.freeze([
+	"pass",
+	"fail",
+	"incomplete",
+	"unknown",
+	"blocked",
+	"not-run",
+]);
+const COMPLETENESS_VALUES = Object.freeze(["complete", "partial", "not-evaluated"]);
+
+// R-ET-2.2: every axis is ALWAYS present, mirroring evaluateChecks' always-add
+// rule — there is no "not applicable". Each axis is a projection of the
+// existing closed check set; no new probe is invented, and a `not-run` axis
+// means "no evidence yet", never "irrelevant".
+const AXIS_CHECKS = Object.freeze({
+	functional: ["attempts", "execution"],
+	performance: ["execution"],
+	security: ["policy", "execution"],
+	provenance: ["tools"],
+	context: ["context"],
+});
+const AXIS_NAMES = Object.freeze(Object.keys(AXIS_CHECKS));
+
 function typedError(code, message) {
 	const err = new Error(message);
 	err.amberCode = code;
@@ -148,6 +179,60 @@ function receiptProblem(record) {
 		}
 		if (typeof evalCheck.detail !== "string" || evalCheck.detail.length === 0) {
 			return "validation receipt eval check carries no detail";
+		}
+	}
+	// R-ET-2 (0172): the four derived fields. Optional on read so a pre-0172
+	// receipt stays readable (§4), but a receipt that carries them must carry
+	// them completely — a missing axis IS the blind spot the field exists to
+	// expose, so it refuses rather than defaulting to a pass.
+	const derived = [record.verdict, record.gateVerdict, record.completeness, record.axes];
+	const present = derived.filter((value) => value !== undefined).length;
+	if (present !== 0 && present !== derived.length) {
+		return "validation receipt carries an incomplete set of derived verdict fields";
+	}
+	if (record.verdict !== undefined && !RECEIPT_VERDICTS.includes(record.verdict)) {
+		return `validation receipt verdict must be one of ${RECEIPT_VERDICTS.join("|")}`;
+	}
+	if (record.gateVerdict !== undefined && !GATE_VERDICTS.includes(record.gateVerdict)) {
+		return `validation receipt gateVerdict must be one of ${GATE_VERDICTS.join("|")}`;
+	}
+	if (record.completeness !== undefined && !COMPLETENESS_VALUES.includes(record.completeness)) {
+		return `validation receipt completeness must be one of ${COMPLETENESS_VALUES.join("|")}`;
+	}
+	if (record.axes !== undefined) {
+		if (!record.axes || typeof record.axes !== "object" || Array.isArray(record.axes)) {
+			return "validation receipt axes is not an object";
+		}
+		const names = Object.keys(record.axes).sort();
+		if (JSON.stringify(names) !== JSON.stringify([...AXIS_NAMES].sort())) {
+			return `validation receipt axes carries unknown or missing axes: ${names.join(", ")}`;
+		}
+		for (const [axis, status] of Object.entries(record.axes)) {
+			if (!CHECK_STATUSES.includes(status)) {
+				return `axis ${JSON.stringify(axis)} carries unknown status ${JSON.stringify(status)}`;
+			}
+		}
+		// R-ET-2.3: re-derive from the receipt's OWN checks and refuse a
+		// disagreement — a receipt that says `verdict: "pass"` beside a `not-run`
+		// check is exactly the silent pass these fields exist to prevent, and an
+		// enum check alone would let it through. `gateVerdict` is the one derived
+		// field the receipt cannot recompute (it reads the run state and the
+		// execution record), so its vocabulary check above is all the read path
+		// can do.
+		const checks = record.checks || [];
+		const expectedAxes = axesFromChecks(checks, record.evalResult ?? null);
+		if (
+			canonicalJson(JSON.stringify(record.axes)) !== canonicalJson(JSON.stringify(expectedAxes))
+		) {
+			return "validation receipt axes disagree with its own checks (the axes are derived, never declared)";
+		}
+		const expectedVerdict = verdictFromChecks(checks);
+		if (record.verdict !== expectedVerdict) {
+			return `validation receipt verdict ${JSON.stringify(record.verdict)} disagrees with its own checks (expected ${JSON.stringify(expectedVerdict)})`;
+		}
+		const expectedCompleteness = completenessFromAxes(expectedAxes);
+		if (record.completeness !== expectedCompleteness) {
+			return `validation receipt completeness ${JSON.stringify(record.completeness)} disagrees with its own axes (expected ${JSON.stringify(expectedCompleteness)})`;
 		}
 	}
 	return null;
@@ -345,6 +430,86 @@ function evaluateChecks(targetRoot, run) {
 	return checks;
 }
 
+// fail > not-run > pass, the precedence the six-check set already reads.
+function foldStatuses(statuses) {
+	if (statuses.some((status) => status === "fail")) return "fail";
+	if (statuses.some((status) => status === "not-run")) return "not-run";
+	return "pass";
+}
+
+// R-ET-2.3: the derived fields are a PURE function of the receipt's own checks
+// (plus the eval binding, for the provenance override below) — which is what
+// makes them re-derivable on read, so "derived, never independently writable"
+// is enforced rather than merely intended. `receiptProblem` recomputes all
+// three through these same helpers and refuses a disagreement.
+function axesFromChecks(checks, binding) {
+	const byName = new Map(checks.map((check) => [check.name, check.status]));
+	const axes = {};
+	for (const [axis, names] of Object.entries(AXIS_CHECKS)) {
+		axes[axis] = foldStatuses(names.map((name) => byName.get(name) ?? "not-run"));
+	}
+	// R-ET-2.4: an eval binding that records no definition pin is missing
+	// evaluator provenance, so the axis cannot claim a pass.
+	if (binding !== null && binding.definition === null) axes.provenance = "not-run";
+	return axes;
+}
+
+// verdict: nothing evaluated at all is `not-run` (not a soft `incomplete`);
+// some evidence not gathered is `incomplete`; a failed check is `fail`.
+function verdictFromChecks(checks) {
+	const statuses = checks.map((check) => check.status);
+	const evaluated = statuses.filter((status) => status !== "not-run");
+	if (statuses.includes("fail")) return "fail";
+	if (evaluated.length === 0) return "not-run";
+	return statuses.includes("not-run") ? "incomplete" : "pass";
+}
+
+function completenessFromAxes(axes) {
+	const statuses = Object.values(axes);
+	if (statuses.every((status) => status === "not-run")) return "not-evaluated";
+	return statuses.some((status) => status === "not-run") ? "partial" : "complete";
+}
+
+// R-ET-2 (0172): the receipt-level verdict, the governed-gate verdict, the
+// completeness, and the five axes — all DERIVED from evidence already on the
+// run, never independently writable. Reads only what evaluateChecks reads.
+function deriveReceiptFields(targetRoot, { run, checks, bound }) {
+	const axes = axesFromChecks(checks, bound === null ? null : bound.binding);
+
+	const executionRecord = readExecutionRecord(targetRoot, { runId: run.id });
+	const policyEvents = readRunEvents(targetRoot, run.id).filter(
+		(event) => event.kind === "policy.evaluated",
+	);
+	const comparisonVerdict = executionRecord?.comparison?.verdict ?? null;
+	// The provider's effective enforcement level (R-ET-1 / ADR-0104), read off
+	// the execution record's effective boundary.
+	const enforcement = executionRecord?.effective?.enforcement ?? null;
+	const denied = policyEvents.some((event) => event.decision && event.decision.result === "deny");
+	// gateVerdict: `blocked` is the run state a refused gate transitions to, so
+	// it outranks a plain fail. `observed-only` never vetoes the receipt verdict
+	// — it caps THIS one, because the gate could not enforce what it compared.
+	// Unlike the other three this field is NOT re-derivable from the receipt
+	// alone (it reads the run state and the execution record), so the read path
+	// can only check its vocabulary.
+	const gateVerdict =
+		run.state === "blocked"
+			? "blocked"
+			: denied || comparisonVerdict === "violation"
+				? "fail"
+				: !executionRecord && policyEvents.length === 0
+					? "not-run"
+					: comparisonVerdict === "unevaluated" || enforcement !== "enforced"
+						? "incomplete"
+						: "pass";
+
+	return {
+		verdict: verdictFromChecks(checks),
+		gateVerdict,
+		completeness: completenessFromAxes(axes),
+		axes,
+	};
+}
+
 /**
  * Validate one run: the closed deterministic check set over the run's own
  * records, one receipt record, one `validation.completed` event. Re-validating
@@ -391,6 +556,7 @@ function validateRun(targetRoot, { runId, now, evalResult } = {}) {
 		state: run.state,
 		checks,
 		result: { status },
+		...deriveReceiptFields(targetRoot, { run, checks, bound }),
 		...(bound !== null ? { evalResult: bound.binding } : {}),
 	};
 	const problem = receiptProblem(receipt);
@@ -472,6 +638,10 @@ module.exports = {
 	EVAL_CHECK_NAME,
 	ALLOWED_CHECK_NAMES,
 	CHECK_STATUSES,
+	AXIS_NAMES,
+	RECEIPT_VERDICTS,
+	GATE_VERDICTS,
+	COMPLETENESS_VALUES,
 	CODE_CORRUPT,
 	CODE_INVALID_ARG,
 	CODE_ARTIFACT_NOT_FOUND,

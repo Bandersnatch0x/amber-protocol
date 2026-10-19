@@ -277,11 +277,17 @@ test("harness eval aliases the F058 surface through the SAME dispatch path; eval
 		}).ok,
 		true,
 	);
-	const { validateRun } = require("../../scripts/lib/harness/validation-core");
-	validateRun(target, {
+	const { validateRun, AXIS_NAMES } = require("../../scripts/lib/harness/validation-core");
+	const boundReceipt = validateRun(target, {
 		runId: "run-eval-1",
 		evalResult: { identity: "eval-result/harness-control-plane-pass", revision: 1 },
-	});
+	}).receipt;
+	// R-ET-2 (0172): the derived fields are present on every receipt, and a
+	// bound eval leg that PASSES cannot mask the checks that never ran — the
+	// binding is one more check, never a receipt-level promotion.
+	assert.deepEqual(Object.keys(boundReceipt.axes).sort(), [...AXIS_NAMES].sort());
+	assert.equal(boundReceipt.checks.find((c) => c.name === "eval").status, "pass");
+	assert.equal(boundReceipt.verdict, "incomplete");
 	const runFile = path.join(target, ".amber", "harness", "runs", "run-eval-1.json");
 	const beforeBoundView = fs.readFileSync(runFile);
 	const withBoundRun = dispatch("harness", {
