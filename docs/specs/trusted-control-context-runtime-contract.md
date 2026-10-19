@@ -82,6 +82,21 @@ Runtime interception (PreToolUse-level blocking) remains a *possible future opt-
 
 The narrow amendment appended to `docs/adr/0001-governance-first-artifact-first.md` by this packet states the §2.1/§2.2 contract in ADR form with source provenance. It makes no blanket control claim: it does not claim interception, sandboxing, or observability of unmediated actions.
 
+### 2.6 Receipt surface (0173)
+
+This section remains the **owner** of the E1–E4 definitions and their assurance ceilings; §2.1 and §2.2 are not restated anywhere else (DRY). 0173 adds the *receipt surface* for them: a ValidationReceipt
+(`scripts/lib/harness/validation-core.js`) carries a `pepCoverage` object — a `pointer` to ADR-0001's
+0047 amendment plus one row per class, each holding a **ceiling on what a statement of that class can
+support**, never a measurement of what happened and never a blended single value (R-EC-4).
+
+The receipt therefore discloses the blind spot in the record itself rather than leaving a reader to
+infer it: E4 reads `unavailable`, E2 reads `claimed`. A read-side ceiling guard refuses any receipt
+that claims more for a class than §2.2 allows, so "never promoted to an enforcement claim" (R-ET-3.3)
+is structural rather than a convention. The ceiling is a ceiling, not a veto — a mediated-only run
+whose checks all pass reaches `pass` with E4 `unavailable` on the same receipt (R-ET-3.2).
+
+Origin: `issues/0047` ruling A. Binding text: ADR-0001 `## Amendment (0047, 2026-09-16)`.
+
 ## 3. Context Firewall: classification, purpose, TTL, snapshot, three directions (0053)
 
 ### 3.1 Trusted metadata owner and source validation

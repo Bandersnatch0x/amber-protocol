@@ -78,6 +78,30 @@ const AXIS_CHECKS = Object.freeze({
 });
 const AXIS_NAMES = Object.freeze(Object.keys(AXIS_CHECKS));
 
+// R-ET-3 (0173): PEP coverage over the four evidence classes that ADR-0001's
+// `## Amendment (0047, 2026-09-16)` fixes. The DEFINITIONS are owned by that
+// amendment and by `docs/specs/trusted-control-context-runtime-contract.md`
+// §2.1 — never restated here (R-ET-3.4, DRY). This is the receipt's pointer
+// into them.
+//
+// Each value is a CEILING on what a statement of that class can support, not a
+// measurement of what happened — which is why the table is a constant by
+// construction. "Which classes did this run actually exercise" is a different
+// question, and one the receipt does not answer. E4 is `unavailable` and no
+// code path raises it: that is the declared blind spot (`issues/0047` ruling A),
+// recorded rather than left for a reader to infer.
+const PEP_CLASSES = Object.freeze(["E1", "E2", "E3", "E4"]);
+// Ascending strength. `verified` is reachable only through an independent
+// verification event (0054); this receipt has no producer for one.
+const PEP_ASSURANCES = Object.freeze(["unavailable", "claimed", "observed", "verified"]);
+const PEP_CEILINGS = Object.freeze({
+	E1: "observed", // Amber-recorded facts about the mediation itself
+	E2: "claimed", // executor self-reports — a claim, never an observation
+	E3: "observed", // independently observed state, file state inside the repo only
+	E4: "unavailable", // unobservable host actions — no record point, not even a claim
+});
+const PEP_POINTER = "docs/adr/0001-governance-first-artifact-first.md#amendment-0047-2026-09-16";
+
 function typedError(code, message) {
 	const err = new Error(message);
 	err.amberCode = code;
@@ -233,6 +257,34 @@ function receiptProblem(record) {
 		const expectedCompleteness = completenessFromAxes(expectedAxes);
 		if (record.completeness !== expectedCompleteness) {
 			return `validation receipt completeness ${JSON.stringify(record.completeness)} disagrees with its own axes (expected ${JSON.stringify(expectedCompleteness)})`;
+		}
+	}
+	// R-ET-3 (0173): the PEP coverage declaration. Optional on read so a pre-0173
+	// receipt stays readable (§4); when present it carries exactly the four
+	// classes, each at or below its ADR-0001 ceiling. The ceiling guard is what
+	// makes "never promoted to an enforcement claim" structural rather than
+	// intended: E4's ceiling IS `unavailable`, so a receipt claiming anything
+	// stronger for it — or `observed` for E2's claims — refuses on read.
+	if (record.pepCoverage !== undefined) {
+		const coverage = record.pepCoverage;
+		if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {
+			return "validation receipt pepCoverage is not an object";
+		}
+		const fields = Object.keys(coverage).sort();
+		if (JSON.stringify(fields) !== JSON.stringify([...PEP_CLASSES, "pointer"].sort())) {
+			return `validation receipt pepCoverage carries unknown or missing fields: ${fields.join(", ")}`;
+		}
+		if (coverage.pointer !== PEP_POINTER) {
+			return "validation receipt pepCoverage carries no pointer to the binding evidence-class contract";
+		}
+		for (const evidenceClass of PEP_CLASSES) {
+			const assurance = coverage[evidenceClass];
+			if (!PEP_ASSURANCES.includes(assurance)) {
+				return `pepCoverage ${evidenceClass} carries unknown assurance ${JSON.stringify(assurance)}`;
+			}
+			if (PEP_ASSURANCES.indexOf(assurance) > PEP_ASSURANCES.indexOf(PEP_CEILINGS[evidenceClass])) {
+				return `pepCoverage ${evidenceClass} claims ${JSON.stringify(assurance)} above its ${JSON.stringify(PEP_CEILINGS[evidenceClass])} ceiling (ADR-0001 0047 amendment)`;
+			}
 		}
 	}
 	return null;
@@ -507,6 +559,10 @@ function deriveReceiptFields(targetRoot, { run, checks, bound }) {
 		gateVerdict,
 		completeness: completenessFromAxes(axes),
 		axes,
+		// R-ET-3 (0173): the declared PEP coverage — a fresh object per receipt,
+		// never a shared constant, so no consumer can mutate one receipt's
+		// coverage into another's.
+		pepCoverage: { pointer: PEP_POINTER, ...PEP_CEILINGS },
 	};
 }
 
@@ -642,6 +698,9 @@ module.exports = {
 	RECEIPT_VERDICTS,
 	GATE_VERDICTS,
 	COMPLETENESS_VALUES,
+	PEP_CLASSES,
+	PEP_CEILINGS,
+	PEP_POINTER,
 	CODE_CORRUPT,
 	CODE_INVALID_ARG,
 	CODE_ARTIFACT_NOT_FOUND,
