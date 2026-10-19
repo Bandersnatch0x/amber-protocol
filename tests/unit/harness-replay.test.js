@@ -20,6 +20,7 @@ const {
 	validateRun,
 	listReceipts,
 	CHECK_NAMES,
+	CODE_CORRUPT,
 } = require("../../scripts/lib/harness/validation-core");
 const {
 	replayRun,
@@ -160,8 +161,10 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 	});
 	assert.equal(receipt.result.status, "accepted");
 	// F077 compatibility pin: an UNBOUND validation remains byte-identical to
-	// F073 — same check array, receiptId, and bytes. A pass recorded before the
-	// optional eval-result binding existed is never silently revised.
+	// F073 apart from R-ET-2's derived fields — same check array, receiptId, and
+	// bytes. A pass recorded before the optional eval-result binding existed is
+	// never silently revised; binding an eval-result still changes only the
+	// `eval` leg and the evalResult block.
 	assert.equal(
 		fs.readFileSync(receiptFile, "utf8"),
 		`{
@@ -203,6 +206,16 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 \t],
 \t"result": {
 \t\t"status": "accepted"
+\t},
+\t"verdict": "incomplete",
+\t"gateVerdict": "not-run",
+\t"completeness": "not-evaluated",
+\t"axes": {
+\t\t"functional": "not-run",
+\t\t"performance": "not-run",
+\t\t"security": "not-run",
+\t\t"provenance": "not-run",
+\t\t"context": "not-run"
 \t}
 }
 `,
@@ -522,6 +535,18 @@ test("a boundary-violating run validates rejected; a deny policy verdict fails t
 	assert.equal(receipt.result.status, "rejected");
 	const execution = receipt.checks.find((c) => c.name === "execution");
 	assert.equal(execution.status, "fail");
+	// R-ET-2 (0172): the derived fields read the same closed check set — a
+	// failed check makes the verdict `fail`, and a violation gates `fail` too.
+	assert.equal(receipt.verdict, "fail");
+	assert.equal(receipt.gateVerdict, "fail");
+	assert.deepEqual(receipt.axes, {
+		functional: "fail", // attempts not-run, execution fail → fail wins
+		performance: "fail",
+		security: "fail", // policy not-run, execution fail
+		provenance: "not-run", // tools never snapshotted
+		context: "not-run",
+	});
+	assert.equal(receipt.completeness, "partial"); // some axes have no evidence yet
 	// A deny verdict on the trail fails the policy check too (§16: the
 	// receipt records the first authority fact that failed).
 	const { emitHarnessEvent } = require("../../scripts/lib/harness/event-ledger");
@@ -535,6 +560,99 @@ test("a boundary-violating run validates rejected; a deny policy verdict fails t
 	const afterDeny = validateRun(target, { runId: "run-val-2" }).receipt;
 	const policy = afterDeny.checks.find((c) => c.name === "policy");
 	assert.equal(policy.status, "fail");
+	assert.equal(afterDeny.verdict, "fail");
+	assert.equal(afterDeny.gateVerdict, "fail"); // a deny gate outranks the comparison
+});
+
+// R-ET-2.4 (0172): `verdict` answers "was the evidence complete and correct",
+// `gateVerdict` answers "how strong was the governed gate". The split is what
+// keeps R-ET-3.2 (a mediated-only run can still reach `pass`) and R-ET-2.4
+// (`observed-only` can never yield `pass`) from contradicting: the provider's
+// strength caps the GATE verdict and never the receipt verdict.
+test("R-ET-2: an observed-only provider caps gateVerdict and never the receipt verdict", () => {
+	const target = tmpTarget();
+	const execRecord = (runId, enforcement) => ({
+		kind: "ExecutionRecord",
+		runId,
+		contract: "exec-coding",
+		contractSnapshotHash: `sha256:${"b".repeat(64)}`,
+		declared: {
+			workspace: { type: "local", path: "w" },
+			filesystem: { read: [], write: ["src"], deny: [] },
+			network: { mode: "deny" },
+			resources: {},
+			mutation: { mode: "isolated" },
+		},
+		effective: { workspace: { type: "local", path: "w" }, enforcement },
+		observed: {
+			entries: [{ kind: "mutation", paths: ["src/a"], source: "s" }],
+			collectedAt: "2026-09-23T00:00:00.000Z",
+		},
+		comparison: { verdict: "ok", findings: [], evaluatedAt: "2026-09-23T00:00:00.000Z" },
+	});
+	const dir = path.join(target, ".amber", "harness", "executions");
+	fs.mkdirSync(dir, { recursive: true });
+	const receipts = {};
+	// Two runs whose records differ in exactly one field: the provider's
+	// effective enforcement level.
+	for (const [runId, enforcement] of [
+		["run-enforced-1", "enforced"],
+		["run-observed-1", "observed-only"],
+	]) {
+		admitAndStart(target, runId);
+		fs.writeFileSync(
+			path.join(dir, `${runId}.json`),
+			JSON.stringify(execRecord(runId, enforcement), null, "\t"),
+			"utf8",
+		);
+		receipts[enforcement] = validateRun(target, { runId }).receipt;
+	}
+	const strong = receipts.enforced;
+	const observed = receipts["observed-only"];
+	// The comparison is `ok` in both, so every check reads identically — the
+	// provider level is not a check, it is a property of the gate.
+	const statuses = (receipt) => receipt.checks.map((c) => `${c.name}=${c.status}`);
+	assert.equal(strong.checks.find((c) => c.name === "execution").status, "pass");
+	assert.deepEqual(statuses(observed), statuses(strong));
+	assert.equal(strong.gateVerdict, "pass");
+	assert.equal(observed.gateVerdict, "incomplete"); // the gate could not enforce
+	assert.equal(observed.verdict, strong.verdict); // ...and the verdict is untouched
+	assert.deepEqual(observed.axes, strong.axes);
+});
+
+// R-ET-2.2/2.3: the derived fields are never independently writable, so the
+// read path refuses a receipt that omits an axis rather than defaulting the
+// missing axis to a pass — and re-derives the rest, so a hand-edited verdict
+// cannot disagree with the checks it claims to summarize.
+test("R-ET-2: a stored receipt that omits an axis, or overclaims its verdict, is refused on read", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-axis-1");
+	const { receipt } = validateRun(target, { runId: "run-axis-1" });
+	const { context: dropped, ...axes } = receipt.axes;
+	assert.equal(dropped, "not-run");
+	const file = path.join(
+		target,
+		".amber",
+		"harness",
+		"validations",
+		"run-axis-1",
+		`${receipt.receiptId}.json`,
+	);
+	const refuses = (body, pattern) => {
+		fs.writeFileSync(file, JSON.stringify(body, null, "\t"), "utf8");
+		assert.throws(
+			() => listReceipts(target, { runId: "run-axis-1" }),
+			(err) => err.amberCode === CODE_CORRUPT && pattern.test(err.message),
+		);
+	};
+	refuses({ ...receipt, axes }, /missing axes/);
+	// The silent-pass case the field exists to prevent: a `pass` verdict beside
+	// a `not-run` check. An enum check alone would accept this.
+	refuses({ ...receipt, verdict: "pass" }, /verdict "pass" disagrees/);
+	refuses({ ...receipt, completeness: "complete" }, /completeness "complete" disagrees/);
+	// The untouched receipt still reads.
+	fs.writeFileSync(file, JSON.stringify(receipt, null, "\t"), "utf8");
+	assert.equal(listReceipts(target, { runId: "run-axis-1" }).length, 1);
 });
 
 test("replay on an untouched target answers equivalent/unevaluated from records alone (§43 gate)", () => {

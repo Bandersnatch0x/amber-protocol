@@ -106,9 +106,16 @@ policy.evaluated event yet", "the run never executed", "no attempt records"). Th
 **R-ET-2.3** The new fields are **derived** from existing evidence, never independently
 writable.
 
-**R-ET-2.4** Fail-closed: `not-run`, `unknown`, a missing axis, an `observed-only`
-provider (R-ET-1), a missing Context Firewall receipt, or missing evaluator provenance can
-never yield `pass`.
+**R-ET-2.4** Fail-closed. The receipt `verdict` is `pass` only when every check is `pass`:
+a `not-run` check, a missing axis, a missing Context Firewall receipt, or missing evaluator
+provenance yields `incomplete`/`not-run` and never `pass`. An **`observed-only` provider
+(R-ET-1) does not veto the receipt `verdict`** — it caps the **`gateVerdict`**, which is
+`pass` only when the provider can actually enforce. The two fields answer different
+questions: `verdict` is "was the evidence complete and correct", `gateVerdict` is "how
+strong was the governed gate". This keeps R-ET-3.2 true (a mediated-only run can still
+reach `pass`) while still refusing to claim enforcement the provider cannot deliver.
+`unknown` is a declared value the current derivation never emits — reserved for a
+condition that is neither a check status nor an evidence gap.
 
 ### R-ET-3 — PEP coverage over the four evidence classes
 

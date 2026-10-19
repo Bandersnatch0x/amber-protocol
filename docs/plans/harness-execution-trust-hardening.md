@@ -77,8 +77,11 @@ verdict, no completeness, and no per-axis breakdown.
 **Change.** Add to the receipt: `verdict` (`pass|fail|incomplete|unknown|not-run`),
 `gateVerdict` (`pass|fail|incomplete|unknown|blocked|not-run`), `completeness`
 (`complete|partial|not-evaluated`), and `axes` (`functional|performance|security|provenance|context`).
-Fail-closed rules: `not-run`, `unknown`, a missing axis, an `observed-only` provider, a missing
-Context Firewall receipt, or missing evaluator provenance can never yield `pass`.
+Fail-closed rules: a `not-run` check, a missing axis, a missing Context Firewall receipt, or missing
+evaluator provenance can never yield `verdict: pass`; an `observed-only` provider can never yield
+`gateVerdict: pass`. `verdict` answers "was the evidence complete and correct", `gateVerdict` answers
+"how strong was the governed gate" — the split that keeps R-ET-3.2 ("a mediated-only run can still
+reach `pass`") and R-ET-2.4 ("`observed-only` can never yield `pass`") from contradicting.
 
 **Touch points.** `scripts/lib/harness/validation-core.js`, its receipt schema, `listReceipts`.
 
