@@ -46,6 +46,8 @@
  *   rides the Envelope's existing extensions carrier under the `policy`
  *   namespace; the policy evaluator is the first shape consumer, so the
  *   artifact registry remains opaque and type-generic.
+ * - Eval-set (R-ET-4.1): held-out evaluation content measured by an Eval
+ *   definition is a distinct artifact from the Eval definition itself.
  * `draft` is the initial admitted state of every gate-bearing type — the
  *   state before the type's gate. A lifecycle change is always an admission
  *   carrying a named transition: it produces a NEW revision, never an
@@ -175,6 +177,18 @@ const TYPE_REGISTRY = Object.freeze({
 			states: Object.freeze(["recorded"]),
 		}),
 		transitions: Object.freeze({}),
+		requiredTraces: Object.freeze({}),
+	}),
+	"eval-set": Object.freeze({
+		dir: "eval-sets",
+		lifecycle: Object.freeze({
+			initial: "draft",
+			states: Object.freeze(["draft", "active", "retired"]),
+		}),
+		transitions: Object.freeze({
+			activate: Object.freeze({ name: "activate", from: "draft", to: "active" }),
+			retire: Object.freeze({ name: "retire", from: "active", to: "retired" }),
+		}),
 		requiredTraces: Object.freeze({}),
 	}),
 });

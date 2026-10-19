@@ -25,6 +25,7 @@ const { listAttempts } = require("./attempt-core");
 const { readExecutionRecord } = require("./execution-adapter");
 const { emitHarnessEvent } = require("./event-ledger");
 const { toolsSnapshot } = require("./tool-core");
+const { resolveHeldOutBinding, leakCheck } = require("./held-out-core");
 
 const CODE_CORRUPT = "AMBER_E_HARNESS_VALIDATION_CORRUPT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
@@ -40,10 +41,10 @@ const CHECK_NAMES = Object.freeze([
 	"evidence",
 	"attempts",
 ]);
-// F077: the one check that exists ONLY when a committed eval-result is bound
-// onto the validation (`--eval-result <identity>@<revision>`). Absent on an
-// unbound receipt so the unbound path stays byte-identical to F073 — a pass
-// recorded before F077 is never silently revised.
+// F077/R-ET-4: the one check that exists only when a committed eval-result or
+// held-out eval-set is bound onto the validation. Absent on an unbound receipt
+// so the unbound path stays byte-identical to F073 — a pass recorded before
+// these checks is never silently revised.
 const EVAL_CHECK_NAME = "eval";
 const ALLOWED_CHECK_NAMES = Object.freeze([...CHECK_NAMES, EVAL_CHECK_NAME]);
 const CHECK_STATUSES = Object.freeze(["pass", "fail", "not-run"]);
@@ -150,10 +151,92 @@ function receiptProblem(record) {
 	const evalChecks = (record.checks || []).filter((check) => check.name === EVAL_CHECK_NAME);
 	if (evalChecks.length > 1) return "validation receipt carries duplicate eval checks";
 	const hasEvalCheck = evalChecks.length === 1;
-	if (hasEvalCheck !== (record.evalResult !== undefined)) {
+	const hasHeldOut = record.heldOut !== undefined;
+	const heldOut = hasHeldOut ? record.heldOut : null;
+	// R-ET-4.5: `not-run` is the requirement for an unbound held-out set,
+	// never a fallback that can turn an absent leak check into a pass.
+	if (hasHeldOut) {
+		if (!heldOut || typeof heldOut !== "object" || Array.isArray(heldOut)) {
+			return "validation receipt heldOut is not an object";
+		}
+		const heldOutFields = Object.keys(heldOut).sort();
+		if (JSON.stringify(heldOutFields) !== JSON.stringify(["leak", "set"])) {
+			return `validation receipt heldOut carries unknown or missing fields: ${heldOutFields.join(", ")}`;
+		}
+		if (heldOut.set !== null) {
+			const set = heldOut.set;
+			const setFields =
+				set && typeof set === "object" && !Array.isArray(set) ? Object.keys(set).sort() : [];
+			if (
+				!set ||
+				typeof set !== "object" ||
+				Array.isArray(set) ||
+				JSON.stringify(setFields) !== JSON.stringify(["contentHash", "identity", "revision"])
+			) {
+				return "validation receipt heldOut.set must be null or {identity, revision, contentHash}";
+			}
+			if (typeof set.identity !== "string" || set.identity.length === 0) {
+				return "validation receipt heldOut.set carries no identity";
+			}
+			if (!Number.isInteger(set.revision) || set.revision < 1) {
+				return "validation receipt heldOut.set revision must be a positive integer";
+			}
+			if (!/^sha256:[0-9a-f]{64}$/.test(set.contentHash || "")) {
+				return "validation receipt heldOut.set.contentHash must be sha256:<64-hex>";
+			}
+		}
+		const leak = heldOut.leak;
+		if (!leak || typeof leak !== "object" || Array.isArray(leak)) {
+			return "validation receipt heldOut.leak is not an object";
+		}
+		const leakFields = Object.keys(leak).sort();
+		if (JSON.stringify(leakFields) !== JSON.stringify(["detail", "findings", "status"])) {
+			return `validation receipt heldOut.leak carries unknown or missing fields: ${leakFields.join(", ")}`;
+		}
+		if (!CHECK_STATUSES.includes(leak.status)) {
+			return `validation receipt heldOut.leak.status must be pass|fail|not-run; got ${JSON.stringify(leak.status)}`;
+		}
+		if (typeof leak.detail !== "string" || leak.detail.length === 0) {
+			return "validation receipt heldOut.leak.detail must be a non-empty string";
+		}
+		if (!Array.isArray(leak.findings) || leak.findings.length > 5) {
+			return "validation receipt heldOut.leak.findings must be an array of at most 5 items";
+		}
+		for (const finding of leak.findings) {
+			if (!finding || typeof finding !== "object" || Array.isArray(finding)) {
+				return "validation receipt heldOut.leak finding is not an object";
+			}
+			const findingFields = Object.keys(finding).sort();
+			if (JSON.stringify(findingFields) !== JSON.stringify(["needleHash", "pointer", "surface"])) {
+				return "validation receipt heldOut.leak finding carries unknown or missing fields";
+			}
+			if (!["event", "page"].includes(finding.surface)) {
+				return `validation receipt heldOut.leak finding surface must be event|page; got ${JSON.stringify(finding.surface)}`;
+			}
+			if (!/^sha256:[0-9a-f]{64}$/.test(finding.needleHash || "")) {
+				return "validation receipt heldOut.leak finding needleHash must be sha256:<64-hex>";
+			}
+			if (typeof finding.pointer !== "string" || finding.pointer.length === 0) {
+				return "validation receipt heldOut.leak finding pointer must be a non-empty string";
+			}
+		}
+		if (heldOut.set === null && leak.status !== "not-run") {
+			return "validation receipt heldOut.set null requires heldOut.leak.status not-run";
+		}
+		if (heldOut.set !== null && leak.status === "not-run") {
+			return "validation receipt heldOut.set requires heldOut.leak.status pass|fail";
+		}
+		if (leak.status === "fail" && leak.findings.length === 0) {
+			return "validation receipt heldOut.leak fail requires findings";
+		}
+		if (leak.status === "pass" && leak.findings.length !== 0) {
+			return "validation receipt heldOut.leak pass requires no findings";
+		}
+	}
+	if (hasEvalCheck !== (record.evalResult !== undefined || hasHeldOut)) {
 		return hasEvalCheck
-			? "validation receipt carries an eval check without its evalResult binding"
-			: "validation receipt carries an evalResult binding without its eval check";
+			? "validation receipt carries an eval check without its evalResult or heldOut binding"
+			: "validation receipt carries an evalResult or heldOut binding without its eval check";
 	}
 	if (record.evalResult !== undefined) {
 		const bound = record.evalResult;
@@ -196,15 +279,39 @@ function receiptProblem(record) {
 			}
 		}
 		const evalCheck = evalChecks[0];
-		if (evalCheck.status !== bound.overall) {
-			return "validation receipt eval check status disagrees with evalResult.overall";
-		}
-		const { artifactGraphNodeId } = require("../core/artifact-graph-projection");
-		if (evalCheck.pointer !== artifactGraphNodeId("eval-result", bound.identity, bound.revision)) {
-			return "validation receipt eval check pointer disagrees with the bound eval-result revision";
-		}
 		if (typeof evalCheck.detail !== "string" || evalCheck.detail.length === 0) {
 			return "validation receipt eval check carries no detail";
+		}
+	}
+	if (hasEvalCheck) {
+		const evalCheck = evalChecks[0];
+		const expected =
+			hasHeldOut && heldOut.leak.status === "fail"
+				? "fail"
+				: record.evalResult !== undefined
+					? record.evalResult.overall
+					: "not-run";
+		if (evalCheck.status !== expected) {
+			return "validation receipt eval check status disagrees with its evalResult or heldOut leak";
+		}
+		const { artifactGraphNodeId } = require("../core/artifact-graph-projection");
+		if (record.evalResult !== undefined) {
+			if (
+				evalCheck.pointer !==
+				artifactGraphNodeId("eval-result", record.evalResult.identity, record.evalResult.revision)
+			) {
+				return "validation receipt eval check pointer disagrees with the bound eval-result revision";
+			}
+		} else {
+			if (!hasHeldOut || heldOut.set === null) {
+				return "validation receipt heldOut binding carries no eval-set pointer";
+			}
+			if (
+				evalCheck.pointer !==
+				artifactGraphNodeId("eval-set", heldOut.set.identity, heldOut.set.revision)
+			) {
+				return "validation receipt eval check pointer disagrees with the bound eval-set revision";
+			}
 		}
 	}
 	// R-ET-2 (0172): the four derived fields. Optional on read so a pre-0172
@@ -399,6 +506,33 @@ function resolveEvalResultBinding(targetRoot, pin) {
 			pointer,
 		},
 		pointers,
+	};
+}
+
+function evalCheck(bound, held, leak) {
+	if (bound === null && held === null) return null;
+	if (held === null) return bound.check;
+	const definitionClause = bound
+		? bound.binding.definition
+			? ` (definition ${bound.binding.definition.identity}@${bound.binding.definition.revision})`
+			: " (no definition pin recorded)"
+		: "";
+	return {
+		name: EVAL_CHECK_NAME,
+		status: leak.status === "fail" ? "fail" : bound ? bound.binding.overall : "not-run",
+		detail:
+			`held-out set ${held.binding.identity}@${held.binding.revision}: leak check ${leak.status}` +
+			(bound
+				? `; the bound eval-result ${bound.binding.identity}@${bound.binding.revision} records overall ${bound.binding.overall}${definitionClause}`
+				: "; no eval-result is bound, so the suite itself is not judged"),
+		pointer:
+			bound !== null
+				? require("../core/artifact-graph-projection").artifactGraphNodeId(
+						"eval-result",
+						bound.binding.identity,
+						bound.binding.revision,
+					)
+				: held.pointer,
 	};
 }
 
@@ -598,11 +732,10 @@ function deriveReceiptFields(targetRoot, { run, checks, bound }) {
  * the existing receipt is returned); a changed run yields a new receipt.
  * The receipt never touches the run's state machine.
  *
- * F077: an optional `evalResult` pin ({ identity, revision }) binds one
- * committed eval-result revision onto this validation — the check set grows
- * the `eval` leg (a projection of the result's own `overall`), the receipt
- * records the binding, and the event carries the eval-prefixed pointers.
- * Without the pin the receipt is byte-identical to F073.
+ * F077/R-ET-4: optional `evalResult` and `heldOut` pins bind committed
+ * revisions onto this validation. The check set grows the `eval` leg, the
+ * receipt records the bindings, and the event carries the canonical pointers.
+ * Without either pin the receipt is byte-identical to F073.
  *
  * R-ET-5 (0175): every receipt freezes a release manifest — the code/task/
  * evaluator/provider/model versions it validated — with its sha256. The
@@ -615,8 +748,9 @@ function deriveReceiptFields(targetRoot, { run, checks, bound }) {
  * @param {string} opts.runId
  * @param {string} [opts.now]
  * @param {{identity: string, revision: number}} [opts.evalResult]
+ * @param {{identity: string, revision: number}} [opts.heldOut]
  */
-function validateRun(targetRoot, { runId, now, evalResult } = {}) {
+function validateRun(targetRoot, { runId, now, evalResult, heldOut } = {}) {
 	if (!runId || typeof runId !== "string") {
 		throw typedError(CODE_INVALID_ARG, "--run <id> is required to validate a run");
 	}
@@ -624,9 +758,12 @@ function validateRun(targetRoot, { runId, now, evalResult } = {}) {
 	// Resolve the binding BEFORE evaluating anything: a refused pin writes
 	// nothing (no receipt, no event, no summary).
 	const bound = evalResult === undefined ? null : resolveEvalResultBinding(targetRoot, evalResult);
+	const held = heldOut === undefined ? null : resolveHeldOutBinding(targetRoot, heldOut);
 	const at = now || new Date().toISOString();
 	const checks = evaluateChecks(targetRoot, run);
-	if (bound !== null) checks.push(bound.check);
+	const leak = held === null ? null : leakCheck(targetRoot, { runId, needles: held.needles });
+	const evaluation = evalCheck(bound, held, leak);
+	if (evaluation !== null) checks.push(evaluation);
 	const failed = checks.filter((check) => check.status === "fail");
 	const status = failed.length === 0 ? "accepted" : "rejected";
 	// Content-addressed identity: same run content + same checks → same id →
@@ -653,6 +790,28 @@ function validateRun(targetRoot, { runId, now, evalResult } = {}) {
 		releaseManifest,
 		releaseManifestSha256: manifestSha256(releaseManifest),
 		...(bound !== null ? { evalResult: bound.binding } : {}),
+		...(held !== null || bound !== null
+			? {
+					heldOut: {
+						set: held === null ? null : held.binding,
+						leak:
+							held === null
+								? {
+										status: "not-run",
+										detail: "no held-out set is bound to this validation",
+										findings: [],
+									}
+								: {
+										status: leak.status,
+										detail:
+											leak.status === "fail"
+												? "held-out content appears in the run's accessible context or events"
+												: "no held-out content appears in the run's accessible context or events",
+										findings: leak.findings,
+									},
+					},
+				}
+			: {}),
 	};
 	const problem = receiptProblem(receipt);
 	if (problem) throw typedError(CODE_CORRUPT, `refusing to store a malformed receipt: ${problem}`);
@@ -677,6 +836,7 @@ function validateRun(targetRoot, { runId, now, evalResult } = {}) {
 			pointers: [
 				`validation-receipt:${safeId(runId)}#${receiptId}`,
 				...(bound !== null ? bound.pointers : []),
+				...(held !== null ? [held.pointer] : []),
 			],
 		});
 		refreshValidationSummary(targetRoot, { runId, receipt });

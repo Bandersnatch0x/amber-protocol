@@ -29,7 +29,7 @@ const {
 	traceShapeProblem,
 } = require("../../scripts/lib/core/canonical-artifact-contracts");
 
-test("the type registry covers intent, spec, plan, decision, gate, policy, eval, and eval-result (closed set)", () => {
+test("the type registry covers intent, spec, plan, decision, gate, policy, eval, eval-result, and eval-set (closed set)", () => {
 	assert.deepEqual(ARTIFACT_TYPES, [
 		"intent",
 		"spec",
@@ -39,6 +39,7 @@ test("the type registry covers intent, spec, plan, decision, gate, policy, eval,
 		"policy",
 		"eval",
 		"eval-result",
+		"eval-set",
 	]);
 	assert.equal(Object.isFrozen(TYPE_REGISTRY), true);
 });
@@ -87,6 +88,10 @@ test("each registered type has a closed lifecycle with named transitions", () =>
 		initial: "recorded",
 		states: ["recorded"],
 	});
+	assert.deepEqual(TYPE_REGISTRY["eval-set"].lifecycle, {
+		initial: "draft",
+		states: ["draft", "active", "retired"],
+	});
 	assert.deepEqual(registeredTransitionsOf("intent"), ["accept"]);
 	assert.deepEqual(registeredTransitionsOf("spec"), ["approve"]);
 	assert.deepEqual(registeredTransitionsOf("plan"), ["approve"]);
@@ -95,6 +100,7 @@ test("each registered type has a closed lifecycle with named transitions", () =>
 	assert.deepEqual(registeredTransitionsOf("policy"), ["activate", "retire"]);
 	assert.deepEqual(registeredTransitionsOf("eval"), ["activate", "retire"]);
 	assert.deepEqual(registeredTransitionsOf("eval-result"), []);
+	assert.deepEqual(registeredTransitionsOf("eval-set"), ["activate", "retire"]);
 	assert.deepEqual(registeredTransitionsOf("bogus"), []);
 	// Every transition's from/to states are registered states of its type.
 	for (const type of ARTIFACT_TYPES) {

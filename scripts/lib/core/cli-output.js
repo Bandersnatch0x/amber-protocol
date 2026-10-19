@@ -290,6 +290,7 @@ const FLAG_SPECS = {
 	"--intent": { key: "intent" },
 	"--eval": { key: "evalVal" },
 	"--eval-result": { key: "evalResult" },
+	"--held-out": { key: "heldOut" },
 	// F055 ticket 1 (#283): retention classification flags (--now, --type,
 	// and --id are shared with existing surfaces).
 	"--record": { key: "record" },

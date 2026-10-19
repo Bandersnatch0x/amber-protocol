@@ -3033,14 +3033,16 @@ cancellation can address exactly that handle.
 
 **Validation and replay (F073/F076/F077).**
 
-- `harness validate --run <id> [--eval-result <identity>@<revision>]` — the ValidationReceipt:
+- `harness validate --run <id> [--eval-result <identity>@<revision>] [--held-out <identity>@<revision>]` — the ValidationReceipt:
   a closed deterministic check set (policy/execution/tools/context/evidence/attempts) over the
   run's own frozen records, each landing `pass` | `fail` | `not-run` with every `not-run`
   disclosing its reason. With `--eval-result` (F077) one committed eval-result is bound through
   the canonical artifact reader: the receipt grows the `eval` leg (the result's own `overall`
   copied, never re-derived) and the `validation.completed` event carries the
   `eval-result/<id>@<rev>` and `eval/<id>@<rev>` pointers. Without the flag the receipt is
-  unchanged. Validation never moves the run's state machine. Every receipt also freezes a
+  unchanged. With `--held-out` (R-ET-4) one committed eval-set is resolved and its content is
+  checked against the run's accessible context and events; findings store only hashed needles.
+  Validation never moves the run's state machine. Every receipt also freezes a
   release manifest (R-ET-5): the code/task/evaluator/provider/model versions it validated,
   bound to a sha256 that the read path re-derives — a tampered snapshot fails closed, and a
   repository that has since moved on is reported as staleness, never as corruption.

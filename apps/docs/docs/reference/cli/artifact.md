@@ -56,7 +56,7 @@ revisions are visible; history is append-only and immutable — there
 is no in-place mutation path for a committed revision.
 
 Registered Artifact Types (closed registry): intent, spec, plan,
-decision, gate, policy, eval, eval-result. intent, spec, and plan
+decision, gate, policy, eval, eval-result, eval-set. intent, spec, and plan
 each have a closed lifecycle of
 named transitions — intent: draft -> accepted via --transition
 accept; spec/plan: draft -> approved via --transition approve. A
@@ -79,7 +79,9 @@ evaluate` is that content's strict-consumption consumer. Eval
 definitions use the same draft -> active -> retired lifecycle under
 the eval type; eval-result artifacts are recorded immutable suite
 outcomes produced by `amber eval admit` and then referenced by normal
-replayable Evidence receipts.
+replayable Evidence receipts. Eval-set artifacts are held-out
+evaluation content (R-ET-4.1) with the same draft -> active ->
+retired lifecycle.
 
 Typed Trace lineage (versioned registry: refines, realizes,
 supersedes, decides): a Spec must refine exactly one accepted Intent

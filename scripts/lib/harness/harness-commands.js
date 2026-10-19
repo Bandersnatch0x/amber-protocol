@@ -822,11 +822,12 @@ const harnessDispatch = defineCliCommand({
 				if (sub === "list") {
 					if (!args.run) return invalidArg("--run <id> is required for harness validate list");
 					// Listing existing receipts is read-only and does not bind a
-					// caller-supplied eval result; --eval-result is intentionally
-					// ignored on this subcommand.
+					// caller-supplied eval result or held-out set; --eval-result and
+					// --held-out are intentionally ignored on this subcommand.
 					result = { ok: true, receipts: listReceipts(target, { runId: args.run }) };
 				} else if (args.run || sub) {
 					let evalResult;
+					let heldOut;
 					if (Object.prototype.hasOwnProperty.call(args, "evalResult")) {
 						if (args.evalResult === undefined) {
 							return invalidArg(
@@ -841,9 +842,24 @@ const harnessDispatch = defineCliCommand({
 						if (parsed.error) return invalidArg(parsed.error);
 						evalResult = parsed.value;
 					}
+					if (Object.prototype.hasOwnProperty.call(args, "heldOut")) {
+						if (args.heldOut === undefined) {
+							return invalidArg(
+								"--held-out requires a value; it was the last token on the command line",
+							);
+						}
+						const parsed = parseRevisionPin(
+							args.heldOut,
+							"--held-out",
+							"eval-set/held-out-coding@1",
+						);
+						if (parsed.error) return invalidArg(parsed.error);
+						heldOut = parsed.value;
+					}
 					result = validateRun(target, {
 						runId: args.run || sub,
 						...(evalResult !== undefined ? { evalResult } : {}),
+						...(heldOut !== undefined ? { heldOut } : {}),
 					});
 				} else {
 					return invalidArg("--run <id> is required for harness validate");

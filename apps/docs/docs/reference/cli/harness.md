@@ -52,7 +52,7 @@ amber harness admit --file <contract.json> --target <repo> [--json]
        amber harness checkpoint (capture | list | verify --run <id> [--checkpoint <id>] | inspect --run <id> --checkpoint <id>) --target <repo> [--json]
        amber harness attempt (list --run <id> | inspect --run <id> --attempt <id>) --target <repo> [--json]
        amber harness lifecycle [--run <id>] --target <repo> [--json]
-       amber harness validate --run <id> [--eval-result <identity>@<revision>] --target <repo> [--json]
+       amber harness validate --run <id> [--eval-result <identity>@<revision>] [--held-out <identity>@<revision>] --target <repo> [--json]
        amber harness replay --run <id> --target <repo> [--json]
        amber harness propose-regression --run <id> --target <repo> [--json]
        amber harness trace --run <id> --target <repo> [--json]
@@ -235,12 +235,15 @@ Subcommands:
                       --eval-result <identity>@<revision> resolves one
                       committed eval-result and adds the eval pass|fail leg
                       plus eval-prefixed pointers to validation.completed.
+                      --held-out <identity>@<revision> resolves one committed
+                      eval-set and runs the held-out leak check.
                       Without the flag the F073 receipt stays byte-identical;
                       validation never touches the run's state machine.
                       Every receipt also freezes a release manifest (R-ET-5):
                       the code/task/evaluator/provider/model versions it
                       validated, with its sha256, re-derived on read.
-                      Subcommands: (--run <id> [--eval-result <id>@<rev>]),
+                      Subcommands: (--run <id> [--eval-result <id>@<rev>]
+                      [--held-out <id>@<rev>]),
                       list (--run <id>).
   replay              Replay as verification, not re-execution (F073 H5,
                       §7/§43): re-derives the six frozen axes (contract/
