@@ -181,10 +181,16 @@ jobs:
         run: npm audit --audit-level=moderate
         continue-on-error: true
 
-      # apps/web is not part of the root workspace, so the audit above never
-      # reaches it. Scan its lockfile explicitly (no install needed).
+      # apps/web and apps/docs are not part of the root workspace, so the audit
+      # above never reaches them. Scan their lockfiles explicitly (no install
+      # needed). The docs site ships static output, so its build-time toolchain
+      # stays advisory-only; the hard gate below remains production-only.
       - name: Run web viewer security audit
         run: npm audit --prefix apps/web --package-lock-only --audit-level=moderate
+        continue-on-error: true
+
+      - name: Run docs site security audit
+        run: npm audit --prefix apps/docs --package-lock-only --audit-level=moderate
         continue-on-error: true
 
       - name: Check production dependencies for known vulnerabilities

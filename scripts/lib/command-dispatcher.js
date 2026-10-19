@@ -32,7 +32,6 @@ function handleLedger(args) {
 		const { exportLedger } = require("./core/ledger-export");
 		const result = exportLedger(targetRoot, { format: args.format, home: args.home });
 		if (args.out) {
-			const fs = require("node:fs");
 			const { writeFileWithinTarget } = require("./core/fs-utils");
 			const outputPath = writeFileWithinTarget(targetRoot, args.out, result.payload + "\n", {
 				label: "Ledger export destination",
