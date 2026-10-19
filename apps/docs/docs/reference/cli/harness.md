@@ -196,7 +196,7 @@ Subcommands:
                       admit (--file), list, inspect (--grant <id>), check
                       (--subject --resource --purpose [--classification]
                       [--now] [--run]), revoke (--grant --revoker).
-  advance             Move a Run along its closed nine-state machine. Advancing to
+  advance             Move a Run along its closed ten-state machine. Advancing to
                       admitted requires the complete six-check AdmissionReceipt:
                       --check <name:pointer> for identity, contract, policy,
                       context, execution, approval — each pointer citing the

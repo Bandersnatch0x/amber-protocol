@@ -33,7 +33,7 @@ function typedError(code, message) {
 }
 
 // The closed nearest-neighbor table: the legacy ledger's status vocabulary
-// mapped to the run nine-state vocabulary. Unmapped statuses refuse the
+// mapped to the run state vocabulary. Unmapped statuses refuse the
 // projection with the raw value shown — never guessed. The legacy surface
 // predates Runs, so every projection carries `legacy: true`.
 const LEGACY_STATUS_MAP = Object.freeze({

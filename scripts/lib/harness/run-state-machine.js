@@ -2,13 +2,13 @@
 
 // Run state machine (F065 H0; ADR-0101).
 //
-// The closed nine-state lifecycle of a Harness Run, with the same SSOT
+// The closed ten-state lifecycle of a Harness Run, with the same SSOT
 // discipline as the session machine (scripts/lib/session-state-machine.js):
 // exported STATES/TRANSITIONS/isLegalTransition/legalTargets/isFinal, illegal
 // transitions rejected by callers. This machine is deliberately separate from
 // the session machine — a Run is one bounded execution while a Session spans
 // framing/approval/review — and the only sanctioned bridge between them is
-// the vertical-slice mapping adapter (ADR-0101, decision 4).
+// the vertical-slice mapping adapter (ADR-0101, decision 4; amendment 0176).
 
 const STATES = {
 	CREATED: "created",
@@ -16,6 +16,7 @@ const STATES = {
 	RUNNING: "running",
 	PAUSED: "paused",
 	BLOCKED: "blocked",
+	SETTLING: "settling",
 	FAILED: "failed",
 	COMPLETED: "completed",
 	CANCELLED: "cancelled",
@@ -31,14 +32,15 @@ const TRANSITIONS = {
 		STATES.PAUSED,
 		STATES.BLOCKED,
 		STATES.FAILED,
-		STATES.COMPLETED,
+		STATES.SETTLING,
 		STATES.CANCELLED,
 	],
 	[STATES.PAUSED]: [STATES.RUNNING, STATES.CANCELLED, STATES.EXPIRED],
 	// BLOCKED → RUNNING (human-review recovery) | FAILED | CANCELLED | EXPIRED.
-	// BLOCKED → COMPLETED is illegal: unblocking precedes completion (same
-	// rule as the session machine).
+	// BLOCKED → SETTLING/COMPLETED is illegal: unblocking precedes completion
+	// (same rule as the session machine).
 	[STATES.BLOCKED]: [STATES.RUNNING, STATES.FAILED, STATES.CANCELLED, STATES.EXPIRED],
+	[STATES.SETTLING]: [STATES.COMPLETED, STATES.FAILED, STATES.CANCELLED],
 	[STATES.COMPLETED]: [],
 	[STATES.FAILED]: [],
 	[STATES.CANCELLED]: [],

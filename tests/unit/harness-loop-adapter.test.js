@@ -147,6 +147,7 @@ test("bind maps the real executed outcome: success completes the run with execut
 			"run.started",
 			"execution.started",
 			"policy.evaluated",
+			"run.settling",
 			"run.completed",
 			"execution.completed",
 		]);

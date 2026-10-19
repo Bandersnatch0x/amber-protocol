@@ -31,6 +31,7 @@ const HARNESS_EVENT_TYPES = Object.freeze([
 	"run.resumed",
 	"run.paused",
 	"run.blocked",
+	"run.settling",
 	"run.failed",
 	"run.completed",
 	"run.cancelled",

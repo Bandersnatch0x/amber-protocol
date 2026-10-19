@@ -963,7 +963,7 @@ One auditable, bounded execution unit of the Harness: subject (agent/session/tas
 _Avoid_: session, chat session, loop record, execution attempt
 
 **Run State**:
-The closed nine-state lifecycle of a Run — `created`, `admitted`, `running`, `paused`, `blocked`, `failed`, `completed`, `cancelled`, `expired` — validated by `src/lifecycle/run/state-machine.js`; illegal transitions refuse. Separate from the session state machine; the only sanctioned bridge is the vertical-slice mapping adapter.
+The closed ten-state lifecycle of a Run — `created`, `admitted`, `running`, `paused`, `blocked`, `settling`, `failed`, `completed`, `cancelled`, `expired` — validated by `scripts/lib/harness/run-state-machine.js`; illegal transitions refuse. Separate from the session state machine; the only sanctioned bridge is the vertical-slice mapping adapter.
 _Avoid_: session stage, route stage, free-form status
 
 **Harness Event**:

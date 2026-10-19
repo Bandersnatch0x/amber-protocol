@@ -1,6 +1,6 @@
 "use strict";
 
-// F065 H0 — Harness Run lifecycle (ADR-0101): the closed nine-state machine,
+// F065 H0 — Harness Run lifecycle (ADR-0101): the closed ten-state machine,
 // contract binding with fail-closed snapshot references, immutable terminal
 // records, and the `amber harness start|advance|status` seam. All cases use
 // their own temporary target directory (suite leak guard).
@@ -41,13 +41,24 @@ function admitContract(target) {
 	return dispatch("harness", { target, file, json: true, _: ["admit"] });
 }
 
-test("the nine-state machine exposes the SSOT predicates with closed transitions", () => {
-	assert.deepEqual(Object.keys(STATES).length, 9);
+test("the ten-state machine exposes the SSOT predicates with closed transitions", () => {
+	assert.deepEqual(Object.keys(STATES).length, 10);
 	assert.ok(isLegalTransition("created", "admitted"));
 	assert.ok(isLegalTransition("running", "blocked"));
+	assert.ok(isLegalTransition("running", "settling"));
 	assert.ok(isLegalTransition("blocked", "running"));
 	assert.equal(isLegalTransition("created", "running"), false, "created must be admitted first");
 	assert.equal(isLegalTransition("blocked", "completed"), false, "unblocking precedes completion");
+	assert.equal(
+		isLegalTransition("running", "completed"),
+		false,
+		"completion goes through settling",
+	);
+	assert.equal(isLegalTransition("settling", "completed"), true);
+	assert.equal(isLegalTransition("settling", "running"), false);
+	assert.equal(isLegalTransition("blocked", "settling"), false);
+	assert.equal(isLegalTransition("paused", "settling"), false);
+	assert.equal(isLegalTransition("settling", "settling"), false);
 	assert.equal(isLegalTransition("completed", "running"), false, "final states are frozen");
 	for (const [from, targets] of Object.entries(TRANSITIONS)) {
 		assert.deepEqual(legalTargets(from), targets, `legalTargets(${from}) must copy TRANSITIONS`);
@@ -102,7 +113,7 @@ test("start without an admitted contract fails closed", () => {
 	}
 });
 
-test("advance walks the legal path created→admitted→running→completed", () => {
+test("advance walks the legal path created→admitted→running→settling→completed", () => {
 	const target = tmpTarget();
 	try {
 		admitContract(target);
@@ -126,6 +137,7 @@ test("advance walks the legal path created→admitted→running→completed", ()
 		for (const step of [
 			{ to: "admitted", checks: admissionChecks },
 			{ to: "running" },
+			{ to: "settling" },
 			{ to: "completed" },
 		]) {
 			const advanced = dispatch("harness", {
@@ -144,6 +156,62 @@ test("advance walks the legal path created→admitted→running→completed", ()
 		assert.equal(shown.result.run.state, "completed");
 		assert.ok(shown.result.run.outcome.startedAt, "entering running records startedAt");
 		assert.ok(shown.result.run.outcome.finishedAt, "entering a final state records finishedAt");
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
+test("a run cannot reach completed without settling", () => {
+	const target = tmpTarget();
+	try {
+		admitContract(target);
+		const started = dispatch("harness", {
+			target,
+			json: true,
+			contract: "coding-task",
+			agent: "worker",
+			_: ["start"],
+		});
+		const runId = started.result.run.id;
+		const admissionChecks = [
+			"identity:subjects/worker",
+			"contract:harness/contracts/coding-task.json",
+			"policy:governance/rules.json#default-safe",
+			"context:loops/walk/context-authority",
+			"execution:worktrees/walk-1",
+			"approval:loops/ledger#approval-1",
+		];
+		for (const step of [{ to: "admitted", checks: admissionChecks }, { to: "running" }]) {
+			const advanced = dispatch("harness", {
+				target,
+				json: true,
+				run: runId,
+				to: step.to,
+				...(step.checks ? { checks: step.checks } : {}),
+				_: ["advance"],
+			});
+			assert.equal(advanced.exitCode, 0);
+		}
+		const direct = dispatch("harness", {
+			target,
+			json: true,
+			run: runId,
+			to: "completed",
+			_: ["advance"],
+		});
+		assert.equal(direct.exitCode, 1);
+		assert.equal(direct.result.code, "AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION");
+
+		for (const to of ["settling", "completed"]) {
+			const advanced = dispatch("harness", {
+				target,
+				json: true,
+				run: runId,
+				to,
+				_: ["advance"],
+			});
+			assert.equal(advanced.exitCode, 0);
+		}
 	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
 	}

@@ -2929,7 +2929,7 @@ ADR-0102, and `docs/specs/F065-harness-h0-foundation.md`.
   witnessed, and a loop without an unconsumed approval refuses closed
   (`AMBER_E_HARNESS_LOOP_APPROVAL_MISSING`).
 - `harness advance --run <id> --to <state> [--reason <text>] [--check <name:pointer> ...]` —
-  move a Run along its closed nine-state machine (`created→admitted→running→{paused|blocked|…}`);
+  move a Run along its closed ten-state machine (`created→admitted→running→{paused|blocked|…}`);
   illegal transitions and final-state rewrites refuse with stable `AMBER_E_HARNESS_*` codes.
   Advancing to `admitted` requires the complete six-check AdmissionReceipt
   (`AMBER_E_HARNESS_ADMISSION_INCOMPLETE` otherwise). Each transition appends a `run.*` event

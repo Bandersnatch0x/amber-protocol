@@ -3119,7 +3119,7 @@ const CATALOG = {
 	AMBER_E_HARNESS_RUN_ILLEGAL_TRANSITION: {
 		title: "Illegal Run state transition",
 		cause:
-			"The requested run transition is not an edge of the closed nine-state machine (ADR-0101), e.g. created→running or blocked→completed.",
+			"The requested run transition is not an edge of the closed ten-state machine (ADR-0101), e.g. created→running or blocked→completed.",
 		remedy:
 			"Advance through a legal path (see `scripts/lib/harness/run-state-machine.js` TRANSITIONS); retry of a failed run is a new run on the same task.",
 		layer: "Lifecycle",

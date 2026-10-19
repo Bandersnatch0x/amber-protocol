@@ -111,6 +111,7 @@
 				"running",
 				"paused",
 				"blocked",
+				"settling",
 				"failed",
 				"completed",
 				"cancelled",

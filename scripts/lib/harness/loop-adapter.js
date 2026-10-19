@@ -192,6 +192,14 @@ function bindLoopOutcome(targetRoot, { runId, loopContractId, now } = {}) {
 		},
 		pointers: [executedPointer],
 	});
+	if (exitCode === 0) {
+		transitionRun(targetRoot, {
+			runId,
+			to: "settling",
+			reason: `loop ${loopContractId} execution converged (exit 0) at ${executedPointer}`,
+			now,
+		});
+	}
 	const final = transitionRun(targetRoot, {
 		runId,
 		to: exitCode === 0 ? "completed" : "failed",

@@ -4,7 +4,7 @@
 //
 // Owns every semantic verdict of the Run lifecycle: binding to an admitted
 // contract snapshot (fail closed when the contract is missing or corrupt),
-// schema-validated records under the harness state area, closed nine-state
+// schema-validated records under the harness state area, closed ten-state
 // transitions via the Run state machine, and immutable terminal records
 // (a final run is never rewritten; retry is a new Run on the same task).
 // Storage paths resolve through the state-dir seam only.
@@ -99,6 +99,7 @@ function eventKindForTransition(from, to) {
 	if (to === "running") return from === "paused" ? "run.resumed" : "run.started";
 	if (to === "paused") return "run.paused";
 	if (to === "blocked") return "run.blocked";
+	if (to === "settling") return "run.settling";
 	if (to === "failed") return "run.failed";
 	if (to === "completed") return "run.completed";
 	if (to === "cancelled") return "run.cancelled";
