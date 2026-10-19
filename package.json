@@ -120,7 +120,7 @@
 		"eslint": "^10.12.0",
 		"globals": "^17.11.0",
 		"lint-staged": "^17.4.1",
-		"prettier": "^3.9.6"
+		"prettier": "^3.9.10"
 	},
 	"volta": {
 		"node": "22.19.0"
