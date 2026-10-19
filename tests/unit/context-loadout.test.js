@@ -155,6 +155,45 @@ describe("buildLoadout — input validation", () => {
 			cleanup(root);
 		}
 	});
+
+	it("writes a run-scoped loadout when --run has no subject", () => {
+		const root = makeTarget();
+		try {
+			const runId = "run-no-subject";
+			const result = buildLoadout(root, { route: "bugfix-quick", runId });
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.equal(path.basename(result.loadoutPath), `bugfix-quick--${runId}.json`);
+			assert.equal(result.loadout.runId, runId);
+			assert.equal(JSON.parse(fs.readFileSync(result.loadoutPath, "utf8")).runId, runId);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("keeps a run-scoped loadout when a later unscoped build runs", () => {
+		const root = makeTarget();
+		try {
+			const runId = "run-with-subject";
+			const scoped = buildLoadout(root, {
+				route: "bugfix-quick",
+				subject: "worker",
+				purpose: "review",
+				runId,
+			});
+			assert.equal(scoped.errors.length, 0, JSON.stringify(scoped.errors));
+
+			const unscoped = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(unscoped.errors.length, 0, JSON.stringify(unscoped.errors));
+			assert.equal(path.basename(scoped.loadoutPath), `bugfix-quick--${runId}.json`);
+			assert.equal(path.basename(unscoped.loadoutPath), "bugfix-quick.json");
+			assert.equal(fs.existsSync(scoped.loadoutPath), true);
+			assert.equal(fs.existsSync(unscoped.loadoutPath), true);
+			assert.equal(JSON.parse(fs.readFileSync(scoped.loadoutPath, "utf8")).runId, runId);
+			assert.equal(scoped.loadout.firewall.runId, runId);
+		} finally {
+			cleanup(root);
+		}
+	});
 });
 
 describe("buildLoadout — determinism (D3)", () => {
@@ -1207,6 +1246,27 @@ describe("buildLoadout — firewall verdict wiring (F071 H3b)", () => {
 				const result = buildLoadout(root, { route: "bugfix-quick", subject: garbage });
 				assert.equal(result.loadout, null, JSON.stringify(garbage));
 				assert.match(result.errors[0].detail, /subject must be a non-empty string/);
+			} finally {
+				cleanup(root);
+			}
+		}
+	});
+
+	it("refuses malformed run IDs through context load without writing a file", () => {
+		for (const run of ["../escape", "has space"]) {
+			const root = makeTarget();
+			try {
+				const result = dispatch("context", {
+					target: root,
+					json: true,
+					yes: true,
+					route: "bugfix-quick",
+					run,
+					_: ["load"],
+				});
+				assert.equal(result.exitCode, 1, JSON.stringify(result));
+				assert.equal(result.result.code, "AMBER_E_CONTEXT_LOADOUT_FIREWALL");
+				assert.equal(fs.existsSync(loadoutsDir(root)), false);
 			} finally {
 				cleanup(root);
 			}

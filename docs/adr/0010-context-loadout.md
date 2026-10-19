@@ -54,7 +54,7 @@ parsing is introduced.
 
 ### D2 — Artifact form: generated file (T2)
 
-The loadout is a file at `.amber/context/loadouts/<route>[-<feature>].json`: deterministic (same
+The loadout is a file at `.amber/context/loadouts/<route>[-<feature>][--<run>].json`: deterministic (same
 signal → byte-identical output), cacheable (same-signal regeneration skipped), diffable (shows what
 context changed between sessions), and embeds each referenced page's `rawHash` so `verify` can
 re-check at load time. Gitignored with the rest of `.amber/`, consistent with pages/requests/events.

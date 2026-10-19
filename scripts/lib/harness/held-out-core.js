@@ -131,7 +131,8 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 			} catch {
 				continue;
 			}
-			if (loadout?.firewall?.runId !== runId) continue;
+			const scopedRunId = loadout?.runId ?? loadout?.firewall?.runId;
+			if (scopedRunId !== runId) continue;
 			for (const pageId of Object.keys(loadout.pages || {})) {
 				scannedPages += 1;
 				const page = readPage(targetRoot, pageId);

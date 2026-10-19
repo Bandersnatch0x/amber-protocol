@@ -64,6 +64,7 @@ const { checkContextAccess } = require("../harness/context-core");
 const SCHEMA_VERSION = "1.0.0";
 const ROUTE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/; // kebab-case, matching pageId
 const FEATURE_RE = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
+const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const EPOCH = "1970-01-01T00:00:00.000Z";
 const OPERATING_MANUAL_PATH = "docs/wiki/agent/amber.md";
 const LOADOUT_DEFINITION_PATH = "docs/wiki/agent/context-loadout.md";
@@ -84,8 +85,9 @@ function loadoutsDir(targetRoot) {
 	});
 }
 
-function loadoutPathFor(targetRoot, route, feature) {
-	const name = feature ? `${route}-${feature}.json` : `${route}.json`;
+function loadoutPathFor(targetRoot, route, feature, runId) {
+	const scope = feature ? `${route}-${feature}` : route;
+	const name = runId ? `${scope}--${runId}.json` : `${scope}.json`;
 	return resolvePathWithin(loadoutsDir(targetRoot), name, {
 		label: "Context Loadout file",
 		canonicalExisting: true,
@@ -213,6 +215,18 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 }
 
 function loadBuildConfig(targetRoot, opts) {
+	const runIdDeclared = opts.runId !== undefined && opts.runId !== null;
+	if (runIdDeclared && (typeof opts.runId !== "string" || !RUN_ID_RE.test(opts.runId))) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_LOADOUT_FIREWALL",
+					detail: `runId must be a safe identifier (got ${JSON.stringify(opts.runId)})`,
+				},
+			],
+		};
+	}
+	const runId = runIdDeclared ? opts.runId : null;
 	const route = opts.route;
 	if (!route || typeof route !== "string" || !ROUTE_RE.test(route)) {
 		return {
@@ -324,6 +338,7 @@ function loadBuildConfig(targetRoot, opts) {
 		errors: [],
 		route,
 		feature,
+		runId,
 		budget: Number.isInteger(opts.budget) && opts.budget > 0 ? opts.budget : 4000,
 		since: opts.since || null,
 		requiredPins: Array.isArray(opts.required) ? opts.required.slice() : [],
@@ -334,7 +349,7 @@ function loadBuildConfig(targetRoot, opts) {
 			? {
 					subject,
 					purpose: opts.purpose,
-					runId: typeof opts.runId === "string" && opts.runId.trim().length > 0 ? opts.runId : null,
+					runId,
 				}
 			: null,
 		targetRoot,
@@ -708,6 +723,7 @@ function assembleLoadout(config, pageState, selection, delta) {
 		schemaVersion: SCHEMA_VERSION,
 		route: config.route,
 		feature: config.feature,
+		...(config.runId ? { runId: config.runId } : {}),
 		generatedAt: pageState.generatedAt,
 		budgetWords: config.budget,
 		knowledgeKinds: config.knowledgeKinds,
@@ -740,10 +756,10 @@ function assembleLoadout(config, pageState, selection, delta) {
 	};
 }
 
-function persistLoadout(targetRoot, loadout, route, feature) {
+function persistLoadout(targetRoot, loadout, route, feature, runId) {
 	let loadoutPath;
 	try {
-		loadoutPath = loadoutPathFor(targetRoot, route, feature);
+		loadoutPath = loadoutPathFor(targetRoot, route, feature, runId);
 	} catch (error) {
 		return {
 			error: { code: "AMBER_E_CONTEXT_LOADOUT_REQUIRED", detail: error.message || String(error) },
@@ -832,7 +848,13 @@ function buildLoadout(targetRoot, opts = {}) {
 		return { ...preview, loadoutPath: null };
 	}
 	const { loadout, errors, warnings } = preview;
-	const persisted = persistLoadout(targetRoot, loadout, loadout.route, loadout.feature);
+	const persisted = persistLoadout(
+		targetRoot,
+		loadout,
+		loadout.route,
+		loadout.feature,
+		loadout.runId,
+	);
 	if (persisted.error) {
 		errors.push(persisted.error);
 		return { loadout: null, loadoutPath: null, errors, warnings };

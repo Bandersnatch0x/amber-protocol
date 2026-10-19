@@ -115,6 +115,16 @@ function scopeLoadoutToPage(target, runId, pageId) {
 	);
 }
 
+function scopeLoadoutToPageWithTopLevelRunId(target, runId, pageId) {
+	const dir = loadoutsDir(target);
+	fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, `${runId}-top-level.json`),
+		JSON.stringify({ runId, pages: { [pageId]: {} } }),
+		"utf8",
+	);
+}
+
 function eventCount(target, runId) {
 	return readRunEvents(target, runId).length;
 }
@@ -229,7 +239,7 @@ test("held-out receipt records page scan coverage", () => {
 		);
 		admitAndStart(target, runId);
 		pageWithNeedle(target, pageId, "accessible page content");
-		scopeLoadoutToPage(target, runId, pageId);
+		scopeLoadoutToPageWithTopLevelRunId(target, runId, pageId);
 		const { receipt } = validateRun(target, { runId, heldOut: set.pin });
 		assert.equal(receipt.heldOut.leak.status, "pass");
 		assert.equal(receipt.heldOut.leak.scanned.pages, 1);

@@ -26,6 +26,12 @@
 			"type": "string",
 			"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
 		},
+		"runId": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+		},
 		"redactions": {
 			"description": "ContextSnapshot redaction ledger (context/runtime contract §3.2): records THAT a field was omitted inside admitted pages and why — never values, counts, or ordering. Empty when the build omitted nothing.",
 			"type": "array",

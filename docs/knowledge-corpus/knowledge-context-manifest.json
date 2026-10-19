@@ -124,8 +124,8 @@
       "sourcePath": "docs/adr/0010-context-loadout.md",
       "title": "Context Loadout — Amber Governs the Agent's Context Window",
       "source": {
-        "rawHash": "sha256:16dcabf2fcf1f7dff4d60d4482a1a96db6b080c0990e444eee9eaafac85d6feb",
-        "normHash": "sha256:3de8c939c016ecb91b298a05716bc7cbcd410a98aa13274c9626a04563db0fa0"
+        "rawHash": "sha256:87a96e9649c41da7ea6df5579aecf1b149c10988d67619633db318ca6116fc03",
+        "normHash": "sha256:df9b1e1122734f96de004ad9da407073228a0fb5ffaf7635ffdb79ca6a55381e"
       }
     },
     {
@@ -657,5 +657,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:0240a57f22b0d473360006e5a1032682974fc50aef4d07979854667906741e41"
+  "manifestHash": "sha256:324a9cba2521129bd8bea28045157fcd8d42bb5deffb7af1c7263ff3c33c6a47"
 }

@@ -87,13 +87,15 @@ Subcommands:
   load --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
         Assemble a task-scoped Loadout: three target-local Required Artifacts plus
         a freshness-gated, budgeted selection of Context Pages, written to
-        .amber/context/loadouts/<route>[-<feature>].json.
+        .amber/context/loadouts/<route>[-<feature>][--<run>].json.
         With --subject <s> --purpose <p> ([--run <id>]) the F069 firewall
         verdict gates every candidate page: allowed pages cite the covering
         grant (id + snapshot + validUntil), denied pages are excluded with
         reason firewall and the closed deny reason (each denial on the
         trail); without --subject the build is byte-identical and the
         artifact carries no firewall section (visibly not grant-governed).
+        --run <id> writes a per-run snapshot; the run's page set survives a later
+        build without --run, which the held-out leak check depends on.
   preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
         Assemble and print the same Loadout without writing files or events.
         Firewall mode (--subject/--purpose) requires `load` — preview never
