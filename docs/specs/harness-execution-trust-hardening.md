@@ -226,7 +226,7 @@ execution suites):
 | R-ET-2 | derived verdict/axes; fail-closed conditions never `pass`; six-check behavior unchanged | `tests/unit/harness-control-plane.test.js`, `tests/unit/harness-replay.test.js` |
 | R-ET-3 | four classes labelled distinctly; mediated-only run can `pass`; class-2/4 evidence cannot ground `pass` | `tests/unit/harness-control-plane.test.js` |
 | R-ET-4 | leak check fails on access; set unreachable through declared scope; no binding ⇒ `not-run` | `tests/unit/canonical-artifact-contracts.test.js`, `tests/unit/canonical-artifacts.test.js` (F077 pinning), `tests/unit/harness-context.test.js` (leak seam) |
-| R-ET-5 | tampered stored snapshot fails closed on read; stale manifest is a staleness finding, not an integrity failure | `tests/unit/canonical-artifact-contracts.test.js`, `tests/unit/harness-control-plane.test.js` |
+| R-ET-5 | tampered stored snapshot fails closed on read; stale manifest is a staleness finding, not an integrity failure | `tests/unit/harness-replay.test.js` (the receipt suite; 0175) |
 | R-ET-6 | `completed` unreachable without `settling`; verdict independent of terminal outcome | `tests/unit/harness-run.test.js` |
 
 Every change also runs the five repository gates defined in `docs/agents/dev-workflow.md`
@@ -247,5 +247,10 @@ stage 6 (`npm test`, `npm run manifests`, `npm run doctor`, `npm run gen:agents:
   construction.
 - **Re-verifying artifact bytes at receipt read.** Would misreport every historical receipt
   once the repository moves on; staleness is a separate check (R-ET-5.3).
+- **A canonical-artifact-registry entry for the release manifest.** The registry holds
+  *authored, revisioned* governance objects with lineage and traces; a release manifest is
+  *derived* from the run it describes, so registering it would mint a revision lineage for
+  something nobody authors. It is a schema-validated document frozen into the receipt
+  (R-ET-5.2), which is what binds it.
 - **A new ADR to add `settling`.** Overhead without content; in-place amendment is the
   established convention for extending an ADR.

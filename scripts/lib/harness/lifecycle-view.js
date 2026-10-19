@@ -19,6 +19,8 @@
 const { getRun, listRuns } = require("./run-core");
 const { listAttempts, detectNoProgress } = require("./attempt-core");
 const { listCheckpoints } = require("./checkpoint-core");
+const { listReceipts } = require("./validation-core");
+const { manifestStaleness, ambientCodeState } = require("./release-manifest");
 
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 
@@ -61,10 +63,34 @@ function loopProvenance(run) {
 	};
 }
 
+// R-ET-5 (0175): the release manifest the run's latest receipt froze — the
+// versions this run was validated against. The receipt is named by the run's
+// own recorded summary pointer (never "the newest file", which a hash-named
+// receipt cannot answer), and the staleness verdict rides alongside it as a
+// SEPARATE field: a moved repository is a finding about the present, never a
+// corruption of the past (R-ET-5.3). No receipt, or a pre-0175 one, is null.
+function releaseManifestWitness(targetRoot, run, current) {
+	const receiptId = run.validation ? run.validation.receiptId : null;
+	if (!receiptId) return null;
+	const receipt = listReceipts(targetRoot, { runId: run.id }).find(
+		(entry) => entry.receiptId === receiptId,
+	);
+	if (!receipt || !receipt.releaseManifest) return null;
+	return {
+		receiptId: receipt.receiptId,
+		sha256: receipt.releaseManifestSha256,
+		versions: receipt.releaseManifest,
+		staleness: manifestStaleness(targetRoot, {
+			manifest: receipt.releaseManifest,
+			current,
+		}),
+	};
+}
+
 // One run's unified-lifecycle row: the spine (state + history), the
 // subject's session/task mapping witnesses, the execution verdict, and the
 // attempt/checkpoint folds.
-function runLifecycle(targetRoot, runId) {
+function runLifecycle(targetRoot, runId, current) {
 	const run = getRun(targetRoot, { runId }).run;
 	const attempts = listAttempts(targetRoot, { runId });
 	const checkpoints = listCheckpoints(targetRoot, { runId });
@@ -77,6 +103,7 @@ function runLifecycle(targetRoot, runId) {
 		outcome: run.outcome ?? null,
 		loop: loopProvenance(run),
 		execution: executionWitness(run),
+		releaseManifest: releaseManifestWitness(targetRoot, run, current),
 		attempts: {
 			count: attempts.length,
 			lastAttemptState: attempts.length > 0 ? attempts[attempts.length - 1].state : null,
@@ -108,8 +135,12 @@ function lifecycleView(targetRoot, { runId } = {}) {
 	if (runId !== undefined && (typeof runId !== "string" || runId.length === 0)) {
 		throw typedError(CODE_INVALID_ARG, "--run <id> must be a run id");
 	}
+	// Read the ambient code state ONCE for the whole view: the manifest
+	// staleness check compares every run's frozen manifest against it, and the
+	// underlying git read costs ~190ms per spawn on Windows.
+	const current = ambientCodeState(targetRoot);
 	if (runId !== undefined) {
-		return { ok: true, run: runLifecycle(targetRoot, runId) };
+		return { ok: true, run: runLifecycle(targetRoot, runId, current) };
 	}
 	const runs = listRuns(targetRoot);
 	return {
@@ -119,7 +150,7 @@ function lifecycleView(targetRoot, { runId } = {}) {
 				// listRuns' tombstone: cite the corruption, render the rest.
 				return { id: entry.id, corrupt: true };
 			}
-			return runLifecycle(targetRoot, entry.id);
+			return runLifecycle(targetRoot, entry.id, current);
 		}),
 		// The §42 mapping statement, readable from the view itself: run is the
 		// spine; the other surfaces map through declared bridges, never ad hoc.

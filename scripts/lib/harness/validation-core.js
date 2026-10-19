@@ -17,6 +17,8 @@ const path = require("node:path");
 
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { canonicalJson } = require("../core/context-hash");
+const { canonicalHashOf } = require("../core/registry-ledger");
+const { buildReleaseManifest, manifestSha256 } = require("./release-manifest");
 const { getRun, ADMISSION_CHECK_NAMES } = require("./run-core");
 const { readRunEvents } = require("./event-ledger");
 const { listAttempts } = require("./attempt-core");
@@ -285,6 +287,29 @@ function receiptProblem(record) {
 			if (PEP_ASSURANCES.indexOf(assurance) > PEP_ASSURANCES.indexOf(PEP_CEILINGS[evidenceClass])) {
 				return `pepCoverage ${evidenceClass} claims ${JSON.stringify(assurance)} above its ${JSON.stringify(PEP_CEILINGS[evidenceClass])} ceiling (ADR-0001 0047 amendment)`;
 			}
+		}
+	}
+	// R-ET-5 (0175): the frozen release manifest and its sha256 appear together,
+	// and the read path RE-DERIVES the hash from the STORED snapshot — a
+	// tampered or truncated snapshot fails closed here (R-ET-5.4). This is the
+	// contract-snapshot precedent (`inspectHarnessContract`, R-ET-5.2) applied
+	// to the receipt. It deliberately does NOT compare the manifest against
+	// current artifacts: that is the separate staleness check (R-ET-5.3), and
+	// making it a read gate would misreport every historical receipt the moment
+	// the repository moved on.
+	const hasManifest = record.releaseManifest !== undefined;
+	if (hasManifest !== (record.releaseManifestSha256 !== undefined)) {
+		return hasManifest
+			? "validation receipt carries a release manifest without its sha256"
+			: "validation receipt carries a release manifest sha256 without its manifest";
+	}
+	if (hasManifest) {
+		if (!/^sha256:[0-9a-f]{64}$/.test(record.releaseManifestSha256 || "")) {
+			return "validation receipt releaseManifestSha256 must be sha256:<64-hex>";
+		}
+		const derived = canonicalHashOf(record.releaseManifest);
+		if (derived !== record.releaseManifestSha256) {
+			return `validation receipt release manifest no longer hashes to its recorded sha256 (${record.releaseManifestSha256} != ${derived}); the stored snapshot is tampered`;
 		}
 	}
 	return null;
@@ -578,6 +603,13 @@ function deriveReceiptFields(targetRoot, { run, checks, bound }) {
  * the `eval` leg (a projection of the result's own `overall`), the receipt
  * records the binding, and the event carries the eval-prefixed pointers.
  * Without the pin the receipt is byte-identical to F073.
+ *
+ * R-ET-5 (0175): every receipt freezes a release manifest — the code/task/
+ * evaluator/provider/model versions it validated — with its sha256. The
+ * manifest is derived from the run's own records, so it never changes the
+ * receipt's content-addressed identity; the two ambient code axes are the only
+ * ones a later repository can move, and that drift is the staleness check's
+ * finding, never this receipt's.
  * @param {string} targetRoot
  * @param {object} opts
  * @param {string} opts.runId
@@ -605,6 +637,11 @@ function validateRun(targetRoot, { runId, now, evalResult } = {}) {
 	const identity = canonicalJson(JSON.stringify({ runId, runState: run.state, checks }));
 	const crypto = require("node:crypto");
 	const receiptId = `vr-${crypto.createHash("sha256").update(identity).digest("hex").slice(0, 16)}`;
+	// R-ET-5 (0175): freeze WHAT this receipt validated. Built from the run's own
+	// frozen records (plus the two ambient code axes), then frozen into the
+	// receipt with its canonical-JSON sha256 — the receipt is the store, so the
+	// read path can re-derive the hash without touching the repository.
+	const releaseManifest = buildReleaseManifest(targetRoot, { run, bound });
 	const receipt = {
 		receiptId,
 		runId,
@@ -613,6 +650,8 @@ function validateRun(targetRoot, { runId, now, evalResult } = {}) {
 		checks,
 		result: { status },
 		...deriveReceiptFields(targetRoot, { run, checks, bound }),
+		releaseManifest,
+		releaseManifestSha256: manifestSha256(releaseManifest),
 		...(bound !== null ? { evalResult: bound.binding } : {}),
 	};
 	const problem = receiptProblem(receipt);

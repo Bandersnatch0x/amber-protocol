@@ -220,7 +220,10 @@ Subcommands:
   lifecycle           The unified lifecycle view (F072 H4): one read-only
                       mapping of run state/history, loop/session/task
                       provenance (cited from the run's admission pointers),
-                      the execution verdict, attempts, and checkpoints.
+                      the execution verdict, attempts, and checkpoints,
+                      plus the release manifest the run's latest receipt
+                      froze (R-ET-5: the versions validated, beside whether
+                      they still hold — staleness, never integrity).
                       Writes nothing; corrupt records fail closed.
                       Optional: --run <id> (one run) or omit for every run
                       plus the surface mapping.
@@ -234,6 +237,9 @@ Subcommands:
                       plus eval-prefixed pointers to validation.completed.
                       Without the flag the F073 receipt stays byte-identical;
                       validation never touches the run's state machine.
+                      Every receipt also freezes a release manifest (R-ET-5):
+                      the code/task/evaluator/provider/model versions it
+                      validated, with its sha256, re-derived on read.
                       Subcommands: (--run <id> [--eval-result <id>@<rev>]),
                       list (--run <id>).
   replay              Replay as verification, not re-execution (F073 H5,
