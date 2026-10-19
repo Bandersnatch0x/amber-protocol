@@ -89,6 +89,10 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 - Bugfix (`bugfix-quick`): reproduce -> [approve fix] -> fix -> verify. Reproduce BEFORE fixing.
 - Refactor (`refactor-safe`): characterize behavior -> [approve refactor] -> refactor ->
   [approve merge] -> verify. No restructuring without a green characterization net.
+- A stage of type `verb` advances only through the governed seam. A route carrying one refuses
+  `session verify` (`contains verb stages, whose cursor advances only through the governed seam`,
+  exit 1) and requires `session run` then `session settle`. No packaged route has a verb stage, so
+  this surfaces only on a custom route.
 
 ## 6. Evidence And Feature State
 
@@ -101,10 +105,13 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
   Version 2 runs four Evals covering MCP tool descriptions, QA contract-surface model independence,
   the Context quote boundary, and breadcrumb authenticity. They are not Approval and do not call a
   model.
-- `amber session verify` without `--execute` records a claim tagged `executed: false`;
-  `complete-check --strict` requires executed evidence. `verify --execute` runs in the working
-  copy behind two gates: policy (`.amber/governance/rules.json`, deny-wins, default-deny) and
-  tamper-evident ledger. Extend `rules.json` rather than bypassing a denied command.
+- `amber session verify` without `--execute` records a claim tagged `executed: false` (exit 0);
+  `complete-check --strict` requires executed evidence, so a claim-only session still reports
+  `Missing: verification` and exits 1. `verify --execute` runs in the working copy behind two
+  gates: policy (`.amber/governance/verify-rules.json` — a separate file from the governed-surface
+  `rules.json`, deny-wins, default-deny) and tamper-evident ledger. Extend `verify-rules.json`
+  rather than bypassing a denied command; a command no allow rule matches reports
+  `no allow rule matched; defaultAction=deny` and exits 1.
 
 ## 7. Approval And Governed Execution
 
@@ -123,6 +130,10 @@ report-only:
 
 Worker output never approves itself: worker, reviewer, approval, and acceptance are separate records.
 
+A governed mutation refused for lack of approval prints `Executed: false` with
+`This typed mutation requires explicit approval (--yes or --confirm).` and exits 1. `Executed: false`
+means the action did not happen; never read it as success.
+
 ## 8. Handoff
 
 A session is handoff-ready only when someone can continue without the chat transcript:
@@ -130,6 +141,11 @@ goal, work done, feature/session status, verification evidence, blockers, next a
 instructions. Regenerate the live handoff with `node scripts/amber.js handoff --target .`, produce the
 portable bundle with `node scripts/amber.js handoff bundle --target .`, and validate it with
 `node scripts/amber.js handoff validate --target .`.
+
+A regenerated handoff still fails `complete-check` while its verification section reads
+`Command: not run yet` / `Result: pending`. The completion check treats that content as scaffold, so
+handoff evidence becomes live only once real verification evidence exists — the handoff item and the
+verification item are not independent.
 
 ## 9. State Vs Docs
 
