@@ -124,3 +124,45 @@ test("scaffoldPlan rejects a whitespace-only explicit title", () => {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test("scaffoldPlan errors instead of throwing when the feature has no title", () => {
+	const root = tempProject([
+		{ id: "f6", user_visible_behavior: "x", verification: ["run npm test"] },
+	]);
+	try {
+		const result = scaffoldPlan(root, { feature: "f6" });
+		assert.ok(
+			result.errors.includes(
+				"Feature f6 has no non-empty title in feature_list.json; run validate-feature-list to fix it.",
+			),
+			`expected a title error, got: ${JSON.stringify(result.errors)}`,
+		);
+		assert.deepEqual(result.created, []);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("scaffoldPlan rejects a whitespace-only feature title", () => {
+	const root = tempProject([
+		{
+			id: "f7",
+			title: "   ",
+			user_visible_behavior: "x",
+			verification: ["run npm test"],
+		},
+	]);
+	try {
+		const result = scaffoldPlan(root, { feature: "f7" });
+		assert.ok(
+			result.errors.includes(
+				"Feature f7 has no non-empty title in feature_list.json; run validate-feature-list to fix it.",
+			),
+			`expected a title error, got: ${JSON.stringify(result.errors)}`,
+		);
+		assert.deepEqual(result.created, []);
+		assert.equal(fs.existsSync(path.join(root, "docs", "plans")), false);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});

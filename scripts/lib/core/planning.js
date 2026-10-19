@@ -243,7 +243,18 @@ function scaffoldPlan(target, options = {}) {
 		return { target: targetRoot, created, skipped, errors, warnings };
 	}
 
-	const title = options.title || feature.title.trim();
+	let title;
+	if (options.title === undefined) {
+		if (typeof feature.title !== "string" || feature.title.trim() === "") {
+			errors.push(
+				`Feature ${featureId} has no non-empty title in feature_list.json; run validate-feature-list to fix it.`,
+			);
+			return { target: targetRoot, created, skipped, errors, warnings };
+		}
+		title = feature.title.trim();
+	} else {
+		title = options.title;
+	}
 	const relativePath = path.join("docs", "plans", `${feature.id}-${slugify(title)}.md`);
 	let destination;
 	try {
