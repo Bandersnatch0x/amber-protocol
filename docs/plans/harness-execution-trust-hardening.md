@@ -145,7 +145,12 @@ exists (F081) but is not a named lifecycle step.
 its own ADR (it touches ADR-0101) — **list it here but do not implement until that ADR lands**.
 
 **Touch points.** `scripts/lib/harness/run-state-machine.js`, `scripts/lib/harness/run-core.js`,
-`schemas/run.schema.json`, `scripts/lib/harness/event-ledger.js` (`HARNESS_EVENT_TYPES`).
+`schemas/run.schema.json`, `schemas/event.schema.json` and `scripts/lib/harness/event-ledger.js`
+(the new event kind joins both closed enums: the schema validates every emitted body, the ledger
+fold rejects unknown kinds), the callers that bind a real outcome
+(`scripts/lib/harness/loop-adapter.js`), and `docs/knowledge-corpus/*` — the ADR is a managed
+knowledge source, so amending it makes the committed corpus stale until
+`amber knowledge context-sync` regenerates it, and the two corpus files ship with the change.
 
 **Acceptance.** `completed` is reachable only through `settling`; a receipt verdict is
 independent of the run's terminal outcome.
