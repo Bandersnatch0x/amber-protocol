@@ -21,6 +21,7 @@ const {
 	listReceipts,
 	CHECK_NAMES,
 	CODE_CORRUPT,
+	PEP_CLASSES,
 } = require("../../scripts/lib/harness/validation-core");
 const {
 	replayRun,
@@ -161,10 +162,11 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 	});
 	assert.equal(receipt.result.status, "accepted");
 	// F077 compatibility pin: an UNBOUND validation remains byte-identical to
-	// F073 apart from R-ET-2's derived fields — same check array, receiptId, and
-	// bytes. A pass recorded before the optional eval-result binding existed is
-	// never silently revised; binding an eval-result still changes only the
-	// `eval` leg and the evalResult block.
+	// F073 apart from the additive R-ET-2 derived fields and R-ET-3's PEP
+	// coverage — same check array, receiptId, and bytes. A pass recorded before
+	// the optional eval-result binding existed is never silently revised;
+	// binding an eval-result still changes only the `eval` leg and the
+	// evalResult block.
 	assert.equal(
 		fs.readFileSync(receiptFile, "utf8"),
 		`{
@@ -216,6 +218,13 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 \t\t"security": "not-run",
 \t\t"provenance": "not-run",
 \t\t"context": "not-run"
+\t},
+\t"pepCoverage": {
+\t\t"pointer": "docs/adr/0001-governance-first-artifact-first.md#amendment-0047-2026-09-16",
+\t\t"E1": "observed",
+\t\t"E2": "claimed",
+\t\t"E3": "observed",
+\t\t"E4": "unavailable"
 \t}
 }
 `,
@@ -653,6 +662,127 @@ test("R-ET-2: a stored receipt that omits an axis, or overclaims its verdict, is
 	// The untouched receipt still reads.
 	fs.writeFileSync(file, JSON.stringify(receipt, null, "\t"), "utf8");
 	assert.equal(listReceipts(target, { runId: "run-axis-1" }).length, 1);
+});
+
+// R-ET-3 (0173): the receipt declares PEP coverage over the four evidence
+// classes ADR-0001's 0047 amendment fixes, each labelled distinctly. The
+// blind spot CAPS assurance, it does not veto the run: an `unavailable` E4
+// sits on the same receipt as a `pass`.
+test("R-ET-3: the receipt declares the four evidence classes, and a pass beside E4 unavailable is legal", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-pep-1");
+	const { receipt } = validateRun(target, { runId: "run-pep-1" });
+	// Four rows, never blended into one value (R-EC-4).
+	assert.deepEqual(Object.keys(receipt.pepCoverage).sort(), [...PEP_CLASSES, "pointer"].sort());
+	assert.equal(receipt.pepCoverage.E1, "observed");
+	assert.equal(receipt.pepCoverage.E2, "claimed"); // a claim, never an observation
+	assert.equal(receipt.pepCoverage.E3, "observed"); // file state inside the repo only
+	assert.equal(receipt.pepCoverage.E4, "unavailable"); // no record point, not even a claim
+	// The pointer names the binding text (a committed ADR), not the gitignored
+	// issues/ ticket — a receipt read outside this checkout must still resolve.
+	assert.equal(
+		receipt.pepCoverage.pointer,
+		"docs/adr/0001-governance-first-artifact-first.md#amendment-0047-2026-09-16",
+	);
+
+	// A mediated-only run whose checks all pass still reaches `pass`, with E4
+	// `unavailable` on the very same receipt.
+	const file = path.join(
+		target,
+		".amber",
+		"harness",
+		"validations",
+		"run-pep-1",
+		`${receipt.receiptId}.json`,
+	);
+	const allPass = {
+		...receipt,
+		checks: CHECK_NAMES.map((name) => ({ name, status: "pass", detail: "d" })),
+		verdict: "pass",
+		completeness: "complete",
+		axes: {
+			functional: "pass",
+			performance: "pass",
+			security: "pass",
+			provenance: "pass",
+			context: "pass",
+		},
+	};
+	fs.writeFileSync(file, JSON.stringify(allPass, null, "\t"), "utf8");
+	const readBack = listReceipts(target, { runId: "run-pep-1" })[0];
+	assert.equal(readBack.verdict, "pass");
+	assert.equal(readBack.pepCoverage.E4, "unavailable");
+});
+
+// R-ET-3.3/判据 4: no code path promotes a claim or the blind spot above its
+// ADR-0001 ceiling. The guard is structural — E4's ceiling IS `unavailable` —
+// so a receipt that claims otherwise refuses on read rather than being trusted.
+test("R-ET-3: a receipt that promotes an evidence class above its ceiling is refused on read", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-pep-2");
+	const { receipt } = validateRun(target, { runId: "run-pep-2" });
+	const file = path.join(
+		target,
+		".amber",
+		"harness",
+		"validations",
+		"run-pep-2",
+		`${receipt.receiptId}.json`,
+	);
+	const refuses = (coverage, pattern) => {
+		fs.writeFileSync(
+			file,
+			JSON.stringify({ ...receipt, pepCoverage: coverage }, null, "\t"),
+			"utf8",
+		);
+		assert.throws(
+			() => listReceipts(target, { runId: "run-pep-2" }),
+			(err) => err.amberCode === CODE_CORRUPT && pattern.test(err.message),
+		);
+	};
+	// The blind spot cannot be raised to anything at all.
+	refuses(
+		{ ...receipt.pepCoverage, E4: "observed" },
+		/E4 claims "observed" above its "unavailable"/,
+	);
+	// A self-report cannot be dressed as an observation.
+	refuses({ ...receipt.pepCoverage, E2: "observed" }, /E2 claims "observed" above its "claimed"/);
+	// `verified` needs an independent verification event (0054); this receipt has
+	// no producer for one, so E1's ceiling is `observed`.
+	refuses({ ...receipt.pepCoverage, E1: "verified" }, /E1 claims "verified" above its "observed"/);
+	refuses({ ...receipt.pepCoverage, E1: "certain" }, /E1 carries unknown assurance/);
+	refuses({ ...receipt.pepCoverage, pointer: "issues/0047" }, /no pointer to the binding/);
+	refuses({ ...receipt.pepCoverage, E5: "observed" }, /unknown or missing fields/);
+	const { E4: dropped, ...threeClasses } = receipt.pepCoverage;
+	assert.equal(dropped, "unavailable");
+	refuses(threeClasses, /unknown or missing fields/);
+	// The untouched receipt still reads.
+	fs.writeFileSync(file, JSON.stringify(receipt, null, "\t"), "utf8");
+	assert.equal(listReceipts(target, { runId: "run-pep-2" }).length, 1);
+});
+
+// R-ET-3.4: the class definitions and ceilings are owned by
+// `docs/specs/trusted-control-context-runtime-contract.md` §2, and the guard in
+// validation-core.js necessarily holds a copy of the ceilings to check against.
+// This is a tripwire, not an equivalence proof: it fails when the owner's
+// ceiling clause is rewritten, so a human re-reads §2.2 and updates
+// PEP_CEILINGS instead of the two silently drifting apart.
+test("R-ET-3: the owner spec's ceiling clause is unchanged since PEP_CEILINGS was copied", () => {
+	const spec = fs.readFileSync(
+		path.join(
+			__dirname,
+			"..",
+			"..",
+			"docs",
+			"specs",
+			"trusted-control-context-runtime-contract.md",
+		),
+		"utf8",
+	);
+	assert.match(spec, /E1 facts may reach `observed`/, "E1's ceiling clause moved — re-read §2.2");
+	assert.match(spec, /E2 content stays `claimed`/, "E2's ceiling clause moved — re-read §2.2");
+	assert.match(spec, /E3 facts are `observed`/, "E3's ceiling clause moved — re-read §2.2");
+	assert.match(spec, /E4 is `unavailable`/, "E4's ceiling clause moved — re-read §2.2");
 });
 
 test("replay on an untouched target answers equivalent/unevaluated from records alone (§43 gate)", () => {
