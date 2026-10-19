@@ -372,6 +372,56 @@ async function verifyNarrowSectionNavigation(
 	return errors;
 }
 
+// Trial 2 mechanical half (0020 Layer-2, tracked by issues/0062). The human half
+// needs a reader who did not write the pages; this half proves the search surface
+// that reader uses still resolves the three command references. It drives the
+// site's own search box against the built site, so a search regression fails the
+// docs job instead of silently breaking the reader path. `words` is injectable
+// for tests.
+const SEARCH_COMMAND_WORDS = ["audit", "doctor", "next"];
+
+async function verifySearchResolvesCommands(browser, origin, words = SEARCH_COMMAND_WORDS) {
+	const errors = [];
+	const context = await browser.newContext();
+	try {
+		for (const word of words) {
+			const page = await context.newPage();
+			page.setDefaultTimeout(20000);
+			const expected = `${BASE}/reference/cli/${word}`;
+			try {
+				await page.goto(`${origin}${BASE}/`, { waitUntil: "domcontentloaded", timeout: 25000 });
+				await page.waitForSelector("#__docusaurus", { timeout: 15000 });
+				await page.waitForTimeout(400);
+				await page.click(".navbar__search-input");
+				await page.type(".navbar__search-input", word, { delay: 40 });
+				await page.waitForSelector("[class*='dropdownMenu'] [class*='suggestion_']", {
+					timeout: 10000,
+				});
+				await Promise.all([
+					page
+						.waitForURL((u) => u.pathname !== "/" && !u.pathname.endsWith("/"), { timeout: 10000 })
+						.catch(() => {}),
+					page.locator("[class*='dropdownMenu'] [class*='suggestion_']").first().click(),
+				]);
+				await page.waitForTimeout(400);
+				const landed = new URL(page.url()).pathname;
+				if (landed !== expected) {
+					errors.push(
+						`search "${word}": the top suggestion landed on ${landed}, expected ${expected}.`,
+					);
+				}
+			} catch (e) {
+				errors.push(`search "${word}": could not evaluate — ${e.message}`);
+			} finally {
+				await page.close();
+			}
+		}
+	} finally {
+		await context.close();
+	}
+	return errors;
+}
+
 async function runBrowserVerification() {
 	if (!fs.existsSync(BUILD_DIR)) {
 		console.log("[skip] apps/docs/build not found — run `npm run docs:build` first.");
@@ -406,12 +456,16 @@ async function runBrowserVerification() {
 		allErrors.push(...(await verifyThemeRendering(browser, origin)));
 		console.log("Gate 7b (browser): section navigation reachable at the 768px tablet width…");
 		allErrors.push(...(await verifyNarrowSectionNavigation(browser, origin)));
+		console.log("Trial 2 (mechanical): the site search resolves the three command references…");
+		allErrors.push(...(await verifySearchResolvesCommands(browser, origin)));
 	} finally {
 		await browser.close();
 		server.close();
 	}
 	if (allErrors.length === 0) {
-		console.log("✅ Browser verification passed: rows 7 & 10 clean on the dark and light themes.");
+		console.log(
+			"✅ Browser verification passed: rows 7 & 10 clean on the dark and light themes, and the site search resolves the three command references.",
+		);
 		return 0;
 	}
 	console.log(`\n❌ Browser verification found ${allErrors.length} issue(s):`);
@@ -425,6 +479,7 @@ module.exports = {
 	REPRESENTATIVE_PAGES,
 	THEME_PAGE_TYPES,
 	VIEWPORTS,
+	SEARCH_COMMAND_WORDS,
 	startServer,
 	loadChromium,
 	loadAxeSource,
@@ -432,6 +487,7 @@ module.exports = {
 	verifyBrowserAccessibility,
 	verifyThemeRendering,
 	verifyNarrowSectionNavigation,
+	verifySearchResolvesCommands,
 	runBrowserVerification,
 };
 
