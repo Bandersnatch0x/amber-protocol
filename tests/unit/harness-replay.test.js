@@ -912,12 +912,12 @@ test("R-ET-5: a tampered stored manifest snapshot is refused on read", () => {
 	);
 	refuses({ ...receipt, releaseManifestSha256: `sha256:${"0".repeat(64)}` }, /no longer hashes/);
 	refuses({ ...receipt, releaseManifestSha256: "sha256:nope" }, /must be sha256:<64-hex>/);
-	const { releaseManifest: droppedManifest, ...withoutManifest } = receipt;
+	const { releaseManifest: _droppedManifest, ...withoutManifest } = receipt;
 	refuses(withoutManifest, /release manifest sha256 without its manifest/);
-	const { releaseManifestSha256: droppedHash, ...withoutHash } = receipt;
+	const { releaseManifestSha256: _droppedHash, ...withoutHash } = receipt;
 	refuses(withoutHash, /release manifest without its sha256/);
 	// §4: a receipt written before R-ET-5 carries neither field and stays readable.
-	const { releaseManifest: preEt5, releaseManifestSha256: preEt5Hash, ...legacy } = receipt;
+	const { releaseManifest: _preEt5, releaseManifestSha256: _preEt5Hash, ...legacy } = receipt;
 	fs.writeFileSync(file, JSON.stringify(legacy, null, "\t"), "utf8");
 	assert.equal(listReceipts(target, { runId: "run-manifest-3" }).length, 1);
 });
