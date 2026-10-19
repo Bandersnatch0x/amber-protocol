@@ -23,6 +23,8 @@ const {
 	CODE_CORRUPT,
 	PEP_CLASSES,
 } = require("../../scripts/lib/harness/validation-core");
+const { manifestSha256, manifestStaleness } = require("../../scripts/lib/harness/release-manifest");
+const { lifecycleView } = require("../../scripts/lib/harness/lifecycle-view");
 const {
 	replayRun,
 	proposeRegression,
@@ -124,6 +126,30 @@ function admitEvalResult(
 	};
 }
 
+// One prepared execution record, differing only in the provider's EFFECTIVE
+// enforcement level (R-ET-1) — the closed shape the reader validates.
+function execRecordFor(runId, enforcement) {
+	return {
+		kind: "ExecutionRecord",
+		runId,
+		contract: "exec-coding",
+		contractSnapshotHash: `sha256:${"b".repeat(64)}`,
+		declared: {
+			workspace: { type: "local", path: "w" },
+			filesystem: { read: [], write: ["src"], deny: [] },
+			network: { mode: "deny" },
+			resources: {},
+			mutation: { mode: "isolated" },
+		},
+		effective: { workspace: { type: "local", path: "w" }, enforcement },
+		observed: {
+			entries: [{ kind: "mutation", paths: ["src/a"], source: "s" }],
+			collectedAt: "2026-09-23T00:00:00.000Z",
+		},
+		comparison: { verdict: "ok", findings: [], evaluatedAt: "2026-09-23T00:00:00.000Z" },
+	};
+}
+
 // The §17/§26 guard surface: the governance files validate/replay/propose
 // must never touch — content digests (not lengths), taken BEFORE any
 // validate/replay/propose runs, over the full named surface (rules, contract
@@ -162,11 +188,13 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 	});
 	assert.equal(receipt.result.status, "accepted");
 	// F077 compatibility pin: an UNBOUND validation remains byte-identical to
-	// F073 apart from the additive R-ET-2 derived fields and R-ET-3's PEP
-	// coverage — same check array, receiptId, and bytes. A pass recorded before
-	// the optional eval-result binding existed is never silently revised;
-	// binding an eval-result still changes only the `eval` leg and the
-	// evalResult block.
+	// F073 apart from the additive R-ET-2 derived fields, R-ET-3's PEP coverage,
+	// and R-ET-5's frozen release manifest — same check array, receiptId, and
+	// bytes. A pass recorded before the optional eval-result binding existed is
+	// never silently revised; binding an eval-result still changes only the
+	// `eval` leg and the evalResult block. (R-ET-5 rides outside the receiptId
+	// identity on purpose: `{runId, runState, checks}` is what names the
+	// receipt, and the manifest is derived from the same frozen records.)
 	assert.equal(
 		fs.readFileSync(receiptFile, "utf8"),
 		`{
@@ -225,7 +253,27 @@ test("validateRun produces an accepted receipt with honest not-run disclosure an
 \t\t"E2": "claimed",
 \t\t"E3": "observed",
 \t\t"E4": "unavailable"
-\t}
+\t},
+\t"releaseManifest": {
+\t\t"apiVersion": "amber.dev/v1",
+\t\t"kind": "ReleaseManifest",
+\t\t"code": {
+\t\t\t"version": null,
+\t\t\t"commit": null
+\t\t},
+\t\t"task": {
+\t\t\t"id": null,
+\t\t\t"contract": "coding-task",
+\t\t\t"contractSnapshotHash": "sha256:5549565c647b31fb0adba2d5709f4e6cd6fe8fc4e3e312cf98adc7e76a88ab11"
+\t\t},
+\t\t"evaluator": null,
+\t\t"provider": {
+\t\t\t"workspace": null,
+\t\t\t"enforcement": null
+\t\t},
+\t\t"model": null
+\t},
+\t"releaseManifestSha256": "sha256:3b0e33804aca7178e95893947e54b6277e0fbe07b66eecd196af2c848b51b7f5"
 }
 `,
 	);
@@ -580,25 +628,6 @@ test("a boundary-violating run validates rejected; a deny policy verdict fails t
 // strength caps the GATE verdict and never the receipt verdict.
 test("R-ET-2: an observed-only provider caps gateVerdict and never the receipt verdict", () => {
 	const target = tmpTarget();
-	const execRecord = (runId, enforcement) => ({
-		kind: "ExecutionRecord",
-		runId,
-		contract: "exec-coding",
-		contractSnapshotHash: `sha256:${"b".repeat(64)}`,
-		declared: {
-			workspace: { type: "local", path: "w" },
-			filesystem: { read: [], write: ["src"], deny: [] },
-			network: { mode: "deny" },
-			resources: {},
-			mutation: { mode: "isolated" },
-		},
-		effective: { workspace: { type: "local", path: "w" }, enforcement },
-		observed: {
-			entries: [{ kind: "mutation", paths: ["src/a"], source: "s" }],
-			collectedAt: "2026-09-23T00:00:00.000Z",
-		},
-		comparison: { verdict: "ok", findings: [], evaluatedAt: "2026-09-23T00:00:00.000Z" },
-	});
 	const dir = path.join(target, ".amber", "harness", "executions");
 	fs.mkdirSync(dir, { recursive: true });
 	const receipts = {};
@@ -611,7 +640,7 @@ test("R-ET-2: an observed-only provider caps gateVerdict and never the receipt v
 		admitAndStart(target, runId);
 		fs.writeFileSync(
 			path.join(dir, `${runId}.json`),
-			JSON.stringify(execRecord(runId, enforcement), null, "\t"),
+			JSON.stringify(execRecordFor(runId, enforcement), null, "\t"),
 			"utf8",
 		);
 		receipts[enforcement] = validateRun(target, { runId }).receipt;
@@ -783,6 +812,147 @@ test("R-ET-3: the owner spec's ceiling clause is unchanged since PEP_CEILINGS wa
 	assert.match(spec, /E2 content stays `claimed`/, "E2's ceiling clause moved — re-read §2.2");
 	assert.match(spec, /E3 facts are `observed`/, "E3's ceiling clause moved — re-read §2.2");
 	assert.match(spec, /E4 is `unavailable`/, "E4's ceiling clause moved — re-read §2.2");
+});
+
+// R-ET-5.1/5.2 (0175): the receipt freezes WHAT it validated. The manifest is
+// derived from the run's own records and frozen with its canonical-JSON
+// sha256, so the read path re-derives the hash without touching the repository
+// (test 2). An axis Amber has no record point for is DECLARED null — never
+// omitted, never fabricated (§4).
+test("R-ET-5: the receipt freezes the release manifest it validated against", () => {
+	const target = tmpTarget();
+	fs.writeFileSync(path.join(target, "package.json"), JSON.stringify({ version: "1.0.0" }), "utf8");
+	admitAndStart(target, "run-manifest-1");
+	const { receipt } = validateRun(target, { runId: "run-manifest-1" });
+	assert.equal(receipt.releaseManifestSha256, manifestSha256(receipt.releaseManifest));
+	assert.deepEqual(receipt.releaseManifest.code, { version: "1.0.0", commit: null });
+	// The contract axis cites the run's own admission pointers, verbatim.
+	assert.deepEqual(receipt.releaseManifest.task, {
+		id: null,
+		contract: "coding-task",
+		contractSnapshotHash: runRecord(target, "run-manifest-1").harness.contractSnapshotHash,
+	});
+	assert.equal(receipt.releaseManifest.evaluator, null); // no eval-result bound
+	assert.deepEqual(receipt.releaseManifest.provider, { workspace: null, enforcement: null });
+	// No model introspection exists (replay-core's `model-drift` residual), so
+	// the axis is present and null rather than absent.
+	assert.equal(receipt.releaseManifest.model, null);
+});
+
+test("R-ET-5: a bound, executed validation names the evaluator pin and the EFFECTIVE boundary", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-manifest-2");
+	const admitted = admitEvalResult(target, { identity: "eval-result/manifest" });
+	const dir = path.join(target, ".amber", "harness", "executions");
+	fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, "run-manifest-2.json"),
+		JSON.stringify(execRecordFor("run-manifest-2", "observed-only"), null, "\t"),
+		"utf8",
+	);
+	const { receipt } = validateRun(target, {
+		runId: "run-manifest-2",
+		evalResult: admitted.pin,
+	});
+	// The evaluator axis IS the F077 pin — one pinning discipline, never a second.
+	assert.deepEqual(receipt.releaseManifest.evaluator, {
+		identity: receipt.evalResult.identity,
+		revision: receipt.evalResult.revision,
+		contentHash: receipt.evalResult.contentHash,
+		definition: receipt.evalResult.definition,
+	});
+	// It names WHAT was bound, never how it judged: the verdict lives on the
+	// receipt's own eval check, and a second record of one verdict is the drift
+	// surface §4.6 refuses.
+	assert.equal(Object.hasOwn(receipt.releaseManifest.evaluator, "overall"), false);
+	assert.equal(receipt.releaseManifest.provider.enforcement, "observed-only");
+	assert.equal(receipt.releaseManifest.provider.workspace, "local");
+	assert.equal(receipt.releaseManifestSha256, manifestSha256(receipt.releaseManifest));
+});
+
+// R-ET-5.4/判据 2: the stored snapshot is re-derived on read, exactly like the
+// contract snapshot (inspectHarnessContract). A receipt whose manifest no
+// longer hashes to its recorded sha256 fails closed — never presented.
+test("R-ET-5: a tampered stored manifest snapshot is refused on read", () => {
+	const target = tmpTarget();
+	admitAndStart(target, "run-manifest-3");
+	const { receipt } = validateRun(target, { runId: "run-manifest-3" });
+	const file = path.join(
+		target,
+		".amber",
+		"harness",
+		"validations",
+		"run-manifest-3",
+		`${receipt.receiptId}.json`,
+	);
+	const refuses = (record, pattern) => {
+		fs.writeFileSync(file, JSON.stringify(record, null, "\t"), "utf8");
+		assert.throws(
+			() => listReceipts(target, { runId: "run-manifest-3" }),
+			(err) => err.amberCode === CODE_CORRUPT && pattern.test(err.message),
+		);
+	};
+	const tamper = (mutate) => ({ ...receipt, releaseManifest: mutate(receipt.releaseManifest) });
+	refuses(
+		tamper((manifest) => ({ ...manifest, code: { version: "9.9.9", commit: null } })),
+		/no longer hashes to its recorded sha256/,
+	);
+	// The unobservable axis cannot be filled by hand either: `model` is null by
+	// construction, and any value breaks the frozen hash.
+	refuses(
+		tamper((manifest) => ({ ...manifest, model: "claude-code" })),
+		/no longer hashes to its recorded sha256/,
+	);
+	refuses(
+		tamper((manifest) => ({
+			...manifest,
+			provider: { workspace: "local", enforcement: "enforced" },
+		})),
+		/no longer hashes to its recorded sha256/,
+	);
+	refuses({ ...receipt, releaseManifestSha256: `sha256:${"0".repeat(64)}` }, /no longer hashes/);
+	refuses({ ...receipt, releaseManifestSha256: "sha256:nope" }, /must be sha256:<64-hex>/);
+	const { releaseManifest: droppedManifest, ...withoutManifest } = receipt;
+	refuses(withoutManifest, /release manifest sha256 without its manifest/);
+	const { releaseManifestSha256: droppedHash, ...withoutHash } = receipt;
+	refuses(withoutHash, /release manifest without its sha256/);
+	// §4: a receipt written before R-ET-5 carries neither field and stays readable.
+	const { releaseManifest: preEt5, releaseManifestSha256: preEt5Hash, ...legacy } = receipt;
+	fs.writeFileSync(file, JSON.stringify(legacy, null, "\t"), "utf8");
+	assert.equal(listReceipts(target, { runId: "run-manifest-3" }).length, 1);
+});
+
+// R-ET-5.3/判据 3: staleness is the SEPARATE question. A repository that moved
+// on makes the frozen manifest stale — a finding about the present, never a
+// corruption of the past, and never a reason to refuse a historical receipt.
+test("R-ET-5: a stale manifest is a staleness finding, not an integrity failure", () => {
+	const target = tmpTarget();
+	fs.writeFileSync(path.join(target, "package.json"), JSON.stringify({ version: "1.0.0" }), "utf8");
+	admitAndStart(target, "run-manifest-4");
+	const { receipt } = validateRun(target, { runId: "run-manifest-4" });
+	assert.deepEqual(manifestStaleness(target, { manifest: receipt.releaseManifest }), {
+		stale: false,
+		findings: [],
+	});
+	// The repository moves on; the frozen snapshot does not.
+	fs.writeFileSync(path.join(target, "package.json"), JSON.stringify({ version: "2.0.0" }), "utf8");
+	assert.deepEqual(manifestStaleness(target, { manifest: receipt.releaseManifest }), {
+		stale: true,
+		findings: [{ field: "code.version", frozen: "1.0.0", current: "2.0.0" }],
+	});
+	// Integrity is untouched: the receipt still reads, and reads the same.
+	const readBack = listReceipts(target, { runId: "run-manifest-4" })[0];
+	assert.equal(readBack.releaseManifestSha256, receipt.releaseManifestSha256);
+	// The provenance report surfaces the versions and the staleness as separate
+	// fields — the versions it validated, beside whether they still hold.
+	const { run } = lifecycleView(target, { runId: "run-manifest-4" });
+	assert.equal(run.releaseManifest.receiptId, receipt.receiptId);
+	assert.equal(run.releaseManifest.sha256, receipt.releaseManifestSha256);
+	assert.equal(run.releaseManifest.versions.code.version, "1.0.0");
+	assert.equal(run.releaseManifest.staleness.stale, true);
+	// A run never validated has no manifest to report — null, never invented.
+	admitAndStart(target, "run-manifest-5");
+	assert.equal(lifecycleView(target, { runId: "run-manifest-5" }).run.releaseManifest, null);
 });
 
 test("replay on an untouched target answers equivalent/unevaluated from records alone (§43 gate)", () => {

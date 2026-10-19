@@ -3028,7 +3028,8 @@ cancellation can address exactly that handle.
   derivation (reported, never enforced).
 - `harness lifecycle [--run <id>]` — the unified mapping view (run state and history, loop/
   session/task provenance from the admission pointers, execution verdict, attempts,
-  checkpoints). Writes nothing; corrupt records fail closed.
+  checkpoints, and the release manifest the latest receipt froze — the versions validated,
+  beside whether they still hold). Writes nothing; corrupt records fail closed.
 
 **Validation and replay (F073/F076/F077).**
 
@@ -3039,7 +3040,10 @@ cancellation can address exactly that handle.
   the canonical artifact reader: the receipt grows the `eval` leg (the result's own `overall`
   copied, never re-derived) and the `validation.completed` event carries the
   `eval-result/<id>@<rev>` and `eval/<id>@<rev>` pointers. Without the flag the receipt is
-  unchanged. Validation never moves the run's state machine.
+  unchanged. Validation never moves the run's state machine. Every receipt also freezes a
+  release manifest (R-ET-5): the code/task/evaluator/provider/model versions it validated,
+  bound to a sha256 that the read path re-derives — a tampered snapshot fails closed, and a
+  repository that has since moved on is reported as staleness, never as corruption.
 - `harness replay --run <id>` — verification, not re-execution: re-derives the six §7 axes
   (contract/tools/execution/context/policy/attempts) from the run's own records and compares —
   per-axis `equivalent` | `drift` | `unevaluated` with the closed §7 drift kinds. No chat

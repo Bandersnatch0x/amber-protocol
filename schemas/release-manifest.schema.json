@@ -1,0 +1,80 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Amber Release Manifest (v1)",
+	"description": "R-ET-5 (0175): the versions a ValidationReceipt binds — what the run validated, not just whether it passed. Frozen into the receipt at write time; integrity is the re-derivation of that stored snapshot, never a comparison against current artifacts (R-ET-5.3 — that question belongs to the separate staleness check). An axis Amber has no record point for is declared null, never omitted and never fabricated.",
+	"type": "object",
+	"required": ["apiVersion", "kind", "code", "task", "evaluator", "provider", "model"],
+	"additionalProperties": false,
+	"properties": {
+		"apiVersion": { "const": "amber.dev/v1" },
+		"kind": { "const": "ReleaseManifest" },
+		"code": {
+			"description": "The repository the run was validated against: its package version and HEAD commit. Both null when the target carries neither.",
+			"type": "object",
+			"required": ["version", "commit"],
+			"additionalProperties": false,
+			"properties": {
+				"version": {
+					"type": ["string", "null"],
+					"minLength": 1,
+					"maxLength": 64
+				},
+				"commit": {
+					"type": ["string", "null"],
+					"pattern": "^[0-9a-f]{40}$"
+				}
+			}
+		},
+		"task": {
+			"description": "The task the run subject names, and the admitted contract that governed it (id + the Snapshot Hash ADR-0100 froze at admission).",
+			"type": "object",
+			"required": ["id", "contract", "contractSnapshotHash"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+				"contract": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+				"contractSnapshotHash": {
+					"type": ["string", "null"],
+					"pattern": "^sha256:[0-9a-f]{64}$"
+				}
+			}
+		},
+		"evaluator": {
+			"description": "The bound eval-result revision, reusing the F077 {identity, revision} pin verbatim — null when the validation bound no evaluator. The result's own verdict stays on the receipt's eval check; this axis names WHAT was bound, never how it judged.",
+			"type": ["object", "null"],
+			"required": ["identity", "revision", "contentHash", "definition"],
+			"additionalProperties": false,
+			"properties": {
+				"identity": { "type": "string", "minLength": 1, "maxLength": 128 },
+				"revision": { "type": "integer", "minimum": 1 },
+				"contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+				"definition": {
+					"type": ["object", "null"],
+					"required": ["identity", "revision"],
+					"additionalProperties": false,
+					"properties": {
+						"identity": { "type": "string", "minLength": 1, "maxLength": 128 },
+						"revision": { "type": "integer", "minimum": 1 }
+					}
+				}
+			}
+		},
+		"provider": {
+			"description": "The EFFECTIVE boundary the run executed under (R-ET-1 / ADR-0104) — the provider's enforcement level, never the declared one. Null on both axes when the run never prepared an execution.",
+			"type": "object",
+			"required": ["workspace", "enforcement"],
+			"additionalProperties": false,
+			"properties": {
+				"workspace": { "type": ["string", "null"], "maxLength": 64 },
+				"enforcement": {
+					"type": ["string", "null"],
+					"enum": ["unsupported", "observed-only", "enforced", null]
+				}
+			}
+		},
+		"model": {
+			"description": "Always null: Amber has no model introspection — the standing residual replay-core's `model-drift` kind names. The axis is present so the absence is DECLARED (never read as forgotten), and no code path may fill it from a hash or a guess.",
+			"type": "null"
+		}
+	}
+}
