@@ -265,6 +265,10 @@
 					"type": "object",
 					"additionalProperties": false,
 					"properties": { "mode": { "enum": ["isolated", "restricted"] } }
+				},
+				"enforcement": {
+					"enum": ["unsupported", "observed-only", "enforced"],
+					"description": "R-ET-1 (ADR-0104): the provider ENFORCEMENT level the effective boundary actually delivers. Derived from the declared workspace.type (git-worktree/local -> observed-only); effective can only DOWNGRADE from declared, and an observation above this level yields verdict `unevaluated`, never `ok`."
 				}
 			}
 		},
@@ -296,6 +300,10 @@
 					"type": "string",
 					"enum": ["git-status", "bounded-root-listing"],
 					"description": "F070 H2b: the deterministic observation mechanism (additive, optional)."
+				},
+				"enforcement": {
+					"enum": ["unsupported", "observed-only", "enforced"],
+					"description": "R-ET-1 (ADR-0104): the enforcement level this observation claims. A claim above the boundary's effective level cannot be substantiated, so the fold records it and the verdict is `unevaluated`, never `ok` (additive, optional)."
 				}
 			}
 		},

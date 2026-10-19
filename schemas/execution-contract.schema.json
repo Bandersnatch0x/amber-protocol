@@ -70,6 +70,10 @@
 			"properties": {
 				"mode": { "enum": ["isolated", "restricted"] }
 			}
+		},
+		"enforcement": {
+			"enum": ["unsupported", "observed-only", "enforced"],
+			"description": "R-ET-1 (ADR-0104): how strong the backing provider's boundary actually is — the provider ENFORCEMENT level, never 'capability' (execution-domain-adapter.js capabilities() already means the F052 EFFECT_KINDS; the trusted-control Capability is Scope×Target×Effect×Constraint). Derived from the declared workspace.type when absent (git-worktree/local -> observed-only). A level above the declared provider's ceiling refuses at admission; there is no runtime probe."
 		}
 	},
 	"$defs": {

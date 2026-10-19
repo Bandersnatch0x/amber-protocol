@@ -25,7 +25,12 @@ const crypto = require("node:crypto");
 
 const { createWorktree } = require("../worktree-manager");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
-const { inspectExecutionContract } = require("./execution-core");
+const {
+	inspectExecutionContract,
+	declaredEnforcementOf,
+	enforcementCeilingForWorkspaceType,
+	enforcementRank,
+} = require("./execution-core");
 const { getRun, transitionRun } = require("./run-core");
 const { emitHarnessEvent } = require("./event-ledger");
 const { runGovernedCommand } = require("../core/governed-runner");
@@ -76,9 +81,16 @@ function safeId(id) {
 
 // The effective report mirrors the declared shape (defaults applied the same
 // way the adapters apply them) so declared/effective are field-comparable.
+// R-ET-1 (ADR-0104): enforcement is the level the provider can actually
+// deliver — the weaker of the contract's requirement and the provider ceiling.
+// With no probe today that equals the declared level for every admitted run.
 function effectiveBoundaryOf(contract, workspace) {
+	const declaredLevel = declaredEnforcementOf(contract);
+	const ceiling = enforcementCeilingForWorkspaceType(workspace.type);
 	return {
 		workspace,
+		enforcement:
+			enforcementRank(declaredLevel) <= enforcementRank(ceiling) ? declaredLevel : ceiling,
 		filesystem: contract.filesystem ?? { read: [], write: [], deny: [] },
 		network: contract.network ?? { mode: "deny" },
 		...(contract.resources ? { resources: contract.resources } : {}),
@@ -262,6 +274,21 @@ function compareBoundaries(declared, effective, observedEntries) {
 		}
 	}
 
+	// 1b) R-ET-1 (ADR-0104): enforcement may only DOWNGRADE from declared, so
+	// the drift check is directional — effective above declared is adapter
+	// drift; below is the sanctioned weaker provider. An absent effective level
+	// inherits the declared one (the same defaulting rule the sections use).
+	const declaredLevel = declaredEnforcementOf(declared);
+	const effectiveLevel = effective.enforcement ?? declaredLevel;
+	if (enforcementRank(effectiveLevel) > enforcementRank(declaredLevel)) {
+		add(
+			"violation",
+			"effective-exceeds-declared-enforcement",
+			`effective enforcement "${effectiveLevel}" exceeds the declared "${declaredLevel}"`,
+			null,
+		);
+	}
+
 	// 2) observed-vs-declared.
 	const deny = (declared.filesystem && declared.filesystem.deny) || [];
 	const write = (declared.filesystem && declared.filesystem.write) || [];
@@ -270,10 +297,26 @@ function compareBoundaries(declared, effective, observedEntries) {
 			? declared.resources.timeoutMinutes
 			: null;
 	let observedCount = 0;
+	let exceedsLevel = false;
 	for (const entry of observedEntries || []) {
 		if (!entry || typeof entry !== "object") continue;
 		observedCount += 1;
 		const source = entry.source ?? null;
+		// R-ET-1: an observation that claims enforcement above the provider's
+		// effective level cannot be validated at this level — the fold records
+		// it and the verdict is `unevaluated`, never `ok` (ADR-0104 dec. 5).
+		if (
+			entry.enforcement !== undefined &&
+			enforcementRank(entry.enforcement) > enforcementRank(effectiveLevel)
+		) {
+			exceedsLevel = true;
+			add(
+				"info",
+				"observation-exceeds-enforcement",
+				`observation claims enforcement "${entry.enforcement}" above the effective "${effectiveLevel}"`,
+				source,
+			);
+		}
 		if (entry.kind === "refusal") {
 			add(
 				"info",
@@ -327,7 +370,10 @@ function compareBoundaries(declared, effective, observedEntries) {
 	if (findings.some((finding) => finding.severity === "violation")) {
 		return { verdict: "violation", findings };
 	}
-	if (observedCount === 0 && findings.length === 0) {
+	// R-ET-1: an observation above the provider's effective level caps the
+	// verdict at `unevaluated` — the boundary cannot substantiate it, so `ok`
+	// would overclaim (ADR-0104 dec. 5).
+	if (exceedsLevel || (observedCount === 0 && findings.length === 0)) {
 		return { verdict: "unevaluated", findings };
 	}
 	return { verdict: "ok", findings };

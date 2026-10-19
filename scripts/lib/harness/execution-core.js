@@ -22,6 +22,31 @@ const CODE_NOT_FOUND = "AMBER_E_HARNESS_EXEC_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_EXEC_CORRUPT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 
+// R-ET-1 (ADR-0104): the provider ENFORCEMENT level — how strong the backing
+// provider's boundary actually is. Named "enforcement", never "capability":
+// execution-domain-adapter.js's capabilities() already means the F052
+// EFFECT_KINDS, and the trusted-control Capability is Scope×Target×Effect×
+// Constraint. Weakest to strongest.
+const ENFORCEMENT_LEVELS = Object.freeze(["unsupported", "observed-only", "enforced"]);
+
+// A provider's ceiling is a STATIC function of the declared workspace type.
+// There is no runtime provider probe and none is added (ADR-0022, issues/0044):
+// a provider interface would make Amber own the sandbox. A future hardened
+// provider enters only through the execution-domain-adapter seam (issues/0059).
+function enforcementCeilingForWorkspaceType(type) {
+	return type === "git-worktree" || type === "local" ? "observed-only" : "unsupported";
+}
+
+function enforcementRank(level) {
+	return ENFORCEMENT_LEVELS.indexOf(level);
+}
+
+// The level the contract requires. Absent means "whatever the declared
+// provider delivers" — the same defaulting rule the boundary sections use.
+function declaredEnforcementOf(contract) {
+	return contract.enforcement ?? enforcementCeilingForWorkspaceType(contract.workspace.type);
+}
+
 function typedError(code, message) {
 	const err = new Error(message);
 	err.amberCode = code;
@@ -69,6 +94,20 @@ function contractProblemsBeyondSchema(candidate) {
 		for (const prefix of list) {
 			const problem = prefixProblem(prefix);
 			if (problem) problems.push(`${label}: ${problem}`);
+		}
+	}
+	// R-ET-1 (ADR-0104): a contract requiring a level above its declared
+	// provider's ceiling cannot be honored. Refuse it here — admission is the
+	// only point that can, since no runtime probe exists to downgrade later.
+	if (candidate.workspace && candidate.workspace.type !== undefined) {
+		const ceiling = enforcementCeilingForWorkspaceType(candidate.workspace.type);
+		if (
+			candidate.enforcement !== undefined &&
+			enforcementRank(candidate.enforcement) > enforcementRank(ceiling)
+		) {
+			problems.push(
+				`enforcement: contract requires "${candidate.enforcement}" but the declared "${candidate.workspace.type}" provider delivers at most "${ceiling}"`,
+			);
 		}
 	}
 	return problems;
@@ -241,6 +280,10 @@ module.exports = {
 	admitExecutionContract,
 	inspectExecutionContract,
 	listExecutionContracts,
+	enforcementCeilingForWorkspaceType,
+	enforcementRank,
+	declaredEnforcementOf,
+	ENFORCEMENT_LEVELS,
 	CODE_IMMUTABLE,
 	CODE_NOT_FOUND,
 	CODE_CORRUPT,
