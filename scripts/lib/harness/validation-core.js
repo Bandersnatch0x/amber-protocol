@@ -815,7 +815,9 @@ function validateRun(targetRoot, { runId, now, evalResult, heldOut } = {}) {
 										leak.status === "fail"
 											? "held-out content appears in the run's accessible context or events"
 											: leak.status === "not-run"
-												? "no run-scoped context loadout was built for this run, so the page surface was never scanned"
+												? leak.reason === "unreadable-page"
+													? "a run-scoped context loadout named an unreadable page, so the page surface was not fully scanned"
+													: "no run-scoped context loadout was built for this run, so the page surface was never scanned"
 												: "no held-out content appears in the run's accessible context or events",
 									findings: leak.findings,
 									scanned: leak.scanned,

@@ -237,6 +237,27 @@ test("a clean held-out set with no run-scoped loadout leaves the leak check not-
 	}
 });
 
+test("an unreadable page in a run-scoped loadout leaves the leak check not-run", () => {
+	const target = tmpTarget();
+	try {
+		const runId = "run-held-unreadable-page";
+		const set = admitEvalSet(
+			target,
+			"eval-set/held-out-unreadable-page",
+			"clean held-out content\n",
+		);
+		admitAndStart(target, runId);
+		scopeLoadoutToPage(target, runId, "missing-held-page");
+		const { receipt } = validateRun(target, { runId, heldOut: set.pin });
+		assert.equal(receipt.heldOut.leak.status, "not-run");
+		assert.equal(receipt.heldOut.leak.scanned.pages, 0);
+		assert.match(receipt.heldOut.leak.detail, /unreadable page/);
+		assert.equal(listReceipts(target, { runId }).length, 1);
+	} finally {
+		cleanup(target);
+	}
+});
+
 test("an empty run-scoped loadout distinguishes a scanned clean set from an unscanned set", () => {
 	const target = tmpTarget();
 	try {

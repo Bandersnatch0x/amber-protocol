@@ -118,6 +118,7 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 	}
 
 	let scannedPages = 0;
+	let unreadablePages = 0;
 	let runScopedLoadouts = 0;
 	const directory = loadoutsDir(targetRoot);
 	if (fs.existsSync(directory)) {
@@ -136,9 +137,12 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 			if (scopedRunId !== runId) continue;
 			runScopedLoadouts += 1;
 			for (const pageId of Object.keys(loadout.pages || {})) {
-				scannedPages += 1;
 				const page = readPage(targetRoot, pageId);
-				if (page === null) continue;
+				if (page === null) {
+					unreadablePages += 1;
+					continue;
+				}
+				scannedPages += 1;
 				const text = pageText(page);
 				for (const needle of needles) {
 					if (text.includes(needle)) addFinding("page", `page:${pageId}`, needle);
@@ -155,8 +159,16 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 				compareCodeUnits(a.needleHash, b.needleHash),
 		)
 		.slice(0, 5);
+	const status =
+		orderedFindings.length > 0
+			? "fail"
+			: runScopedLoadouts === 0 || unreadablePages > 0
+				? "not-run"
+				: "pass";
 	return {
-		status: orderedFindings.length > 0 ? "fail" : runScopedLoadouts === 0 ? "not-run" : "pass",
+		status,
+		reason:
+			status === "not-run" ? (runScopedLoadouts === 0 ? "no-loadout" : "unreadable-page") : null,
 		findings: orderedFindings,
 		scanned: { events: events.length, pages: scannedPages },
 	};
