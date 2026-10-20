@@ -12,6 +12,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { doctor } = require("../../scripts/lib/core/doctor");
+const { VALID_STATUSES } = require("../../scripts/lib/core/constants");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const CI_WORKFLOW = path.join(REPO_ROOT, ".github", "workflows", "ci.yml");
@@ -25,6 +26,24 @@ const GOVERNANCE_DOC = path.join(REPO_ROOT, "docs", "agents", "documentation-gov
 // one without opening it, and nothing noticed a new spelling.
 const SPEC_STATUS_VOCABULARY = ["draft", "proposed", "accepted", "superseded", "retired"];
 const SPEC_STATUS_RE = /^\*{0,2}Status:\*{0,2}\s*(.+)$/im;
+
+// The manual states the feature-status vocabulary as a fact about the validator
+// (`validator-enforced, doctor-checked`), so the two must agree. It listed four statuses
+// while constants.js carried five: `accepted` is written by `amber accept` and held by 64 of
+// the repository's own features, so an agent reading the manual would not know a delivered
+// feature reads `accepted`, not `passing`. The spec-vocabulary gate above cannot see this
+// (it checks spec headers, not the manual's claim about code).
+const FEATURE_STATUS_LINE_RE = /`([a-z_]+(?:\s*\|\s*[a-z_]+)+)`/;
+it("the manual's feature-status vocabulary matches the validator's", () => {
+	const manual = fs.readFileSync(
+		path.join(REPO_ROOT, "docs", "wiki", "AMBER_AGENT_OPERATING_MANUAL.md"),
+		"utf8",
+	);
+	const match = manual.match(FEATURE_STATUS_LINE_RE);
+	assert.ok(match, "the manual must state the feature-status vocabulary in one backtick pipe list");
+	const stated = match[1].split("|").map((s) => s.trim());
+	assert.deepEqual(stated, Array.from(VALID_STATUSES));
+});
 
 it("every spec declares a lifecycle status from the closed vocabulary", () => {
 	const dir = path.join(REPO_ROOT, "docs", "specs");

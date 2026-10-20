@@ -98,7 +98,7 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 
 - `feature_list.json` invariants (validator-enforced, doctor-checked): at most ONE feature
   `in_progress`; `passing` requires non-empty `evidence`; statuses are
-  `not_started | in_progress | blocked | passing`.
+  `not_started | in_progress | blocked | passing | accepted`.
 - Any completion/pass/safe claim must name the command or inspection, its result/exit code, the
   artifact path or session id, and remaining risk. Without evidence it is only a claim.
 - Instruction-surface Evals (`amber eval run --suite instruction-surface`) supply F050 Evidence.
