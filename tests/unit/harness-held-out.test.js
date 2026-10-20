@@ -115,6 +115,16 @@ function scopeLoadoutToPage(target, runId, pageId) {
 	);
 }
 
+function scopeLoadoutEmpty(target, runId) {
+	const dir = loadoutsDir(target);
+	fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, `${runId}.json`),
+		JSON.stringify({ firewall: { runId }, pages: {} }),
+		"utf8",
+	);
+}
+
 function scopeLoadoutToPageWithTopLevelRunId(target, runId, pageId) {
 	const dir = loadoutsDir(target);
 	fs.mkdirSync(dir, { recursive: true });
@@ -204,7 +214,7 @@ test("quoted held-out needles are detected on the events surface", () => {
 	}
 });
 
-test("a clean held-out set passes its leak check but cannot claim a suite verdict", () => {
+test("a clean held-out set with no run-scoped loadout leaves the leak check not-run", () => {
 	const target = tmpTarget();
 	try {
 		const runId = "run-held-clean";
@@ -214,7 +224,7 @@ test("a clean held-out set passes its leak check but cannot claim a suite verdic
 		assert.equal(receipt.heldOut.set.identity, set.pin.identity);
 		assert.equal(receipt.heldOut.set.revision, set.pin.revision);
 		assert.equal(receipt.heldOut.set.contentHash, set.receipt.contentHash);
-		assert.equal(receipt.heldOut.leak.status, "pass");
+		assert.equal(receipt.heldOut.leak.status, "not-run");
 		assert.equal(receipt.heldOut.leak.scanned.events > 0, true);
 		assert.equal(receipt.heldOut.leak.scanned.pages, 0);
 		const evaluation = receipt.checks.find((check) => check.name === "eval");
@@ -222,6 +232,108 @@ test("a clean held-out set passes its leak check but cannot claim a suite verdic
 		assert.match(evaluation.detail, /no eval-result is bound/);
 		assert.equal(receipt.result.status, "accepted");
 		assert.equal(receipt.verdict, "incomplete");
+	} finally {
+		cleanup(target);
+	}
+});
+
+test("an empty run-scoped loadout distinguishes a scanned clean set from an unscanned set", () => {
+	const target = tmpTarget();
+	try {
+		const runA = "run-held-no-loadout";
+		const runB = "run-held-empty-loadout";
+		const heldOut = admitEvalSet(
+			target,
+			"eval-set/held-out-empty-loadout",
+			"clean held-out comparison content\n",
+		);
+		const evalResult = admitEvalResult(target, "eval-result/held-out-empty-loadout");
+		const { canonicalHashOf } = require("../../scripts/lib/core/registry-ledger");
+		const { dispatch } = require("../../scripts/lib/command-dispatcher");
+		const { recordAttempt } = require("../../scripts/lib/harness/attempt-core");
+		const tool = { metadata: { id: "held-out-test-tool", version: "1" }, effect: "read_only" };
+		const toolsDir = path.join(target, ".amber", "harness", "tools");
+		fs.mkdirSync(toolsDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(toolsDir, "held-out-test-tool.json"),
+			JSON.stringify(
+				{
+					snapshotHash: canonicalHashOf(tool),
+					admittedAt: "2026-10-20T00:00:00.000Z",
+					tool,
+				},
+				null,
+				"\t",
+			),
+			"utf8",
+		);
+		admitAndStart(target, runA);
+		admitAndStart(target, runB);
+		scopeLoadoutEmpty(target, runB);
+		const executionDir = path.join(target, ".amber", "harness", "executions");
+		fs.mkdirSync(executionDir, { recursive: true });
+		for (const runId of [runA, runB]) {
+			const advanced = dispatch("harness", {
+				target,
+				json: true,
+				run: runId,
+				to: "admitted",
+				reason: "held-out comparison",
+				checks: [
+					"identity:p/i",
+					"contract:p/c",
+					"policy:p/p",
+					"context:p/x",
+					"execution:p/e",
+					"approval:p/a",
+				],
+				_: ["advance"],
+			});
+			assert.equal(
+				advanced.exitCode,
+				0,
+				advanced.result.errors?.join("; ") || advanced.result.text,
+			);
+			fs.writeFileSync(
+				path.join(executionDir, `${runId}.json`),
+				JSON.stringify(
+					{
+						kind: "ExecutionRecord",
+						runId,
+						contract: "coding-task",
+						contractSnapshotHash: `sha256:${"b".repeat(64)}`,
+						declared: { workspace: { type: "local", path: "w" } },
+						effective: { workspace: { type: "local", path: "w" } },
+						comparison: { verdict: "ok", findings: [] },
+					},
+					null,
+					"\t",
+				),
+				"utf8",
+			);
+			emitHarnessEvent(target, {
+				kind: "policy.evaluated",
+				schemaVersion: 1,
+				at: "2026-10-20T00:00:00.000Z",
+				runId,
+				decision: { result: "allow", policy: "default-safe" },
+			});
+			recordAttempt(target, {
+				runId,
+				attemptId: `${runId}-attempt`,
+				commandId: "held-out-comparison",
+				state: "completed",
+				exitCode: 0,
+			});
+		}
+
+		const A = validateRun(target, { runId: runA, evalResult, heldOut: heldOut.pin });
+		const B = validateRun(target, { runId: runB, evalResult, heldOut: heldOut.pin });
+		assert.equal(A.receipt.heldOut.leak.status, "not-run");
+		assert.equal(B.receipt.heldOut.leak.status, "pass");
+		assert.equal(B.receipt.heldOut.leak.scanned.pages, 0);
+		assert.notEqual(A.receipt.verdict, B.receipt.verdict);
+		assert.notEqual(A.receipt.heldOut.leak.status, B.receipt.heldOut.leak.status);
 	} finally {
 		cleanup(target);
 	}
@@ -257,8 +369,8 @@ test("a self-referential held-out line stays stable across validation", () => {
 		admitAndStart(target, runId);
 		const first = validateRun(target, { runId, heldOut: set.pin });
 		const second = validateRun(target, { runId, heldOut: set.pin });
-		assert.equal(first.receipt.heldOut.leak.status, "pass");
-		assert.equal(second.receipt.heldOut.leak.status, "pass");
+		assert.equal(first.receipt.heldOut.leak.status, "not-run");
+		assert.equal(second.receipt.heldOut.leak.status, "not-run");
 		assert.equal(second.receipt.receiptId, first.receipt.receiptId);
 		assert.equal(listReceipts(target, { runId }).length, 1);
 	} finally {
@@ -539,7 +651,7 @@ test("raw CLI accepts --held-out and returns the leak status", () => {
 		);
 		assert.equal(result.status, 0, result.stderr || result.stdout);
 		const output = JSON.parse(result.stdout);
-		assert.equal(output.receipt.heldOut.leak.status, "pass");
+		assert.equal(output.receipt.heldOut.leak.status, "not-run");
 	} finally {
 		cleanup(target);
 	}

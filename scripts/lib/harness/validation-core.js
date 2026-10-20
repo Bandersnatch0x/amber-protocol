@@ -245,14 +245,11 @@ function receiptProblem(record) {
 		if (heldOut.set === null && leak.status !== "not-run") {
 			return "validation receipt heldOut.set null requires heldOut.leak.status not-run";
 		}
-		if (heldOut.set !== null && leak.status === "not-run") {
-			return "validation receipt heldOut.set requires heldOut.leak.status pass|fail";
-		}
 		if (leak.status === "fail" && leak.findings.length === 0) {
 			return "validation receipt heldOut.leak fail requires findings";
 		}
-		if (leak.status === "pass" && leak.findings.length !== 0) {
-			return "validation receipt heldOut.leak pass requires no findings";
+		if (leak.status !== "fail" && leak.findings.length !== 0) {
+			return `validation receipt heldOut.leak ${leak.status} requires no findings`;
 		}
 	}
 	if (hasEvalCheck !== (record.evalResult !== undefined || hasHeldOut)) {
@@ -310,9 +307,11 @@ function receiptProblem(record) {
 		const expected =
 			hasHeldOut && heldOut.leak.status === "fail"
 				? "fail"
-				: record.evalResult !== undefined
-					? record.evalResult.overall
-					: "not-run";
+				: hasHeldOut && heldOut.set !== null && heldOut.leak.status === "not-run"
+					? "not-run"
+					: record.evalResult !== undefined
+						? record.evalResult.overall
+						: "not-run";
 		if (evalCheck.status !== expected) {
 			return "validation receipt eval check status disagrees with its evalResult or heldOut leak";
 		}
@@ -545,7 +544,14 @@ function evalCheck(bound, held, leak) {
 		: "";
 	return {
 		name: EVAL_CHECK_NAME,
-		status: leak.status === "fail" ? "fail" : bound ? bound.binding.overall : "not-run",
+		status:
+			leak.status === "fail"
+				? "fail"
+				: leak.status === "not-run"
+					? "not-run"
+					: bound
+						? bound.binding.overall
+						: "not-run",
 		detail:
 			`held-out set ${held.binding.identity}@${held.binding.revision}: leak check ${leak.status}` +
 			(bound
@@ -808,7 +814,9 @@ function validateRun(targetRoot, { runId, now, evalResult, heldOut } = {}) {
 									detail:
 										leak.status === "fail"
 											? "held-out content appears in the run's accessible context or events"
-											: "no held-out content appears in the run's accessible context or events",
+											: leak.status === "not-run"
+												? "no run-scoped context loadout was built for this run, so the page surface was never scanned"
+												: "no held-out content appears in the run's accessible context or events",
 									findings: leak.findings,
 									scanned: leak.scanned,
 								},

@@ -118,6 +118,7 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 	}
 
 	let scannedPages = 0;
+	let runScopedLoadouts = 0;
 	const directory = loadoutsDir(targetRoot);
 	if (fs.existsSync(directory)) {
 		const entries = fs
@@ -133,6 +134,7 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 			}
 			const scopedRunId = loadout?.runId ?? loadout?.firewall?.runId;
 			if (scopedRunId !== runId) continue;
+			runScopedLoadouts += 1;
 			for (const pageId of Object.keys(loadout.pages || {})) {
 				scannedPages += 1;
 				const page = readPage(targetRoot, pageId);
@@ -154,7 +156,7 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 		)
 		.slice(0, 5);
 	return {
-		status: orderedFindings.length === 0 ? "pass" : "fail",
+		status: orderedFindings.length > 0 ? "fail" : runScopedLoadouts === 0 ? "not-run" : "pass",
 		findings: orderedFindings,
 		scanned: { events: events.length, pages: scannedPages },
 	};
