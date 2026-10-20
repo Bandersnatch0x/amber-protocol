@@ -165,8 +165,11 @@ appears in the run's accessible context or events — the control that holds und
 `observed-only`. It shares the context-firewall seam rather than inventing a second surface.
 
 **R-ET-4.5** No held-out binding ⇒ the eval axis is `not-run`, never `pass`. In a
-ValidationReceipt this reads as `heldOut.leak.status === "not-run"` (R-ET-4.5); a bound set
-records `pass` or `fail` and never `not-run`.
+ValidationReceipt this reads as `heldOut.leak.status === "not-run"` (R-ET-4.5). A bound set
+records `fail` on a finding, and otherwise records `pass` only when its page surface was
+fully examined — an absent run-scoped loadout, or a loadout naming a page the check cannot
+read, leaves the surface unexamined and records `not-run` (0178, 0179), so a `pass` always
+carries a scanned surface behind it.
 
 Here `checks[name="eval"]` is the suite verdict folded from the bound eval-result,
 `heldOut.leak.status` is the R-ET-4.5 axis, and the receipt-level `verdict` never reads `pass`
@@ -231,7 +234,7 @@ execution suites):
 | R-ET-1 | admission refusal for an unmet level; `unevaluated` beyond `observed-only` | `tests/unit/harness-execution.test.js`, `tests/unit/surface-boundary.test.js` |
 | R-ET-2 | derived verdict/axes; fail-closed conditions never `pass`; six-check behavior unchanged | `tests/unit/harness-control-plane.test.js`, `tests/unit/harness-replay.test.js` |
 | R-ET-3 | four classes labelled distinctly; mediated-only run can `pass`; class-2/4 evidence cannot ground `pass` | `tests/unit/harness-control-plane.test.js` |
-| R-ET-4 | leak check fails on access; set unreachable through declared scope; no binding ⇒ `not-run` | `tests/unit/canonical-artifact-contracts.test.js`, `tests/unit/canonical-artifacts.test.js` (F077 pinning), `tests/unit/harness-context.test.js` (leak seam) |
+| R-ET-4 | leak check fails on access; set unreachable through declared scope; no binding ⇒ `not-run`; an unexamined page surface ⇒ `not-run`, never `pass` | `tests/unit/harness-held-out.test.js`, `tests/unit/canonical-artifact-contracts.test.js`, `tests/unit/canonical-artifacts.test.js` (F077 pinning), `tests/unit/harness-context.test.js` (leak seam) |
 | R-ET-5 | tampered stored snapshot fails closed on read; stale manifest is a staleness finding, not an integrity failure | `tests/unit/harness-replay.test.js` (the receipt suite; 0175) |
 | R-ET-6 | `completed` unreachable without `settling`; verdict independent of terminal outcome | `tests/unit/harness-run.test.js` |
 
