@@ -1,7 +1,9 @@
 # ADR-0101: Run Is the Unit of Auditable Execution, With Its Own State Machine
 
-**Status:** Proposed (2026-09-22)
+**Status:** Accepted (2026-09-22)
 **Date:** 2026-09-22
+**Approved by:** Project lead via F065 HITL (`issues/0069`, 「按推荐」) — the same ruling that
+accepted `docs/specs/F065-harness-h0-foundation.md`; recorded here on 2026-10-21.
 **Amended by:** 0176 (2026-10-20) — `settling` as the tenth state, below.
 **Builds on:** [ADR-0100](0100-harness-contract.md) (HarnessContract),
 [ADR-0003](0003-governance-gated-execution.md) (governed execution),

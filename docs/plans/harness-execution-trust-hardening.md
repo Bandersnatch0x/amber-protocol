@@ -235,7 +235,8 @@ staleness discipline) — re-verifying artifact bytes at read would misreport ev
 receipt once the repo moves on.
 
 **ADRs written:** Q1 → `docs/adr/0104-provider-enforcement-level.md`; Q3 →
-`docs/adr/0105-held-out-evaluation-set-boundary.md` (both Proposed, 2026-10-19). Q2 and Q4 are
+`docs/adr/0105-held-out-evaluation-set-boundary.md` (both Proposed, 2026-10-19; implemented, with
+no approval ruling recorded). Q2 and Q4 are
 direct applications of existing discipline and need no new ADR.
 
 ## 7. Sequence

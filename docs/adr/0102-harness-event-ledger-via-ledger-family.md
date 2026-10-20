@@ -1,7 +1,9 @@
 # ADR-0102: The Harness Event Ledger Composes the Governed-Ledger Factory
 
-**Status:** Proposed (2026-09-22)
+**Status:** Accepted (2026-09-22)
 **Date:** 2026-09-22
+**Approved by:** Project lead via F065 HITL (`issues/0069`, 「按推荐」) — the same ruling that
+accepted `docs/specs/F065-harness-h0-foundation.md`; recorded here on 2026-10-21.
 **Builds on:** [ADR-0028](0028-ledger-family-factory-and-decision-primitives.md) (one factory,
 one dialect; byte-compatibility contract), [ADR-0012](0012-protocol-and-schema-versioning.md) (closed-field versioning conventions), the shared governed-ledger core
 (`scripts/lib/core/registry-ledger.js`, `scripts/lib/core/ledger-family.js`), and the Harness

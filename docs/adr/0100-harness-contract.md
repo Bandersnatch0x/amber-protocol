@@ -1,7 +1,9 @@
 # ADR-0100: HarnessContract Is the Versioned, Immutable Total Contract of a Run
 
-**Status:** Proposed (2026-09-22)
+**Status:** Accepted (2026-09-22)
 **Date:** 2026-09-22
+**Approved by:** Project lead via F065 HITL (`issues/0069`, 「按推荐」) — the same ruling that
+accepted `docs/specs/F065-harness-h0-foundation.md`; recorded here on 2026-10-21.
 **Builds on:** [ADR-0028](0028-ledger-family-factory-and-decision-primitives.md) (ledger factory),
 [ADR-0029](0029-named-governed-commands-and-stage-verbs.md) (governed execution),
 [ADR-0030](0030-coding-agent-enabled-repositories-and-trusted-continuation.md) (trusted continuation),

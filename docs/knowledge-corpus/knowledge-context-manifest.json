@@ -376,8 +376,8 @@
       "sourcePath": "docs/adr/0100-harness-contract.md",
       "title": "HarnessContract Is the Versioned, Immutable Total Contract of a Run",
       "source": {
-        "rawHash": "sha256:d1cd3f55d8b08d6184dc37228e5bd6bf450f1d7b6ce85d8fc32de3d019f55f39",
-        "normHash": "sha256:aa2b085983b335f958b1c5570b60eb6c6239a43483fc9319543e15e288ec5b63"
+        "rawHash": "sha256:80764f9595cc98f9077c9c6199f6e15299b967d6ba9b416550db2e2d6f6fa977",
+        "normHash": "sha256:7b4c24f135d278342341b6e9903c6c6ead6f75a6a901e9c8089f01d210369ed7"
       }
     },
     {
@@ -388,8 +388,8 @@
       "sourcePath": "docs/adr/0101-run-unit-of-auditable-execution.md",
       "title": "Run Is the Unit of Auditable Execution, With Its Own State Machine",
       "source": {
-        "rawHash": "sha256:7f29223ccdcf3af7e6aeb142ac608e2284cca765198b018fba8e24607a4defec",
-        "normHash": "sha256:adb129a66fc745d620886525574baee81b7340e3aa7ea6581b2f9b913e089684"
+        "rawHash": "sha256:e4c301bc6d284fc62d3779a078d6ddb8abcd5367ffa792214917822cbacbb5b4",
+        "normHash": "sha256:5a3df9c2c167e8c1ba07f85abae0fd465562aa3469a889a810c4fb671b9c5dcb"
       }
     },
     {
@@ -400,8 +400,8 @@
       "sourcePath": "docs/adr/0102-harness-event-ledger-via-ledger-family.md",
       "title": "The Harness Event Ledger Composes the Governed-Ledger Factory",
       "source": {
-        "rawHash": "sha256:e4e74988aa112a849bbd3beac7a726c7a12cd586dac47dddaafcf9e6c870f433",
-        "normHash": "sha256:9b2fd524666a977509ecf0da2279381f37bde5474e1c6291e20987760a0a60cb"
+        "rawHash": "sha256:e034389f0dcf69de28400289257c8715df6dbd3c81f09c68a1dbae1536b244eb",
+        "normHash": "sha256:1eb884e9632054673bb5abe2e371572e7c9961cbbda6bd2eb380735e1833c847"
       }
     },
     {
@@ -424,8 +424,8 @@
       "sourcePath": "docs/adr/0104-provider-enforcement-level.md",
       "title": "Provider Enforcement Level Is a Tri-State on the Declared/Effective Boundary",
       "source": {
-        "rawHash": "sha256:b003f13ffaee905a2cf5dabc67c9d933aec97fd20f90a55849cdb69f042fa1aa",
-        "normHash": "sha256:d36457103de26aa95fcb282f3faba8580d49f4b404d52d624c29de72c9b577af"
+        "rawHash": "sha256:6a95224444a5447be96c2935a21a5162d9006be65c41f156fbe6d875b6c3fefa",
+        "normHash": "sha256:62e562dbf00a1066f043683e81139d568991e1309e68f1ae22fdcbec4d391497"
       }
     },
     {
@@ -436,8 +436,8 @@
       "sourcePath": "docs/adr/0105-held-out-evaluation-set-boundary.md",
       "title": "Held-Out Evaluation Sets Live Outside the Run Workspace as Pinned Governed Artifacts",
       "source": {
-        "rawHash": "sha256:6ee2cf3483286187788692d5afc4648bee62af83f541dd1379aa39c42ac01ee0",
-        "normHash": "sha256:acc8993237741e3a6ad7650315dc1f5ec5164d990f441c66a9b51eb73366471c"
+        "rawHash": "sha256:08a74f678ed43251c2b0ea832419c37c3965afb173540742dcffd9bd502ee7c0",
+        "normHash": "sha256:17320f5d81c38f0b70bd7f836a5b1dd2f48fe80b677ceed095a2370c198edf19"
       }
     },
     {
@@ -657,5 +657,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:c88f4d6ad27053943c5299dcca7fd1e81e8ed60e54c1940042b3796ebf4d67cc"
+  "manifestHash": "sha256:0774a7009766da6ab0ddb040976ae7b36c9ccedc98ecabf2b446a2a470019408"
 }
