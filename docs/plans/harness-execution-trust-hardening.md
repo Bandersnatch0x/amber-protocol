@@ -1,7 +1,7 @@
 # Plan: Harness execution-trust hardening
 
-Spec: `docs/specs/harness-execution-trust-hardening.md` (spec_id `harness-execution-trust-hardening`, status `proposed`, updated 2026-10-19)
-Status: proposed
+Spec: `docs/specs/harness-execution-trust-hardening.md` (spec_id `harness-execution-trust-hardening`, status `proposed (implementation shipped; spec acceptance pending)`, updated 2026-10-21)
+**Status:** implemented (no F-number assigned; delivered via `issues/0171`–`0179` on the default branch, spec acceptance pending)
 Origin: audit of `AMBER_V4_SPEC_AND_PLAN_REVISED.md` (2026-10-19)
 Baseline HEAD: `ce3f8c3fe85731019bd3d4a1d9a78ea29f56108f`
 Supersedes: nothing (this plan replaces the V4 spec's migration frame, which is not adopted)
@@ -169,10 +169,12 @@ Tracer bullets, each independently deliverable and gate-verified. Filed as local
 | 5 | `issues/0175-release-manifest-sha256-binding.md` — E: release manifest binding | 0172 |
 | 6 | `issues/0176-amend-adr-0101-for-settling-phase.md` — F: amend ADR-0101 for `settling` | — |
 | 7 | `issues/0177-settling-phase.md` — F: `settling` phase (after 0176's ADR) | 0176 |
+| 8 | `issues/0178-leak-check-empty-page-scan.md` — follow-up to 4: an empty page scan is not a pass | 0174 |
+| 9 | `issues/0179-leak-check-unreadable-page.md` — follow-up to 8: an unreadable page is not a scan | 0178 |
 
 Ticket 0171 is the tracer: it touches the comparison seam every later ticket reads. No F-number
-is assigned yet — `feature_list.json` carries only `accepted`/`passing`, so the number is claimed
-when implementation is scheduled.
+is assigned: the plan was filed against an audit, not a feature, so `feature_list.json` carries
+no entry for this work (its 80 entries end at F082, all `accepted`/`passing`).
 
 ## 5. Gates (stages 6–7)
 
