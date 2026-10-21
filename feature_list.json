@@ -3087,7 +3087,7 @@
 			"area": "execution",
 			"title": "Harness execution-trust hardening (R-ET-1..R-ET-6)",
 			"user_visible_behavior": "A run's ValidationReceipt now says how strong its boundary was (enforcement: unsupported/observed-only/enforced, refused at admission when the contract asks above the provider ceiling), how complete its validation was (verdict, gateVerdict, completeness, and five always-present axes), which of the four evidence classes it covered, whether its held-out eval set leaked, and which exact versions it validated against (release manifest frozen into the receipt). completed is reachable only through settling, so it means execution converged, never passed.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"npm test (4087 pass / 0 fail)",
 				"npm run manifests, amber doctor, gen:agents:check, validate-wiki: 0 errors",
@@ -3140,7 +3140,8 @@
 				"docs/adr/0104-provider-enforcement-level.md",
 				"docs/adr/0105-held-out-evaluation-set-boundary.md",
 				"docs/adr/0101-run-unit-of-auditable-execution.md"
-			]
+			],
+			"updated": "2026-10-21"
 		}
 	]
 }

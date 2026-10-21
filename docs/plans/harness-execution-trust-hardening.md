@@ -2,8 +2,8 @@
 
 Spec: `docs/specs/harness-execution-trust-hardening.md` (spec_id `harness-execution-trust-hardening`, status `proposed (implementation shipped; spec acceptance pending)`, updated 2026-10-21)
 **Feature:** F083
-User Confirmation: pending
-**Status:** implemented (feature_list: passing; delivered via `issues/0171`–`0179` on the default branch, spec acceptance pending)
+User Confirmation: confirmed
+**Status:** accepted
 Origin: audit of `AMBER_V4_SPEC_AND_PLAN_REVISED.md` (2026-10-19)
 Baseline HEAD: `ce3f8c3fe85731019bd3d4a1d9a78ea29f56108f`
 Supersedes: nothing (this plan replaces the V4 spec's migration frame, which is not adopted)

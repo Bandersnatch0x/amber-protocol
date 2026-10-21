@@ -291,3 +291,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F081-governed-execution-cancellation.md`
 - Review status: ready
 - Feature: F081 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/harness-execution-trust-hardening.md
+
+- Plan: `docs/plans/harness-execution-trust-hardening.md`
+- Review status: ready
+- Feature: F083 status → accepted in feature_list.json
