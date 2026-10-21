@@ -2,20 +2,34 @@
 
 **Feature:** F068
 **Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F068-harness-execution-boundary.md`, accepted 2026-09-22 via `issues/0088`)
-**User Confirmation:** confirmed (「按推荐」, 2026-09-22)
+User Confirmation: confirmed
+**Confirmation source:** 「按推荐」, 2026-09-22 (`issues/0088`)
 **Date:** 2026-09-22
 **Decision records:** Harness v2 §13/§24/§31; F065/F066/F067 as the foundation
 **Wayfinder map:** `issues/0066` (tickets 0087–0092; H2b named in fog)
 
+## High Level Design
+
+- Context: a run could name tools but not the boundary it executes inside. Without a declared
+  workspace, filesystem, network and mutation posture, "where did it run" and "what could it
+  reach" had no recorded answer, and a violation had nothing to be measured against.
+- Proposed approach: a closed ExecutionContract artifact (the declaration), an adapter that
+  prepares a real workspace from it, and a deterministic three-way comparison of declared vs
+  effective vs observed. The comparison never invents `ok`: an uncheckable entry reads
+  `unevaluated`, and a violation BLOCKs the run with the finding on the event trail.
+- Risks: Amber must not start owning a sandbox — this slice prepares and observes, it does not
+  enforce (ADR-0022, `issues/0044`); the worktree must compose the one existing seam rather than
+  create a second; and the effective report must stay field-comparable to the declaration, or the
+  comparison degrades into guesswork.
+
 ## Context manifests
 
-| Role | Paths |
-| --- | --- |
-| Normative spec | `docs/specs/F068-harness-execution-boundary.md` |
-| Composed seams (read-only / prepare-only) | `scripts/lib/worktree-manager.js` (the one worktree seam), the governed-execution records (observed fold) |
-| Foundation | `scripts/lib/harness/` (H0 pattern), F067 tool registry |
+Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.
 
-## Slices (tracer bullets, blocking order)
+- implement: docs/specs/F068-harness-execution-boundary.md, docs/adr/0100-harness-contract.md, docs/specs/F067-harness-tool-capability-boundary.md, schemas/execution-contract.schema.json, schemas/run.schema.json
+- review: docs/specs/F068-harness-execution-boundary.md, docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md, CONTEXT.md, docs/agents/dev-workflow.md
+
+## Vertical Slices
 
 1. **ExecutionContract** (ticket 0089, done): `schemas/execution-contract.schema.json`
    (workspace/filesystem prefixes/network/resources/mutation; repo-relative prefix shape checks
@@ -38,18 +52,34 @@
 4. **Integration** (ticket 0092): full gates, three-piece catalog, docs lockstep, stage-7
    two-axis review, ticket-split commits.
 
-## Verification per slice
+## Resume Checkpoint
+
+- Resume Point: all four slices are delivered; the feature carries two evidence entries (the `issues/0088` confirmation and the 6/6 focused suite).
+- Blockers: none open. What remains is the acceptance decision, which is a human ruling and not a code change.
+- Next Action: take the acceptance decision on F068, then `amber gate --confirm` and `amber accept` against this plan if it is positive.
+- Recovery Instructions: if this plan file is lost, reconstruct it from `docs/specs/F068-harness-execution-boundary.md` and the `issues/0087`–`0092` logs; never hand-edit the F068 entry in `feature_list.json`, which `amber feature` owns.
+
+## Acceptance Criteria
+
+- An admitted contract prepares a real worktree whose effective report is field-comparable to the declaration, and the worktree is created through the one existing seam.
+- `compareBoundaries` yields only `ok`, `violation` or `unevaluated`; an uncheckable entry never reads `ok`.
+- A violating observed trail emits the BLOCK-posture event and stops the run, with the violation on the event trail.
+- One evaluation per execution: a second evaluation of the same execution is refused rather than silently appended.
+- Existing guardrails still pass, and the current phase boundary is unchanged: Amber prepares and observes but does not own a sandbox, no network enforcement, no sandbox runtimes, no replay, no scheduler.
+
+## Verification
 
 - Focused: `node --test tests/unit/harness-execution.test.js` (6 cases; real temp git repos for
   the worktree adapter) plus the full harness set.
 - Full gates: `npm test` (log to file), `manifests`, `doctor`, `gen:agents:check`, `lint`,
   `format:check`, `docs:gen:check`, `docs:verify`.
 
-## Evidence schema
+## Evidence Schema
 
-Recorded in `feature_list.json` F068 `evidence[]`. The acceptance demo: an admitted contract
-prepares a real worktree whose effective report is field-comparable to the declaration, and a
-violating observed trail BLOCKs the run with the violation on the event trail.
+- Command: `node --test tests/unit/harness-execution.test.js`
+- Result: pass — 6/6 focused tests green (real temp git repos for the worktree adapter; deterministic fold cases ok/violation/unevaluated)
+- Date: 2026-09-22
+- Notes: the acceptance demo is an admitted contract preparing a real worktree whose effective report is field-comparable to the declaration, and a violating observed trail BLOCKing the run with the violation on the event trail.
 
 ## Non-goals
 

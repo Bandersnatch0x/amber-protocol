@@ -3059,7 +3059,8 @@
 				"README.zh-CN.md",
 				"docs/TEAM_REPLICATION_CHARTER.md",
 				"docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
-				"tests/unit/h7-charter-boundary.test.js"
+				"tests/unit/h7-charter-boundary.test.js",
+				"docs/plans/F082-first-screen-positioning-flip.md"
 			],
 			"title": "§55 first-screen positioning flip (Governed Agent Harness) with recorded scope override",
 			"user_visible_behavior": "README (EN and zh) leads with 'Governed Agent Harness for real engineering systems' and 'Amber Protocol is the governed execution boundary between AI agents and real systems'. ADR-0030 gains an F082 amendment that amends (not supersedes) the 2026-09-04 decision and the 0046 amendment, records the user's explicit scope override (internal H7 + cancellation acceptance evidence substitutes for the external-pilot signal), and restates what does not change: the safety contract, the expert-surface clause, Trusted Continuation as the coding-domain outcome, and the Charter's Own/Integrate/Exclude split. The Web Viewer console title is deliberately left unchanged and disclosed.",
