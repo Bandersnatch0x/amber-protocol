@@ -69,8 +69,8 @@ single sanctioned bridge and must be the only place that translates between them
 ## Amendment (0176, 2026-10-20): settling phase
 
 Per `docs/specs/harness-execution-trust-hardening.md` R-ET-6 and
-`docs/plans/harness-execution-trust-hardening.md` §3 F, this ADR is amended in place to add a
-tenth state, `SETTLING`, between `RUNNING` and the terminal states.
+`docs/plans/harness-execution-trust-hardening.md` (`## Vertical Slices`, increment F), this ADR is
+amended in place to add a tenth state, `SETTLING`, between `RUNNING` and the terminal states.
 
 **Why.** Decision 2's nine states let `RUNNING → COMPLETED` fire directly, so `completed` reads
 as two different claims at once: "the execution stopped" and "the work is done". A reader cannot

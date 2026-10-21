@@ -2,30 +2,35 @@
 
 Spec: `docs/specs/harness-execution-trust-hardening.md` (spec_id `harness-execution-trust-hardening`, status `proposed (implementation shipped; spec acceptance pending)`, updated 2026-10-21)
 **Feature:** F083
+User Confirmation: pending
 **Status:** implemented (feature_list: passing; delivered via `issues/0171`–`0179` on the default branch, spec acceptance pending)
 Origin: audit of `AMBER_V4_SPEC_AND_PLAN_REVISED.md` (2026-10-19)
 Baseline HEAD: `ce3f8c3fe85731019bd3d4a1d9a78ea29f56108f`
 Supersedes: nothing (this plan replaces the V4 spec's migration frame, which is not adopted)
 
-## 1. Origin and scope decision
+## High Level Design
 
-The V4 spec was audited against the repository. Verdict: **not adopted as-is.**
+- Context: the V4 spec was audited against the repository and **not adopted as-is**, for two
+  structural reasons. First, **no migration object**: the spec's M0–M7 frame (freeze V3 →
+  dual-read → cutover → retire V3) assumes a running V3 writer alongside a new V4 one, and the
+  repository has exactly one implementation — the Harness H0–H7 stack (`feature_list.json` F065
+  accepted, F066–F082 passing; ADR-0100/0101/0102/0103). There is no legacy harness event stream
+  to wrap, no second state root to dual-read, and no HTTP layer to content-negotiate, so §4.1,
+  §9, and §10's M0/M1/M2/M6/M7 have no object. Second, **six hard conflicts** with rulings
+  already accepted here, each deferred to its own ADR (below). What survives the audit is six
+  increments of genuine net-new hardening, and this plan covers only those.
+- Proposed approach: six independently deliverable increments, each extending shipped behavior
+  rather than introducing a parallel implementation. A (provider enforcement level) is the tracer
+  because it touches the comparison seam every later increment reads; B (receipt verdict axes)
+  consumes it; C, D and E hang off B's receipt; F (`settling`) is a Run state-machine change
+  behind its own ADR amendment.
+- Risks: the increment that touches the state machine (F) contradicts nothing but does amend an
+  accepted ADR, so it lands last; the held-out set's protection is only as strong as the
+  provider's enforcement level, so the leak check is the backstop rather than the primary
+  control; and a receipt's verdict must never be promoted from `observed-only` evidence, which is
+  why `verdict` and `gateVerdict` are separate fields.
 
-Two structural reasons:
-
-1. **No migration object.** The spec's M0–M7 frame (freeze V3 → dual-read → cutover → retire V3)
-   assumes a running V3 writer alongside a new V4 one. The repository has exactly one
-   implementation — the Harness H0–H7 stack (`feature_list.json` F065 accepted, F066–F082
-   passing; ADR-0100/0101/0102/0103). There is no legacy harness event stream to wrap, no
-   second state root to dual-read, and no HTTP layer to content-negotiate. §4.1, §9, and
-   §10's M0/M1/M2/M6/M7 have no object.
-2. **Six hard conflicts** with rulings already accepted in this repo (§2 below). Each is
-   deferred to its own ADR; none is carried in this plan.
-
-What survives the audit is six increments of genuine net-new hardening. This plan covers
-only those.
-
-## 2. Out of scope — deferred to individual ADRs
+### Out of scope — deferred to individual ADRs
 
 Each row is a V4 requirement that contradicts an accepted repo decision. Not in this plan.
 
@@ -38,7 +43,14 @@ Each row is a V4 requirement that contradicts an accepted repo decision. Not in 
 | §5 three-axis lifecycle | ADR-0101 (accepted Run state machine, nine states plus the 0176 `settling` amendment) | ADR: reopen the state model, or keep the closed set |
 | §2.2 full HarnessContract field set | ADR-0100 (deliberately minimal; embedded policy text rejected) | ADR: which contract fields earn their place |
 
-## 3. Increments
+## Context manifests
+
+Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.
+
+- implement: docs/specs/harness-execution-trust-hardening.md, docs/adr/0104-provider-enforcement-level.md, docs/adr/0105-held-out-evaluation-set-boundary.md, docs/agents/dev-workflow.md, docs/specs/trusted-control-context-runtime-contract.md
+- review: docs/specs/harness-execution-trust-hardening.md, docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md, schemas/execution-contract.schema.json, schemas/release-manifest.schema.json, CONTEXT.md
+
+## Vertical Slices
 
 ### A. Provider enforcement level
 
@@ -156,7 +168,39 @@ knowledge source, so amending it makes the committed corpus stale until
 **Acceptance.** `completed` is reachable only through `settling`; a receipt verdict is
 independent of the run's terminal outcome.
 
-## 4. Ticket breakdown (stage 5 preview)
+## Resume Checkpoint
+
+- Resume Point: all six increments are delivered and on the default branch (`fae35575` through `946c894f`, every commit an ancestor of `origin/master`); the plan itself was reshaped to the current template on 2026-10-21, after delivery.
+- Blockers: the plan's user confirmation is pending a ruling; spec acceptance and ADR-0104/0105 acceptance belong to their owners, not to this plan.
+- Next Action: after confirmation, run `amber gate --confirm --plan docs/plans/harness-execution-trust-hardening.md --target .`, then decide separately whether to `amber accept` F083.
+- Recovery Instructions: if this plan file is lost or corrupted, scaffold a fresh one with `amber plan --feature F083 --target .` and refill the sections from `docs/specs/harness-execution-trust-hardening.md` and the `issues/0171`–`0179` logs; never hand-edit the F083 entry in `feature_list.json`, which `amber feature` owns.
+
+## Acceptance Criteria
+
+- A contract requiring `enforced` cannot be admitted against a `git-worktree`/`local` provider, and no code path claims `enforced` without a provider that can deliver it.
+- The receipt's `verdict`/`gateVerdict`/`completeness`/`axes` are derived from existing evidence, never independently writable; any fail-closed condition reports `incomplete` or `not-run` and never `pass`; `observed-only` caps `gateVerdict`, never `verdict`.
+- PEP coverage names the four evidence classes distinctly, a mediated-only run can still `pass`, and no code path promotes the blind-spot record into an enforcement claim.
+- A run that reads held-out content fails the leak check; no binding yields `not-run`; an unexamined page surface yields `not-run`, never `pass`.
+- A receipt whose stored manifest snapshot no longer hashes to its recorded sha256 fails closed on read.
+- `completed` is reachable only through `settling`; a receipt verdict is independent of the run's terminal outcome.
+- The current phase boundary is unchanged: no new provider, Amber still does not own a sandbox (ADR-0022), a missing PEP receipt still does not veto a run (`issues/0047` ruling A), and no second state root is introduced. The existing Amber guardrails still pass.
+- Full gates: `npm test`, manifests, doctor, `gen:agents:check`, `validate-wiki`, lint and format all green.
+
+## Verification
+
+- Focused: `node --test tests/unit/harness-execution.test.js tests/unit/harness-control-plane.test.js tests/unit/harness-held-out.test.js tests/unit/harness-replay.test.js tests/unit/harness-run.test.js`.
+- Plan gate: `node scripts/amber.js review --plan docs/plans/harness-execution-trust-hardening.md --target .` reports no section, manifest, resume-checkpoint or evidence-schema errors.
+- Full gates per `docs/agents/dev-workflow.md` stage 6: `npm test`, `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`, `node scripts/validate-wiki.js --target .`.
+- Stage 7: two-axis review (Standards + Spec) with all findings adjudicated, a spec-to-code compliance pass with no `contradicts`, report under `.scratch/`, conclusion in the ticket Log, and **delivery evidence** — the change merged to the default branch (`git merge-base --is-ancestor <commit> origin/<default>`).
+
+## Evidence Schema
+
+- Command: `npm test`; `node --test tests/unit/harness-execution.test.js tests/unit/harness-control-plane.test.js tests/unit/harness-held-out.test.js tests/unit/harness-replay.test.js tests/unit/harness-run.test.js`; `npm run manifests`; `amber doctor --target .`; `npm run gen:agents:check`; `node scripts/validate-wiki.js --target .`
+- Result: `npm test` 4087 pass / 0 fail; every repository gate 0 errors; the delivered commits `fae35575`–`946c894f` are all ancestors of `origin/master`; CI run `39521214892` `conclusion=success` with all nine jobs green.
+- Date: 2026-10-21
+- Notes: R-ET-1..R-ET-6 were delivered through `issues/0171`–`0179`, each with its own stage-7 review under `.scratch/`; the two follow-up tickets (0178, 0179) fixed leak-check fail-opens found after 0174 landed.
+
+## Ticket breakdown
 
 Tracer bullets, each independently deliverable and gate-verified. Filed as local tickets
 (`issues/`, gitignored work queue).
@@ -176,22 +220,7 @@ Tracer bullets, each independently deliverable and gate-verified. Filed as local
 Ticket 0171 is the tracer: it touches the comparison seam every later ticket reads. F083 is the
 feature entry, registered after delivery so the registry names the work it holds.
 
-## 5. Gates (stages 6–7)
-
-Per `docs/agents/dev-workflow.md`, each ticket's exit requires all five:
-
-- `npm test`
-- `npm run manifests`
-- `npm run doctor`
-- `npm run gen:agents:check`
-- `node scripts/validate-wiki.js --target .`
-
-Then stage 7: two-axis review (Standards + Spec) with all findings adjudicated, a
-spec-to-code compliance pass with no `contradicts`, report under `.scratch/`, conclusion in the
-ticket Log, and **delivery evidence** — the change merged to the default branch
-(`git merge-base --is-ancestor <commit> origin/<default>`).
-
-## 6. Resolved design questions (stage 3)
+## Resolved design questions
 
 **Q1 — Where does `enforced` capability live? → Both; effective ⊆ declared; the comparison
 consumes the effective (weaker) value.**
@@ -239,7 +268,7 @@ receipt once the repo moves on.
 no approval ruling recorded). Q2 and Q4 are
 direct applications of existing discipline and need no new ADR.
 
-## 7. Sequence
+## Sequence
 
 1. ADR for ticket 6 (Run state model) can proceed in parallel with A/B.
 2. A → B → {C, D, E} is the critical path.
