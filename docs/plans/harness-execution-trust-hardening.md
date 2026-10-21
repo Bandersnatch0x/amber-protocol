@@ -1,7 +1,8 @@
 # Plan: Harness execution-trust hardening
 
 Spec: `docs/specs/harness-execution-trust-hardening.md` (spec_id `harness-execution-trust-hardening`, status `proposed (implementation shipped; spec acceptance pending)`, updated 2026-10-21)
-**Status:** implemented (no F-number assigned; delivered via `issues/0171`–`0179` on the default branch, spec acceptance pending)
+**Feature:** F083
+**Status:** implemented (feature_list: passing; delivered via `issues/0171`–`0179` on the default branch, spec acceptance pending)
 Origin: audit of `AMBER_V4_SPEC_AND_PLAN_REVISED.md` (2026-10-19)
 Baseline HEAD: `ce3f8c3fe85731019bd3d4a1d9a78ea29f56108f`
 Supersedes: nothing (this plan replaces the V4 spec's migration frame, which is not adopted)
@@ -34,7 +35,7 @@ Each row is a V4 requirement that contradicts an accepted repo decision. Not in 
 | §2.3 "no PEP receipt ⇒ not `completed`/`pass`" | `issues/0047` ruling A (declared blind spot — host tool calls never traverse Amber) | ADR: restate as recorded coverage, never as enforcement |
 | §2.4 standalone `ContextSnapshot` object | `issues/0053` (ContextSnapshot ≡ Loadout; standalone object rejected) | ADR: reopen only if Loadout proves insufficient |
 | §4.2 `provenance_tier` field on events | `issues/0054` (doc-only mapping Provenance↔Assurance; no field — DRY) | ADR: only if a consumer needs the field at runtime |
-| §5 three-axis lifecycle | ADR-0101 (accepted nine-state Run machine) | ADR: reopen the state model, or keep nine states |
+| §5 three-axis lifecycle | ADR-0101 (accepted Run state machine, nine states plus the 0176 `settling` amendment) | ADR: reopen the state model, or keep the closed set |
 | §2.2 full HarnessContract field set | ADR-0100 (deliberately minimal; embedded policy text rejected) | ADR: which contract fields earn their place |
 
 ## 3. Increments
@@ -172,9 +173,8 @@ Tracer bullets, each independently deliverable and gate-verified. Filed as local
 | 8 | `issues/0178-leak-check-empty-page-scan.md` — follow-up to 4: an empty page scan is not a pass | 0174 |
 | 9 | `issues/0179-leak-check-unreadable-page.md` — follow-up to 8: an unreadable page is not a scan | 0178 |
 
-Ticket 0171 is the tracer: it touches the comparison seam every later ticket reads. No F-number
-is assigned: the plan was filed against an audit, not a feature, so `feature_list.json` carries
-no entry for this work (its 80 entries end at F082, all `accepted`/`passing`).
+Ticket 0171 is the tracer: it touches the comparison seam every later ticket reads. F083 is the
+feature entry, registered after delivery so the registry names the work it holds.
 
 ## 5. Gates (stages 6–7)
 

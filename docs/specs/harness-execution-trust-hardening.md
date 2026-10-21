@@ -1,6 +1,7 @@
 # Harness Execution-Trust Hardening
 
 **Spec ID:** `harness-execution-trust-hardening`
+**Feature:** F083
 **Status:** proposed (implementation shipped; spec acceptance pending)
 **Updated:** 2026-10-21
 **Provenance:** audit of `AMBER_V4_SPEC_AND_PLAN_REVISED.md` (2026-10-19, user-requested, version numbers deliberately ignored); `docs/plans/harness-execution-trust-hardening.md`; ADR-0104 and ADR-0105 (2026-10-19); `issues/0044` (boundary map), `issues/0047` (runtime-interception ruling A), `issues/0053` (ContextSnapshot ≡ Loadout), `issues/0054` (provenance/assurance mapping), `issues/0059` (generic runtime adapter).
@@ -51,7 +52,7 @@ requires its own reopening before it could be specified:**
 | "No PEP receipt ⇒ not `completed`/`pass`" | `issues/0047` ruling A — the blind spot is declared, not closable |
 | A standalone `ContextSnapshot` object | `issues/0053` — ContextSnapshot ≡ Loadout |
 | A `provenance_tier` field on events | `issues/0054` — document mapping only; no duplicate field |
-| A three-axis canonical lifecycle replacing the nine-state Run machine | ADR-0101 (accepted) |
+| A three-axis canonical lifecycle replacing the Run state machine | ADR-0101 (accepted; nine states plus the 0176 `settling` amendment) |
 | The full V4 HarnessContract field set | ADR-0100 — minimal contract, deliberately |
 | V3→V4 dual-read / cutover / V3 writer retirement | No V3 writer exists; the shipped Harness is the only implementation |
 | HTTP content negotiation (`Accept: amber.v4`) | No HTTP API layer exists (CLI + stdio MCP only) |

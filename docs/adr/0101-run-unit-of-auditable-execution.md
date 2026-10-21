@@ -34,7 +34,9 @@ rule (web console must not keep a second allow-table — CONTEXT.md).
    `FAILED`, `COMPLETED`, `CANCELLED`, `EXPIRED`) lives with the governed core modules under
    `scripts/lib/harness/` (the repo's core home, covered by the state-dir seam guard; amended
    2026-09-22 — the Harness v2 proposal's `src/` target layout stays aspirational per its own
-   strangler rule, and `src/` today holds only auxiliary modules) with the same discipline as
+   strangler rule, and `src/` today holds only auxiliary modules; amended 2026-10-20 — `SETTLING`
+   is the tenth state, so the shipped set is the ten in the Amendment below, never the nine
+   listed here) with the same discipline as
    the session machine: exported `STATES`/`TRANSITIONS`/`isLegalTransition`/`legalTargets`/
    `isFinal`, illegal transitions rejected, pause/resume and failure/block distinction,
    immutable run identity. **The session machine is not modified in H0.** Mapping between

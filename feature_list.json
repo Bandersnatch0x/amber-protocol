@@ -1493,14 +1493,7 @@
 			"user_visible_behavior": "All JSON-schema validation routes through one cached, format-registered schema-contract adapter; no module instantiates Ajv directly",
 			"status": "accepted",
 			"verification": ["node --test tests/unit/schema-contract.test.js", "npm test"],
-			"evidence": [
-				{
-					"command": "",
-					"result": "",
-					"date": "2026-08-25",
-					"notes": ""
-				}
-			],
+			"evidence": [{ "command": "", "result": "", "date": "2026-08-25", "notes": "" }],
 			"notes": [],
 			"paths": [
 				"scripts/lib/core/schema-contract.js",
@@ -3086,6 +3079,67 @@
 			"notes": [
 				"The flip records a scope override rather than a new external signal; it is reversible by a later ruling.",
 				"Trusted Continuation remains the coding-domain core outcome; the lift changes the first screen, not the safety contract."
+			]
+		},
+		{
+			"id": "F083",
+			"priority": 83,
+			"area": "execution",
+			"title": "Harness execution-trust hardening (R-ET-1..R-ET-6)",
+			"user_visible_behavior": "A run's ValidationReceipt now says how strong its boundary was (enforcement: unsupported/observed-only/enforced, refused at admission when the contract asks above the provider ceiling), how complete its validation was (verdict, gateVerdict, completeness, and five always-present axes), which of the four evidence classes it covered, whether its held-out eval set leaked, and which exact versions it validated against (release manifest frozen into the receipt). completed is reachable only through settling, so it means execution converged, never passed.",
+			"status": "passing",
+			"verification": [
+				"npm test (4087 pass / 0 fail)",
+				"npm run manifests, amber doctor, gen:agents:check, validate-wiki: 0 errors",
+				"node --test tests/unit/harness-execution.test.js tests/unit/harness-control-plane.test.js tests/unit/harness-held-out.test.js tests/unit/harness-replay.test.js tests/unit/harness-run.test.js"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "4087 pass / 0 fail on the committed tree",
+					"date": "2026-10-21",
+					"notes": "R-ET-1..R-ET-6 delivered via issues/0171-0179 (commits fae35575..946c894f, all ancestors of origin/master); five repository gates green (manifests, doctor, gen:agents:check, validate-wiki, prettier)"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"docs/specs/harness-execution-trust-hardening.md",
+				"docs/plans/harness-execution-trust-hardening.md",
+				"schemas/execution-contract.schema.json",
+				"schemas/run.schema.json",
+				"schemas/event.schema.json",
+				"schemas/release-manifest.schema.json",
+				"schemas/context-loadout.schema.json",
+				"scripts/lib/harness/execution-core.js",
+				"scripts/lib/harness/validation-core.js",
+				"scripts/lib/harness/held-out-core.js",
+				"scripts/lib/harness/release-manifest.js",
+				"scripts/lib/harness/run-state-machine.js",
+				"scripts/lib/harness/run-core.js",
+				"scripts/lib/harness/execution-adapter.js",
+				"scripts/lib/harness/legacy-core.js",
+				"scripts/lib/harness/lifecycle-view.js",
+				"scripts/lib/harness/loop-adapter.js",
+				"scripts/lib/harness/event-ledger.js",
+				"scripts/lib/harness/harness-commands.js",
+				"scripts/lib/core/context-loadout.js",
+				"scripts/lib/core/canonical-artifact-contracts.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/core/error-catalog.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/harness-execution.test.js",
+				"tests/unit/harness-control-plane.test.js",
+				"tests/unit/harness-held-out.test.js",
+				"tests/unit/harness-replay.test.js",
+				"tests/unit/harness-run.test.js",
+				"tests/unit/harness-loop-adapter.test.js",
+				"tests/unit/canonical-artifact-contracts.test.js",
+				"tests/unit/canonical-artifacts.test.js",
+				"tests/unit/context-loadout.test.js",
+				"tests/unit/distributed-governance-schemas.test.js",
+				"docs/adr/0104-provider-enforcement-level.md",
+				"docs/adr/0105-held-out-evaluation-set-boundary.md",
+				"docs/adr/0101-run-unit-of-auditable-execution.md"
 			]
 		}
 	]

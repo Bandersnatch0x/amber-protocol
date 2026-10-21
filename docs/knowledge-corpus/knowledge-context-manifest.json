@@ -388,8 +388,8 @@
       "sourcePath": "docs/adr/0101-run-unit-of-auditable-execution.md",
       "title": "Run Is the Unit of Auditable Execution, With Its Own State Machine",
       "source": {
-        "rawHash": "sha256:e4c301bc6d284fc62d3779a078d6ddb8abcd5367ffa792214917822cbacbb5b4",
-        "normHash": "sha256:5a3df9c2c167e8c1ba07f85abae0fd465562aa3469a889a810c4fb671b9c5dcb"
+        "rawHash": "sha256:5646ac334e5149a9e3f6d2f3266dfaa5a82cc5c67fad42e8951dcd7257611dd0",
+        "normHash": "sha256:9af56c31e8a5bde1dc38388779cc47222f1a35485ed78e722165d5935ada83c3"
       }
     },
     {
@@ -657,5 +657,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:0774a7009766da6ab0ddb040976ae7b36c9ccedc98ecabf2b446a2a470019408"
+  "manifestHash": "sha256:0f7814ef35efb6dea6ec7df97e5ca2a9ea401a0d46ed9bcdadd2b4f0f79cfbc3"
 }
