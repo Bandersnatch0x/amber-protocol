@@ -1,7 +1,7 @@
 # F079 Plan: Bounded Live Runtime Charter Amendment
 
 **Feature:** F079
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F079-bounded-live-runtime-charter-amendment.md`; accepted via `issues/0130`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「全部按推荐」, 2026-09-24 (`issues/0130`)
 **Date:** 2026-09-24

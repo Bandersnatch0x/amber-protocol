@@ -1,7 +1,7 @@
 # F066 Plan: Harness Vertical Slice — One Governed Execution Through the Chain
 
 **Feature:** F066
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F066-harness-vertical-slice.md`, accepted 2026-09-22 via `issues/0076`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「按推荐」, 2026-09-22 (`issues/0076`)
 **Date:** 2026-09-22

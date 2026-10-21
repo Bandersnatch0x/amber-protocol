@@ -1,7 +1,7 @@
 # F070 Plan: Harness H2b — Governed-Runner Wiring
 
 **Feature:** F070
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F070-harness-h2b-execution-wiring.md`, accepted 2026-09-23 via `issues/0100`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「继续推进v2.2」, 2026-09-23 — standing directive per map `issues/0066` 执行带入 (`issues/0100`)
 **Date:** 2026-09-23

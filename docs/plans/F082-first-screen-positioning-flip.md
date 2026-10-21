@@ -1,7 +1,7 @@
 # F082 Plan: §55 First-Screen Positioning Flip (Governed Agent Harness)
 
 **Feature:** F082
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (no F-spec; the positioning decision lives in ADR-0030's F082 amendment)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「翻首屏（记录 scope override）」, 2026-09-24 — the §55 gate ruling
 **Date:** 2026-09-24

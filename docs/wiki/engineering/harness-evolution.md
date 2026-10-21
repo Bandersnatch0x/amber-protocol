@@ -297,3 +297,99 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/harness-execution-trust-hardening.md`
 - Review status: ready
 - Feature: F083 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F066-harness-vertical-slice.md
+
+- Plan: `docs/plans/F066-harness-vertical-slice.md`
+- Review status: ready
+- Feature: F066 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F067-harness-tool-capability-boundary.md
+
+- Plan: `docs/plans/F067-harness-tool-capability-boundary.md`
+- Review status: ready
+- Feature: F067 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F068-harness-execution-boundary.md
+
+- Plan: `docs/plans/F068-harness-execution-boundary.md`
+- Review status: ready
+- Feature: F068 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F069-harness-context-firewall.md
+
+- Plan: `docs/plans/F069-harness-context-firewall.md`
+- Review status: ready
+- Feature: F069 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F070-harness-h2b-execution-wiring.md
+
+- Plan: `docs/plans/F070-harness-h2b-execution-wiring.md`
+- Review status: ready
+- Feature: F070 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F071-harness-h3b-firewall-wiring.md
+
+- Plan: `docs/plans/F071-harness-h3b-firewall-wiring.md`
+- Review status: ready
+- Feature: F071 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F072-harness-h4-runtime-lifecycle.md
+
+- Plan: `docs/plans/F072-harness-h4-runtime-lifecycle.md`
+- Review status: ready
+- Feature: F072 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F073-harness-h5-eval-replay.md
+
+- Plan: `docs/plans/F073-harness-h5-eval-replay.md`
+- Review status: ready
+- Feature: F073 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F074-harness-h6-control-plane.md
+
+- Plan: `docs/plans/F074-harness-h6-control-plane.md`
+- Review status: ready
+- Feature: F074 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F075-legacy-surface-dispositions.md
+
+- Plan: `docs/plans/F075-legacy-surface-dispositions.md`
+- Review status: ready
+- Feature: F075 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F076-harness-cross-run-diff.md
+
+- Plan: `docs/plans/F076-harness-cross-run-diff.md`
+- Review status: ready
+- Feature: F076 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F077-harness-eval-result-binding.md
+
+- Plan: `docs/plans/F077-harness-eval-result-binding.md`
+- Review status: ready
+- Feature: F077 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F078-harness-execution-terminate-refusal.md
+
+- Plan: `docs/plans/F078-harness-execution-terminate-refusal.md`
+- Review status: ready
+- Feature: F078 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F079-bounded-live-runtime-charter-amendment.md
+
+- Plan: `docs/plans/F079-bounded-live-runtime-charter-amendment.md`
+- Review status: ready
+- Feature: F079 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F080-h7-bounded-maintenance-runtime.md
+
+- Plan: `docs/plans/F080-h7-bounded-maintenance-runtime.md`
+- Review status: ready
+- Feature: F080 status → accepted in feature_list.json
+
+## 2026-10-21 docs/plans/F082-first-screen-positioning-flip.md
+
+- Plan: `docs/plans/F082-first-screen-positioning-flip.md`
+- Review status: ready
+- Feature: F082 status → accepted in feature_list.json

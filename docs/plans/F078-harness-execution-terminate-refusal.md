@@ -1,7 +1,7 @@
 # F078 Plan: Harness Execution Terminate — Explicit Refusal
 
 **Feature:** F078
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F078-harness-execution-terminate-refusal.md`, accepted 2026-09-24 via `issues/0128`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** `显式拒绝面`, 2026-09-24 — preserve separate Run cancel / runner abort / workspace release semantics (`issues/0128`)
 **Date:** 2026-09-24

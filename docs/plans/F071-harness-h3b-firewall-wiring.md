@@ -1,7 +1,7 @@
 # F071 Plan: Harness H3b — Firewall Verdict Wiring
 
 **Feature:** F071
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F071-harness-h3b-firewall-wiring.md`, accepted 2026-09-23 via `issues/0105`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「继续推进v2.2」, 2026-09-23 — standing directive per map `issues/0066` 执行带入 (`issues/0105`)
 **Date:** 2026-09-23

@@ -1,7 +1,7 @@
 # F074 Plan: Harness H6 — Control Plane (the Aggregated Surface over the Shared Core)
 
 **Feature:** F074
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F074-harness-h6-control-plane.md`, accepted 2026-09-24 via `issues/0120`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「继续」, 2026-09-24 — standing directive per map `issues/0066` 执行带入 (`issues/0120`)
 **Date:** 2026-09-24

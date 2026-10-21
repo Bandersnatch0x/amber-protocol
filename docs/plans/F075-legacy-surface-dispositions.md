@@ -1,7 +1,7 @@
 # F075 Plan: Harness §52 Legacy Surface Dispositions (task / result / profile inspect)
 
 **Feature:** F075
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F075-legacy-surface-dispositions.md`, accepted 2026-09-24 via `issues/0122`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「先做2,3,4」, 2026-09-24 — standing directive, `issues/0066` close-out follow-ups 按推荐 (`issues/0122`)
 **Date:** 2026-09-24

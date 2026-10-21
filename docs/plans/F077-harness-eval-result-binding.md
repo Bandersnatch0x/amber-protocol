@@ -1,7 +1,7 @@
 # F077 Plan: Harness Eval-Result Binding (the First Eval-Prefixed Pointer Producer)
 
 **Feature:** F077
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F077-harness-eval-result-binding.md`, accepted 2026-09-24 via `issues/0126`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「全部按推荐」, 2026-09-24 (`issues/0126`); standing directive 「继续剩余项」, `issues/0066` close-out follow-ups
 **Date:** 2026-09-24

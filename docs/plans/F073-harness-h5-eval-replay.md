@@ -1,7 +1,7 @@
 # F073 Plan: Harness H5 — Eval & Replay (ValidationReceipt, Drift Detection, Regression Proposals)
 
 **Feature:** F073
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F073-harness-h5-eval-replay.md`, accepted 2026-09-23 via `issues/0115`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「继续推进v2.2」, 2026-09-23 — standing directive per map `issues/0066` 执行带入 (`issues/0115`)
 **Date:** 2026-09-23

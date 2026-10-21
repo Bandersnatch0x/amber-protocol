@@ -2407,7 +2407,7 @@
 			],
 			"title": "Harness Vertical Slice (loop execution through Contract/Admission/Run/Event)",
 			"user_visible_behavior": "One governed loop execution maps to Task + Run + AdmissionReceipt + Events: amber harness start --from-loop admits a run whose six receipt checks (identity/contract/policy/context/execution/approval) each cite the real loop gate artifact it witnessed; amber harness bind maps the loop ledger's real executed outcome to execution.* and policy.evaluated events and moves the run to completed/failed. The adapter only reads the loop's tamper-evident ledger and grants no new authority.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-admission.test.js tests/unit/harness-loop-adapter.test.js tests/unit/harness-run.test.js tests/unit/harness-events.test.js tests/unit/harness-commands.test.js tests/unit/harness-integration.test.js",
 				"amber harness start --from-loop <loopId> then amber harness bind --run <id> --from-loop <loopId> presents the full chain via amber harness inspect --run <id>"
@@ -2431,7 +2431,7 @@
 				"The adapter is read-only over the loop surfaces: the loop's four gates (policy, approval, worktree, ledger) remain the sole authority.",
 				"Replay/validation-receipt engine (H5), scheduler (H7), and MCP projection stay out of scope."
 			],
-			"updated": "2026-09-22"
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F067",
@@ -2447,7 +2447,7 @@
 			],
 			"title": "Harness H1 Tool/Capability/Effect/Credential Boundary",
 			"user_visible_behavior": "amber harness tool admit|list|inspect|check (expert tier, untyped): Tool declarations whose capability pins resolve ONLY through the existing F052/F056 registries (unresolvable pins refuse admission; admission grants zero authority — connector != permission, test-enforced), immutable Snapshot-Hash records with tombstone lists, a report-only policy check mirroring the existing policy surface (deny-wins, default fallback), and per-run tool-registry snapshots making tool drift detectable.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-tool.test.js",
 				"amber harness tool admit --file <tool.json> with an F052-pinned capability; amber harness tool check --tool <id> reports the existing policy verdict"
@@ -2471,7 +2471,7 @@
 				"Compose-not-duplicate: capability pins resolve through resolveRequestCapability (F052) / showExternalEffect (F056); no parallel registry.",
 				"The check is report-only and writes nothing; enforcement stays with the existing gates. Replay (H5) and scheduler (H7) stay out of scope."
 			],
-			"updated": "2026-09-22"
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F068",
@@ -2487,7 +2487,7 @@
 			],
 			"title": "Harness H2a Execution Boundary (declared/effective/observed comparable)",
 			"user_visible_behavior": "amber harness execution admit|list|inspect|prepare|evaluate (expert tier, untyped): an admitted ExecutionContract declares the workspace/filesystem/network/resources/mutation boundary; preparing selects the adapter by declared type (the git-worktree adapter composes the existing worktree seam) and reports the EFFECTIVE boundary field-comparably; evaluating folds observed entries into an ok/violation/unevaluated verdict — observed outside declared BLOCKs the run (execution.failed event, never silent continuation) and lands the three boundaries on the run record.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-execution.test.js",
 				"amber harness execution prepare --contract <id> --run <id> then evaluate with an observed trail; inspect --run presents declared/effective/observed/comparison"
@@ -2511,7 +2511,7 @@
 				"H2b (governed-runner consumes adapter-prepared workspaces; per-mutation observation) is a separate named ticket behind H2a evidence.",
 				"Observed entries are mapped from records that already exist; no new observation mechanism in H2a."
 			],
-			"updated": "2026-09-22"
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F069",
@@ -2526,7 +2526,7 @@
 			],
 			"title": "Harness H3a Context Firewall (grants, TTL, purpose, denials)",
 			"user_visible_behavior": "amber harness context admit|list|inspect|check|revoke (expert tier, untyped): a ContextGrant binds one subject to resource prefixes for one purpose inside a half-open TTL under a classification ceiling from the loadout vocabulary; the deterministic report-first check answers allow-with-pointer or deny-with-closed-reason (no-grant/expired/revoked/purpose-mismatch/classification-above-ceiling, unrated unknown fails closed) reading labels only; revocation is a terminal record and expiry a read-time projection; context.granted/denied/revoked events land on the tamper-evident trail (runId required only for run-scoped kinds, ADR-0102 amendment).",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-context.test.js",
 				"amber harness context check --subject <s> --resource <prefix> --purpose <p> with an admitted grant; denials carry closed reasons and land on the trail"
@@ -2550,7 +2550,7 @@
 				"H3b (verdict wiring into the actual context-loading path) is a separate named ticket behind this evidence.",
 				"ADR-0102 amendment: runId is required only for run-scoped event kinds, enforced at the write seam."
 			],
-			"updated": "2026-09-22"
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F070",
@@ -2572,7 +2572,7 @@
 			],
 			"title": "Harness H2b Governed-Runner Wiring (prepared workspaces, per-mutation observation)",
 			"user_visible_behavior": "amber harness execution run|release (expert tier, untyped): a run's governed named command executes inside the adapter-prepared workspace through the row-11 seam (four gates in Core unchanged, the main checkout never the default cwd — local contracts prepare a bounded scratch root); each attempt appends a deterministic dirty-path mutation entry to the run's observed trail and the comparison recomputes over the full trail, so a violating attempt BLOCKs the run from the run's own observation; release removes the prepared workspace as a recorded step (releasedAt).",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-execution.test.js",
 				"amber harness execution run --run <id> --command-id <id> against a prepared worktree; inspect --run presents declared/effective/observed/comparison from the run's own trail"
@@ -2596,7 +2596,7 @@
 				"Per-mutation observation is the per-attempt dirty-path delta via the adapter's existing observe() — no new observation mechanism, no OS watchers (§24: per-write interception is a sandbox feature Amber does not own).",
 				"Observed growth replaces the H2a one-shot evaluate refusal; the verdict enum and BLOCK posture are unchanged."
 			],
-			"updated": "2026-09-23"
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F071",
@@ -2611,7 +2611,7 @@
 			],
 			"title": "Harness H3b Firewall Verdict Wiring (the loadout consumes the grants)",
 			"user_visible_behavior": "amber context load --subject <s> --purpose <p> [--run <id>] gates the Context Loadout through the F069 verdict: each candidate page passes checkContextAccess verbatim after the §3.3 authority exclusions (a required pin cannot pull a page past the firewall); denied pages are excluded with reason firewall plus the closed deny reason, each denial on the trail as context.denied; the loadout cites its covering grants (id + snapshot + validUntil) in an additive firewall section, so the Phase-H3 gate questions are answered from the artifact; without --subject the build is byte-identical to today (absence of the section = not grant-governed, never silent).",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/context-loadout.test.js",
 				"amber context load --subject <s> --purpose <p> against an admitted grant; the same load under a mismatched purpose excludes every page with reason firewall"
@@ -2635,7 +2635,7 @@
 				"Activation is explicit (subject+purpose); a plain load stays byte-identical — mandatory subject declaration would be a charter-level default-deny flip, out of scope.",
 				"Schema growth is optional-field-only (firewall section + excluded.reason enum += firewall); pre-H3b loadouts stay valid."
 			],
-			"updated": "2026-09-23"
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F072",
@@ -2657,7 +2657,7 @@
 			],
 			"title": "Harness H4 Runtime Lifecycle (attempts, checkpoints, the unified mapping)",
 			"user_visible_behavior": "amber harness checkpoint|attempt|lifecycle (expert tier, untyped): every governed attempt is a first-class run-scoped record (running -> completed/failed/refused, terminal immutable) with execution.started/completed/failed emitted per attempt (closed enum, zero growth); run-scoped checkpoints capture citing digests (non-final only, idempotent per content) and recovery verifies the run still stands where the checkpoint captured it (drift refuses); the lifecycle view maps run state/history, loop/session/task provenance, execution verdict, attempts, and checkpoints in one read-only view (F072 H4, §33/§42).",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-attempt.test.js",
 				"node --test tests/unit/harness-checkpoint.test.js",
@@ -2688,7 +2688,8 @@
 				"H4 graduates from the F071 fog: attempts and checkpoints compose the existing governed surfaces (records cite ledger pointers and digests; no second trail, no new event types — the three execution.* kinds were already in the closed enum).",
 				"The §49 no-progress signal is derived deterministically from attempt records and REPORTED only; enforcement stays a future Loop/Runtime concern (§49 names it there).",
 				"Checkpoints are snapshots, not events: they live outside the event ledger and cite run-record digests (canonicalized to exclude the self-maintained summary section); recovery is read + verify, never a state rewrite."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F073",
@@ -2708,7 +2709,7 @@
 			],
 			"title": "Harness H5 Eval & Replay (ValidationReceipt, drift detection, regression proposals)",
 			"user_visible_behavior": "amber harness validate|replay|propose-regression --run <id> (expert tier, untyped): validate produces a ValidationReceipt over the closed deterministic check set (policy/execution/tools/context/evidence/attempts; pass|fail|not-run with every not-run disclosing its reason) and emits the first real validation.completed event; replay re-derives the six frozen axes from the run's own records — no chat history, no re-execution — and reports per-axis equivalent|drift|unevaluated with the closed §7 drift kinds; propose-regression derives a proposal from recorded facts only (terminal failure or drift; a clean run refuses) as data for human review — eval can never change governance (§17/§26).",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-replay.test.js",
 				"npm test (3919/3919 expected after review fixes)",
@@ -2732,7 +2733,8 @@
 				"H5 graduates from the F072 fog (the last H-fog): replay is verification, not re-execution — retry is a new run (ADR-0101); the §43 gate (amber harness replay run-123 without chat history) is answered by reading frozen records only.",
 				"The §46.5 matrix is covered at the real path: same environment -> equivalent; tool drift (F052-fixture tools admitted after the freeze), context drift (trail-vs-record admission tampering), execution drift (corrupt record), non-determinism (fold mismatch) all detected.",
 				"The §17/§26 guarantee is a conformance assertion: validate + replay + propose leave policy/rules/contract bytes byte-identical."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F074",
@@ -2747,7 +2749,7 @@
 			],
 			"title": "Harness H6 Control Plane (the aggregated surface over the shared core)",
 			"user_visible_behavior": "amber harness trace|events|policy|capabilities|eval (expert tier, untyped): trace shows one run's causal line (record + state history + admission pointers + ordered trail, the same citations inspect --run composes); events reads one run's trail or the whole verified ledger (fail-closed); policy check surfaces a run's policy posture from the trail, report-only; capabilities shows the admitted tools with resolved pins and the registry snapshot hash; eval is a governed ALIAS over the F058 surface through the same dispatch path (report-only; eval admit is NOT aliased). Every pre-existing subverb keeps its exact shape — the §44 gate (new and old CLI over the same core) is structural.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-control-plane.test.js",
 				"npm test (3923/3923 exit=0)",
@@ -2771,7 +2773,8 @@
 				"H6 graduates from the F073 fog (the last H-phase): five read-only subverbs composing the existing cores verbatim — zero new semantic verdicts, zero writes (distinct from validate/replay, whose artifacts are their governed records).",
 				"The eval alias is locked to the F058 surface by same-dispatch-path identity; eval admit stays on its own explicitly gated surface (§26: eval does not mean authority).",
 				"execution terminate and harness diff are deferred with disclosure: terminate crosses the settled F070 BLOCK posture (violations resolve by contract revision, never an operator kill — a new spec decision needed); diff belongs with the H5 replay lineage as its own ticket."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F075",
@@ -2788,7 +2791,7 @@
 			],
 			"title": "Harness §52 legacy surface dispositions (task / result / profile inspect)",
 			"user_visible_behavior": "amber harness legacy [task --task <id> | profile] (expert tier, untyped): one read-only disposition row per deprecated surface naming its mapping onto the harness spine — task prepare/result inspect map to Task + a legacy run projection (legacy: true, a view never a record) + Evidence + the ValidationReceipt vocabulary (replayable/chatHistoryRequired disclosed); profile inspect declares NO correspondence (deletion candidate pending an explicit user decision). Frozen-fixture conformance (the legacy writer is deprecated and frozen); per-artifact fail-closed reads; the closed nearest-neighbor status table refuses unknown statuses; the view writes nothing.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-legacy.test.js",
 				"amber harness legacy (the three-row table); harness legacy task --task <id> against legacy artifacts"
@@ -2804,7 +2807,8 @@
 			"notes": [
 				"The §52 discipline is declared-not-improvised: the dispositions are citable, deletions remain explicit user decisions, and the legacy run projection never enters the Run state machine.",
 				"Frozen-fixture conformance is disclosed in the spec: the legacy writer is deprecated and frozen; driving the real task prepare (plan gate + active session) is heavier than the reader contract warrants."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F076",
@@ -2821,7 +2825,7 @@
 			],
 			"title": "Harness cross-run diff (the H5 replay lineage comparison across two runs)",
 			"user_visible_behavior": "amber harness diff --from <runId> --to <runId> (expert tier, untyped): compares two runs over the SAME six replay axes (deriveAxes composed verbatim — a per-axis fact equals what harness replay reports), per-axis same | differs | only-a | only-b, verdict equivalent-world | world-drift | incomparable; the outcome states are reported, never compared into the verdict; response-only (a diff of two immutable records is reproducible by re-running); unrelated declared tasks refuse; both flags required.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-diff.test.js",
 				"amber harness diff --from <a> --to <b>; tool change between runs flips tools axis to world-drift (real F052 fixture)"
@@ -2837,7 +2841,8 @@
 			"notes": [
 				"The axis comparison composes the replay derivation verbatim — the verdict folds two derivations; one-sided facts are disclosed, never guessed into the verdict.",
 				"Response-only by design: both sides are immutable records; no receipt/proposal artifact is warranted (keeping H5 artifact discipline intact)."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F077",
@@ -2854,7 +2859,7 @@
 			],
 			"title": "Harness eval-result binding (the first eval-prefixed pointer producer)",
 			"user_visible_behavior": "amber harness validate --run <id> [--eval-result <identity>@<revision>] (expert tier, untyped): optionally resolves one committed eval-result through the canonical artifact reader, projects its own overall pass|fail into an eval ValidationReceipt leg, records the immutable pin, and emits the ADR-0021 eval-result/ and eval/ revision pointers on validation.completed. Without the flag the F073 receipt bytes and receiptId are unchanged; harness eval --run and trace consume the new pointers without new authority or writes.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-replay.test.js tests/unit/harness-control-plane.test.js",
 				"amber harness validate --run <id> --eval-result <identity>@<revision>; amber harness eval --run <id> cites the bound eval-result and definition pointers"
@@ -2876,7 +2881,8 @@
 			"notes": [
 				"The eval check is a projection of the committed result's own overall verdict, never a new threshold, weight, or model judgment.",
 				"The unbound path is pinned byte-for-byte to F073; binding is a new content-addressed receipt and re-binding the same revision is idempotent."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F078",
@@ -2891,7 +2897,7 @@
 			],
 			"title": "Harness execution terminate explicit refusal (not a fake kill)",
 			"user_visible_behavior": "amber harness execution terminate [--run <id>] is a recognized, stable AMBER_E_INVALID_ARG refusal: Amber persists no cancellable live-process handle and will not pretend cancel+release killed a process. The message points to the separate audited surfaces for Run cancellation (harness advance --to cancelled), missing-receipt runner-request settlement (runner execution abort), and prepared-workspace deletion (execution release). The refusal reads no run and writes no target byte; F070 BLOCK posture is unchanged.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-execution.test.js",
 				"amber harness execution terminate [--run <id>] returns the explicit no-live-handle refusal; whole target tree remains byte-identical"
@@ -2913,7 +2919,8 @@
 			"notes": [
 				"Capability absence is target-independent: existing, missing, and omitted run ids return the same refusal without reading the run.",
 				"A real live-cancel feature would require a separate protocol for owned handles, coordination, termination receipts/evidence, settlement races, and controller recovery."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F079",
@@ -2933,7 +2940,7 @@
 			],
 			"title": "Bounded H7 maintenance-runtime and cancellation authority amendment",
 			"user_visible_behavior": "The effective Charter now permits one repository-local H7 maintenance scheduler for a closed registry of deterministic Amber-internal proposal jobs with executesAnything=false, schedulesJobs=true, dispatchesAgents=false, and writesExternalSystems=false. Existing Loop/Workflow contracts stay unscheduled. Cancellation authority is reserved for already-approved executions with owned handles, separate approval, race-safe settlement, and terminal Evidence; F078 refusal remains until F081. Target-command scheduling, agents, dynamic workflows, external writes, document rewrites, and restored experimental runtime code remain forbidden. README positioning is unchanged pending F080+F081 evidence and a separate §55 gate.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/h7-charter-boundary.test.js tests/unit/security-governance-packs.test.js",
 				"README sha256 remains cbd25c1cf0757b88ee557db0f88b9698127ac294ed24c1043f5da6e53f482bbf; every existing workflow-pack execution tuple remains all-false"
@@ -2955,7 +2962,8 @@
 			"notes": [
 				"ADR-0103 amends the blanket scheduling prohibition without authorizing unattended target execution or agent dispatch.",
 				"ADR-0005 remains binding: H7 must be new code over current governance primitives, never restoration of the deleted daemon/autonomous executor."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F080",
@@ -2975,7 +2983,7 @@
 			],
 			"title": "H7 bounded maintenance runtime (closed job registry, Decision schedules, fenced daemon)",
 			"user_visible_behavior": "amber harness runtime (expert tier, untyped): jobs lists the closed deterministic maintenance registry (initially draft-spec-review); schedule admit--file|list|show|revoke binds one committed human Decision per bounded window with maxRuns/maxProposals; tick runs due schedules deterministically and writes content-addressed proposals under .amber/harness/runtime/proposals/; daemon start|stop|status runs a lease/fence-guarded local worker that wakes only the closed registry. Every wake/skip/result/stop/crash-recovery is a typed event on the existing Harness ledger. Authority stays executesAnything=false, schedulesJobs=true, dispatchesAgents=false, writesExternalSystems=false; no target command, agent, workflow, external effect, or document edit is reachable.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/harness-runtime.test.js",
 				"amber harness runtime jobs|schedule admit|list|show|revoke|tick|daemon start|stop|status against a real target; docs/specs bytes unchanged by a tick"
@@ -2998,7 +3006,8 @@
 				"Time never becomes authority: a schedule can only wake one registered internal function whose ceiling is repository inspection plus append-only proposal records.",
 				"The daemon self-signals only; it can never signal a governed target execution.",
 				"README positioning stays unchanged; the F082 §55 gate decides any first-screen flip after F080+F081 evidence."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F081",
@@ -3064,7 +3073,7 @@
 			],
 			"title": "§55 first-screen positioning flip (Governed Agent Harness) with recorded scope override",
 			"user_visible_behavior": "README (EN and zh) leads with 'Governed Agent Harness for real engineering systems' and 'Amber Protocol is the governed execution boundary between AI agents and real systems'. ADR-0030 gains an F082 amendment that amends (not supersedes) the 2026-09-04 decision and the 0046 amendment, records the user's explicit scope override (internal H7 + cancellation acceptance evidence substitutes for the external-pilot signal), and restates what does not change: the safety contract, the expert-surface clause, Trusted Continuation as the coding-domain outcome, and the Charter's Own/Integrate/Exclude split. The Web Viewer console title is deliberately left unchanged and disclosed.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/h7-charter-boundary.test.js",
 				"README first screen and ADR-0030 amendment asserted; the F079 positioning hold is replaced by the F082 flip"
@@ -3080,7 +3089,8 @@
 			"notes": [
 				"The flip records a scope override rather than a new external signal; it is reversible by a later ruling.",
 				"Trusted Continuation remains the coding-domain core outcome; the lift changes the first screen, not the safety contract."
-			]
+			],
+			"updated": "2026-10-21"
 		},
 		{
 			"id": "F083",

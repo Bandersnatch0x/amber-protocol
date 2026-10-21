@@ -1,7 +1,7 @@
 # F067 Plan: Harness H1 — Tool / Capability / Effect / Credential Boundary
 
 **Feature:** F067
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F067-harness-tool-capability-boundary.md`, accepted 2026-09-22 via `issues/0082`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「按推荐」, 2026-09-22 (`issues/0082`)
 **Date:** 2026-09-22

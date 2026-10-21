@@ -1,7 +1,7 @@
 # F068 Plan: Harness H2a — Execution Boundary
 
 **Feature:** F068
-**Status:** implemented (feature_list: passing); originally recorded implementation-ready (spec `docs/specs/F068-harness-execution-boundary.md`, accepted 2026-09-22 via `issues/0088`)
+**Status:** accepted
 User Confirmation: confirmed
 **Confirmation source:** 「按推荐」, 2026-09-22 (`issues/0088`)
 **Date:** 2026-09-22
