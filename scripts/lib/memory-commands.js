@@ -29,6 +29,7 @@ const crypto = require("node:crypto");
 const { resolvePathWithin } = require("./core/fs-utils");
 
 const store = require("./core/memory-store");
+const triggers = require("./core/memory-trigger");
 const { sha256, hashFile } = require("./core/context-hash");
 const {
 	SCHEMA_VERSION,
@@ -161,6 +162,37 @@ function handleRequest(args, targetRoot) {
 	const gate = identityGate(args);
 	if (gate) return gate;
 
+	// `--skip-trigger <id>` records the nomination's documented no-change
+	// outcome (§5.1-M3): the human ruled no memory entry is warranted. Without
+	// it a trigger stayed `open` forever, so the count only ever grew.
+	if (args.skipTrigger) {
+		const closed = triggers.closeTrigger(targetRoot, {
+			triggerId: args.skipTrigger,
+			status: "skipped",
+		});
+		if (!closed.ok) return failure(closed.code, closed.message);
+		return {
+			errors: [],
+			warnings: [],
+			text: `trigger ${closed.triggerId} closed as skipped (no memory entry warranted).`,
+			triggerId: closed.triggerId,
+			status: closed.status,
+		};
+	}
+
+	// `--trigger <id>` names the open nomination this request answers. The
+	// request cites it and the trigger closes as `answered` in the same call,
+	// so the closure cannot drift from the request that produced it. Resolved
+	// before the payload so an already-answered nomination is refused as such,
+	// not as a payload problem.
+	let answeredTrigger = null;
+	if (args.trigger) {
+		answeredTrigger = triggers.findOpenTrigger(targetRoot, args.trigger);
+		if (!answeredTrigger) {
+			return failure("AMBER_E_MEMORY_REQUEST_NOT_FOUND", `no open trigger with id ${args.trigger}`);
+		}
+	}
+
 	if (!args.payload) {
 		return failure(
 			"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
@@ -176,8 +208,18 @@ function handleRequest(args, targetRoot) {
 		schemaVersion: body.schemaVersion || SCHEMA_VERSION,
 		requestId,
 		createdAt: body.createdAt || nowIso(),
-		triggerRef: body.triggerRef || { ref: "manual" },
-		provenance: body.provenance || { channel: "human-escape-hatch" },
+		triggerRef: answeredTrigger
+			? { ref: answeredTrigger.triggerId }
+			: body.triggerRef || { ref: "manual" },
+		provenance: answeredTrigger
+			? {
+					...(body.provenance || {}),
+					channel:
+						body.provenance && body.provenance.channel
+							? body.provenance.channel
+							: answeredTrigger.channel,
+				}
+			: body.provenance || { channel: "human-escape-hatch" },
 		entries: (body.entries || []).map(withEntryId),
 		contract: body.contract || {
 			instructions: "Nominate durable memory entries for human approval.",
@@ -216,12 +258,21 @@ function handleRequest(args, targetRoot) {
 		batchId: request.provenance.batchId,
 		derivedFrom: request.provenance.derivedFrom,
 	});
+	if (answeredTrigger) {
+		const closed = triggers.closeTrigger(targetRoot, {
+			triggerId: answeredTrigger.triggerId,
+			status: "answered",
+			requestId,
+		});
+		if (!closed.ok) return failure(closed.code, closed.message);
+	}
 	return {
 		errors: [],
 		warnings: [],
-		text: `memory request ${requestId} created (${request.entries.length} entry/entries, channel ${request.provenance.channel}).`,
+		text: `memory request ${requestId} created (${request.entries.length} entry/entries, channel ${request.provenance.channel}).${answeredTrigger ? ` Trigger ${answeredTrigger.triggerId} closed as answered.` : ""}`,
 		requestId,
 		entryIds: request.entries.map((e) => e.entryId),
+		...(answeredTrigger ? { triggerId: answeredTrigger.triggerId, triggerStatus: "answered" } : {}),
 	};
 }
 

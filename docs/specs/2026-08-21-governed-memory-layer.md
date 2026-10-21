@@ -140,6 +140,7 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 | T2 feature 侧 | feature accept 流程中写回类别命中处（复用 `detectWriteBackTriggers` 判据与 F023 owner 路由；**Spec-defined 定位**：与 F023 learningWriteBack 同一触发位点） | feature accept ∧ 路径类别命中（确定性判据，零语义判定） | `t2-writeback` |
 
 - **M3（噪声不耗预算）**：触发产物仅为 request（契约文件 + 事件记账）；宿主 agent 可用 ADR-0009 既有 `outcome:"no-change"` 合法空结果应答；γ 只计"获准入 registry 的 proposal 数"，不计触发数与 request 数。
+- **M3a（提名生命周期，Spec-defined 补全）**：trigger 工件状态闭集 `open → answered | skipped`，两个终态都经 `amber memory request` 到达——`--trigger <id>` 让 request 引用该提名并在同一次调用里记为 `answered`（request 的 `triggerRef` 指向 triggerId），`--skip-trigger <id>` 记录"无需条目"的合法空结果并记为 `skipped`。闭合是一次性事实：已终态的 trigger 拒绝再次闭合，不重写。此前 trigger 只有 `open` 且无闭合路径，提名计数只增不减，M3 明文允许的"合法地 skip"无处落盘。
 - **排他规则**：同一触发事件恰一个 open memory request；一份 request 载多条目（#172-Q2 处置）。
 - **人工逃生舱**：`amber memory request` 为补充入口（#172-Q1(d)），不免除 T1/T2 自动义务；不受信号地板约束（#173-Q1.2 人治主权通道）。一个 session 同时改 schema 又踩流程坑 → 两侧各自触发、各产各的 request（两个独立事实，非分配歧义；重复知识由内容哈希去重下游消解）。
 

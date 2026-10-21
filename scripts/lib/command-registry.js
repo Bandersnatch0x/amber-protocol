@@ -597,6 +597,8 @@ const COMMAND_HELP = {
 		"",
 		"Subcommands:",
 		"  request    Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination).",
+		"             --trigger <id> cites an open nomination and closes it as answered;",
+		"             --skip-trigger <id> records that no entry is warranted (closes it as skipped).",
 		"  ingest     Mechanically admit request entries into the registry as proposals (all-or-nothing).",
 		"  approve    Human, entry-level approval gate (--entry-id, --decision approve|reject, --reason).",
 		"  book       Register a MEMORY.md surface hash and promote booked entries to active.",

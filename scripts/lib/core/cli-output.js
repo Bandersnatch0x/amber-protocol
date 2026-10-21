@@ -133,6 +133,12 @@ const FLAG_SPECS = {
 	// issues/357: the ratification track reads args.claim; unregistered, it could
 	// never be set, so `memory book --ratify --claim` always refused (ADR-0018 §5.5).
 	"--claim": { key: "claim" },
+	// Trigger closure: `--trigger <id>` answers a nomination (request cites it,
+	// trigger → answered), `--skip-trigger <id>` records the documented
+	// no-change outcome (trigger → skipped). Unregistered, both would parse as
+	// positionals and the closure would never reach the handler.
+	"--trigger": { key: "trigger" },
+	"--skip-trigger": { key: "skipTrigger" },
 	"--reason": { key: "reason" },
 	"--run": { key: "run" },
 	// F080 H7 bounded maintenance runtime.

@@ -306,3 +306,112 @@ test("T2 stays silent when no write-back category hits", () => {
 	assert.equal(memoryEvents(dir).length, 0);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ── trigger closure: open → answered | skipped ──────────────────────────────
+//
+// Before closure existed a trigger stayed `open` forever, so the nomination
+// count only grew and the spec's documented "legitimately skip" outcome (§5.1
+// M3) had no way to be recorded. Both terminal states are reached through the
+// request verb, never a separate closing verb.
+
+const { memoryDispatch } = require("../../scripts/lib/memory-commands");
+
+function triggerFixture() {
+	const dir = mkTarget();
+	const created = triggerWriteBackRequest(dir, { channel: "t2-writeback", triggerRef: "F001" });
+	return { dir, triggerId: created.triggerId };
+}
+
+test("skip-trigger closes an open nomination as skipped, once", () => {
+	const { dir, triggerId } = triggerFixture();
+	const first = memoryDispatch("request", { target: dir, skipTrigger: triggerId, yes: true }, dir);
+	assert.deepEqual(first.result.errors, []);
+	assert.equal(first.result.status, "skipped");
+
+	const record = listTriggers(dir).find((t) => t.triggerId === triggerId);
+	assert.equal(record.status, "skipped");
+	assert.ok(record.closedAt, "closure records when it happened");
+
+	const second = memoryDispatch("request", { target: dir, skipTrigger: triggerId, yes: true }, dir);
+	assert.equal(second.exitCode, 1);
+	assert.match(second.result.errors.join("\n"), /already skipped/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("skip-trigger refuses an unknown id rather than fabricating a closure", () => {
+	const { dir } = triggerFixture();
+	const result = memoryDispatch(
+		"request",
+		{ target: dir, skipTrigger: "trig-nope", yes: true },
+		dir,
+	);
+	assert.equal(result.exitCode, 1);
+	assert.match(result.result.errors.join("\n"), /trigger not found/);
+	assert.equal(listTriggers(dir).filter((t) => t.status !== "open").length, 0);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a request naming an open trigger cites it and closes it as answered", () => {
+	const { dir, triggerId } = triggerFixture();
+	const payload = path.join(dir, "mem-request.json");
+	fs.mkdirSync(path.join(dir, "docs", "specs"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, "docs", "specs", "note.md"),
+		"# note\n\nThe trigger closure cites this surface.\n",
+	);
+	fs.writeFileSync(
+		payload,
+		JSON.stringify({
+			entries: [
+				{
+					schemaVersion: "1.0.0",
+					claim: "Trigger closure is a one-way fact recorded through the request verb.",
+					knowledgeKind: "decision",
+					targetSurface: "MEMORY.md",
+					provenance: {
+						sources: [
+							{
+								kind: "file",
+								ref: "docs/specs/note.md",
+								rawHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+								mutable: false,
+								excerpt: "The trigger closure cites this surface.",
+								excerptHash:
+									"sha256:0000000000000000000000000000000000000000000000000000000000000000",
+							},
+						],
+					},
+				},
+			],
+		}),
+	);
+
+	const result = memoryDispatch(
+		"request",
+		{ target: dir, payload: "mem-request.json", trigger: triggerId, yes: true },
+		dir,
+	);
+	assert.deepEqual(result.result.errors, [], JSON.stringify(result.result.errors));
+	assert.equal(result.result.triggerStatus, "answered");
+
+	const record = listTriggers(dir).find((t) => t.triggerId === triggerId);
+	assert.equal(record.status, "answered");
+	assert.equal(record.answeredByRequest, result.result.requestId);
+	const stored = memoryStore.readRequests(dir).find((r) => r.requestId === result.result.requestId);
+	assert.equal(stored.triggerRef.ref, triggerId, "the request cites the trigger it answers");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a request naming an already-closed trigger refuses instead of reopening it", () => {
+	const { dir, triggerId } = triggerFixture();
+	memoryDispatch("request", { target: dir, skipTrigger: triggerId, yes: true }, dir);
+	const result = memoryDispatch(
+		"request",
+		{ target: dir, payload: "missing.json", trigger: triggerId, yes: true },
+		dir,
+	);
+	assert.equal(result.exitCode, 1);
+	assert.match(result.result.errors.join("\n"), /no open trigger/);
+	assert.equal(listTriggers(dir).find((t) => t.triggerId === triggerId).status, "skipped");
+	fs.rmSync(dir, { recursive: true, force: true });
+});

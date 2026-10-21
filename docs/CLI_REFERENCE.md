@@ -2834,6 +2834,10 @@ judgment rules (ledger consistency, source health, surface drift, budget complia
 ```bash
 # Nominate + admit + approve + register (the governed chain)
 node scripts/amber.js memory request --target . --payload mem-request.json --yes
+
+# Answer or skip an open T1/T2 nomination (closes it; one-way)
+node scripts/amber.js memory request --target . --payload mem-request.json --trigger trig-... --yes
+node scripts/amber.js memory request --target . --skip-trigger trig-... --yes
 node scripts/amber.js memory ingest  --target . --request mreq-... --yes
 node scripts/amber.js memory approve --target . --entry-id sha256:... --decision approve --yes
 node scripts/amber.js memory book    --target . --entry-id sha256:... --yes

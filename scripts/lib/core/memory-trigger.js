@@ -34,6 +34,15 @@ const { statePathForCreate } = require("../state-dir-resolver");
 
 const TRIGGER_CHANNELS = new Set(["t1-writeback", "t2-writeback"]);
 
+// A trigger's lifecycle is `open` → `answered` | `skipped`. Both terminal
+// states are reached through `amber memory request` (the spec's "answer the
+// nomination" verb, §5.1-M3), never by a separate closing verb: `answered`
+// when the request it produced cites this trigger, `skipped` when the human
+// rules the nomination not worth a memory entry. Before this existed a
+// trigger stayed `open` forever, so the nomination count only ever grew and
+// the documented "legitimately skip" outcome had no way to be recorded.
+const TRIGGER_STATUSES = new Set(["open", "answered", "skipped"]);
+
 // Triggers are memory-layer state (ADR-0018, post-rename): reads and creates
 // both target the canonical dir (see the note in memory-store.js).
 function triggersDir(targetRoot) {
@@ -136,15 +145,79 @@ function mountWriteBackTrigger(targetRoot, { channel, triggerRef, label }) {
 		return `${label} memory write-back trigger failed (non-blocking): ${err.message}`;
 	}
 	if (!result.created) return null;
-	return `${label} memory write-back nomination created (${result.triggerId}) — answer it with \`amber memory request\` (triggerRef ${triggerRef}) or legitimately skip.`;
+	return `${label} memory write-back nomination created (${result.triggerId}) — answer it with \`amber memory request --trigger ${result.triggerId}\` (or --skip-trigger to record that no entry is warranted).`;
+}
+
+/**
+ * Close one open trigger (§5.1-M3 "answer it or legitimately skip").
+ *
+ * Only the two terminal statuses are accepted: `answered` (a request citing
+ * this trigger was produced) and `skipped` (the human ruled the nomination
+ * not worth a memory entry). A trigger that is already terminal is refused
+ * rather than rewritten, so the closure is a one-way fact.
+ *
+ * @returns {{ok: true, triggerId: string, status: string} | {ok: false, code: string, message: string}}
+ */
+function closeTrigger(targetRoot, { triggerId, status, requestId }) {
+	if (!TRIGGER_STATUSES.has(status) || status === "open") {
+		return {
+			ok: false,
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			message: `trigger closure status must be "answered" or "skipped", got ${JSON.stringify(status)}`,
+		};
+	}
+	const id = String(triggerId || "").trim();
+	if (!id) {
+		return {
+			ok: false,
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			message: "trigger closure requires a triggerId",
+		};
+	}
+	const record = listTriggers(targetRoot).find((t) => t.triggerId === id);
+	if (!record) {
+		return {
+			ok: false,
+			code: "AMBER_E_MEMORY_REQUEST_NOT_FOUND",
+			message: `trigger not found: ${id}`,
+		};
+	}
+	if (record.status !== "open") {
+		return {
+			ok: false,
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			message: `trigger ${id} is already ${record.status}`,
+		};
+	}
+	const closed = {
+		...record,
+		status,
+		closedAt: new Date().toISOString(),
+		...(requestId ? { answeredByRequest: requestId } : {}),
+	};
+	writeTrigger(targetRoot, closed);
+	return { ok: true, triggerId: id, status };
+}
+
+/**
+ * Find the open trigger a `memory request --trigger <id>` names, so a request
+ * can cite it and close it as `answered` in the same call.
+ */
+function findOpenTrigger(targetRoot, triggerId) {
+	const id = String(triggerId || "").trim();
+	if (!id) return null;
+	return listTriggers(targetRoot).find((t) => t.triggerId === id && t.status === "open") || null;
 }
 
 module.exports = {
 	TRIGGER_CHANNELS,
+	TRIGGER_STATUSES,
 	triggersDir,
 	triggerPath,
 	listTriggers,
 	writeTrigger,
 	triggerWriteBackRequest,
 	mountWriteBackTrigger,
+	closeTrigger,
+	findOpenTrigger,
 };
