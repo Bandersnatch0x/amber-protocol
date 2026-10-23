@@ -82,7 +82,7 @@ describe("session-manifest", () => {
 			budget: 1000,
 		});
 		assert.strictEqual(manifest.budget.total, 1000);
-		assert.strictEqual(manifest.budget.used, 0);
+		assert.strictEqual(manifest.budget.used, null);
 	});
 
 	it("should set createdAt and updatedAt to the same timestamp", () => {

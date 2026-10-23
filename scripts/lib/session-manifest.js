@@ -34,7 +34,7 @@ function createManifest({ route, goal, budget, feature, agent }) {
 		status: "created",
 		completedStages: [],
 		...(feature ? { feature } : {}),
-		...(budget != null && { budget: { total: budget, used: 0 } }),
+		...(budget != null && { budget: { total: budget, used: null } }),
 		...(agent ? { agentId: agent, agentClaimedAt: now } : {}),
 	};
 }

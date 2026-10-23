@@ -409,8 +409,14 @@ function statusSession(projectRoot, options) {
 	}
 
 	if (manifest.budget) {
-		const pct = Math.round((manifest.budget.used / manifest.budget.total) * 100);
-		lines.push(`Budget: ${manifest.budget.used}/${manifest.budget.total} (${pct}%)`);
+		if (manifest.budget.used > 0) {
+			const pct = Math.round((manifest.budget.used / manifest.budget.total) * 100);
+			lines.push(`Budget: ${manifest.budget.used}/${manifest.budget.total} (${pct}%)`);
+		} else {
+			lines.push(
+				`Budget: ${manifest.budget.total} tokens (usage untracked; token consumption is not measured by Amber)`,
+			);
+		}
 	}
 
 	return result(lines.join("\n"), 0);
