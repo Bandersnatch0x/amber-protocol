@@ -35,7 +35,16 @@ function scanCategory(scan) {
 	}
 }
 
-function scanDependencies(target) {
+// The audit's registry must not come from the target: a project `.npmrc` naming a
+// registry that answers "no advisories" would let the target award itself a PASS.
+// A CLI flag outranks a project `.npmrc`, and `npm_config_registry` outranks both,
+// so an operator still points a mirrored environment at its own registry through
+// the environment while the target's own config is ignored.
+function auditRegistry(env) {
+	return env?.npm_config_registry || "https://registry.npmjs.org/";
+}
+
+function scanDependencies(target, env) {
 	readTargetFile(target, "package.json");
 	const lock = fs.existsSync(path.join(target, "npm-shrinkwrap.json"))
 		? "npm-shrinkwrap.json"
@@ -51,6 +60,7 @@ function scanDependencies(target) {
 		"--include=dev",
 		"--include=optional",
 		"--include=peer",
+		`--registry=${auditRegistry(env)}`,
 	]);
 	// Target npm settings may otherwise place cache and logs inside the repository.
 	const cache = fs.mkdtempSync(path.join(os.tmpdir(), "amber-security-cache-"));
@@ -58,6 +68,7 @@ function scanDependencies(target) {
 	try {
 		result = childProcess.spawnSync(command, [...args, "--cache", cache, "--logs-dir", cache], {
 			cwd: target,
+			env,
 			encoding: "utf8",
 			timeout: 30_000,
 			maxBuffer: 16 * 1024 * 1024,
@@ -127,7 +138,8 @@ function scanPermissions(target) {
 
 function generateSecurityAuditReport(targetRoot, options = {}) {
 	const target = path.resolve(targetRoot || ".");
-	const depResult = scanCategory(() => scanDependencies(target));
+	const env = options.env || process.env;
+	const depResult = scanCategory(() => scanDependencies(target, env));
 	const secretResult = scanCategory(() => scanTrackedSecrets(target));
 	const permResult = scanCategory(() => scanPermissions(target));
 	const report = REPORT_ONLY_NOTICE + generateAuditReport(depResult, secretResult, permResult);

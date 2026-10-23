@@ -324,3 +324,84 @@ test(
 		}
 	},
 );
+
+test("a target .npmrc cannot choose the registry the audit trusts", { timeout: 60_000 }, (t) => {
+	const target = fixture(t);
+	// A registry that answers "no advisories" would let the target award itself a
+	// PASS. Point the project config at a dead port: if the audit honoured it, the
+	// scan would fail; if the audit ignores it, the scan still passes.
+	fs.writeFileSync(path.join(target, ".npmrc"), "registry=http://127.0.0.1:9/\n");
+	run("git", ["add", ".npmrc"], target);
+	const result = audit(target, [], { ...process.env, npm_config_registry: undefined });
+	assert.match(result.text, /Overall Status:\*\* ✅ \*\*PASS\*\*/);
+	assert.doesNotMatch(result.text, /unscanned/);
+});
+
+test(
+	"a target .npmrc cannot substitute a registry that answers 'no advisories'",
+	{ timeout: 60_000 },
+	async (t) => {
+		const target = fixture(t);
+		// A registry under the target's control that always reports no advisories.
+		// If the audit read the target's .npmrc, the vulnerable fixture below would
+		// come back clean and the target would award itself a PASS.
+		const server = childProcess.spawn(
+			process.execPath,
+			[
+				"-e",
+				`
+		const http = require("node:http");
+		http.createServer((req, res) => {
+			res.setHeader("content-type", "application/json");
+			res.end(JSON.stringify({}));
+		}).listen(0, "127.0.0.1", function () { console.log(this.address().port); });
+	`,
+			],
+			{ stdio: ["ignore", "pipe", "inherit"] },
+		);
+		t.after(() => server.kill());
+		const [ready] = await once(server.stdout, "data");
+		const liar = `http://127.0.0.1:${String(ready).trim()}`;
+		fs.writeFileSync(path.join(target, ".npmrc"), `registry=${liar}/\n`);
+		// A real package with a real advisory. An invented name is useless here: npm
+		// reports "no vulnerabilities" for a package the registry has never heard of,
+		// so a liar registry and the real one would agree and the test could not tell
+		// them apart. lodash@4.17.15 carries advisories on the public registry.
+		fs.writeFileSync(
+			path.join(target, "package.json"),
+			JSON.stringify({
+				name: "audit-fixture",
+				version: "1.0.0",
+				dependencies: { lodash: "4.17.15" },
+			}),
+		);
+		fs.writeFileSync(
+			path.join(target, "package-lock.json"),
+			JSON.stringify({
+				name: "audit-fixture",
+				version: "1.0.0",
+				lockfileVersion: 3,
+				packages: {
+					"": {
+						name: "audit-fixture",
+						version: "1.0.0",
+						dependencies: { lodash: "4.17.15" },
+					},
+					"node_modules/lodash": {
+						version: "4.17.15",
+						resolved: `${liar}/lodash/-/lodash-4.17.15.tgz`,
+					},
+				},
+			}),
+		);
+		run("git", ["add", "."], target);
+		const result = audit(target, [], { ...process.env, npm_config_registry: undefined });
+		// Overall FAIL alone cannot tell the two outcomes apart: an audit that honoured
+		// the liar registry would report the dependency scan UNSCANNED, which is also an
+		// overall FAIL. The distinguishing evidence is that the scan reached the real
+		// registry and named the advisory.
+		assert.match(result.text, /## Dependency Scan\n\n\*\*Status:\*\* ❌ FAIL/);
+		assert.match(result.text, /- \*\*lodash\*\* — Command Injection/);
+		assert.doesNotMatch(result.text, /## Dependency Scan\n\n\*\*Status:\*\* ⚠️ UNSCANNED/);
+	},
+);
