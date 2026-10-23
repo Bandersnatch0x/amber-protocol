@@ -20,6 +20,9 @@ npm-pack-dry-run.json
 
 # --- Runtime state ---
 .amber/
+# CodeGraph / Graphify indexes: tool-fixed at repo root, ~72MB, regenerable
+.codegraph/
+.graphify/
 .amber-test-interactive/
 .harness/
 .amber-legacy-harness-backup-*/
