@@ -13,6 +13,7 @@ const { codedError } = require("./error-catalog");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const { sleepSync } = require("./fs-utils");
 const { sha256Hex } = require("./context-hash");
+const { redactDeep } = require("./redaction");
 
 const GENESIS = "0".repeat(64);
 
@@ -261,7 +262,7 @@ function appendLedgerRecord(ledgerPath, record) {
 			);
 		}
 		const prevHash = existing.length ? existing[existing.length - 1].hash || GENESIS : GENESIS;
-		const body = { ...record, prevHash };
+		const body = redactDeep({ ...record, prevHash });
 		const full = { ...body, hash: hashRecord(body, prevHash) };
 		appendJSONL(ledgerPath, full);
 		writeAnchor(ledgerPath, { count: existing.length + 1, headHash: full.hash });

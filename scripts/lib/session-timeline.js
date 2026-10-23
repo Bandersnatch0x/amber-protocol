@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { assertExclusiveLeaf } = require("./core/fs-utils");
 const { readJSONL } = require("./core/jsonl");
+const { redactDeep } = require("./core/redaction");
 
 // scripts/lib/session-timeline.js
 // The single deep module owning the Session timeline artifact: the event
@@ -64,10 +65,12 @@ function appendSessionEvent(sessionDir, event) {
 		fs.mkdirSync(sessionDir, { recursive: true });
 	}
 	const line =
-		JSON.stringify({
-			...event,
-			timestamp: new Date().toISOString(),
-		}) + "\n";
+		JSON.stringify(
+			redactDeep({
+				...event,
+				timestamp: new Date().toISOString(),
+			}),
+		) + "\n";
 	// Same invariant as appendJSONL: a planted shared-inode leaf would rewrite
 	// bytes under another name, so the governed timeline append checks first.
 	assertExclusiveLeaf("Timeline leaf", path.join(sessionDir, FILENAME));

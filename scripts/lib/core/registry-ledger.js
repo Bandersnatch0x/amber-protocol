@@ -23,6 +23,7 @@ const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { typedError } = require("./error-catalog");
 const { sha256Hex, canonicalJson } = require("./context-hash");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
+const { redactDeep } = require("./redaction");
 
 const GENESIS_HASH = "0".repeat(64);
 
@@ -226,7 +227,7 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 		}
 		const guardVerdict = guard(folded);
 		if (guardVerdict !== null) return guardVerdict;
-		const eventBody = typeof body === "function" ? body(folded) : body;
+		const eventBody = redactDeep(typeof body === "function" ? body(folded) : body);
 		let prevHash;
 		try {
 			prevHash = chainHeadHash(

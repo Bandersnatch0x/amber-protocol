@@ -21,6 +21,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { assertExclusiveLeaf } = require("./fs-utils");
+const { redactDeep } = require("./redaction");
 
 /**
  * Read a JSONL file into an array of parsed objects.
@@ -57,12 +58,13 @@ function readJSONL(filePath, { onCorrupt = "skip", missing = "empty" } = {}) {
  * @returns {object} The appended value.
  */
 function appendJSONL(filePath, obj) {
+	const redacted = redactDeep(obj);
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	// Appending to a leaf that shares its inode rewrites bytes under another name, so the
 	// check sits in the primitive every governed ledger append already routes through.
 	assertExclusiveLeaf("Ledger leaf", filePath);
-	fs.appendFileSync(filePath, JSON.stringify(obj) + "\n", "utf8");
-	return obj;
+	fs.appendFileSync(filePath, JSON.stringify(redacted) + "\n", "utf8");
+	return redacted;
 }
 
 /**
@@ -71,6 +73,11 @@ function appendJSONL(filePath, obj) {
  * This is the NON-append tool: it exists for tests (building fixtures) and
  * one-shot rebuilds, not for the append-only production paths — production
  * record/ledger writers must use appendJSONL so lineage is never truncated.
+ *
+ * Deliberately NOT redacted: fixtures must be able to construct arbitrary
+ * stored state, including secret-looking values and deliberately broken hash
+ * chains. Redacting here would make an adversarial fixture impossible to
+ * write, and this path never runs in production.
  * @param {string} filePath - Absolute path.
  * @param {Array<object>} objs - Values to serialize.
  */

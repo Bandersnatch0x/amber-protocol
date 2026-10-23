@@ -10,6 +10,7 @@ const path = require("node:path");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
+const { redactDeep } = require("./redaction");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -193,14 +194,14 @@ function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
 				errors: [err.message || String(err)],
 			};
 		}
-		const body = {
+		const body = redactDeep({
 			kind: "invalidated",
 			schemaVersion: STALENESS_SCHEMA_VERSION,
 			at,
 			subject,
 			dependency: dep,
 			reason,
-		};
+		});
 		const prevHash = folded.length > 0 ? folded[folded.length - 1].hash : GENESIS_HASH;
 		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
 		let ceiling;
