@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { execSync } = require("node:child_process");
-const { gitRun, gitOutput } = require("../../scripts/lib/core/git-exec");
+const { gitRun, gitOutput, gitOutputRaw } = require("../../scripts/lib/core/git-exec");
 
 function mkGit() {
 	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-")));
@@ -32,4 +32,22 @@ test("gitRun reports ok:false on a failing write", () => {
 	const dir = mkGit();
 	const r = gitRun(dir, ["tag", "-a", "-m", "seal", "bad tag name with spaces"]);
 	assert.strictEqual(r.ok, false);
+});
+
+test("gitOutput trims, so a payload with significant leading whitespace needs gitOutputRaw", () => {
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-raw-")));
+	execSync("git init -q", { cwd: dir });
+	// A leading space is legal in a git path and is part of the name.
+	fs.writeFileSync(path.join(dir, " leading.txt"), "x");
+	fs.writeFileSync(path.join(dir, "plain.txt"), "y");
+	execSync("git add -A", { cwd: dir });
+
+	const raw = gitOutputRaw(dir, ["ls-files", "--cached", "-z", "--", "."]);
+	const trimmed = gitOutput(dir, ["ls-files", "--cached", "-z", "--", "."]);
+
+	assert.deepStrictEqual(raw.split("\0").filter(Boolean).sort(), [" leading.txt", "plain.txt"]);
+	// Trimming eats the space, so the entry no longer names a file on disk.
+	assert.deepStrictEqual(trimmed.split("\0").filter(Boolean).sort(), ["leading.txt", "plain.txt"]);
+	assert.strictEqual(fs.existsSync(path.join(dir, "leading.txt")), false);
+	assert.strictEqual(fs.existsSync(path.join(dir, " leading.txt")), true);
 });

@@ -9,7 +9,7 @@ const { dependencyScan, parseAuditOutput } = require("../../src/security/depende
 const { scanForSecrets } = require("../../src/security/secret-scan");
 const { reviewPermissions } = require("../../src/security/permission-review");
 const { toSpawnArgv } = require("./core/loop-policy");
-const { gitOutput } = require("./core/git-exec");
+const { gitOutputRaw } = require("./core/git-exec");
 
 const REPORT_ONLY_NOTICE = [
 	"> **Report-only.** Scans do not modify target files or block other commands.",
@@ -101,9 +101,17 @@ function scanDependencies(target, env) {
 }
 
 function scanTrackedSecrets(target) {
-	// Git access goes through the git-exec seam (F037); null means the call
-	// failed, which for enumeration is a hard error rather than an empty list.
-	const tracked = gitOutput(target, ["ls-files", "--cached", "-z", "--", "."]);
+	// Git access goes through the git-exec seam (F037). The -z payload is raw
+	// paths, so it must not be trimmed: a file named " leading.txt" would lose
+	// its leading space and fail to resolve, degrading the whole scan to
+	// UNSCANNED. Null means the call failed, which for enumeration is a hard
+	// error rather than an empty list.
+	const tracked = gitOutputRaw(target, ["ls-files", "--cached", "-z", "--", "."], {
+		// Restores the ceiling the pre-seam call carried: the default 1 MB trips
+		// somewhere around a few thousand tracked files.
+		maxBuffer: 16 * 1024 * 1024,
+		timeout: 30_000,
+	});
 	if (tracked === null) throw new Error("Git-tracked files could not be enumerated");
 	const files = tracked
 		.split("\0")

@@ -7,14 +7,27 @@ const { spawnSync } = require("node:child_process");
 // gitExec's {ok, status, stdout, stderr}. Never throws; status is -1 when the
 // spawn throws or produces no status (missing binary); stdout/stderr are
 // trimmed strings, "" when git produced none.
-function gitExec(targetRoot, args) {
+// `preserveWhitespace` keeps stdout byte-faithful. Trimming is right for values a
+// human reads (a config value, a rev-parse answer) but destroys payloads where
+// leading/trailing whitespace is data: `git ls-files -z` yields raw paths, and a
+// file legally named " leading.txt" loses its space and stops resolving on disk.
+// Payload callers pass true and do their own NUL handling.
+function gitExec(targetRoot, args, options = {}) {
+	const preserveWhitespace = Boolean(options.preserveWhitespace);
+	// spawnSync's default ceiling is 1 MB. A repo with a few thousand files
+	// already exceeds that for `ls-files -z`, and ENOBUFS surfaces as a null
+	// status — a silent failure unless a caller can raise the ceiling.
+	const spawnOptions = { cwd: targetRoot, encoding: "utf8" };
+	if (options.maxBuffer) spawnOptions.maxBuffer = options.maxBuffer;
+	if (options.timeout) spawnOptions.timeout = options.timeout;
 	try {
-		const res = spawnSync("git", args, { cwd: targetRoot, encoding: "utf8" });
+		const res = spawnSync("git", args, spawnOptions);
 		const status = res && typeof res.status === "number" ? res.status : -1;
+		const stdout = res && typeof res.stdout === "string" ? res.stdout : "";
 		return {
 			ok: status === 0,
 			status,
-			stdout: (res && typeof res.stdout === "string" && res.stdout.trim()) || "",
+			stdout: preserveWhitespace ? stdout : stdout.trim(),
 			stderr: (res && typeof res.stderr === "string" && res.stderr.trim()) || "",
 		};
 	} catch (e) {
@@ -30,6 +43,15 @@ function gitExec(targetRoot, args) {
 // when it is absent.
 function gitOutput(targetRoot, args) {
 	const res = gitExec(targetRoot, args);
+	return res.ok ? res.stdout : null;
+}
+
+// Same failure policy as gitOutput, but the bytes are returned untouched. Use it
+// whenever git's output is a payload rather than a value — NUL-separated lists,
+// raw paths, porcelain formats — because trimming there silently corrupts data.
+// Null still means "the call failed".
+function gitOutputRaw(targetRoot, args, options = {}) {
+	const res = gitExec(targetRoot, args, { ...options, preserveWhitespace: true });
 	return res.ok ? res.stdout : null;
 }
 
@@ -55,4 +77,4 @@ function configGet(targetRoot, key) {
 	return res.ok ? res.stdout : "";
 }
 
-module.exports = { gitExec, gitOutput, gitRun, isRepository, configGet };
+module.exports = { gitExec, gitOutput, gitOutputRaw, gitRun, isRepository, configGet };
