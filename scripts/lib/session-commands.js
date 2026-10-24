@@ -21,7 +21,7 @@ const { result } = require("./result");
 const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
 const { writeRouteGates, writeGateDecision } = require("./gate-writer");
-const { appendLedgerRecord, verifyLedgerOutcome } = require("./core/loop-ledger");
+const { appendLedgerRecord, readLedger, verifyLedgerOutcome } = require("./core/loop-ledger");
 const { runEvidenceCommand, resolveBudgetMinutes } = require("./core/evidence-runner");
 const { recordFeatureEvidence } = require("./feature-commands");
 const { writeRunnerAck } = require("./runner-ack");
@@ -398,6 +398,17 @@ function statusSession(projectRoot, options) {
 
 	if (manifest.currentStage) {
 		lines.push(`Current stage: ${manifest.currentStage}`);
+	}
+	const focusStage =
+		manifest.currentStage ||
+		loadTargetRoutes(projectRoot)
+			.routes.find((route) => route.routeId === manifest.route.id)
+			?.stages.find((stage) => !manifest.completedStages?.includes(stage.name))?.name;
+	if (focusStage) {
+		const attempts = readLedger(path.join(sessionDir, "ledger.jsonl")).filter(
+			(record) => record.kind === "stage_attempt_requested" && record.stageName === focusStage,
+		).length;
+		lines.push(`Stage attempts (${focusStage}): ${attempts}`);
 	}
 
 	if (manifest.mode) {

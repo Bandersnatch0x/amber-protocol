@@ -17,6 +17,7 @@ const {
 const { addFeature, listFeatureEvidence } = require("../../scripts/lib/feature-commands");
 const { readSessionArtifacts } = require("../helpers/session-artifacts");
 const { installTargetRoutes } = require("../helpers/target-routes");
+const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 
 // Unique temp dir per test (assigned in beforeEach). The former fixed shared path
 // tests/fixtures/session-test-repo meant one locked rmdir on Windows (EBUSY from
@@ -405,6 +406,25 @@ describe("session-commands", () => {
 
 			assert.strictEqual(result.exitCode, 0);
 			assert.ok(result.text.includes("test"));
+		});
+
+		it("shows the current stage attempt count from the session ledger", async () => {
+			const start = await startSession(TEST_ROOT, {
+				goal: "test",
+				route: "feature-standard",
+			});
+			const sessionDir = path.join(TEST_ROOT, ".amber", "sessions", start.sessionId);
+			for (const stageName of ["capture", "plan", "capture"]) {
+				appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
+					kind: "stage_attempt_requested",
+					stageName,
+				});
+			}
+
+			const result = statusSession(TEST_ROOT, { sessionId: start.sessionId });
+
+			assert.strictEqual(result.exitCode, 0, result.text);
+			assert.match(result.text, /^Stage attempts \(capture\): 2$/m);
 		});
 
 		it("returns error when session not found", () => {
