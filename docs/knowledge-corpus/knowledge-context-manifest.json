@@ -112,8 +112,8 @@
       "sourcePath": "docs/adr/0009-contract-driven-context-distillation.md",
       "title": "Contract-Driven Context Distillation — Amber Governs, Agents Generate",
       "source": {
-        "rawHash": "sha256:750b685176e178f0c7bdb1a40c28b4da67865366e479126de099bee81fe6ea1a",
-        "normHash": "sha256:29da2cd0e8a6d4cdb259b8ee1daf8f6222ed90e287b18047d96eca6444c2feb5"
+        "rawHash": "sha256:c386f1cc95f460d33455acc92d798e1da1018ae622f2cc885b72304e8644d515",
+        "normHash": "sha256:79c14b748422267b038143ed89b60998918d294abc23b290c40fe9dad154ee3c"
       }
     },
     {
@@ -657,5 +657,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:fd53ce3d91cf7a3cd298bf4a9ec198ed92884d1882069cbab2a8b9bb77313c98"
+  "manifestHash": "sha256:470f75060aceb7857a95d0ca2d0c013276f015bbc7cca1b77576a403d657d3b7"
 }

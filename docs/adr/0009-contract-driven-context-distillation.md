@@ -17,7 +17,7 @@ logs — but that evidence **sinks**. It lands in `.amber/` when a session ends 
 while the next agent boots from `AGENTS.md` and `docs/wiki/`, which nobody refreshed. The repository
 accumulates artifacts without accumulating knowledge.
 
-A survey of the current agent-memory landscape (Tencent TencentDB-Agent-Memory, zosmaai/pi-llm-wiki,
+A survey of the current agent-memory landscape (a vendor cloud agent-memory store, zosmaai/pi-llm-wiki,
 SAGE (arXiv 2605.12061), PrimeIntellect prime-agent, rohitg00/agentmemory, and the "Memory Engineer"
 long-form) produced four points of consensus worth acting on:
 
