@@ -13,7 +13,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { scaffoldWiki } = require("../../scripts/lib/core/scaffold");
-const { scaffoldKnowledgePlan } = require("../../scripts/lib/knowledge-plan/internal/scaffold");
+const knowledgePlan = require("../../scripts/lib/knowledge-plan");
 
 function mkTarget(label) {
 	return trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-wiki-yaml-${label}-`)));
@@ -35,7 +35,7 @@ test("the default wiki scaffold seeds the JSON plan but not the yaml alternate",
 
 test("`knowledge scaffold --yaml` remains the only entry point that emits the yaml", () => {
 	const dir = mkTarget("yaml");
-	const result = scaffoldKnowledgePlan(dir, { yaml: true });
+	const result = knowledgePlan.scaffold(dir, { yaml: true });
 	assert.equal(result.errors.length, 0, result.errors.join("; "));
 
 	const wiki = path.join(dir, "docs", "wiki");

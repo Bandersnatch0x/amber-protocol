@@ -9,6 +9,7 @@ const { dependencyScan, parseAuditOutput } = require("../../src/security/depende
 const { scanForSecrets } = require("../../src/security/secret-scan");
 const { reviewPermissions } = require("../../src/security/permission-review");
 const { toSpawnArgv } = require("./core/loop-policy");
+const { gitOutput } = require("./core/git-exec");
 
 const REPORT_ONLY_NOTICE = [
 	"> **Report-only.** Scans do not modify target files or block other commands.",
@@ -100,15 +101,11 @@ function scanDependencies(target, env) {
 }
 
 function scanTrackedSecrets(target) {
-	const result = childProcess.spawnSync("git", ["ls-files", "--cached", "-z", "--", "."], {
-		cwd: target,
-		encoding: "utf8",
-		timeout: 30_000,
-		maxBuffer: 16 * 1024 * 1024,
-	});
-	if (result.error) throw result.error;
-	if (result.status !== 0) throw new Error("Git-tracked files could not be enumerated");
-	const files = result.stdout
+	// Git access goes through the git-exec seam (F037); null means the call
+	// failed, which for enumeration is a hard error rather than an empty list.
+	const tracked = gitOutput(target, ["ls-files", "--cached", "-z", "--", "."]);
+	if (tracked === null) throw new Error("Git-tracked files could not be enumerated");
+	const files = tracked
 		.split("\0")
 		.filter(Boolean)
 		.map((file) => ({
