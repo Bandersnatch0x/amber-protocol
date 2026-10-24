@@ -33,6 +33,20 @@ Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, ga
 
 Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).
 
+## Verification rules
+
+- **A local green is not a push license.** Whole-repository guards (`git-seam`,
+  `schema-contract`, knowledge-plan interface) scan _which file references what_, not behavior, so
+  adjacent suites never reach them. Any change under `scripts/lib/` or any new test file requires
+  `npm test` over the full suite before push. Dependency- and docs-only changes may run just their
+  own gate.
+- **Fix-then-revert is the only proof a test bites.** Remove the fix, watch the test turn red,
+  restore it. A test that passes both ways pins nothing.
+- **Check for an existing seam before wiring a new call.** `git-exec.js` for git,
+  `schema-contract.js` for JSON Schema compilation, `knowledge-plan/index.js` for the knowledge
+  plan. Bypassing a seam fails no feature — only the whole-repository guard — so it survives every
+  targeted test run.
+
 ## Entry point
 
 ```bash

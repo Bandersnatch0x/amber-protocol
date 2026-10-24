@@ -12,6 +12,13 @@ Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, ga
 
 Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).
 
+**Verification rules (mirror of `AGENTS.md`):** a local green is not a push license — whole-repository
+guards (`git-seam`, `schema-contract`, knowledge-plan interface) scan _which file references what_,
+so adjacent suites never reach them; any change under `scripts/lib/` or any new test file requires the
+full `npm test` before push. Prove a test bites by removing the fix, watching it turn red, then
+restoring. Check for an existing seam (`git-exec.js`, `schema-contract.js`,
+`knowledge-plan/index.js`) before wiring a new call.
+
 ## Project Overview
 
 **Amber Protocol** (formerly Coding Harness) is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.

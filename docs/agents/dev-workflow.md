@@ -43,6 +43,27 @@
 
 阶段 6→7 的门槛是**全量**测试：日志完整落盘到文件后整体读取，管道截断（`| tail` 之类）不算数。失败先归因——负载 flake 用空载复证、自伤清理后复证、既有红向历史溯源——再决定修复还是重锚。
 
+**局部绿不等于可推送**（2026-10-24，issues/0196）。只跑被改动文件附近的套件就推送，让两处全仓级守卫在 CI 才暴露：
+
+1. **F037 git seam 守卫**（`tests/unit/git-seam-guard.test.js`）：`scripts/lib` 下任何 `spawnSync("git", ...)` 都必须走 `git-exec.js`。上一轮 0182 给 `security-commands.js` 加 git 调用时漏了这条，一直躺到本轮才红。
+2. **F013-K3 接口契约**（`tests/unit/knowledge-plan-interface.test.js`）：普通测试禁止 `require` 任何 `*/internal/*`，只能走 facade 导出。
+
+这类守卫**只在全仓扫描时才命中**——它们检查的不是行为，是"哪些文件引用了什么"，所以跑几个相关套件永远碰不到。改动了 `scripts/lib/` 任何文件或新增测试文件，推送前必须跑 `npm test` 全量；纯依赖/文档改动可只跑对应门禁。
+
+失败修复后**反向验证**：临时撤掉修复，确认测试转红，再恢复。否则无法区分"测试钉住了行为"和"测试恒真"。
+
+## seam 契约（改代码前先确认接线方式）
+
+`scripts/lib/` 里有几处**唯一入口**，绕过它们的调用不会在功能上失败，只会在全仓守卫里失败：
+
+| seam | 唯一入口 | 守卫 |
+| --- | --- | --- |
+| git 调用 | `scripts/lib/core/git-exec.js`（`gitExec`/`gitOutput`/`gitRun`/`isRepository`/`configGet`） | `tests/unit/git-seam-guard.test.js` |
+| JSON Schema 编译 | `scripts/lib/core/schema-contract.js`（`compileSchema`/`compileInline`/`validate`），禁止别处实例化 Ajv | `tests/unit/schema-contract-guard.test.js` |
+| Knowledge Plan | `scripts/lib/knowledge-plan/index.js` 的 facade 导出 | `tests/unit/knowledge-plan-interface.test.js` |
+
+写新代码前先问"这层有没有已存在的 seam"，而不是发现功能能跑就收工。
+
 ## 横切机制（按触发条件生效，不占流水线位置）
 
 | 机制               | 触发条件                                             | 产出                                                                     |
