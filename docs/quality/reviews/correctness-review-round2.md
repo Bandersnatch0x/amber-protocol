@@ -50,7 +50,7 @@ const entry = {
 
 The Password Assignment regex includes a negative lookahead intended to skip lines like:
 ```js
-const password = "hunter2"; // eslint-disable-line
+const password = "hunter2"; // eslint-disable-line <!-- amber:scan-allow -->
 ```
 
 The lookahead `(?!\s*\/\/(?:\s*eslint| biome))` is positioned **immediately after the closing quote**, but real code has `; ` (semicolon + space) between the quote and `//`. So the lookahead always succeeds trivially because it's checking at a position that doesn't start with `\s*\/\/`.

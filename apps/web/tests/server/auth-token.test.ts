@@ -23,7 +23,7 @@ describe('auth-token', () => {
 
   it('validates a matching token via query param', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'prod-secret';
+    process.env.SSE_AUTH_SECRET = 'prod-secret'; // amber:scan-allow
     const result = validateSSEAuthToken(
       mockRequest({ query: { token: 'prod-secret' } }) as Request,
     );
@@ -32,7 +32,7 @@ describe('auth-token', () => {
 
   it('validates a matching token via Authorization header', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'prod-secret';
+    process.env.SSE_AUTH_SECRET = 'prod-secret'; // amber:scan-allow
     const result = validateSSEAuthToken(
       mockRequest({ headers: { authorization: 'Bearer prod-secret' } }) as Request,
     );
@@ -41,7 +41,7 @@ describe('auth-token', () => {
 
   it('rejects a mismatched token via query param', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'prod-secret';
+    process.env.SSE_AUTH_SECRET = 'prod-secret'; // amber:scan-allow
     const result = validateSSEAuthToken(mockRequest({ query: { token: 'wrong' } }) as Request);
     expect(result.valid).toBe(false);
     expect(result.reason).toContain('Invalid');
@@ -49,7 +49,7 @@ describe('auth-token', () => {
 
   it('rejects a mismatched token via Authorization header', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'prod-secret';
+    process.env.SSE_AUTH_SECRET = 'prod-secret'; // amber:scan-allow
     const result = validateSSEAuthToken(
       mockRequest({ headers: { authorization: 'Bearer wrong' } }) as Request,
     );
@@ -58,14 +58,14 @@ describe('auth-token', () => {
 
   it('rejects when token length differs from secret', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'long-secret-value';
+    process.env.SSE_AUTH_SECRET = 'long-secret-value'; // amber:scan-allow
     const result = validateSSEAuthToken(mockRequest({ query: { token: 'short' } }) as Request);
     expect(result.valid).toBe(false);
   });
 
   it('rejects missing token when secret is set', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'prod-secret';
+    process.env.SSE_AUTH_SECRET = 'prod-secret'; // amber:scan-allow
     const result = validateSSEAuthToken(mockRequest() as Request);
     expect(result.valid).toBe(false);
     expect(result.reason).toContain('Missing');
@@ -73,7 +73,7 @@ describe('auth-token', () => {
 
   it('rejects empty query string token', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'prod-secret';
+    process.env.SSE_AUTH_SECRET = 'prod-secret'; // amber:scan-allow
     const result = validateSSEAuthToken(mockRequest({ query: { token: '' } }) as Request);
     expect(result.valid).toBe(false);
   });
@@ -109,7 +109,7 @@ describe('auth-token', () => {
 
   it('prefers query token over Authorization header', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'query-wins';
+    process.env.SSE_AUTH_SECRET = 'query-wins'; // amber:scan-allow
     // Query has the correct token, header has wrong
     const result = validateSSEAuthToken(
       mockRequest({
@@ -122,7 +122,7 @@ describe('auth-token', () => {
 
   it('falls back to Authorization header when query is absent', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'bearer-wins';
+    process.env.SSE_AUTH_SECRET = 'bearer-wins'; // amber:scan-allow
     const result = validateSSEAuthToken(
       mockRequest({
         headers: { authorization: 'Bearer bearer-wins' },
@@ -135,7 +135,7 @@ describe('auth-token', () => {
 
   it('handles non-string query token gracefully', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'secret';
+    process.env.SSE_AUTH_SECRET = 'secret'; // amber:scan-allow
     const req = mockRequest() as any;
     req.query = { token: ['array', 'token'] };
     const result = validateSSEAuthToken(req as Request);
@@ -144,7 +144,7 @@ describe('auth-token', () => {
 
   it('handles missing Authorization header prefix', () => {
     process.env.NODE_ENV = 'production';
-    process.env.SSE_AUTH_SECRET = 'no-bearer';
+    process.env.SSE_AUTH_SECRET = 'no-bearer'; // amber:scan-allow
     const result = validateSSEAuthToken(
       mockRequest({ headers: { authorization: 'no-bearer' } }) as Request,
     );

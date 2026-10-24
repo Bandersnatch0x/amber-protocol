@@ -9,7 +9,7 @@ const FIXTURE_JSONL = [
     type: 'user',
     message: {
       role: 'user',
-      content: 'set GITHUB_TOKEN=ghp_1234567890abcdefABCDEF1234567890abcd then continue',
+      content: 'set GITHUB_TOKEN=ghp_1234567890abcdefABCDEF1234567890abcd then continue', // amber:scan-allow
     },
     timestamp: '2026-06-17T10:00:00Z',
   }),
@@ -49,7 +49,7 @@ describe('lens-store', () => {
   it('never writes raw secrets to the saved digest', () => {
     const result = saveTranscriptDigest('sess-1', { repoPath, repoRoot, claudeHome });
     const written = fs.readFileSync(result!.path, 'utf8');
-    expect(written).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd');
+    expect(written).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd'); // amber:scan-allow
     expect(written).toContain('[REDACTED');
   });
 

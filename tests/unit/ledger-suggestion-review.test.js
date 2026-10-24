@@ -448,7 +448,7 @@ test("writer inputs are validated fail-closed: closed sets, digests, no credenti
 		const leaky = review.recordSuggestionDismissal(root, {
 			fingerprint: "fp-3",
 			reason: "dismissed-by-operator",
-			summary: "Authorization: Bearer sk-ant-secret000111222333444",
+			summary: "Authorization: Bearer sk-ant-secret000111222333444", // amber:scan-allow
 		});
 		assert.equal(leaky.ok, false);
 		assert.equal(leaky.code, INVALID_ARG_CODE);

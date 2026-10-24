@@ -9,13 +9,13 @@ describe('redactSecrets', () => {
   });
 
   it('redacts AWS access key IDs', () => {
-    const out = redactSecrets('aws_access_key_id = AKIAIOSFODNN7EXAMPLE');
-    expect(out).not.toContain('AKIAIOSFODNN7EXAMPLE');
+    const out = redactSecrets('aws_access_key_id = AKIAIOSFODNN7EXAMPLE'); // amber:scan-allow
+    expect(out).not.toContain('AKIAIOSFODNN7EXAMPLE'); // amber:scan-allow
     expect(out).toContain('[REDACTED');
   });
 
   it('redacts GitHub personal access tokens', () => {
-    const secret = 'ghp_1234567890abcdefABCDEF1234567890abcd';
+    const secret = 'ghp_1234567890abcdefABCDEF1234567890abcd'; // amber:scan-allow
     const out = redactSecrets(`git remote set-url origin https://${secret}@github.com/x/y`);
     expect(out).not.toContain(secret);
     expect(out).toContain('[REDACTED');
@@ -23,7 +23,7 @@ describe('redactSecrets', () => {
 
   it('redacts Bearer tokens in authorization headers', () => {
     const out = redactSecrets(
-      'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig',
+      'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig', // amber:scan-allow
     );
     expect(out).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig');
     expect(out).toContain('[REDACTED');
@@ -55,7 +55,7 @@ describe('redactDeep', () => {
   it('redacts secret strings inside nested objects', () => {
     const input = {
       url: 'https://example.com',
-      auth: { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl' },
+      auth: { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl' }, // amber:scan-allow
     };
     const out = redactDeep(input) as typeof input;
     expect(out.auth.apiKey).not.toContain('sk-ant-api03-AbC123_def456GHI789jkl');
@@ -64,9 +64,9 @@ describe('redactDeep', () => {
   });
 
   it('redacts secret strings inside arrays', () => {
-    const input = { tokens: ['ghp_1234567890abcdefABCDEF1234567890abcd', 'normal'] };
+    const input = { tokens: ['ghp_1234567890abcdefABCDEF1234567890abcd', 'normal'] }; // amber:scan-allow
     const out = redactDeep(input) as typeof input;
-    expect(out.tokens[0]).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd');
+    expect(out.tokens[0]).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd'); // amber:scan-allow
     expect(out.tokens[0]).toContain('[REDACTED]');
     expect(out.tokens[1]).toBe('normal');
   });
@@ -89,7 +89,7 @@ describe('redactDeep', () => {
   });
 
   it('does not mutate the input object', () => {
-    const input = { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl' };
+    const input = { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl' }; // amber:scan-allow
     redactDeep(input);
     expect(input.apiKey).toBe('sk-ant-api03-AbC123_def456GHI789jkl');
   });
@@ -111,15 +111,15 @@ describe('redactDeep', () => {
 describe('redactDeep', () => {
   it('redacts secret strings in a nested object', () => {
     const input = {
-      apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl',
-      nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' },
+      apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', // amber:scan-allow
+      nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' }, // amber:scan-allow
     };
     const out = redactDeep(input) as Record<string, unknown>;
     expect(out.apiKey).toBe('[REDACTED]');
     const nested = out.nested as Record<string, unknown>;
     expect(nested.token).toBe('[REDACTED]');
     expect(JSON.stringify(out)).not.toContain('sk-ant-api03-AbC123_def456GHI789jkl');
-    expect(JSON.stringify(out)).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd');
+    expect(JSON.stringify(out)).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd'); // amber:scan-allow
   });
 
   it('redacts secret strings inside arrays', () => {
@@ -138,7 +138,7 @@ describe('redactDeep', () => {
   });
 
   it('does not mutate the input object', () => {
-    const input = { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl' };
+    const input = { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl' }; // amber:scan-allow
     redactDeep(input);
     expect(input.apiKey).toBe('sk-ant-api03-AbC123_def456GHI789jkl');
   });
@@ -146,7 +146,7 @@ describe('redactDeep', () => {
   it('redacts secrets inside arrays of objects', () => {
     const input = {
       events: [
-        { token: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig' },
+        { token: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig' }, // amber:scan-allow
         { token: 'clean' },
       ],
     };
@@ -171,7 +171,7 @@ describe('redactDeep', () => {
   it('redacts secrets inside nested object values', () => {
     const out = redactDeep({
       level1: {
-        apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl',
+        apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', // amber:scan-allow
         keep: 'plain text',
       },
     }) as Record<string, unknown>;
@@ -191,7 +191,7 @@ describe('redactDeep', () => {
 
   it('recurses through mixed nested objects and arrays', () => {
     const out = redactDeep({
-      tokens: ['Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'],
+      tokens: ['Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'], // amber:scan-allow
       nested: { deep: [{ env: 'DATABASE_PASSWORD=sup3r-s3cret-value-here' }] },
     }) as Record<string, unknown>;
 
@@ -213,8 +213,8 @@ describe('redactDeep', () => {
 
   it('does not mutate the input object', () => {
     const input = {
-      apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl',
-      nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' },
+      apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', // amber:scan-allow
+      nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' }, // amber:scan-allow
     };
     const snapshot = JSON.parse(JSON.stringify(input));
     redactDeep(input);

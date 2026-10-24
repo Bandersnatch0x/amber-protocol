@@ -208,7 +208,7 @@ test("malformed, mis-shaped, and secret-bearing blocks are problems, never findi
 	const target = tmpTarget("bad-blocks");
 	try {
 		fs.mkdirSync(path.dirname(evolutionPath(target)), { recursive: true });
-		const secret = "SyntheticSecretGhIjKlMnOpQrStUvWx";
+		const secret = "SyntheticSecretGhIjKlMnOpQrStUvWx"; // amber:scan-allow
 		fs.writeFileSync(
 			evolutionPath(target),
 			[

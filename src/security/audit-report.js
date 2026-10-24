@@ -6,14 +6,14 @@
 
 /**
  * @param {object} depResult - dependency scan result
- * @param {Array|object|null} secretResult - findings or an unscanned result
+ * @param {object|null} secretResult - findings with suppression count or an unscanned result
  * @param {object} permResult - permission review result
  * @returns {string} markdown report
  */
 function generateAuditReport(depResult, secretResult, permResult) {
 	const date = new Date().toISOString().split("T")[0];
 	const dependencyStatus = scanStatus(depResult);
-	const secretStatus = scanStatus(secretResult);
+	const secretStatus = scanStatus(secretResult?.findings);
 	const permissionStatus = scanStatus(permResult);
 	const statuses = [dependencyStatus, secretStatus, permissionStatus];
 	const overallStatus = statuses.includes("fail")
@@ -57,12 +57,15 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	// Secret scan section
 	report += "## Secret Scan\n\n";
 	report += `**Status:** ${labels[secretStatus]}  \n`;
-	report += `**Findings:** ${secretStatus === "unscanned" ? "unknown" : secretResult.length}\n\n`;
+	report += `**Findings:** ${secretStatus === "unscanned" ? "unknown" : secretResult.findings.length}\n\n`;
+	if (secretStatus !== "unscanned") {
+		report += `${secretResult.suppressedCount} findings suppressed by allow markers.\n\n`;
+	}
 
 	if (secretStatus === "unscanned") {
 		report += `${secretResult?.summary || "Secret scan not executed."}\n\n`;
-	} else if (secretResult.length > 0) {
-		for (const f of secretResult) {
+	} else if (secretResult.findings.length > 0) {
+		for (const f of secretResult.findings) {
 			report += `- **${f.type}** in \`${f.file}:${f.line}\` — \`${f.match}\`\n`;
 		}
 		report += "\n";

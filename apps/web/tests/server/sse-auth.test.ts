@@ -57,7 +57,7 @@ describe('SSE authentication', () => {
   });
 
   it('opens the stream when a valid token is provided via query param', () => {
-    process.env.SSE_AUTH_SECRET = 'valid-token';
+    process.env.SSE_AUTH_SECRET = 'valid-token'; // amber:scan-allow
     (sessionReader.readSessionById as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'session-1',
       goal: 'test',
@@ -74,7 +74,7 @@ describe('SSE authentication', () => {
   });
 
   it('opens the stream when a valid token is provided via Authorization header', () => {
-    process.env.SSE_AUTH_SECRET = 'valid-token';
+    process.env.SSE_AUTH_SECRET = 'valid-token'; // amber:scan-allow
     (sessionReader.readSessionById as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'session-1',
       goal: 'test',
@@ -90,7 +90,7 @@ describe('SSE authentication', () => {
   });
 
   it('returns 401 when no token is provided', () => {
-    process.env.SSE_AUTH_SECRET = 'valid-token';
+    process.env.SSE_AUTH_SECRET = 'valid-token'; // amber:scan-allow
     const req = createMockRequest();
     const res = createMockResponse();
 
@@ -101,7 +101,7 @@ describe('SSE authentication', () => {
   });
 
   it('returns 401 when an invalid token is provided', () => {
-    process.env.SSE_AUTH_SECRET = 'valid-token';
+    process.env.SSE_AUTH_SECRET = 'valid-token'; // amber:scan-allow
     const req = createMockRequest({ query: { token: 'invalid-token' } });
     const res = createMockResponse();
 

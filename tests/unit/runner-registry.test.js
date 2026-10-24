@@ -852,7 +852,7 @@ test("credential declarations are opaque short-lived handles, never secrets", ()
 
 	const smuggled = submitRunnerRequest(
 		dir,
-		requestInput({ credential: { ...CREDENTIAL, secret: "hunter2" } }),
+		requestInput({ credential: { ...CREDENTIAL, secret: "hunter2" } }), // amber:scan-allow
 	);
 	assert.equal(smuggled.code, "AMBER_E_RUNNER_REQUEST_INVALID");
 	assert.match(smuggled.errors[0], /unknown field/);

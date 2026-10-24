@@ -172,7 +172,7 @@ describe('Improvement Suggestions clustering', () => {
   });
 
   it('redacts secrets in evidence excerpts', () => {
-    const secretError = 'Authorization: Bearer sk-ant-secret000111222333444 failed';
+    const secretError = 'Authorization: Bearer sk-ant-secret000111222333444 failed'; // amber:scan-allow
     seedClaude('claude-1', secretError);
     seedCursor('cursor-1', secretError);
     const excerpt = list().suggestions[0].evidence[0].excerpt;

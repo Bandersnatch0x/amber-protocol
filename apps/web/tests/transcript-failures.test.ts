@@ -74,7 +74,7 @@ describe('extractFailures', () => {
               id: 'x',
               name: 'Bash',
               input: {
-                command: 'curl -H "Authorization: Bearer sk-ant-secret000111222333444" url',
+                command: 'curl -H "Authorization: Bearer sk-ant-secret000111222333444" url', // amber:scan-allow
               },
             },
           ],

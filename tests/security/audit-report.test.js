@@ -1,6 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const { generateAuditReport } = require("../../src/security/audit-report");
+const { scanForSecrets } = require("../../src/security/secret-scan");
 
 describe("generateAuditReport", () => {
 	it("combines all scan results into a single report", () => {
@@ -9,7 +10,10 @@ describe("generateAuditReport", () => {
 			summary: "1 vulnerability found",
 			pass: false,
 		};
-		const secretResult = [{ file: "/tmp/test.js", line: 2, type: "API Key", match: "sk-abc" }];
+		const secretResult = {
+			findings: [{ file: "/tmp/test.js", line: 2, type: "API Key", match: "sk-abc" }],
+			suppressedCount: 0,
+		};
 		const permResult = {
 			findings: [
 				{
@@ -39,7 +43,7 @@ describe("generateAuditReport", () => {
 			summary: "3 vulnerabilities",
 			pass: false,
 		};
-		const secretResult = [];
+		const secretResult = { findings: [], suppressedCount: 0 };
 		const permResult = { findings: [], pass: true };
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
@@ -62,7 +66,10 @@ describe("generateAuditReport", () => {
 			summary: "1 vulnerability",
 			pass: false,
 		};
-		const secretResult = [{ file: "src/config.js", line: 5, type: "API Key", match: "sk-abc" }];
+		const secretResult = {
+			findings: [{ file: "src/config.js", line: 5, type: "API Key", match: "sk-abc" }],
+			suppressedCount: 0,
+		};
 		const permResult = {
 			findings: [{ issue: "overly_broad", severity: "warning", message: "** pattern" }],
 			pass: false,
@@ -76,18 +83,22 @@ describe("generateAuditReport", () => {
 
 	it("shows pass summary when all scans pass", () => {
 		const depResult = { vulnerabilities: [], summary: "ok", pass: true };
-		const secretResult = [];
+		const secretResult = { findings: [], suppressedCount: 0 };
 		const permResult = { findings: [], pass: true };
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
 
 		assert.ok(report.includes("PASS"), "Should show PASS status");
 		assert.ok(!report.includes("FAIL"), "Should not show FAIL when passing");
+		assert.ok(report.includes("0 findings suppressed by allow markers"));
 	});
 
 	it("shows fail summary when any scan fails", () => {
 		const depResult = { vulnerabilities: [], summary: "ok", pass: true };
-		const secretResult = [{ file: "x.js", line: 1, type: "Password", match: "pwd=123" }];
+		const secretResult = {
+			findings: [{ file: "x.js", line: 1, type: "Password", match: "pwd=123" }],
+			suppressedCount: 0,
+		};
 		const permResult = { findings: [], pass: true };
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
@@ -97,12 +108,29 @@ describe("generateAuditReport", () => {
 
 	it("includes metadata section with timestamp", () => {
 		const depResult = { vulnerabilities: [], summary: "ok", pass: true };
-		const secretResult = [];
+		const secretResult = { findings: [], suppressedCount: 0 };
 		const permResult = { findings: [], pass: true };
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
 
 		assert.ok(report.includes("## Metadata"), "Should include metadata section");
 		assert.ok(report.includes("Date:"), "Should include date");
+	});
+
+	it("renders suppression counts without hiding remaining findings", () => {
+		const credential = `const accessKey = "AKIA${"A".repeat(16)}";`;
+		const depResult = { vulnerabilities: [], summary: "ok", pass: true };
+		const permResult = { findings: [], pass: true };
+		for (const includeUnmarked of [false, true]) {
+			const content =
+				credential + " // amber:scan-allow" + (includeUnmarked ? "\n" + credential : "");
+			const result = scanForSecrets([{ path: "mixed.js", content }]);
+			const report = generateAuditReport(depResult, result, permResult);
+
+			assert.ok(report.includes("1 findings suppressed by allow markers"));
+			assert.ok(report.includes(`**Findings:** ${includeUnmarked ? 1 : 0}`));
+			assert.ok(report.includes(includeUnmarked ? "FAIL" : "PASS"));
+			if (includeUnmarked) assert.ok(report.includes("mixed.js:2"));
+		}
 	});
 });

@@ -12,6 +12,7 @@ const { generateSecurityAuditReport } = require("../../scripts/lib/security-comm
 
 const CLI = path.resolve(__dirname, "../../scripts/amber.js");
 const passed = { pass: true, summary: "ok", vulnerabilities: [], findings: [] };
+const cleanSecrets = { findings: [], suppressedCount: 0 };
 
 function run(command, args, cwd, env = process.env) {
 	const result = childProcess.spawnSync(command, args, {
@@ -66,12 +67,17 @@ test(
 	{ timeout: 60_000 },
 	(t) => {
 		const target = fixture(t);
-		fs.writeFileSync(path.join(target, "config.js"), `const api_key = "sk-${"x".repeat(24)}";\n`);
+		const credential = `const api_key = "sk-${"x".repeat(24)}";`;
+		fs.writeFileSync(
+			path.join(target, "config.js"),
+			`${credential} // amber:scan-allow\n${credential}\n`,
+		);
 		run("git", ["add", "config.js"], target);
 		const before = run("git", ["status", "--porcelain"], target);
 		const result = audit(target);
 		assert.match(result.text, /Overall Status:\*\* ❌ \*\*FAIL\*\*/);
-		assert.match(result.text, /API Key.*config\.js:1/);
+		assert.match(result.text, /API Key.*config\.js:2/);
+		assert.match(result.text, /1 findings suppressed by allow markers/);
 		assert.deepEqual(result.errors, []);
 		assert.equal(run("git", ["status", "--porcelain"], target), before);
 		assert.deepEqual(fs.readdirSync(target).sort(), [
@@ -150,13 +156,13 @@ test("security audit writes the scanned report to an explicit output", { timeout
 });
 
 for (const [label, dep, secrets, permissions] of [
-	["dependencies", null, [], passed],
+	["dependencies", null, cleanSecrets, passed],
 	["secrets", passed, null, passed],
-	["permissions", passed, [], null],
+	["permissions", passed, cleanSecrets, null],
 	[
 		"an explicit unavailable scan",
 		{ status: "unscanned", summary: "audit unavailable" },
-		[],
+		cleanSecrets,
 		passed,
 	],
 ]) {
@@ -170,7 +176,10 @@ for (const [label, dep, secrets, permissions] of [
 test("audit report preserves a known FAIL when another category is unscanned", () => {
 	const report = generateAuditReport(
 		null,
-		[{ file: "config.js", line: 1, type: "API Key", match: "fake" }],
+		{
+			findings: [{ file: "config.js", line: 1, type: "API Key", match: "fake" }],
+			suppressedCount: 0,
+		},
 		passed,
 	);
 	assert.match(report, /Overall Status:\*\* ❌ \*\*FAIL\*\*/);

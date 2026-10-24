@@ -88,8 +88,8 @@ describe('handleErrorReport', () => {
       mockReq({
         message: 'm',
         context: {
-          apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl',
-          nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' },
+          apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', // amber:scan-allow
+          nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' }, // amber:scan-allow
         },
       }) as Request,
       res as Response,
@@ -97,7 +97,7 @@ describe('handleErrorReport', () => {
     const payload = lastPayload();
     const ctx = payload.context as Record<string, unknown>;
     expect(JSON.stringify(ctx)).not.toContain('sk-ant-api03-AbC123_def456GHI789jkl');
-    expect(JSON.stringify(ctx)).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd');
+    expect(JSON.stringify(ctx)).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd'); // amber:scan-allow
     expect(ctx.apiKey).toContain('[REDACTED]');
     expect((ctx.nested as Record<string, unknown>).token).toContain('[REDACTED]');
   });

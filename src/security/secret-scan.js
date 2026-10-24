@@ -44,10 +44,11 @@ const PATTERNS = [
 
 /**
  * @param {Array<{path: string, content: string}>} files
- * @returns {Array<{file: string, line: number, type: string, match: string}>}
+ * @returns {{findings: Array<{file: string, line: number, type: string, match: string}>, suppressedCount: number}}
  */
 function scanForSecrets(files) {
 	const findings = [];
+	let suppressedCount = 0;
 
 	for (const file of files) {
 		const lines = file.content.split("\n");
@@ -67,6 +68,10 @@ function scanForSecrets(files) {
 					// For password patterns in comments, skip
 					if (isComment && pattern.type === "Password Assignment") {
 						continue;
+					}
+					if (line.includes("amber:scan-allow")) {
+						suppressedCount++;
+						break;
 					}
 
 					const matchedText = match[0];
@@ -88,7 +93,7 @@ function scanForSecrets(files) {
 		}
 	}
 
-	return findings;
+	return { findings, suppressedCount };
 }
 
 module.exports = { scanForSecrets, PATTERNS };
