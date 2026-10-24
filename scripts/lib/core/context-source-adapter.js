@@ -7,6 +7,7 @@ const { sha256 } = require("./context-hash");
 const { bundleSource } = require("./context-request");
 const { resolvePathWithin } = require("./fs-utils");
 const { redactSecrets } = require("./redaction");
+const { normalizeExternalText } = require("./text-sanitize");
 const { compileSchema } = require("./schema-contract");
 
 const ADAPTER_ID = "local-fixture";
@@ -93,7 +94,7 @@ function importSource(targetRoot, source, allowTranscript) {
 			return failure("AMBER_E_CONTEXT_SOURCE_MISSING", `source not found: ${source.ref}`);
 		}
 		const content = fs.readFileSync(fullPath, "utf8");
-		const excerpt = redactSecrets(content);
+		const excerpt = redactSecrets(normalizeExternalText(content));
 		const hashes = {
 			rawHash: sha256(content),
 			excerptHash: sha256(excerpt),
