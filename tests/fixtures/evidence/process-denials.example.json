@@ -1,0 +1,16 @@
+{
+	"id": "evidence/process-denials-example",
+	"producer": "ci@example.com",
+	"assurance": "replayable",
+	"scope": "process-compliance",
+	"subject": "spec/process-compliance@1",
+	"inputs": [".amber/sessions/ attempt ledger fold"],
+	"tools": ["attempt-metrics-fold"],
+	"environment": { "os": "linux" },
+	"outputs": ["denials/window", "2"],
+	"status": "pass",
+	"replayOf": "process/denials-v1",
+	"verifiedBy": ["lead@example.com"],
+	"recordedAt": "2026-10-24T00:00:00.000Z",
+	"effectiveAssurance": "verified"
+}
