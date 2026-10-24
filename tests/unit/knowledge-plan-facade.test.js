@@ -341,20 +341,6 @@ describe("knowledge-plan facade: scaffold", () => {
 		}
 	});
 
-	it("creates knowledge-plan.yaml when yaml option is set", () => {
-		const tmp = makeTempTarget();
-		try {
-			const res = scaffold(tmp, { dryRun: false, yaml: true });
-			assert.ok(
-				res.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml")),
-			);
-			assert.ok(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.yaml")));
-			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.json")), false);
-		} finally {
-			cleanup(tmp);
-		}
-	});
-
 	it("is idempotent: second run skips existing", () => {
 		const tmp = makeTempTarget();
 		try {

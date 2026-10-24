@@ -370,16 +370,12 @@ function saveInitReport(targetRoot, data) {
 function scaffoldWiki(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const wikiTemplateRoot = path.join(TEMPLATE_ROOT, "docs", "wiki");
-	// knowledge-plan.yaml is a deliberate alternate, not part of the default
-	// wiki skeleton: seeding it here would create a second plan file that the
-	// JSON (first in load order) silently shadows. `amber wiki knowledge
-	// scaffold --yaml` is the only entry point allowed to emit it.
-	const items = listTemplateFiles(wikiTemplateRoot)
-		.filter((item) => item.relativePath !== "knowledge-plan.yaml")
-		.map((item) => ({
+	const items = listTemplateFiles(wikiTemplateRoot).map((item) => {
+		return {
 			source: item.source,
 			relativePath: path.join("docs", "wiki", item.relativePath),
-		}));
+		};
+	});
 	const result = copyTemplateFiles(targetRoot, items, options);
 	const validation = options.dryRun ? { errors: [], warnings: [] } : validateWiki(targetRoot);
 

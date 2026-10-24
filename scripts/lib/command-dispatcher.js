@@ -317,6 +317,21 @@ function handleWiki(args) {
 		return { result: require("./core/validators").validateWiki(args.target, { okf: true }) };
 	}
 
+	// `--yaml` belongs to the knowledge scaffold, not the bare wiki skeleton.
+	// Accepting it silently here would re-seed the alternate plan format the
+	// scaffold deliberately keeps out of the default install.
+	if (args.yaml || args.yml) {
+		return {
+			result: {
+				target: args.target,
+				errors: [
+					"--yaml applies to `amber wiki knowledge scaffold`, not the default wiki scaffold.",
+				],
+				warnings: [],
+			},
+		};
+	}
+
 	return { result: require("./core/scaffold").scaffoldWiki(args.target, { dryRun: args.dryRun }) };
 }
 

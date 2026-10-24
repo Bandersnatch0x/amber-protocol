@@ -38,8 +38,7 @@ Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acce
 - **A local green is not a push license.** Whole-repository guards (`git-seam`,
   `schema-contract`, knowledge-plan interface) scan _which file references what_, not behavior, so
   adjacent suites never reach them. Any change under `scripts/lib/` or any new test file requires
-  `npm test` over the full suite before push. Dependency- and docs-only changes may run just their
-  own gate.
+  `npm test` over the full suite before push.
 - **Fix-then-revert is the only proof a test bites.** Remove the fix, watch the test turn red,
   restore it. A test that passes both ways pins nothing.
 - **Check for an existing seam before wiring a new call.** `git-exec.js` for git,

@@ -5,6 +5,7 @@ const path = require("node:path");
 const { TEMPLATE_ROOT } = require("../../core/constants");
 const { resolveTarget } = require("../../core/fs-utils");
 const { listTemplateFiles, copyTemplateFiles } = require("../../core/scaffold");
+const { KNOWLEDGE_PLAN_TEMPLATE_ROOT } = require("./constants");
 const {
 	KNOWLEDGE_PLAN_RELATIVE,
 	KNOWLEDGE_PLAN_YAML_RELATIVE,
@@ -28,8 +29,10 @@ function scaffoldKnowledgePlan(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const useYaml = Boolean(options.yaml || options.yml);
 
-	const wikiTemplateRoot = path.join(TEMPLATE_ROOT, "docs", "wiki");
-	const all = listTemplateFiles(wikiTemplateRoot);
+	const templateRoot = useYaml
+		? KNOWLEDGE_PLAN_TEMPLATE_ROOT
+		: path.join(TEMPLATE_ROOT, "docs", "wiki");
+	const all = listTemplateFiles(templateRoot);
 
 	const templateName = useYaml ? "knowledge-plan.yaml" : "knowledge-plan.json";
 	const planItem = all.find((item) => item.relativePath === templateName);

@@ -13,6 +13,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { scaffoldWiki } = require("../../scripts/lib/core/scaffold");
+const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
 const knowledgePlan = require("../../scripts/lib/knowledge-plan");
 
 function mkTarget(label) {
@@ -31,6 +32,17 @@ test("the default wiki scaffold seeds the JSON plan but not the yaml alternate",
 		false,
 		"the yaml alternate must not ride along with the default skeleton",
 	);
+});
+
+test("init does not seed the yaml alternate", () => {
+	const dir = mkTarget("init");
+	const result = scaffoldHarness(dir, { skipDetection: true });
+	assert.equal(
+		fs.existsSync(path.join(dir, "docs", "wiki", "knowledge-plan.yaml")),
+		false,
+		"the yaml alternate must not ride along with the full harness install",
+	);
+	assert.ok(result.created.some((p) => p.replace(/\\/g, "/") === "docs/wiki/knowledge-plan.json"));
 });
 
 test("`knowledge scaffold --yaml` remains the only entry point that emits the yaml", () => {
