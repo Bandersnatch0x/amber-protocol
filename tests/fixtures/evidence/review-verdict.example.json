@@ -1,0 +1,16 @@
+{
+	"id": "evidence/review-verdict-example",
+	"producer": "reviewer@example.com",
+	"assurance": "replayable",
+	"scope": "review",
+	"subject": "spec/review-verdict@1",
+	"inputs": ["git diff HEAD~1"],
+	"tools": ["review-agent"],
+	"environment": { "os": "linux" },
+	"outputs": ["review/findings", "0"],
+	"status": "pass",
+	"replayOf": "review/verdict-v1",
+	"verifiedBy": ["lead@example.com"],
+	"recordedAt": "2026-10-24T00:00:00.000Z",
+	"effectiveAssurance": "verified"
+}
