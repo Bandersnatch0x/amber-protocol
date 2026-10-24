@@ -294,6 +294,68 @@ describe("session stage runner — run", () => {
 		assert.strictEqual(blocked.success, false);
 		assert.match(blocked.message, /user-approval/);
 	});
+
+	it("records one skip and proceeds past a declared low-risk gate", async () => {
+		const { root, sessionDir } = makeTarget({
+			stages: [
+				{ name: "check", type: "verb", target: PIN, gateAfter: "low-risk-gate" },
+				{ name: "second", type: "verb", target: PIN },
+			],
+		});
+		const routesPath = path.join(root, "routes", "probe.route.json");
+		const route = JSON.parse(fs.readFileSync(routesPath, "utf8"));
+		route.gates = [
+			{ id: "low-risk-gate", type: "user-approval", risk: "low", description: "review docs" },
+		];
+		fs.writeFileSync(routesPath, JSON.stringify(route));
+
+		const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.strictEqual(first.success, true);
+		assert.strictEqual(first.request.stageName, "check");
+		await settleSessionRequest(
+			root,
+			"s1",
+			first.request.requestId,
+			{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+			bindOf(first),
+		);
+
+		const second = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.strictEqual(second.success, true);
+		assert.strictEqual(second.request.stageName, "second");
+
+		const skipped = recordsOfKindFactory(sessionDir, "gate_skipped_by_risk");
+		assert.strictEqual(skipped.length, 1);
+		assert.strictEqual(skipped[0].gateId, "low-risk-gate");
+		assert.strictEqual(skipped[0].executesAnything, false);
+		assert.strictEqual(skipped[0].risk, "low");
+		assert.strictEqual(skipped[0].stageName, "check");
+	});
+
+	it("behaves unchanged for a gate without a risk field", async () => {
+		const { root } = makeTarget({
+			stages: [
+				{ name: "check", type: "verb", target: PIN, gateAfter: "user-approval" },
+				{ name: "second", type: "verb", target: PIN },
+			],
+		});
+		const routesPath = path.join(root, "routes", "probe.route.json");
+		const route = JSON.parse(fs.readFileSync(routesPath, "utf8"));
+		route.gates = [{ id: "user-approval", type: "user-approval" }];
+		fs.writeFileSync(routesPath, JSON.stringify(route));
+
+		const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		await settleSessionRequest(
+			root,
+			"s1",
+			first.request.requestId,
+			{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+			bindOf(first),
+		);
+		const blocked = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.strictEqual(blocked.success, false);
+		assert.match(blocked.message, /user-approval/);
+	});
 });
 
 // Settle binding args: the pending request's own attempt id and idempotency

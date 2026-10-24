@@ -455,6 +455,19 @@ function resolveCurrentStage(route, records) {
 	if (index > 0) {
 		const previous = stages[index - 1];
 		if (previous && previous.gateAfter) {
+			// A declared `low` gate never required approval, so the skip ledger
+			// record (written at gate-refusal time) satisfies the cursor. Absent
+			// risk means `high`; legacy behavior unchanged.
+			const gate = (Array.isArray(route.gates) ? route.gates : []).find(
+				(entry) => entry && entry.id === previous.gateAfter,
+			);
+			if (gate && gate.risk === "low") {
+				const skipped = records.some(
+					(record) =>
+						record.kind === "gate_skipped_by_risk" && record.gateId === previous.gateAfter,
+				);
+				if (skipped) return { done: false, blocked: null, stage: stages[index], stageIndex: index };
+			}
 			const passed = records.some(
 				(record) => record.kind === "gate_passed" && record.gateId === previous.gateAfter,
 			);
@@ -722,7 +735,38 @@ function buildRequest(
 async function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, options) {
 	const cursorRead = readCursorLedger(sessionDir);
 	if (!cursorRead.ok) return fail("AMBER_E_LEDGER_TAMPERED", cursorRead.reason);
-	const records = cursorRead.records;
+	let records = cursorRead.records;
+
+	// A declared `low` gate never produced an approval requirement; when its
+	// refusal is the only thing blocking, record the skip once and let the
+	// cursor move. medium/high/critical are untouched.
+	const precheck = resolveCurrentStage(route, records);
+	if (!precheck.done && precheck.blocked) {
+		const gate = (Array.isArray(route.gates) ? route.gates : []).find(
+			(entry) => entry && entry.id === precheck.blocked,
+		);
+		if (
+			gate &&
+			gate.risk === "low" &&
+			!records.some((record) => record.kind === "gate_skipped_by_risk" && record.gateId === gate.id)
+		) {
+			// Re-read after appending so the resolved cursor sees the skip.
+			appendLedgerRecord(ledgerPathOf(sessionDir), {
+				schemaVersion: 2,
+				kind: "gate_skipped_by_risk",
+				sessionId,
+				gateId: gate.id,
+				risk: "low",
+				stageName: route.stages[precheck.stageIndex - 1]?.name,
+				reason: "gate declares risk low; no approval requirement is produced",
+				executesAnything: false,
+				recordedAt: new Date().toISOString(),
+			});
+			const refreshed = readCursorLedger(sessionDir);
+			if (!refreshed.ok) return fail("AMBER_E_LEDGER_TAMPERED", refreshed.reason);
+			records = refreshed.records;
+		}
+	}
 
 	const resolved = resolveVerbStage(projectRoot, route, records);
 	if (resolved.problem) return resolved.problem;
