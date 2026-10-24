@@ -15,6 +15,39 @@ const { loadSessionEvidence } = require("../session-evidence");
 const { walkLedgers, readLedger } = require("./loop-ledger");
 const { attemptMetricsOf } = require("./run-freeze");
 
+// issue/0191 read-only Trip Wire: fold per-subject denial counts from the
+// same session ledgers (denials only, no allows) and render subjects at or
+// above the threshold. Threshold follows the existing constant style in
+// loops.js, with an env override of the same shape.
+const REPEATED_DENIAL_SUBJECT_THRESHOLD = 3;
+const REPEATED_DENIAL_SUBJECT_THRESHOLD_ENV = "AMBER_REPEATED_DENIAL_SUBJECT_THRESHOLD";
+
+function repeatedDenialSubjectThreshold() {
+	const raw = process.env[REPEATED_DENIAL_SUBJECT_THRESHOLD_ENV];
+	if (raw === undefined || raw === "") return REPEATED_DENIAL_SUBJECT_THRESHOLD;
+	const value = Number(raw);
+	return Number.isInteger(value) && value > 0 ? value : REPEATED_DENIAL_SUBJECT_THRESHOLD;
+}
+
+function collectRepeatedDenials(records, threshold) {
+	const counts = new Map();
+	for (const record of records) {
+		const isPolicyDenial =
+			record.kind === "policy.evaluated" &&
+			(record.decision === "deny" || record.decision === "unknown");
+		if (!isPolicyDenial && record.kind !== "attempt_denied") continue;
+		const subject =
+			typeof record.producer === "string" && record.producer.length > 0
+				? record.producer
+				: "unknown";
+		counts.set(subject, (counts.get(subject) ?? 0) + 1);
+	}
+	return [...counts.entries()]
+		.filter(([, count]) => count >= threshold)
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.map(([subject, count]) => ({ subject, count }));
+}
+
 // Trusted-control run contract (spec §7 R2): attempt counters fold over the
 // session ledgers' capture population — the aggregate across all sessions.
 // §8.4: policy decision counters (from `policy.evaluated` events) and budget
@@ -35,6 +68,8 @@ function collectAttemptMetrics(targetRoot) {
 		policy_denials_total: 0,
 		budget_exhausted_total: 0,
 	};
+	const denialRecords = [];
+	const threshold = repeatedDenialSubjectThreshold();
 	walkLedgers(stateDir, ({ home, ledgerPath }) => {
 		if (home !== "sessions") return;
 		totals.sessions += 1;
@@ -56,8 +91,14 @@ function collectAttemptMetrics(targetRoot) {
 			}
 			if (record.kind === "budget.exhausted") totals.budget_exhausted_total += 1;
 		}
+		for (const record of records) {
+			const isPolicyDenial =
+				record.kind === "policy.evaluated" &&
+				(record.decision === "deny" || record.decision === "unknown");
+			if (isPolicyDenial || record.kind === "attempt_denied") denialRecords.push(record);
+		}
 	});
-	return totals;
+	return { ...totals, repeatedDenials: collectRepeatedDenials(denialRecords, threshold) };
 }
 
 const PRODUCT_VALUE_LOOP =
@@ -467,6 +508,10 @@ function renderGovernanceReportMarkdown(report) {
 		"",
 		...renderAttemptMetricsMarkdown(report.attemptMetrics),
 		"",
+		`## Repeated Denials (>= ${repeatedDenialSubjectThreshold()})`,
+		"",
+		...renderRepeatedDenialsMarkdown(report.attemptMetrics),
+		"",
 	];
 	return lines.join("\n");
 }
@@ -490,6 +535,14 @@ function renderAttemptMetricsMarkdown(metrics) {
 		`- policy_denials_total: ${metrics.policy_denials_total}`,
 		`- budget_exhausted_total: ${metrics.budget_exhausted_total}`,
 	];
+}
+
+function renderRepeatedDenialsMarkdown(metrics) {
+	const repeated = metrics.repeatedDenials || [];
+	if (repeated.length === 0) {
+		return [`- No subject reached ${repeatedDenialSubjectThreshold()} denials.`];
+	}
+	return repeated.map((item) => `- ${item.subject}: ${item.count} denials`);
 }
 
 function renderGovernanceReportText(report) {
@@ -516,6 +569,15 @@ function renderGovernanceReportText(report) {
 		`  ${effectiveness.confidence?.summary || "confidence gating: unavailable"}`,
 		`  No-progress findings: ${(effectiveness.noProgress || []).length}`,
 	);
+	const repeatedDenials = report.attemptMetrics?.repeatedDenials || [];
+	lines.push(`Repeated Denials (>= ${repeatedDenialSubjectThreshold()}):`);
+	if (repeatedDenials.length === 0) {
+		lines.push(`  - none`);
+	} else {
+		for (const item of repeatedDenials) {
+			lines.push(`  - ${item.subject}: ${item.count} denials`);
+		}
+	}
 	const mix = report.memoryChannelMix;
 	lines.push("Memory Nomination Mix:");
 	if (!mix) {

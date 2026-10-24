@@ -7,6 +7,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
+const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 const {
 	buildGovernanceReport,
 	renderGovernanceReportMarkdown,
@@ -15,6 +16,50 @@ const {
 function tempDir(name) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-governance-report-${name}-`));
 }
+
+function writeSessionLedger(target, sessionId, records) {
+	const sessionDir = path.join(target, ".amber", "sessions", sessionId);
+	fs.mkdirSync(sessionDir, { recursive: true });
+	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+	for (const record of records) appendLedgerRecord(ledgerPath, record);
+}
+
+test("attempt metrics fold repeated denials per subject at the threshold", () => {
+	const target = tempDir("repeated-denials");
+	scaffoldHarness(target);
+	writeSessionLedger(target, "s1", [
+		...Array.from({ length: 3 }, () => ({
+			kind: "policy.evaluated",
+			decision: "deny",
+			producer: "alice",
+		})),
+		{ kind: "policy.evaluated", decision: "allow", producer: "bob" },
+		...Array.from({ length: 2 }, () => ({
+			kind: "policy.evaluated",
+			decision: "deny",
+			producer: "bob",
+		})),
+	]);
+	writeSessionLedger(target, "s2", [
+		...Array.from({ length: 3 }, () => ({ kind: "attempt_denied" })),
+		{ kind: "policy.evaluated", decision: "unknown", producer: "alice" },
+	]);
+
+	const { attemptMetrics } = buildGovernanceReport(target);
+	const bySubject = new Map(
+		attemptMetrics.repeatedDenials.map((item) => [item.subject, item.count]),
+	);
+	assert.deepEqual([...bySubject.entries()].sort(), [
+		["alice", 4],
+		["unknown", 3],
+	]);
+	assert.equal(bySubject.get("bob"), undefined);
+	const markdown = renderGovernanceReportMarkdown(buildGovernanceReport(target));
+	assert.match(markdown, /## Repeated Denials \(>= 3\)/);
+	assert.match(markdown, /- alice: 4 denials/);
+	assert.match(markdown, /- unknown: 3 denials/);
+	assert.ok(!markdown.includes("- bob:"));
+});
 
 test("buildGovernanceReport returns scores and structured next actions", () => {
 	const target = tempDir("missing-evidence");
