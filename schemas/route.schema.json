@@ -77,9 +77,19 @@
 			"properties": {
 				"id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
 				"type": { "enum": ["auto", "user-approval", "step-confirm"] },
-				"risk": { "enum": ["low", "medium", "high", "critical"] },
+				"risk": {
+					"enum": ["low", "medium", "high", "critical"],
+					"description": "Declared blast radius. Metadata only: it never satisfies an approval gate, because the route file is authored by the party the gate governs."
+				},
 				"description": { "type": "string" }
-			}
+			},
+			"allOf": [
+				{
+					"description": "An approval gate cannot declare itself low-risk. Self-declared risk must never cancel the human-in-the-loop control it exists to trigger.",
+					"if": { "properties": { "type": { "enum": ["user-approval", "step-confirm"] } } },
+					"then": { "properties": { "risk": { "enum": ["medium", "high", "critical"] } } }
+				}
+			]
 		}
 	}
 }

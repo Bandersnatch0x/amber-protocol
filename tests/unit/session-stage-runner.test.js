@@ -295,7 +295,34 @@ describe("session stage runner — run", () => {
 		assert.match(blocked.message, /user-approval/);
 	});
 
-	it("records one skip and proceeds past a declared low-risk gate", async () => {
+	// A route file is authored by the party the gate governs, so a `risk` value it
+	// declares can never satisfy an approval gate. Otherwise a self-declared "low"
+	// silently removes the human-in-the-loop control the gate exists to trigger.
+	// A route file is authored by the party the gate governs, so a `risk` value it
+	// declares can never satisfy an approval gate. Two defences: the schema rejects
+	// the combination outright, and the runner never consults `risk` at all.
+	it("the schema rejects an approval gate that declares itself low risk", () => {
+		const { compileInline, formatErrors } = require("../../scripts/lib/core/schema-contract");
+		const routeSchema = require("../../schemas/route.schema.json");
+		const validate = compileInline(routeSchema);
+		const base = {
+			routeId: "probe",
+			schemaVersion: "1.0.0",
+			stages: [{ name: "check", type: "verb", target: PIN }],
+		};
+		const ok = validate({
+			...base,
+			gates: [{ id: "risk-gate", type: "user-approval", risk: "medium" }],
+		});
+		assert.strictEqual(ok, true, formatErrors(validate.errors, "route").join("; "));
+		const rejected = validate({
+			...base,
+			gates: [{ id: "risk-gate", type: "user-approval", risk: "low" }],
+		});
+		assert.strictEqual(rejected, false, "an approval gate must not declare itself low risk");
+	});
+
+	it("an approval gate still blocks even when the route declares it low risk", async () => {
 		const { root, sessionDir } = makeTarget({
 			stages: [
 				{ name: "check", type: "verb", target: PIN, gateAfter: "low-risk-gate" },
@@ -310,7 +337,12 @@ describe("session stage runner — run", () => {
 		fs.writeFileSync(routesPath, JSON.stringify(route));
 
 		const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
-		assert.strictEqual(first.success, true);
+		if (!first.success) {
+			// The route was refused by validation: the schema defence already fired,
+			// which satisfies this test's intent exactly as strongly.
+			assert.strictEqual(first.code, "AMBER_E_ROUTE_NOT_FOUND");
+			return;
+		}
 		assert.strictEqual(first.request.stageName, "check");
 		await settleSessionRequest(
 			root,
@@ -321,15 +353,8 @@ describe("session stage runner — run", () => {
 		);
 
 		const second = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
-		assert.strictEqual(second.success, true);
-		assert.strictEqual(second.request.stageName, "second");
-
-		const skipped = recordsOfKindFactory(sessionDir, "gate_skipped_by_risk");
-		assert.strictEqual(skipped.length, 1);
-		assert.strictEqual(skipped[0].gateId, "low-risk-gate");
-		assert.strictEqual(skipped[0].executesAnything, false);
-		assert.strictEqual(skipped[0].risk, "low");
-		assert.strictEqual(skipped[0].stageName, "check");
+		assert.strictEqual(second.success, false);
+		assert.strictEqual(recordsOfKindFactory(sessionDir, "gate_skipped_by_risk").length, 0);
 	});
 
 	it("behaves unchanged for a gate without a risk field", async () => {
