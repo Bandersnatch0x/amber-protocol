@@ -53,13 +53,17 @@ test("gitOutput trims, so a payload with significant leading whitespace needs gi
 });
 
 test("gitExec surfaces the spawn error and gives every call the 16MB default ceiling", () => {
-	const dir = mkGit();
-	// Some platforms tolerate a tiny maxBuffer for a short log, so overflow is
-	// forced with output far past the cap: 500 tag names at a 5-byte cap.
-	for (let i = 0; i < 500; i++) {
-		execSync(`git tag t${i}`, { cwd: dir });
-	}
-	const res = gitExec(dir, ["tag", "-l"], { maxBuffer: 5 });
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-obuf-")));
+	execSync("git init -q", { cwd: dir });
+	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
+	// 5000 lines is far past the 5-byte cap on every platform (the first
+	// version tripped runner differences with a one-line log).
+	fs.writeFileSync(
+		path.join(dir, "big.txt"),
+		Array.from({ length: 5000 }, (_, i) => `line ${i}`).join("\n"),
+	);
+	execSync("git add -A && git commit -q -m init", { cwd: dir });
+	const res = gitExec(dir, ["show", "--format=", "--name-only", "HEAD"], { maxBuffer: 5 });
 	assert.strictEqual(res.ok, false);
 	assert.strictEqual(res.status, -1);
 	assert.strictEqual(res.error.code, "ENOBUFS");
