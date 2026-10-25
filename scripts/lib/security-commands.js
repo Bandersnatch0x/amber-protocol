@@ -9,7 +9,7 @@ const { dependencyScan, parseAuditOutput } = require("../../src/security/depende
 const { scanForSecrets } = require("../../src/security/secret-scan");
 const { reviewPermissions } = require("../../src/security/permission-review");
 const { toSpawnArgv } = require("./core/loop-policy");
-const { gitOutputRaw } = require("./core/git-exec");
+const { gitExec } = require("./core/git-exec");
 
 const REPORT_ONLY_NOTICE = [
 	"> **Report-only.** Scans do not modify target files or block other commands.",
@@ -106,13 +106,16 @@ function scanTrackedSecrets(target) {
 	// its leading space and fail to resolve, degrading the whole scan to
 	// UNSCANNED. Null means the call failed, which for enumeration is a hard
 	// error rather than an empty list.
-	const tracked = gitOutputRaw(target, ["ls-files", "--cached", "-z", "--", "."], {
-		// Restores the ceiling the pre-seam call carried: the default 1 MB trips
-		// somewhere around a few thousand tracked files.
-		maxBuffer: 16 * 1024 * 1024,
+	// The 16 MB ceiling now lives on the seam itself (git-exec DEFAULT_MAX_BUFFER).
+	const res = gitExec(target, ["ls-files", "--cached", "-z", "--", "."], {
+		preserveWhitespace: true,
 		timeout: 30_000,
 	});
-	if (tracked === null) throw new Error("Git-tracked files could not be enumerated");
+	if (!res.ok) {
+		const cause = res.error ? ` (${res.error.code || res.error.message})` : "";
+		throw new Error(`Git-tracked files could not be enumerated${cause}`);
+	}
+	const tracked = res.stdout;
 	const files = tracked
 		.split("\0")
 		.filter(Boolean)

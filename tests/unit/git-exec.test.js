@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { execSync } = require("node:child_process");
-const { gitRun, gitOutput, gitOutputRaw } = require("../../scripts/lib/core/git-exec");
+const { gitExec, gitRun, gitOutput, gitOutputRaw } = require("../../scripts/lib/core/git-exec");
 
 function mkGit() {
 	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-")));
@@ -50,4 +50,20 @@ test("gitOutput trims, so a payload with significant leading whitespace needs gi
 	assert.deepStrictEqual(trimmed.split("\0").filter(Boolean).sort(), ["leading.txt", "plain.txt"]);
 	assert.strictEqual(fs.existsSync(path.join(dir, "leading.txt")), false);
 	assert.strictEqual(fs.existsSync(path.join(dir, " leading.txt")), true);
+});
+
+test("gitExec surfaces the spawn error and gives every call the 16MB default ceiling", () => {
+	const dir = mkGit();
+	// A 5-byte buffer cannot hold even one commit line, so git output overflows
+	// and spawnSync reports ENOBUFS with a null status.
+	const res = gitExec(dir, ["log", "--oneline"], { maxBuffer: 5 });
+	assert.strictEqual(res.ok, false);
+	assert.strictEqual(res.status, -1);
+	assert.strictEqual(res.error.code, "ENOBUFS");
+	assert.strictEqual(res.error.message, "spawnSync git ENOBUFS");
+
+	// The default ceiling (16 MB) covers the same command without opts.
+	const ok = gitExec(dir, ["log", "--oneline"]);
+	assert.strictEqual(ok.ok, true);
+	assert.strictEqual(ok.error, null);
 });

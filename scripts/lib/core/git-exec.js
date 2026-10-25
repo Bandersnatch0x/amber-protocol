@@ -2,6 +2,12 @@
 
 const { spawnSync } = require("node:child_process");
 
+// spawnSync's default ceiling is 1 MB, which a repo with a few thousand files
+// already exceeds for `ls-files -z` — ENOBUFS surfaces as a null status, a
+// silent failure for any caller that cannot raise the ceiling. Every git call
+// in this seam gets the same 16 MB headroom; a caller may still pass its own.
+const DEFAULT_MAX_BUFFER = 16 * 1024 * 1024;
+
 // Canonical git invocation seam (F037, survey Finding 4): the only module in
 // scripts/lib that spawns git. Every caller builds its failure policy on top of
 // gitExec's {ok, status, stdout, stderr}. Never throws; status is -1 when the
@@ -15,11 +21,11 @@ const { spawnSync } = require("node:child_process");
 // for non-UTF-8 paths is out of scope for this seam.
 function gitExec(targetRoot, args, options = {}) {
 	const preserveWhitespace = Boolean(options.preserveWhitespace);
-	// spawnSync's default ceiling is 1 MB. A repo with a few thousand files
-	// already exceeds that for `ls-files -z`, and ENOBUFS surfaces as a null
-	// status — a silent failure unless a caller can raise the ceiling.
-	const spawnOptions = { cwd: targetRoot, encoding: "utf8" };
-	if (options.maxBuffer) spawnOptions.maxBuffer = options.maxBuffer;
+	const spawnOptions = {
+		cwd: targetRoot,
+		encoding: "utf8",
+		maxBuffer: options.maxBuffer || DEFAULT_MAX_BUFFER,
+	};
 	if (options.timeout) spawnOptions.timeout = options.timeout;
 	try {
 		const res = spawnSync("git", args, spawnOptions);
@@ -28,13 +34,20 @@ function gitExec(targetRoot, args, options = {}) {
 		return {
 			ok: status === 0,
 			status,
+			error: (res && res.error) || null,
 			stdout: preserveWhitespace ? stdout : stdout.trim(),
 			stderr: (res && typeof res.stderr === "string" && res.stderr.trim()) || "",
 		};
 	} catch (e) {
 		// Synchronous spawn rejection (e.g. malformed args): surface the message
 		// through stderr so gitRun's historical catch behavior is preserved.
-		return { ok: false, status: -1, stdout: "", stderr: String((e && e.message) || e) };
+		return {
+			ok: false,
+			status: -1,
+			error: e,
+			stdout: "",
+			stderr: String((e && e.message) || e),
+		};
 	}
 }
 
