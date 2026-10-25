@@ -9,9 +9,9 @@ description: "Curated version history, breaking changes, support matrix, and not
 
 This page provides the canonical version identity, environment support matrix, and migration guidance for Amber Protocol releases.
 
-## Current Release: `v2.0.1`
+## Current Release: `v2.0.2`
 
-The current release line is **v2.0.1** — a patch release on the 2.0 line (2.0.0 was the breaking
+The current release line is **v2.0.2** — a patch release on the 2.0 line (2.0.0 was the breaking
 release: it removed the `agent`, `team`, and `adoption` command families; see the upgrade table
 in the repository README).
 

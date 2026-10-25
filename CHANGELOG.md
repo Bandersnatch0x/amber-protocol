@@ -5,32 +5,237 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.2] - 2026-10-25
 
-### Changed
+### Added
 
-- Declare `harness`, `runner`, `retention`, `external`, `breakglass`, and `sync` experimental in the command registry and mark them under `amber --all`. All commands remain callable; default help keeps the seven primary verbs.
-- Document the bounded H7 maintenance scheduler and the need for OS sandboxing to contain absolute-path writes. State the experimental families in the charter, README, and spec, and regenerate the public CLI reference and knowledge corpus with the documentation changes.
-
-## [2.0.1] - 2026-09-30
+- session: let a route gate declare that it needs no human
+- governance: fold repeated denials per subject into the report
+- security: mark deliberate fake credentials so the audit stays credible
+- session: show how many attempts a stage has already taken
+- feature: accept the sixteen harness features left at passing
+- feature: accept F083 after the plan gate reaches zero errors
+- feature: register F083 for the execution-trust hardening, fix ADR-0101's stale state count
+- harness: make settling a formal Run phase (0176, 0177)
+- harness: bind a held-out eval set and run a leak check (R-ET-4)
+- harness: freeze a release manifest into the validation receipt (R-ET-5) (#389)
+- harness: record PEP coverage over the four evidence classes (#388)
+- harness: receipt verdict, gate verdict, completeness, and axes (#387)
+- harness: provider enforcement level on the declared/effective boundary (#386)
+- approval: require a human confirmation proof on grant and consume (#340, #380)
 
 ### Fixed
 
-- maintenance,docs: review the six wiki pages, and stop asking a generated page for a review
-- knowledge,changelog,docs: clear the four findings the cross-cutting review raised
-- ci: refuse an empty identity range on EVERY path, not just the branch one
-- harness: close the round-7 review findings on F081
-- accept: edit the accepted entry instead of rewriting feature_list.json
+- force the ENOBUFS overflow with 5000-line show output
+- force ENOBUFS with real overflow in the git-exec ceiling test
+- give the git seam a uniform 16MB ceiling and surface the spawn error
+- close the interrogation findings on scan visibility and flag guards
+- move the yaml plan template out of the default scaffold paths
+- preserve raw git payloads for the secret scan
+- raise apps/web zod past the memory-exhaustion advisory
+- route the security secret scan through the git-exec seam
+- stop the default wiki scaffold from seeding knowledge-plan.yaml
+- context: strip invisible control characters before text enters an excerpt
+- session: a gate cannot exempt itself from review
+- security: stop letting the target choose the registry the audit trusts
+- security: make the audit stop reporting a PASS it never earned
+- session: stop rendering an unmeasured token budget as a percentage
+- ledger: redact secrets before they enter an append-only ledger
+- memory: give write-back triggers a lifecycle, so a nomination can close
+- harness: stop crediting an unreadable page as scanned
+- harness: distinguish an unscanned leak check from a clean scan
+- context: give each Harness run its own loadout snapshot
+- harness: make the held-out leak check see what it claims to see
+- clear dependency advisories and make docs audit visible (#382)
+- plan: fail closed on missing or blank feature titles
+- plan: reject whitespace-only explicit titles
+- feature: reject whitespace-only ids at add boundary
+- feature: reject whitespace-only titles at add boundary
+- plan: trim derived plan title from feature title
+- session: trim derived goal from feature title
+- lifecycle: drop restated fields from next remedies
+- session: derive session goal from feature title
+- refuse a ledger seal that would cover zero ledgers
+- make ledger seal adoption explicit and reachable
+- ledger: adopt legacy unanchored ledgers at seal
+- confinement: pin the destination fd so seam writes are race-safe
+- confinement: guard the session timeline append against planted shared-inode leaves
+- confinement: route every target-resolved write through the confined writer seam (#362)
+- #374,#375,#376,#377: ledger stage codes, handoff bundle flag, hooks path scope, ledger tail guard (#378)
+- dev: make the identity gate impossible to forget (#347, #368)
+- workflow: stop re-resolving the handoff bundle guard output (#370)
+- knowledge: report names the plan file it actually loaded (#366, #367)
+- cli: register the three help-advertised flags parseArgs was dropping
+- wiki-export: refuse a source page that shares its bytes with another name
+- cli: check the shared inode before confined in-place writes
+- cli: check the shared inode before two flag-resolved report writes
+- exports: check the shared inode before writing a report destination
+- exports: refuse a planned leaf whose referent shares an outside inode
+- exports: refuse a planned leaf hard-linked outside the target
+- exports: refuse child links outside the target before the first write
+- cli: refuse repository-root export destinations
+- cli: confine the three target-resolved output destinations (#345)
+- cli: confine the three target-resolved output destinations
+- hardening: terminate stray children, serialize governed writes, confine target paths (#346)
 
 ### Changed
 
-- specs: make the 18 proposed specs say what is actually true about them
-- specs: give the spec lifecycle a closed vocabulary and a gate
-- quality,tests,readme: document the passing-feature decision and close three P2s
-- quality: certify the 2.0.0 release scope, and reconcile the plan headers
-- harness: cover the branches round 7 named, and bound the identity claim honestly
-- F081: make the spec and plan match the delivered behaviour
-- F081: accept the plan (user-directed)
+- record the verification rules issues/0196 taught
+- governance: make a folded process-denial count gateable
+- governance: prove a review verdict can gate only when independently produced and verified
+- adr: neutralize a vendor brand name in the managed corpus
+- ignore CodeGraph and Graphify index directories
+- quality: the acceptance half of the release-scope gap has closed too
+- quality: restate the two release-scope measurements that moved
+- plan: reshape the 15 delivered harness plans to the current template
+- plan: reshape the F083 plan to the current template
+- adr: record the approval each harness ADR actually has
+- record the trust-hardening spec's real state and its full ticket set
+- wiki: state the full feature-status vocabulary and gate it
+- spec: state the real bound-set leak rule (0178, 0179)
+- plan: name the corpus as a settling delivery artifact
+- skills: add verify — a project-local CLI verification skill (#385)
+- gate the site search + fix the verification policy file name in the agent manual (#384)
+- record the --admin merge convention for owner-authored PRs (#383)
+- deps: bump prettier (#381)
+- record N1 closure in the adjudication ledger
+- record N2 and A1 closures in the adjudication ledger
+- deps: apply non-breaking audit fixes to apps/docs lockfile (#379)
+- deps: bump eslint (#352)
+- locks: make both rendezvous races fail with a cause instead of hanging or drifting (#371)
+- governance: guard the committed governance ledger again (#338, #369)
+- cli: keep the flag census inside the Knowledge Plan facade seam
+- cli: make an unregistered flag a test failure instead of a silent no-op
+- wiki-export: pin the conservative source rule the docs claim
+- cli: cover the in-place writers the flag-derived sweep missed
+- exports: name what the leaf guard can and cannot claim
+- exports: say what workflow assess actually does with an in-target link
+- cli: state the child-path preflight and its concurrency limit
+- exports: pin child-link refusal before bundle writes
+- cli: qualify export path checks and bundle read limits
+- cli: pin root output refusal and bundle input compatibility
+- locks: reproduce both takeover races on demand, not on average (#342, #343)
+- ledger: make the reclaim race actually reach the guard (#342)
+- session: a crashed lock child reports as a crash, not a JSON defect
+- cli: the generated boundary line now names the confined set
+- deps: bump the npm-minor-and-patch group across 1 directory with 4 updates (#337)
+
+## [Unreleased]
+
+## [2.0.1] - 2026-09-30
+
+### Added
+
+- session: let a route gate declare that it needs no human
+- governance: fold repeated denials per subject into the report
+- security: mark deliberate fake credentials so the audit stays credible
+- session: show how many attempts a stage has already taken
+- feature: accept the sixteen harness features left at passing
+- feature: accept F083 after the plan gate reaches zero errors
+- feature: register F083 for the execution-trust hardening, fix ADR-0101's stale state count
+- harness: make settling a formal Run phase (0176, 0177)
+- harness: bind a held-out eval set and run a leak check (R-ET-4)
+- harness: freeze a release manifest into the validation receipt (R-ET-5) (#389)
+- harness: record PEP coverage over the four evidence classes (#388)
+- harness: receipt verdict, gate verdict, completeness, and axes (#387)
+- harness: provider enforcement level on the declared/effective boundary (#386)
+- approval: require a human confirmation proof on grant and consume (#340, #380)
+
+### Fixed
+
+- force the ENOBUFS overflow with 5000-line show output
+- force ENOBUFS with real overflow in the git-exec ceiling test
+- give the git seam a uniform 16MB ceiling and surface the spawn error
+- close the interrogation findings on scan visibility and flag guards
+- move the yaml plan template out of the default scaffold paths
+- preserve raw git payloads for the secret scan
+- raise apps/web zod past the memory-exhaustion advisory
+- route the security secret scan through the git-exec seam
+- stop the default wiki scaffold from seeding knowledge-plan.yaml
+- context: strip invisible control characters before text enters an excerpt
+- session: a gate cannot exempt itself from review
+- security: stop letting the target choose the registry the audit trusts
+- security: make the audit stop reporting a PASS it never earned
+- session: stop rendering an unmeasured token budget as a percentage
+- ledger: redact secrets before they enter an append-only ledger
+- memory: give write-back triggers a lifecycle, so a nomination can close
+- harness: stop crediting an unreadable page as scanned
+- harness: distinguish an unscanned leak check from a clean scan
+- context: give each Harness run its own loadout snapshot
+- harness: make the held-out leak check see what it claims to see
+- clear dependency advisories and make docs audit visible (#382)
+- plan: fail closed on missing or blank feature titles
+- plan: reject whitespace-only explicit titles
+- feature: reject whitespace-only ids at add boundary
+- feature: reject whitespace-only titles at add boundary
+- plan: trim derived plan title from feature title
+- session: trim derived goal from feature title
+- lifecycle: drop restated fields from next remedies
+- session: derive session goal from feature title
+- refuse a ledger seal that would cover zero ledgers
+- make ledger seal adoption explicit and reachable
+- ledger: adopt legacy unanchored ledgers at seal
+- confinement: pin the destination fd so seam writes are race-safe
+- confinement: guard the session timeline append against planted shared-inode leaves
+- confinement: route every target-resolved write through the confined writer seam (#362)
+- #374,#375,#376,#377: ledger stage codes, handoff bundle flag, hooks path scope, ledger tail guard (#378)
+- dev: make the identity gate impossible to forget (#347, #368)
+- workflow: stop re-resolving the handoff bundle guard output (#370)
+- knowledge: report names the plan file it actually loaded (#366, #367)
+- cli: register the three help-advertised flags parseArgs was dropping
+- wiki-export: refuse a source page that shares its bytes with another name
+- cli: check the shared inode before confined in-place writes
+- cli: check the shared inode before two flag-resolved report writes
+- exports: check the shared inode before writing a report destination
+- exports: refuse a planned leaf whose referent shares an outside inode
+- exports: refuse a planned leaf hard-linked outside the target
+- exports: refuse child links outside the target before the first write
+- cli: refuse repository-root export destinations
+- cli: confine the three target-resolved output destinations (#345)
+- cli: confine the three target-resolved output destinations
+- hardening: terminate stray children, serialize governed writes, confine target paths (#346)
+
+### Changed
+
+- record the verification rules issues/0196 taught
+- governance: make a folded process-denial count gateable
+- governance: prove a review verdict can gate only when independently produced and verified
+- adr: neutralize a vendor brand name in the managed corpus
+- ignore CodeGraph and Graphify index directories
+- quality: the acceptance half of the release-scope gap has closed too
+- quality: restate the two release-scope measurements that moved
+- plan: reshape the 15 delivered harness plans to the current template
+- plan: reshape the F083 plan to the current template
+- adr: record the approval each harness ADR actually has
+- record the trust-hardening spec's real state and its full ticket set
+- wiki: state the full feature-status vocabulary and gate it
+- spec: state the real bound-set leak rule (0178, 0179)
+- plan: name the corpus as a settling delivery artifact
+- skills: add verify — a project-local CLI verification skill (#385)
+- gate the site search + fix the verification policy file name in the agent manual (#384)
+- record the --admin merge convention for owner-authored PRs (#383)
+- deps: bump prettier (#381)
+- record N1 closure in the adjudication ledger
+- record N2 and A1 closures in the adjudication ledger
+- deps: apply non-breaking audit fixes to apps/docs lockfile (#379)
+- deps: bump eslint (#352)
+- locks: make both rendezvous races fail with a cause instead of hanging or drifting (#371)
+- governance: guard the committed governance ledger again (#338, #369)
+- cli: keep the flag census inside the Knowledge Plan facade seam
+- cli: make an unregistered flag a test failure instead of a silent no-op
+- wiki-export: pin the conservative source rule the docs claim
+- cli: cover the in-place writers the flag-derived sweep missed
+- exports: name what the leaf guard can and cannot claim
+- exports: say what workflow assess actually does with an in-target link
+- cli: state the child-path preflight and its concurrency limit
+- exports: pin child-link refusal before bundle writes
+- cli: qualify export path checks and bundle read limits
+- cli: pin root output refusal and bundle input compatibility
+- locks: reproduce both takeover races on demand, not on average (#342, #343)
+- ledger: make the reclaim race actually reach the guard (#342)
+- session: a crashed lock child reports as a crash, not a JSON defect
+- cli: the generated boundary line now names the confined set
+- deps: bump the npm-minor-and-patch group across 1 directory with 4 updates (#337)
 
 ## [2.0.0] - 2026-09-29
 
@@ -1129,7 +1334,10 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 
 ---
 
-[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/Bandersnatch0x/amber-protocol/compare/v2.0.1...v2.0.2
+[2.0.1]: https://github.com/Bandersnatch0x/amber-protocol/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.6.0...v2.0.0
 [1.4.1]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.12...v1.4.0
 [1.3.12]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.11...v1.3.12
