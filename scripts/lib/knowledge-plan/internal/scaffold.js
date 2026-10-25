@@ -42,7 +42,7 @@ function scaffoldKnowledgePlan(target, options = {}) {
 			target: targetRoot,
 			created: [],
 			skipped: [],
-			errors: [`${templateName} template not found in templates/docs/wiki/`],
+			errors: [`${templateName} template not found in ${templateRoot}`],
 			warnings: [],
 		};
 	}

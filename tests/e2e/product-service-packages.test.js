@@ -141,11 +141,16 @@ test("Security Governance: security audit and pack validation", () => {
 	const target = tempDir("security");
 	const output = path.join(target, "security-audit.md");
 
+	// The bare temp target has no package.json, so its audit is legitimately
+	// UNSCANNED - and an unscanned category now exits 1 (the rc must not read
+	// as success when the evidence says "unknown"). Assert that behavior and
+	// audit a scannable target for the success path below.
 	const audit = runAmber(["security", "audit", "--target", target, "--output", output, "--json"]);
-	assert.equal(audit.status, 0, audit.stderr);
+	assert.equal(audit.status, 1, audit.stderr);
 	const payload = JSON.parse(audit.stdout);
 	assert.equal(payload.outputPath, output);
 	assert.ok(fs.existsSync(output));
+	assert.ok(payload.errors.length > 0);
 
 	const validate = runAmber([
 		"pack",

@@ -247,6 +247,29 @@ test("--yaml selects the YAML knowledge-plan template", () => {
 	assert.ok(fs.existsSync(path.join(aliasTarget, "docs", "wiki", "knowledge-plan.yaml")));
 });
 
+test("--yaml is refused on every bare wiki surface, not just the default scaffold", () => {
+	for (const args of [
+		["wiki", "--yaml"],
+		["wiki", "--yml"],
+		["wiki", "--okf", "--yaml"],
+		["wiki", "export", "--yaml"],
+	]) {
+		const target = mkTarget(`yaml-reject-${args.join("-").replace(/[^a-z]/g, "-")}`);
+		const form = runCli([...args, "--target", target]);
+		assert.notEqual(form.status, 0, args.join(" "));
+		assert.match(
+			`${form.stdout}${form.stderr}`,
+			/--yaml applies to `amber wiki knowledge scaffold`/,
+			args.join(" "),
+		);
+		assert.equal(
+			fs.existsSync(path.join(target, "docs", "wiki", "knowledge-plan.yaml")),
+			false,
+			args.join(" "),
+		);
+	}
+});
+
 test("--adopt-legacy reaches sealLedger through the real CLI", () => {
 	const target = mkTarget("adopt-legacy");
 	gitInit(target);

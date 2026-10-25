@@ -297,6 +297,23 @@ function handleAudit(args) {
 function handleWiki(args) {
 	const action = args._?.[0];
 
+	// `--yaml` belongs to the knowledge scaffold, not the bare wiki skeleton.
+	// Reject at the entry so export/okf variants cannot silently drop the flag;
+	// the knowledge dispatch below is the legitimate consumer.
+	// Accepting it outside the knowledge scaffold would re-seed the alternate
+	// plan format the scaffold deliberately keeps out of the default install.
+	if ((args.yaml || args.yml) && action !== "knowledge") {
+		return {
+			result: {
+				target: args.target,
+				errors: [
+					"--yaml applies to `amber wiki knowledge scaffold`, not the default wiki scaffold.",
+				],
+				warnings: [],
+			},
+		};
+	}
+
 	if (action === "export") {
 		return {
 			result: require("./core/okf-export").exportOkfBundle(args.target, {
@@ -315,21 +332,6 @@ function handleWiki(args) {
 
 	if (args.okf) {
 		return { result: require("./core/validators").validateWiki(args.target, { okf: true }) };
-	}
-
-	// `--yaml` belongs to the knowledge scaffold, not the bare wiki skeleton.
-	// Accepting it silently here would re-seed the alternate plan format the
-	// scaffold deliberately keeps out of the default install.
-	if (args.yaml || args.yml) {
-		return {
-			result: {
-				target: args.target,
-				errors: [
-					"--yaml applies to `amber wiki knowledge scaffold`, not the default wiki scaffold.",
-				],
-				warnings: [],
-			},
-		};
 	}
 
 	return { result: require("./core/scaffold").scaffoldWiki(args.target, { dryRun: args.dryRun }) };

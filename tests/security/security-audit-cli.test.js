@@ -21,7 +21,8 @@ function run(command, args, cwd, env = process.env) {
 		encoding: "utf8",
 		timeout: 45_000,
 	});
-	assert.equal(result.status, 0, result.stderr || result.error?.message);
+	// The audit exits 1 whenever a category is unscanned (errors folded into
+	// the result), so callers assert the exact rc they need instead of 0.
 	return result.stdout;
 }
 
@@ -129,6 +130,9 @@ test("security audit reports missing dependency inputs as unscanned", { timeout:
 	const target = fixture(t);
 	fs.unlinkSync(path.join(target, "package-lock.json"));
 	const result = audit(target);
+	// An unscanned category is "the evidence does not exist", so the exit code
+	// must not read as success either.
+	assert.deepEqual(result.errors.length > 0, true, result.errors.join("; "));
 	assert.match(result.text, /Overall Status:\*\* ⚠️ \*\*UNSCANNED\*\*/);
 	assert.match(result.text, /Dependency Scan\n\n\*\*Status:\*\* ⚠️ UNSCANNED/);
 });
@@ -143,6 +147,7 @@ test(
 			JSON.stringify({ permissions: { allow: ["Bash(*)"] } }),
 		);
 		const result = audit(target);
+		assert.deepEqual(result.errors.length > 0, true, result.errors.join("; "));
 		assert.match(result.text, /Overall Status:\*\* ⚠️ \*\*UNSCANNED\*\*/);
 		assert.match(result.text, /Permission Review\n\n\*\*Status:\*\* ⚠️ UNSCANNED/);
 	},
@@ -257,6 +262,7 @@ test("security audit reports an unreadable tracked file as unscanned", { timeout
 	run("git", ["add", "removed.js"], target);
 	fs.unlinkSync(path.join(target, "removed.js"));
 	const result = audit(target);
+	assert.deepEqual(result.errors.length > 0, true, result.errors.join("; "));
 	assert.match(result.text, /Overall Status:\*\* ⚠️ \*\*UNSCANNED\*\*/);
 	assert.match(result.text, /Secret Scan\n\n\*\*Status:\*\* ⚠️ UNSCANNED/);
 	assert.doesNotMatch(result.text, /No secrets detected/);

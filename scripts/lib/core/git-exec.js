@@ -5,13 +5,14 @@ const { spawnSync } = require("node:child_process");
 // Canonical git invocation seam (F037, survey Finding 4): the only module in
 // scripts/lib that spawns git. Every caller builds its failure policy on top of
 // gitExec's {ok, status, stdout, stderr}. Never throws; status is -1 when the
-// spawn throws or produces no status (missing binary); stdout/stderr are
-// trimmed strings, "" when git produced none.
-// `preserveWhitespace` keeps stdout byte-faithful. Trimming is right for values a
-// human reads (a config value, a rev-parse answer) but destroys payloads where
-// leading/trailing whitespace is data: `git ls-files -z` yields raw paths, and a
-// file legally named " leading.txt" loses its space and stops resolving on disk.
-// Payload callers pass true and do their own NUL handling.
+// spawn throws or produces no status (missing binary); stdout is trimmed unless
+// `preserveWhitespace` is set, stderr is always trimmed, and empty output is "".
+// Trimming is right for values a human reads (a config value, a rev-parse answer)
+// but destroys payloads where leading/trailing whitespace is data: `git ls-files
+// -z` yields raw paths, and a file legally named " leading.txt" loses its space
+// and stops resolving on disk. Payload callers pass preserveWhitespace and do
+// their own NUL handling; the string is UTF-8-decoded, so byte-level fidelity
+// for non-UTF-8 paths is out of scope for this seam.
 function gitExec(targetRoot, args, options = {}) {
 	const preserveWhitespace = Boolean(options.preserveWhitespace);
 	// spawnSync's default ceiling is 1 MB. A repo with a few thousand files
@@ -46,10 +47,11 @@ function gitOutput(targetRoot, args) {
 	return res.ok ? res.stdout : null;
 }
 
-// Same failure policy as gitOutput, but the bytes are returned untouched. Use it
+// Same failure policy as gitOutput, but stdout keeps its whitespace. Use it
 // whenever git's output is a payload rather than a value — NUL-separated lists,
 // raw paths, porcelain formats — because trimming there silently corrupts data.
-// Null still means "the call failed".
+// The result is a UTF-8-decoded string, not raw bytes. Null still means "the
+// call failed".
 function gitOutputRaw(targetRoot, args, options = {}) {
 	const res = gitExec(targetRoot, args, { ...options, preserveWhitespace: true });
 	return res.ok ? res.stdout : null;

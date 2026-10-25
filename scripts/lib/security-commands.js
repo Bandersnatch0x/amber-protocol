@@ -147,6 +147,13 @@ function generateSecurityAuditReport(targetRoot, options = {}) {
 	const depResult = scanCategory(() => scanDependencies(target, env));
 	const secretResult = scanCategory(() => scanTrackedSecrets(target));
 	const permResult = scanCategory(() => scanPermissions(target));
+	// Report-only does not mean "report a success it did not earn": an
+	// unscanned category must be visible in the exit code, or CI operators
+	// reading only the rc see a green where the evidence says "unknown".
+	const unscanned = [depResult, secretResult, permResult].filter(
+		(result) => result && result.status === "unscanned",
+	);
+	const errors = unscanned.map((result) => `Scan did not complete: ${result.summary}`);
 	const report = REPORT_ONLY_NOTICE + generateAuditReport(depResult, secretResult, permResult);
 
 	if (options.output) {
@@ -157,12 +164,12 @@ function generateSecurityAuditReport(targetRoot, options = {}) {
 			text: `Security audit written: ${outputPath}`,
 			target,
 			outputPath,
-			errors: [],
+			errors,
 			warnings: [],
 		};
 	}
 
-	return { text: report, target, errors: [], warnings: [] };
+	return { text: report, target, errors, warnings: [] };
 }
 
 module.exports = { generateSecurityAuditReport };
