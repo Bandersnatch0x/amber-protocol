@@ -54,9 +54,12 @@ test("gitOutput trims, so a payload with significant leading whitespace needs gi
 
 test("gitExec surfaces the spawn error and gives every call the 16MB default ceiling", () => {
 	const dir = mkGit();
-	// A 5-byte buffer cannot hold even one commit line, so git output overflows
-	// and spawnSync reports ENOBUFS with a null status.
-	const res = gitExec(dir, ["log", "--oneline"], { maxBuffer: 5 });
+	// Some platforms tolerate a tiny maxBuffer for a short log, so overflow is
+	// forced with output far past the cap: 500 tag names at a 5-byte cap.
+	for (let i = 0; i < 500; i++) {
+		execSync(`git tag t${i}`, { cwd: dir });
+	}
+	const res = gitExec(dir, ["tag", "-l"], { maxBuffer: 5 });
 	assert.strictEqual(res.ok, false);
 	assert.strictEqual(res.status, -1);
 	assert.strictEqual(res.error.code, "ENOBUFS");
