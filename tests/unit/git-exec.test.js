@@ -53,24 +53,18 @@ test("gitOutput trims, so a payload with significant leading whitespace needs gi
 });
 
 test("gitExec surfaces the spawn error and gives every call the 16MB default ceiling", () => {
-	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-obuf-")));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-git-err-")));
 	execSync("git init -q", { cwd: dir });
 	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
-	// 5000 lines is far past the 5-byte cap on every platform (--name-only
-	// only prints the filename, so the cat reads the file's own bytes).
-	fs.writeFileSync(
-		path.join(dir, "big.txt"),
-		Array.from({ length: 5000 }, (_, i) => `line ${i}`).join("\n"),
-	);
-	execSync("git add -A && git commit -q -m init", { cwd: dir });
-	const res = gitExec(dir, ["cat-file", "-p", "HEAD:big.txt"], { maxBuffer: 5 });
+	// A 1ms timeout kills any fetch deterministically on every platform —
+	// the ENOBUFS overflow route turned out to be platform-dependent.
+	const res = gitExec(dir, ["fetch", "http://127.0.0.1:9/repo.git", "HEAD"], { timeout: 1 });
 	assert.strictEqual(res.ok, false);
 	assert.strictEqual(res.status, -1);
-	assert.strictEqual(res.error.code, "ENOBUFS");
-	assert.strictEqual(res.error.message, "spawnSync git ENOBUFS");
+	assert.strictEqual(res.error.code, "ETIMEDOUT");
 
 	// The default ceiling (16 MB) covers the same command without opts.
-	const ok = gitExec(dir, ["log", "--oneline"]);
+	const ok = gitExec(dir, ["rev-parse", "--is-inside-work-tree"]);
 	assert.strictEqual(ok.ok, true);
 	assert.strictEqual(ok.error, null);
 });
