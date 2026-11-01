@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 36,
+    "adr": 37,
     "wiki": 9,
     "architecture": 9,
-    "total": 54
+    "total": 55
   },
   "rows": [
     {
@@ -441,6 +441,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0106",
+      "category": "adr",
+      "sourceNodeId": "adr:0106",
+      "pageId": "knowledge-adr-0106",
+      "sourcePath": "docs/adr/0106-verdict-surfaces-declare-where-not-run-goes.md",
+      "title": "A Verdict Surface Must Declare Where \"Did Not Run\" Is Recorded",
+      "source": {
+        "rawHash": "sha256:b362993f22e95993ad777e5b6a9d22133f6468f2de783c42bc3231abb7699b25",
+        "normHash": "sha256:a9c0185c108c0720a984a73d4e65b4b57aa883995184260c06da5d34062354db"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -657,5 +669,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:470f75060aceb7857a95d0ca2d0c013276f015bbc7cca1b77576a403d657d3b7"
+  "manifestHash": "sha256:594113a36a74c0feb3d6aafce40164621f59b4baa04c12c41b7bfcf3bbeed6dc"
 }
