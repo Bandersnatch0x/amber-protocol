@@ -2335,216 +2335,110 @@ const COMMAND_OUTPUT = {
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
-const COMMANDS = Object.freeze([
-	"audit",
-	"init",
-	"doctor",
-	"next",
-	"plan",
-	"handoff",
-	"session",
-	"wiki",
-	"gate",
-	"policy",
-	"adapter",
-	"runner",
-	"release",
-	"maintain",
-	"retention",
-	"external",
-	"breakglass",
-	"review",
-	"accept",
-	"learnings",
-	"break-loop",
-	"pack",
-	"profile",
-	"task",
-	"result",
-	"maintenance",
-	"loop",
-	"ledger",
-	"route",
-	"status",
-	"drift",
-	"sync",
-	"migrate",
-	"governance",
-	"execution",
-	"security",
-	"feature",
-	"clean",
-	"explain",
-	"hooks",
-	"workflow",
-	"context",
-	"memory",
-	"projection",
-	"knowledge",
-	"phase",
-	"artifact",
-	"principal",
-	"eval",
-	"evidence",
-	"approval",
-	"contracts",
-	"harness",
+// ADR-0016 decision 2: Command Definitions are the source, and help, tiers,
+// stability, handlers, and the typed command set are projections of them. One
+// ordered record per command keeps the public display order (an external CLI
+// contract) together with both registry fields, so adding a command edits one
+// literal instead of three parallel maps that only a runtime guard reconciles.
+//
+// `tier` (visibility) and `stability` (F083) are independent axes: stability
+// says whether a family is `core` or `experimental`, never which tier it shows
+// in. Default help keeps the stability-`core` commands in the `journey`/`core`
+// tiers; the six experimental families stay callable and are marked only under
+// `amber --all`.
+const COMMAND_RECORDS = Object.freeze([
+	Object.freeze({ name: "audit", tier: "core", stability: "core" }),
+	Object.freeze({ name: "init", tier: "core", stability: "core" }),
+	Object.freeze({ name: "doctor", tier: "core", stability: "core" }),
+	Object.freeze({ name: "next", tier: "journey", stability: "core" }),
+	Object.freeze({ name: "plan", tier: "core", stability: "core" }),
+	Object.freeze({ name: "handoff", tier: "core", stability: "core" }),
+	Object.freeze({ name: "session", tier: "core", stability: "core" }),
+	Object.freeze({ name: "wiki", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "gate", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "policy", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "adapter", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "runner", tier: "expert", stability: "experimental" }),
+	Object.freeze({ name: "release", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "maintain", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "retention", tier: "expert", stability: "experimental" }),
+	Object.freeze({ name: "external", tier: "expert", stability: "experimental" }),
+	Object.freeze({ name: "breakglass", tier: "expert", stability: "experimental" }),
+	Object.freeze({ name: "review", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "accept", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "learnings", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "break-loop", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "pack", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "profile", tier: "deprecated", stability: "core" }),
+	Object.freeze({ name: "task", tier: "deprecated", stability: "core" }),
+	Object.freeze({ name: "result", tier: "deprecated", stability: "core" }),
+	Object.freeze({ name: "maintenance", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "loop", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "ledger", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "route", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "status", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "drift", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "sync", tier: "expert", stability: "experimental" }),
+	Object.freeze({ name: "migrate", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "governance", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "execution", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "security", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "feature", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "clean", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "explain", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "hooks", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "workflow", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "context", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "memory", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "projection", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "knowledge", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "phase", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "artifact", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "principal", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "eval", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "evidence", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "approval", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "contracts", tier: "expert", stability: "core" }),
+	Object.freeze({ name: "harness", tier: "expert", stability: "experimental" }),
 ]);
-// F063: the default help surface is the seven primary verbs (audit, init,
-// doctor, next, plan, handoff, session); every other governance command is
-// platform/expert tier — fully callable, visible under `amber --all`.
-// DEFAULT_COMMANDS derives from this map by filtering the COMMANDS array.
-// The public array carries the canonical order, so the CLI and tier projection
-// cannot drift through a second display-order constant.
-const TIER_BY_COMMAND = {
-	init: "core",
-	audit: "core",
-	wiki: "expert",
-	doctor: "core",
-	handoff: "core",
-	plan: "core",
-	gate: "expert",
-	policy: "expert",
-	adapter: "expert",
-	runner: "expert",
-	release: "expert",
-	maintain: "expert",
-	retention: "expert",
-	external: "expert",
-	breakglass: "expert",
-	review: "expert",
-	accept: "expert",
-	learnings: "expert",
-	"break-loop": "expert",
-	loop: "expert",
-	ledger: "expert",
-	route: "expert",
-	session: "core",
-	governance: "expert",
-	feature: "expert",
-	context: "expert",
-	memory: "expert",
-	projection: "expert",
-	knowledge: "expert",
-	phase: "expert",
-	artifact: "expert",
-	principal: "expert",
-	eval: "expert",
-	evidence: "expert",
-	approval: "expert",
-	contracts: "expert",
-	harness: "expert",
-	next: "journey",
-	profile: "deprecated",
-	task: "deprecated",
-	result: "deprecated",
-	pack: "expert",
-	maintenance: "expert",
-	status: "expert",
-	drift: "expert",
-	sync: "expert",
-	migrate: "expert",
-	execution: "expert",
-	security: "expert",
-	clean: "expert",
-	explain: "expert",
-	hooks: "expert",
-	workflow: "expert",
-};
-const COMMAND_TIERS = Object.freeze(
-	Object.fromEntries(COMMANDS.map((name) => [name, TIER_BY_COMMAND[name]])),
-);
 const VALID_TIERS = new Set(["core", "journey", "deprecated", "expert"]);
-// F083: stability is a second, independent registry field — `core` or
-// `experimental` — never a visibility tier. The six experimental families stay
-// callable and are listed with a marker only under `amber --all`; default help
-// keeps the stability-`core` commands in the `journey`/`core` tiers. Validation
-// below rejects both a missing and an orphaned stability. That orphan check is
-// real, unlike the tier path's: `COMMAND_TIERS` is built from `COMMANDS`, so its
-// keys cannot be foreign, while `STABILITY_BY_COMMAND` is a hand-written literal
-// that can name a command the registry no longer has.
-const STABILITY_BY_COMMAND = {
-	init: "core",
-	audit: "core",
-	wiki: "core",
-	doctor: "core",
-	handoff: "core",
-	plan: "core",
-	gate: "core",
-	policy: "core",
-	adapter: "core",
-	runner: "experimental",
-	release: "core",
-	maintain: "core",
-	retention: "experimental",
-	external: "experimental",
-	breakglass: "experimental",
-	review: "core",
-	accept: "core",
-	learnings: "core",
-	"break-loop": "core",
-	loop: "core",
-	ledger: "core",
-	route: "core",
-	session: "core",
-	governance: "core",
-	feature: "core",
-	context: "core",
-	memory: "core",
-	projection: "core",
-	knowledge: "core",
-	phase: "core",
-	artifact: "core",
-	principal: "core",
-	eval: "core",
-	evidence: "core",
-	approval: "core",
-	contracts: "core",
-	harness: "experimental",
-	next: "core",
-	profile: "core",
-	task: "core",
-	result: "core",
-	pack: "core",
-	maintenance: "core",
-	status: "core",
-	drift: "core",
-	sync: "experimental",
-	migrate: "core",
-	execution: "core",
-	security: "core",
-	clean: "core",
-	explain: "core",
-	hooks: "core",
-	workflow: "core",
-};
-const COMMAND_STABILITIES = Object.freeze(
-	Object.fromEntries(COMMANDS.map((name) => [name, STABILITY_BY_COMMAND[name]])),
-);
 const VALID_STABILITIES = new Set(["core", "experimental"]);
+// Projections. The export names stay exactly as callers already use them; only
+// the source of truth moved. `COMMANDS` carries the canonical public order.
+const COMMANDS = Object.freeze(COMMAND_RECORDS.map((record) => record.name));
+const COMMAND_TIERS = Object.freeze(
+	Object.fromEntries(COMMAND_RECORDS.map((record) => [record.name, record.tier])),
+);
+const COMMAND_STABILITIES = Object.freeze(
+	Object.fromEntries(COMMAND_RECORDS.map((record) => [record.name, record.stability])),
+);
+// F083: stability is the second registry field carried by each record — `core`
+// or `experimental`, never a visibility tier. Both fields now live in the same
+// literal as the name, so a missing or orphaned tier/stability is no longer
+// representable: there is no second map to fall out of sync.
+
 const commandNames = new Set(COMMANDS);
 const missingHelp = COMMANDS.filter((name) => !Object.hasOwn(COMMAND_HELP, name));
 const orphanedHelp = Object.keys(COMMAND_HELP).filter((name) => !commandNames.has(name));
 const orphanedOutput = Object.keys(COMMAND_OUTPUT).filter((name) => !commandNames.has(name));
-const missingTiers = COMMANDS.filter((name) => !VALID_TIERS.has(COMMAND_TIERS[name]));
-const orphanedTiers = Object.keys(COMMAND_TIERS).filter((name) => !commandNames.has(name));
-const missingStabilities = COMMANDS.filter(
-	(name) => !VALID_STABILITIES.has(COMMAND_STABILITIES[name]),
-);
-const orphanedStabilities = Object.keys(STABILITY_BY_COMMAND).filter(
-	(name) => !commandNames.has(name),
-);
+// The tier/stability maps are projections of COMMAND_RECORDS, so the four drift
+// guards that used to reconcile them with COMMANDS are structurally impossible.
+// What stays checkable is the declaration itself: a record whose tier or
+// stability falls outside the closed set, or a duplicate name, would silently
+// shadow another command's projection.
+const invalidRecords = COMMAND_RECORDS.filter(
+	(record) => !VALID_TIERS.has(record.tier) || !VALID_STABILITIES.has(record.stability),
+).map((record) => record.name);
+const duplicateRecords = COMMANDS.filter((name, index, names) => names.indexOf(name) !== index);
 if (
 	missingHelp.length > 0 ||
 	orphanedHelp.length > 0 ||
 	orphanedOutput.length > 0 ||
-	missingTiers.length > 0 ||
-	orphanedTiers.length > 0 ||
-	missingStabilities.length > 0 ||
-	orphanedStabilities.length > 0
+	invalidRecords.length > 0 ||
+	duplicateRecords.length > 0
 ) {
 	throw new Error(
-		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}], missing tier [${missingTiers.join(", ")}], orphaned tier [${orphanedTiers.join(", ")}], missing stability [${missingStabilities.join(", ")}], orphaned stability [${orphanedStabilities.join(", ")}].`,
+		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}], invalid tier/stability [${invalidRecords.join(", ")}], duplicate command [${duplicateRecords.join(", ")}].`,
 	);
 }
 const COMMAND_DEFINITIONS = Object.freeze(

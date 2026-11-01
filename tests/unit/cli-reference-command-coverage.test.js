@@ -20,11 +20,11 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const REGISTRY = path.join(ROOT, "scripts", "lib", "command-registry.js");
 const CLI_REFERENCE = path.join(ROOT, "docs", "CLI_REFERENCE.md");
 
+// The registry exports the canonical order, so read it instead of parsing the
+// source literal: the list is a projection of the Command Definitions, and a
+// source-shaped regex silently empties this guard whenever that shape changes.
 function declaredCommands() {
-	const source = fs.readFileSync(REGISTRY, "utf8");
-	const match = /const COMMANDS = Object\.freeze\(\[([\s\S]*?)\]\);/.exec(source);
-	assert.ok(match, "command-registry.js must declare the COMMANDS list");
-	return [...match[1].matchAll(/"([a-z0-9-]+)"/g)].map((entry) => entry[1]);
+	return registry().COMMANDS;
 }
 
 function escapeForRegExp(value) {
