@@ -448,8 +448,8 @@
       "sourcePath": "docs/adr/0106-verdict-surfaces-declare-where-not-run-goes.md",
       "title": "A Verdict Surface Must Declare Where \"Did Not Run\" Is Recorded",
       "source": {
-        "rawHash": "sha256:036ed58a7b4285a8129f33868146b38cbb906cfc417f077d71fe1dc8a0b9f7d5",
-        "normHash": "sha256:428a0499db16db038b48324a29fe444f1a472c9532c1689f672c475036be14e0"
+        "rawHash": "sha256:ef879af0b4355dcc9ae353e68baedfcec9e7f648cc986a52acdba1ea3726a43b",
+        "normHash": "sha256:fe17869c6aae6762856b505aed7a9dbea9dc31eda8a94a05f3075a1a258d0ab7"
       }
     },
     {
@@ -669,5 +669,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:af4ab7e86a95669a7f9263f174c64b8b0c98ad94f458ebfa10124233d17839d6"
+  "manifestHash": "sha256:cdcbcc2333623e54e8ebe12ee73b343ba9e0fa942eb4e8091a5e998d844230b1"
 }

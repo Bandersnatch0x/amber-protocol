@@ -68,8 +68,19 @@ all.
 5. **Lifecycle status vocabularies are out of scope.** `adapter READ_STATUSES`,
    `retention HOLD_STATUSES`, `canonical ARTIFACT_STATUSES`, `breakglass GRANT_STATUSES`, and
    `runner REQUEST_STATUSES` describe where a record sits in its lifecycle, not whether a check
-   passed. `external-registry`'s `DECLARED_STATUSES` and `retention SETTLEMENT_STATUSES` mix the
-   two axes and are adjudicated separately.
+   passed. The two mixed axes are adjudicated as follows.
+
+   `retention SETTLEMENT_STATUSES` **is in scope**. `unavailable` means the Holder was never
+   reached, so nothing was deleted: it is a third status value, retryable alongside `refused` and
+   `failed`, and declared as one.
+
+   `external-registry`'s `DECLARED_STATUSES` and `EXECUTION_OUTCOMES` are **not verdict
+   surfaces**. The external effect did run; what is undetermined is its result, which is a
+   different question from "did a check pass". `attempted` and `unknown` are two distinct degrees
+   of that indeterminacy — only `unknown` reconciles to `committed`, and either needs an
+   idempotent contract to retry — so collapsing them into one not-run value would erase a
+   transition the ledger depends on. Splitting outcome from observation would change a recorded
+   vocabulary, which ADR-0012 forbids without a schema version.
 
 ## Rationale
 
@@ -88,16 +99,16 @@ all.
 
 ## Consequences
 
-- Ten modules and fifteen closed vocabularies gained a declaration naming their placement. Gate,
-  Policy, and Evidence change in documentation value only: their placements were already right,
-  they were merely undeclared. Two surfaces that wrote the word as an inline literal
+- Eleven modules and sixteen closed vocabularies gained a declaration naming their placement.
+  Gate, Policy, and Evidence change in documentation value only: their placements were already
+  right, they were merely undeclared. Two surfaces that wrote the word as an inline literal
   (`held-out-core.js`, `src/security/audit-report.js`) now read it from the declaration instead.
 - A new verdict surface that omits the declaration fails at import, and one that declares a
   hand-rolled vocabulary fails the seam guard, which scans both production trees (`scripts/lib`
   and `src`) because the security audit surface spans them. The `security audit` defect class is
   closed structurally rather than by a per-module fix.
-- The mixed-axis vocabularies (`external DECLARED_STATUSES`, `retention SETTLEMENT_STATUSES`) need
-  a follow-up adjudication; they are deliberately excluded so that decision is made on its own
-  evidence.
+- The `external-registry` outcome vocabularies stay outside the rule, with the reason recorded at
+  the declaration site as well as in decision 5 — so the next reader meets the argument where
+  they meet the code.
 - This ADR does not make the three placements interchangeable. It makes choosing one explicit, and
   it keeps each surface's refusal path, assurance axis, or third value where it already is.

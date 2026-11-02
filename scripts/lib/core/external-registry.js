@@ -85,6 +85,17 @@ const EXEC_SIZE_CEILING_CODE = "AMBER_E_EXTERNAL_EXEC_SIZE_CEILING";
 const CREDENTIAL_LEAK_CODE = "AMBER_E_EXTERNAL_CREDENTIAL_LEAK";
 
 const PROPOSAL_STATUSES = Object.freeze(["proposed", "authorized"]);
+// ADR-0106 decision 5: these are NOT verdict surfaces, and the adjudication is
+// recorded here so a later reader does not re-derive it.
+//
+// `unknown` reads like "did not run", but the external effect DID run — what is
+// undetermined is the result, and that is a different question from "did a
+// check pass". Two facts settle it: `attempted` and `unknown` are both
+// unconfirmed yet distinct (reconciliation to `committed` is allowed only from
+// `unknown`, below; retry needs an idempotent contract for either), so folding
+// them into one not-run value would erase a transition the ledger depends on.
+// Splitting the axis into outcome × observation would change a recorded
+// vocabulary, which ADR-0012 forbids without a schema version.
 // What the external Adapter may declare on its result receipt.
 const DECLARED_STATUSES = Object.freeze(["committed", "failed", "denied", "unknown"]);
 // What Amber derives — never the adapter.

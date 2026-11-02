@@ -14,8 +14,10 @@
  *      surface, whether or not it thinks so. It must go through
  *      `defineVerdictSurface`. This is the rule that catches the incident shape
  *      — `held-out-core.js` wrote `"not-run"` inline with no declaration.
- *   2. The surfaces that declare `refusal` or `assurance` record no not-run
- *      word at all, so rule 1 cannot see them. A census pins their
+ *   2. Some surfaces rule 1 cannot see: those placing not-run at `refusal` or
+ *      `assurance` record no not-run word at all, and `retention` spells its
+ *      not-run value `unavailable`, which is outside the narrowed list because
+ *      lifecycle vocabularies use that word too. A census pins their
  *      declarations so removing one is a test failure rather than a silent
  *      regression to "undeclared".
  *
@@ -45,6 +47,7 @@ const DECLARED_SURFACES = Object.freeze([
 	"scripts/lib/core/evidence-receipts.js",
 	"scripts/lib/core/gate-evaluation.js",
 	"scripts/lib/core/policy-evaluation.js",
+	"scripts/lib/core/retention-registry.js",
 ]);
 
 const NOT_RUN_LITERAL = new RegExp(`["'](${NOT_RUN_WORDS.join("|")})["']`);
@@ -104,7 +107,7 @@ test("a module that names a not-run word goes through defineVerdictSurface", () 
 	);
 });
 
-test("the refusal and assurance surfaces keep their declarations", () => {
+test("the surfaces rule 1 cannot see keep their declarations", () => {
 	const sources = new Map(productionFiles().map((f) => [f.relativePath, f.source]));
 	for (const relativePath of DECLARED_SURFACES) {
 		assert.ok(
