@@ -4,6 +4,20 @@
  * Audit report generator — combines all scan results into a markdown report.
  */
 
+const { defineVerdictSurface } = require("../../scripts/lib/core/verdict-surface");
+
+// ADR-0106: `688e9df0` was this fold awarding PASS for every repository. A
+// category that never ran is `unscanned`, it outranks a pass, and it is the
+// value the CLI exit code keys off — so it is declared once here rather than
+// re-typed at each comparison.
+const AUDIT_STATUS = defineVerdictSurface({
+	name: "security audit overall",
+	notRun: "status",
+	outcomes: ["pass", "fail"],
+	notRunValue: "unscanned",
+});
+const UNSCANNED = AUDIT_STATUS.notRunValue;
+
 /**
  * @param {object} depResult - dependency scan result
  * @param {object|null} secretResult - findings with suppression count or an unscanned result
@@ -18,11 +32,11 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	const statuses = [dependencyStatus, secretStatus, permissionStatus];
 	const overallStatus = statuses.includes("fail")
 		? "fail"
-		: statuses.includes("unscanned")
-			? "unscanned"
+		: statuses.includes(UNSCANNED)
+			? UNSCANNED
 			: "pass";
 	const overallPass = overallStatus === "pass";
-	const labels = { pass: "✅ PASS", fail: "❌ FAIL", unscanned: "⚠️ UNSCANNED" };
+	const labels = { pass: "✅ PASS", fail: "❌ FAIL", [UNSCANNED]: "⚠️ UNSCANNED" };
 	const status = labels[overallStatus].replace(/(PASS|FAIL|UNSCANNED)/, "**$1**");
 
 	let report = "";
@@ -36,7 +50,7 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	report += `**Status:** ${labels[dependencyStatus]}  \n`;
 	report += `**Summary:** ${depResult?.summary || "Scan not executed."}\n\n`;
 
-	if (dependencyStatus === "unscanned") {
+	if (dependencyStatus === UNSCANNED) {
 		report += "Dependency scan unscanned.\n\n";
 	} else if (depResult.vulnerabilities && depResult.vulnerabilities.length > 0) {
 		const bySeverity = groupBySeverity(depResult.vulnerabilities);
@@ -57,12 +71,12 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	// Secret scan section
 	report += "## Secret Scan\n\n";
 	report += `**Status:** ${labels[secretStatus]}  \n`;
-	report += `**Findings:** ${secretStatus === "unscanned" ? "unknown" : secretResult.findings.length}\n\n`;
-	if (secretStatus !== "unscanned") {
+	report += `**Findings:** ${secretStatus === UNSCANNED ? "unknown" : secretResult.findings.length}\n\n`;
+	if (secretStatus !== UNSCANNED) {
 		report += `${secretResult.suppressedCount} findings suppressed by allow markers.\n\n`;
 	}
 
-	if (secretStatus === "unscanned") {
+	if (secretStatus === UNSCANNED) {
 		report += `${secretResult?.summary || "Secret scan not executed."}\n\n`;
 	} else if (secretResult.findings.length > 0) {
 		for (const f of secretResult.findings) {
@@ -76,9 +90,9 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	// Permission review section
 	report += "## Permission Review\n\n";
 	report += `**Status:** ${labels[permissionStatus]}  \n`;
-	report += `**Findings:** ${permissionStatus === "unscanned" ? "unknown" : permResult.findings.length}\n\n`;
+	report += `**Findings:** ${permissionStatus === UNSCANNED ? "unknown" : permResult.findings.length}\n\n`;
 
-	if (permissionStatus === "unscanned") {
+	if (permissionStatus === UNSCANNED) {
 		report += `${permResult?.summary || "Permission review not executed."}\n\n`;
 	} else if (permResult.findings.length > 0) {
 		for (const f of permResult.findings) {
@@ -100,7 +114,7 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	report += "## Remediation\n\n";
 
 	if (!overallPass) {
-		if (statuses.includes("unscanned")) {
+		if (statuses.includes(UNSCANNED)) {
 			report +=
 				"Complete unscanned categories with readable, supported inputs and rerun the audit.\n\n";
 		}
@@ -139,10 +153,10 @@ function generateAuditReport(depResult, secretResult, permResult) {
 }
 
 function scanStatus(result) {
-	if (result == null || result.status === "unscanned") return "unscanned";
+	if (result == null || result.status === UNSCANNED) return UNSCANNED;
 	if (Array.isArray(result)) return result.length === 0 ? "pass" : "fail";
 	if (result.pass === true) return "pass";
-	return result.pass === false ? "fail" : "unscanned";
+	return result.pass === false ? "fail" : UNSCANNED;
 }
 
 function groupBySeverity(vulnerabilities) {

@@ -21,6 +21,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { statePath } = require("../state-dir-resolver");
+const { defineVerdictSurface } = require("../core/verdict-surface");
+
+// ADR-0106: the legacy projection discloses each §7 axis as `not-run` because
+// the pre-H1 surface never recorded one. It declares that itself rather than
+// borrowing validation-core's word — this is a projection, not the receipt.
+const LEGACY_RECEIPT_AXIS = defineVerdictSurface({
+	name: "legacy receipt axis",
+	notRun: "status",
+	outcomes: ["pass", "fail"],
+	notRunValue: "not-run",
+});
 
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_LEGACY_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_LEGACY_CORRUPT";
@@ -139,11 +150,11 @@ function legacyTaskView(targetRoot, { taskId } = {}) {
 			chatHistoryRequired: !replayable,
 			receiptAxes: {
 				evidence: replayable ? "pass" : "fail",
-				policy: "not-run",
-				execution: "not-run",
-				tools: "not-run",
-				context: "not-run",
-				attempts: "not-run",
+				policy: LEGACY_RECEIPT_AXIS.notRunValue,
+				execution: LEGACY_RECEIPT_AXIS.notRunValue,
+				tools: LEGACY_RECEIPT_AXIS.notRunValue,
+				context: LEGACY_RECEIPT_AXIS.notRunValue,
+				attempts: LEGACY_RECEIPT_AXIS.notRunValue,
 			},
 		},
 		mapping: {

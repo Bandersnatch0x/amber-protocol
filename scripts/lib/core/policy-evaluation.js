@@ -19,6 +19,7 @@ const {
 	closedFieldProblem,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
+const { defineVerdictSurface } = require("./verdict-surface");
 const { hashText, canonicalJson } = require("./context-hash");
 const { parseTimestamp, resolveActivePrincipal } = require("./principal-registry");
 const { showApproval } = require("./approval-registry");
@@ -102,7 +103,15 @@ const DELEGATION_REF_FIELDS = Object.freeze([
 	"validUntil",
 	"policy",
 ]);
-const VERDICTS = Object.freeze(["pass", "deny"]);
+// ADR-0106: a stale or conflicting Policy refuses before appending and returns
+// `outcome: null`, so the recorded vocabulary stays two-valued. `deny` is the
+// recorded negative (CONTEXT.md), not `fail`.
+const POLICY_VERDICT = defineVerdictSurface({
+	name: "policy outcome verdict",
+	notRun: "refusal",
+	outcomes: ["pass", "deny"],
+});
+const VERDICTS = POLICY_VERDICT.outcomes;
 
 function outcomeCorrupt(message) {
 	return typedError(OUTCOME_REGISTRY_CORRUPT_CODE, message);

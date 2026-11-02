@@ -1,6 +1,6 @@
 # ADR-0106: A Verdict Surface Must Declare Where "Did Not Run" Is Recorded
 
-**Status:** Proposed (2026-11-02; no approval ruling recorded)
+**Status:** Accepted (2026-11-02)
 **Date:** 2026-11-02
 **Builds on:** [ADR-0004](0004-evidence-grade-verification.md) (evidence-grade verification),
 [ADR-0012](0012-protocol-and-schema-versioning.md) (schema growth and drift signalling),
@@ -88,12 +88,14 @@ all.
 
 ## Consequences
 
-- Each of the eight current verdict surfaces gains a one-line declaration naming its placement.
-  Gate, Policy, and Evidence change in documentation value only: their placements are already
-  right, they were merely undeclared.
+- Ten modules and fifteen closed vocabularies gained a declaration naming their placement. Gate,
+  Policy, and Evidence change in documentation value only: their placements were already right,
+  they were merely undeclared. Two surfaces that wrote the word as an inline literal
+  (`held-out-core.js`, `src/security/audit-report.js`) now read it from the declaration instead.
 - A new verdict surface that omits the declaration fails at import, and one that declares a
-  hand-rolled vocabulary fails the seam guard. The `security audit` defect class is closed
-  structurally rather than by a per-module fix.
+  hand-rolled vocabulary fails the seam guard, which scans both production trees (`scripts/lib`
+  and `src`) because the security audit surface spans them. The `security audit` defect class is
+  closed structurally rather than by a per-module fix.
 - The mixed-axis vocabularies (`external DECLARED_STATUSES`, `retention SETTLEMENT_STATUSES`) need
   a follow-up adjudication; they are deliberately excluded so that decision is made on its own
   evidence.

@@ -10,6 +10,17 @@ const { scanForSecrets } = require("../../src/security/secret-scan");
 const { reviewPermissions } = require("../../src/security/permission-review");
 const { toSpawnArgv } = require("./core/loop-policy");
 const { gitExec } = require("./core/git-exec");
+const { defineVerdictSurface } = require("./core/verdict-surface");
+
+// ADR-0106: a scan that threw did not run, and `688e9df0` is what happens when
+// that reads as a pass. The exit code has to see it too, so the value is
+// declared once and compared, never re-typed.
+const SCAN_VERDICT = defineVerdictSurface({
+	name: "security scan",
+	notRun: "status",
+	outcomes: ["pass", "fail"],
+	notRunValue: "unscanned",
+});
 
 const REPORT_ONLY_NOTICE = [
 	"> **Report-only.** Scans do not modify target files or block other commands.",
@@ -32,7 +43,7 @@ function scanCategory(scan) {
 	try {
 		return scan();
 	} catch (error) {
-		return { status: "unscanned", summary: error.message };
+		return { status: SCAN_VERDICT.notRunValue, summary: error.message };
 	}
 }
 
@@ -154,7 +165,7 @@ function generateSecurityAuditReport(targetRoot, options = {}) {
 	// unscanned category must be visible in the exit code, or CI operators
 	// reading only the rc see a green where the evidence says "unknown".
 	const unscanned = [depResult, secretResult, permResult].filter(
-		(result) => result && result.status === "unscanned",
+		(result) => result && result.status === SCAN_VERDICT.notRunValue,
 	);
 	const errors = unscanned.map((result) => `Scan did not complete: ${result.summary}`);
 	const report = REPORT_ONLY_NOTICE + generateAuditReport(depResult, secretResult, permResult);
