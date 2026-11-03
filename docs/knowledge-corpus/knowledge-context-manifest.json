@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 38,
+    "adr": 39,
     "wiki": 9,
     "architecture": 9,
-    "total": 56
+    "total": 57
   },
   "rows": [
     {
@@ -465,6 +465,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0108",
+      "category": "adr",
+      "sourceNodeId": "adr:0108",
+      "pageId": "knowledge-adr-0108",
+      "sourcePath": "docs/adr/0108-subcommand-dispatch-owns-the-second-level.md",
+      "title": "Subcommand Dispatch Owns The Second Level Too",
+      "source": {
+        "rawHash": "sha256:7704f937c8e61b72651d535a3dba3a7bd38de088b9a88a97fc8b9cf074cc343d",
+        "normHash": "sha256:711a8b2600d350ce806a716a4151ceb2114befd43c0fac47e96611b1df4bef57"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -681,5 +693,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:ac3d1252659168ecfb84d7d1e99f388f62acdd4df4550732f1aa7b6260f1034e"
+  "manifestHash": "sha256:166509b86045b6dc8a1397c927374b605b0207c746125098bbfc96a0da1ab801"
 }

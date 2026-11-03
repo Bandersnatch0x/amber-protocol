@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Replay core (F073 H5; proposal §7/§26/§34/§43/§46.5).
 //
 // Replay is VERIFICATION, not re-execution: the §43 gate is that
@@ -57,12 +59,6 @@ const AXIS_VERDICT = defineVerdictSurface({
 	notRunValue: "unevaluated",
 });
 const AXIS_VERDICTS = AXIS_VERDICT.outcomes;
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function safeId(id) {
 	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");

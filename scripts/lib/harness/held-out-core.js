@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Held-out evaluation core (R-ET-4 / 0174).
 //
 // An eval-set is the content measured by an eval definition, not the
@@ -30,12 +32,6 @@ const LEAK_CHECK = defineVerdictSurface({
 
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 const CODE_ARTIFACT_NOT_FOUND = "AMBER_E_ARTIFACT_NOT_FOUND";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function resolveHeldOutBinding(targetRoot, pin) {
 	if (!pin || typeof pin !== "object" || Array.isArray(pin)) {

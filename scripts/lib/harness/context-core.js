@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Context Firewall core (F069 H3a; Harness v2 §11/§32).
 //
 // Owns the ContextGrant registry (§11: Grant = Subject × Resource × Purpose ×
@@ -43,12 +45,6 @@ const DENY_REASONS = Object.freeze([
 	"purpose-mismatch",
 	"classification-above-ceiling",
 ]);
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function grantsDirForCreate(targetRoot) {
 	return statePathForCreate(targetRoot, "harness", "context-grants");

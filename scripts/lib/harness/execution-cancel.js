@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // F081 — truthful cancellation of a live governed execution.
 //
 // The only thing this module may address is an owned execution handle: a pid
@@ -48,12 +50,6 @@ const CODE_CORRUPT = "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT";
 const SIGNAL = "SIGTERM";
 const SETTLE_BOUND_MS = 10_000;
 const POLL_MS = 50;
-
-function typedError(code, message) {
-	const error = new Error(message);
-	error.amberCode = code;
-	return error;
-}
 
 function safeId(value) {
 	return String(value).replace(/[^A-Za-z0-9._-]/g, "-");

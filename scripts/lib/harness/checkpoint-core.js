@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Checkpoint core (F072 H4; proposal §33 "checkpoint supports
 // recovery").
 //
@@ -26,12 +28,6 @@ const CODE_CORRUPT = "AMBER_E_HARNESS_CHECKPOINT_CORRUPT";
 const CODE_FINAL = "AMBER_E_HARNESS_CHECKPOINT_FINAL";
 const CODE_DRIFT = "AMBER_E_HARNESS_CHECKPOINT_DRIFT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function safeId(id) {
 	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");

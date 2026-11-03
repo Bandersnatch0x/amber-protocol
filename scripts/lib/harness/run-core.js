@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Run core (F065 H0; ADR-0101).
 //
 // Owns every semantic verdict of the Run lifecycle: binding to an admitted
@@ -39,12 +41,6 @@ const ADMISSION_CHECK_NAMES = Object.freeze([
 	"execution",
 	"approval",
 ]);
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function runFileForCreate(targetRoot, runId) {
 	return statePathForCreate(targetRoot, "harness", "runs", `${safeId(runId)}.json`);

@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Attempt core (F072 H4; proposal §4.4/§33/§49).
 //
 // A governed attempt becomes a first-class, run-scoped record. The record is
@@ -30,12 +32,6 @@ const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 // F070 distinction carried verbatim; both are terminal.
 const ATTEMPT_STATES = Object.freeze(["running", "completed", "failed", "refused"]);
 const FINAL_ATTEMPT_STATES = new Set(["completed", "failed", "refused"]);
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function safeId(id) {
 	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");

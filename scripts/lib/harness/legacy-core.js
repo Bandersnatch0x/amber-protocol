@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Legacy-surface dispositions (F075; proposal §52 Rules 4–7,
 // ADR-0101 decision 4).
 //
@@ -36,12 +38,6 @@ const LEGACY_RECEIPT_AXIS = defineVerdictSurface({
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_LEGACY_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_LEGACY_CORRUPT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 // The closed nearest-neighbor table: the legacy ledger's status vocabulary
 // mapped to the run state vocabulary. Unmapped statuses refuse the

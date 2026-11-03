@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Tool registry core (F067 H1; Harness v2 §12/§25/§30).
 //
 // Owns every semantic verdict of the Tool declaration surface: schema
@@ -40,12 +42,6 @@ const EFFECT_DEFAULT_POSTURE = Object.freeze({
 	destructive: "deny",
 	irreversible: "deny / human approval",
 });
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function toolsDirForCreate(targetRoot) {
 	return statePathForCreate(targetRoot, "harness", "tools");

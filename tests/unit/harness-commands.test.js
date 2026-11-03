@@ -196,6 +196,58 @@ test("admit without --file and inspect without --contract fail with guidance", (
 	}
 });
 
+// The dispatcher validates a group's second-level verb (ADR-0108). A bare
+// group name and a bogus verb must both answer with that group's own guidance —
+// the wording moved out of the handlers, so it needs a test that would notice a
+// silent change of text or of envelope.
+test("an unknown second-level verb answers with that group's own guidance", () => {
+	const target = tmpTarget();
+	try {
+		const cases = [
+			["tool", "harness tool requires admit, list, inspect, or check."],
+			["context", "harness context requires admit, list, inspect, check, or revoke."],
+			["checkpoint", "harness checkpoint requires capture, list, verify, or inspect."],
+			["attempt", "harness attempt requires list or inspect."],
+			["policy", "harness policy requires check."],
+		];
+		for (const [group, expected] of cases) {
+			for (const argv of [[group], [group, "bogus"]]) {
+				const result = dispatch("harness", { target, json: false, _: argv });
+				assert.equal(result.exitCode, 1, `${argv.join(" ")} must fail`);
+				assert.ok(
+					result.result.errors[0].startsWith(expected),
+					`${argv.join(" ")}: got ${result.result.errors[0]}`,
+				);
+				// The group refusal is an ordinary handler body: it renders through
+				// the same print path a handler's own invalidArg takes.
+				assert.equal(result.bypassPrint, true);
+			}
+		}
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
+// ADR-0108: harness errors go through core/error-catalog's typedError, so the
+// message carries the catalog's [CODE] → fix: suffix. A local `new Error(...)`
+// would silently drop it again.
+test("a harness error message carries the catalog remedy", () => {
+	const target = tmpTarget();
+	try {
+		const result = dispatch("harness", {
+			target,
+			json: false,
+			run: "no-such-run",
+			_: ["status"],
+		});
+		assert.equal(result.exitCode, 1);
+		assert.equal(result.result.code, "AMBER_E_HARNESS_RUN_NOT_FOUND");
+		assert.match(result.result.errors[0], /\[AMBER_E_HARNESS_RUN_NOT_FOUND\] → fix: /);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
 test("harness is expert tier: callable, registered, but off the default help surface", () => {
 	assert.ok(DEFAULT_COMMANDS.includes("audit"), "default surface sanity");
 	assert.equal(DEFAULT_COMMANDS.includes("harness"), false);

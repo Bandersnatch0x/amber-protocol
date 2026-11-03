@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Execution Adapter + boundary comparison (F068 H2a; F070 H2b wiring).
 //
 // GitWorktreeAdapter and LocalAdapter prepare a workspace and report the
@@ -61,12 +63,6 @@ const EXECUTION_VERDICT = defineVerdictSurface({
 	notRunValue: "unevaluated",
 });
 const EXECUTION_VERDICTS = EXECUTION_VERDICT.outcomes;
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function confinedWorkspacePath(targetRoot, candidate) {
 	try {

@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Lifecycle view (F072 H4; proposal §42 gate).
 //
 // ONE read-only report answering the Phase-H4 gate question: do the existing
@@ -23,12 +25,6 @@ const { listReceipts } = require("./validation-core");
 const { manifestStaleness, ambientCodeState } = require("./release-manifest");
 
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 // The run's additive execution section is the execution surface's mapping
 // witness (contract + snapshot + comparison verdict + releasedAt). Absent
