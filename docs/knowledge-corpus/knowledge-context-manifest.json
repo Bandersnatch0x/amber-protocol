@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 37,
+    "adr": 38,
     "wiki": 9,
     "architecture": 9,
-    "total": 55
+    "total": 56
   },
   "rows": [
     {
@@ -453,6 +453,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0107",
+      "category": "adr",
+      "sourceNodeId": "adr:0107",
+      "pageId": "knowledge-adr-0107",
+      "sourcePath": "docs/adr/0107-verification-execution-has-one-pipeline.md",
+      "title": "Verification Execution Has One Pipeline",
+      "source": {
+        "rawHash": "sha256:f08ff84d555155b072a636347d65b0de67ec75fbf3c7308d21cffdd170a76f86",
+        "normHash": "sha256:c367ecb965ba3d5fe4c3400102d21355b0d22a4cb3c57db30ea1a5e3bc4f032b"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -669,5 +681,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:cdcbcc2333623e54e8ebe12ee73b343ba9e0fa942eb4e8091a5e998d844230b1"
+  "manifestHash": "sha256:ac3d1252659168ecfb84d7d1e99f388f62acdd4df4550732f1aa7b6260f1034e"
 }

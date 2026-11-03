@@ -1,20 +1,20 @@
 /**
  * Asynchronous evidence-job runner for the web console.
  *
- * The CLI surface executes verification synchronously inside
- * scripts/lib/core/evidence-runner.js (spawnSync), which is fine for a CLI
- * process but would freeze the web server event loop for up to the full
- * budget. This service re-implements ONLY the execution layer on top of
- * child_process.spawn; the governance seams are never forked here:
+ * The verification itself — policy gate, spawn, output caps, budget kill, and
+ * the hash-chained ledger record — lives in ONE place:
+ * `scripts/lib/core/evidence-runner.js`, reached through web-adapter. This
+ * service owns only what is genuinely the web's: accepting a job immediately
+ * instead of blocking a tRPC mutation for the full budget, tracking the job
+ * table, persisting terminal states so a client that loses its SSE connection
+ * can recover by polling, and writing the session timeline + stage completion
+ * once the command settles.
  *
- *   - the deny-wins policy verdict comes through web-adapter's
- *     evaluateVerifyPolicy (which delegates to loop-policy.js — the same call
- *     evidence-runner makes), so built-in destructive/composition denies and
- *     custom verify-rules.json behave byte-identically;
- *   - ledger records are appended through web-adapter's
- *     appendVerificationLedgerRecord (which delegates to loop-ledger.js — the
- *     hash-chain SSOT), so web-written records verify against the same chain
- *     the CLI writes.
+ * The previous version re-implemented the execution layer because the CLI
+ * runner was `spawnSync`; that premise expired (the CLI runner is async spawn
+ * with the same caps, kill, and ledger shape), so a second implementation only
+ * bought drift — it had already diverged to `shell: true` while the CLI ran
+ * `shell: false` over the same policy verdict.
  *
  * Job state lives in an in-memory table (jobId -> record) and every terminal
  * state is also persisted under `.amber/tmp/evidence-jobs/` so a client that
@@ -22,9 +22,8 @@
  * lifecycle.verificationJob.
  */
 
-import { spawn, execFileSync, type ChildProcessWithoutNullStreams } from 'child_process';
-import { createRequire } from 'module';
 import crypto from 'crypto';
+import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
 import { resolveStatePath, readJsonSafe } from '../lib/artifact-store';
@@ -33,6 +32,7 @@ import { persistCompletedStage } from '../lib/session-writer';
 import { sessionEvents } from './session-events';
 import type {
   CompletionStatusResult,
+  EvidenceCommandResult,
   VerifyPolicyVerdict,
   WebAdapter,
 } from '../../../../scripts/lib/web-adapter';
@@ -41,11 +41,6 @@ const requireCli = createRequire(import.meta.url);
 
 const adapter = requireCli('../../../../scripts/lib/web-adapter.js') as WebAdapter;
 
-// Output caps mirror scripts/lib/core/evidence-runner.js so web-written ledger
-// records stay shape-identical to CLI-written ones.
-const STDOUT_CAP = 4000;
-const STDERR_CAP = 2000;
-const DEFAULT_BUDGET_MINUTES = 5;
 const JOB_DIR_SEGMENTS = ['tmp', 'evidence-jobs'] as const;
 // The in-memory table is a fast path; terminal results are persisted to disk
 // before eviction, so the evicted job's disk file is dropped alongside it
@@ -111,13 +106,6 @@ export interface EvidenceJobRecord {
   error?: string;
 }
 
-interface SpawnOutcome {
-  exitCode: number;
-  timedOut: boolean;
-  stdoutTail: string;
-  stderrTail: string;
-}
-
 const jobs = new Map<string, EvidenceJobRecord>();
 
 // Dedup index: `sessionId\u0000stage` → jobId of the currently running job.
@@ -159,8 +147,9 @@ function releaseInFlightJob(job: EvidenceJobRecord): void {
 
 /**
  * Deny-wins verification policy gate. Delegates to web-adapter's
- * evaluateVerifyPolicy — the exact call evidence-runner makes before spawning
- * — so the web surface can neither relax nor fork the gate.
+ * evaluateVerifyPolicy — the same verdict `runEvidenceCommand` applies — so the
+ * web surface can neither relax nor fork the gate. The router calls this BEFORE
+ * creating a job, so a refusal returns synchronously.
  */
 export function evaluateEvidencePolicy(targetRoot: string, command: string): VerifyPolicyVerdict {
   return adapter.evaluateVerifyPolicy(targetRoot, command);
@@ -378,107 +367,9 @@ export function harvestOrphanedEvidenceJobs(): { settled: number; removed: numbe
   return { settled, removed };
 }
 
-function killProcessTree(child: ChildProcessWithoutNullStreams): void {
-  if (child.pid === undefined) return;
-  if (process.platform === 'win32') {
-    // shell:true spawns cmd.exe; killing only the shell would orphan the real
-    // command on Windows. taskkill /T walks the tree (pid is a Node-provided
-    // number, so no injection surface).
-    try {
-      execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-      return;
-    } catch {
-      // fall through to the plain kill below
-    }
-  } else {
-    // POSIX: the job is spawned detached (process-group leader) precisely so
-    // a budget kill can take out the WHOLE group. Killing only the shell pid
-    // would orphan the real command, which keeps the inherited stdio pipes
-    // open — the 'close' event then waits for the command's full runtime and
-    // the job settles far past its budget.
-    try {
-      process.kill(-child.pid, 'SIGKILL');
-      return;
-    } catch {
-      // fall through to the plain kill below
-    }
-  }
-  child.kill('SIGKILL');
-}
-
-function spawnEvidenceCommand(
-  command: string,
-  cwd: string,
-  budgetMinutes: number,
-): Promise<SpawnOutcome> {
-  return new Promise((resolve) => {
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    let timedOut = false;
-
-    const finish = (exitCode: number) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({
-        exitCode,
-        timedOut,
-        stdoutTail: stdout.slice(-STDOUT_CAP),
-        stderrTail: stderr.slice(-STDERR_CAP),
-      });
-    };
-
-    let child: ChildProcessWithoutNullStreams;
-    try {
-      child = spawn(command, {
-        shell: true,
-        cwd,
-        windowsHide: true,
-        // POSIX: run the shell as its own process-group leader so a budget
-        // kill can SIGKILL the entire group (see killProcessTree).
-        detached: process.platform !== 'win32',
-      });
-    } catch (error) {
-      resolve({
-        exitCode: -1,
-        timedOut: false,
-        stdoutTail: '',
-        stderrTail: String(error instanceof Error ? error.message : error).slice(-STDERR_CAP),
-      });
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      timedOut = true;
-      killProcessTree(child);
-    }, budgetMinutes * 60_000);
-    // The timer must not keep the server alive once everything else settled.
-    if (typeof timer.unref === 'function') timer.unref();
-
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    // Keep only the tail so a chatty command cannot grow memory without bound.
-    child.stdout.on('data', (chunk) => {
-      stdout = (stdout + chunk).slice(-STDOUT_CAP);
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr = (stderr + chunk).slice(-STDERR_CAP);
-    });
-    child.on('error', (error) => {
-      stderr = (stderr + String(error.message)).slice(-STDERR_CAP);
-      finish(-1);
-    });
-    // A null code means the process was killed (signal); treat it as failure
-    // (-1) so a timed-out verify never records as passed — same convention as
-    // evidence-runner's spawnSync path. A budget kill is normalized to -1 too:
-    // on Windows the shell reports 1 after taskkill, which would otherwise
-    // look like an ordinary command failure instead of a timeout.
-    child.on('close', (code) => finish(timedOut ? -1 : code === null ? -1 : code));
-  });
+function settleFailure(job: EvidenceJobRecord, message: string): void {
+  updateJob(job, { status: 'failed', error: message });
+  sessionEvents.emitEvidenceJobChanged(job.sessionId, job.jobId, 'failed');
 }
 
 async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams): Promise<void> {
@@ -486,40 +377,39 @@ async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams)
     updateJob(job, { status: 'running' });
     sessionEvents.emitEvidenceJobChanged(params.sessionId, job.jobId, 'running');
 
-    const budgetMinutes = params.budgetMinutes ?? DEFAULT_BUDGET_MINUTES;
-    const startedAt = Date.now();
-
-    let exec: SpawnOutcome;
+    // The ONE verification pipeline (ADR-0107): same policy verdict, spawn mode,
+    // output caps, budget kill, and hash-chained ledger record the CLI writes.
+    let exec: EvidenceCommandResult;
     try {
-      exec = await spawnEvidenceCommand(params.command, params.targetRoot, budgetMinutes);
-    } catch (error) {
-      exec = {
-        exitCode: -1,
-        timedOut: false,
-        stdoutTail: '',
-        stderrTail: String(error instanceof Error ? error.message : error).slice(-STDERR_CAP),
-      };
-    }
-    const durationMs = Date.now() - startedAt;
-
-    try {
-      // Same hash-chained record evidence-runner writes, so CLI and web evidence
-      // verify against one chain.
-      const ledgerRecord = appendEvidenceLedgerRecord(params.ledgerPath, {
-        schemaVersion: 2,
-        kind: exec.exitCode === 0 ? 'verification_passed' : 'verification_failed',
+      exec = await adapter.runEvidenceCommand({
+        target: params.targetRoot,
         command: params.command,
-        exitCode: exec.exitCode,
-        durationMs,
-        stdoutTail: exec.stdoutTail,
-        stderrTail: exec.stderrTail,
-        recordedAt: new Date().toISOString(),
-        executesAnything: true,
-        sessionId: params.sessionId,
-        stage: params.stage,
+        ledgerPath: params.ledgerPath,
+        budgetMinutes: params.budgetMinutes,
+        subject: { sessionId: params.sessionId, stage: params.stage },
       });
+    } catch (error) {
+      settleFailure(job, error instanceof Error ? error.message : String(error));
+      return;
+    }
 
-      if (exec.exitCode === 0) {
+    // Policy can only have tightened between the router's pre-check and here
+    // (a rules file edited mid-flight), but if it did the command did NOT run
+    // and the job must say so rather than report an execution.
+    if (exec.denied) {
+      updateJob(job, { status: 'denied', error: exec.reason });
+      sessionEvents.emitEvidenceJobChanged(params.sessionId, job.jobId, 'denied');
+      return;
+    }
+
+    const exitCode = exec.exitCode ?? -1;
+    const durationMs = exec.durationMs ?? 0;
+    const stdoutTail = exec.stdoutTail ?? '';
+    const stderrTail = exec.stderrTail ?? '';
+    const ledgerRecord = exec.ledgerRecord;
+
+    try {
+      if (exitCode === 0) {
         // Persist the stage completion BEFORE writing the stage_completed
         // audit event: if persistence throws, the catch below settles the job
         // as failed WITHOUT the timeline already claiming the stage passed —
@@ -549,8 +439,8 @@ async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams)
           denied: false,
           exitCode: 0,
           durationMs,
-          stdoutTail: exec.stdoutTail,
-          stderrTail: exec.stderrTail,
+          stdoutTail,
+          stderrTail,
           completedStages: Array.isArray(rawCompletedStages)
             ? (rawCompletedStages as string[])
             : [],
@@ -571,7 +461,7 @@ async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams)
           stage: params.stage,
           displayName: params.displayName,
           command: params.command,
-          exitCode: exec.exitCode,
+          exitCode,
           durationMs,
         },
       });
@@ -583,10 +473,10 @@ async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams)
         command: params.command,
         executed: true,
         denied: false,
-        exitCode: exec.exitCode,
+        exitCode,
         durationMs,
-        stdoutTail: exec.stdoutTail,
-        stderrTail: exec.stderrTail,
+        stdoutTail,
+        stderrTail,
         ledgerRecord,
       };
       const status: EvidenceJobStatus = exec.timedOut ? 'timeout' : 'failed';
@@ -594,7 +484,7 @@ async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams)
         status,
         result,
         ...(exec.timedOut
-          ? { error: `Verification command exceeded the ${budgetMinutes} minute budget` }
+          ? { error: `Verification command exceeded the ${exec.budgetMinutes} minute budget` }
           : {}),
       });
       sessionEvents.emitEvidenceJobChanged(params.sessionId, job.jobId, status);
@@ -603,9 +493,7 @@ async function runEvidenceJob(job: EvidenceJobRecord, params: EvidenceJobParams)
       // job must settle visibly instead of hanging in 'running'. Because the
       // stage persistence happens before the audit writes (see above), a
       // failure here never leaves a stage_completed event ahead of the state.
-      const message = error instanceof Error ? error.message : String(error);
-      updateJob(job, { status: 'failed', error: message });
-      sessionEvents.emitEvidenceJobChanged(params.sessionId, job.jobId, 'failed');
+      settleFailure(job, error instanceof Error ? error.message : String(error));
     }
   } finally {
     // Terminal by construction: every path above settles the job, so the
