@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { resolvePathWithin, writeFileWithinTarget } = require("./core/fs-utils");
 const { statePath } = require("./state-dir-resolver");
 
 const DEFAULT_THRESHOLD = 2;
@@ -169,7 +170,11 @@ function findDistillCandidates(projectRoot, options = {}) {
 
 function writeDistillProposal(projectRoot, outputPath, options = {}) {
 	const root = path.resolve(projectRoot || ".");
-	const resolvedOutput = path.resolve(outputPath);
+	const label = "maintenance distill --output";
+	// --output names a destination inside the target, like every other write flag.
+	// Resolving it against the process cwd let `--output ../elsewhere/x.md` land
+	// outside the repository with no refusal (#345/#346 fixed the same class).
+	const resolvedOutput = resolvePathWithin(root, outputPath, { label });
 	const candidates = findDistillCandidates(root, options);
 
 	fs.mkdirSync(path.dirname(resolvedOutput), { recursive: true });
@@ -197,10 +202,15 @@ function writeDistillProposal(projectRoot, outputPath, options = {}) {
 	);
 	lines.push("");
 
-	fs.writeFileSync(resolvedOutput, lines.join("\n"));
+	const writtenOutput = writeFileWithinTarget(
+		root,
+		path.relative(root, resolvedOutput),
+		lines.join("\n"),
+		{ label },
+	);
 
 	return {
-		outputPath: resolvedOutput,
+		outputPath: writtenOutput,
 		candidateCount: candidates.length,
 		target: root,
 	};
