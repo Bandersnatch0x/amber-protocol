@@ -2097,7 +2097,7 @@ const COMMAND_OUTPUT = {
 	},
 	session: {
 		usage:
-			"Usage: amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger|lease|run|settle> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
+			"Usage: amber session <start|status|list|abort|continue|complete-check|complete|verify|approve|verify-ledger|lease|run|settle> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
 	},
 	status: { usage: "Usage: amber status --target <repo> [--json]" },
 	drift: {

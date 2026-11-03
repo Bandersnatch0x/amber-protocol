@@ -24,7 +24,7 @@ Manage session lifecycle: start, status, list, abort, continue, complete-check, 
 ## Usage
 
 ```bash
-amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger|lease|run|settle> [--target <repo>] [--session <id>] [--goal <goal>] [--json]
+amber session <start|status|list|abort|continue|complete-check|complete|verify|approve|verify-ledger|lease|run|settle> [--target <repo>] [--session <id>] [--goal <goal>] [--json]
 ```
 
 ## Execution Contract
