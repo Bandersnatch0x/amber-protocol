@@ -39,11 +39,11 @@ amber projection --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>invalidate</code> | Subcommand action for <code>projection</code> |
-| <code>list</code> | Subcommand action for <code>projection</code> |
-| <code>rebuild</code> | Subcommand action for <code>projection</code> |
-| <code>status</code> | Subcommand action for <code>projection</code> |
-| <code>strict-query</code> | Subcommand action for <code>projection</code> |
+| <code>invalidate</code> | Append a scoped staleness receipt; history is never rewritten. |
+| <code>list</code> | List all projections and their status. |
+| <code>rebuild</code> | Rebuild from canonical artifacts: context pages (.amber/context/pages/), plus committed Canonical Artifact revisions for the Governance Graph. |
+| <code>status</code> | Report projection state: missing, current, or drifted. |
+| <code>strict-query</code> | Strict Governance Graph read: exact scope/checkpoint/version, expiring cursor, and stale dependency refusal. |
 
 ## Command Details
 

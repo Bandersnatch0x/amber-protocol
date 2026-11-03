@@ -1908,6 +1908,92 @@ function documentedSubcommands(command) {
 	return [...discovered].sort();
 }
 
+/**
+ * Read one command's "Subcommands:" help block into per-verb details.
+ *
+ * The registry documents a verb in one of three layouts, and all three appear
+ * today:
+ *   `  list                 List all routes …`      (signature, gutter, prose)
+ *   `  inspect <id>         Print a route's …`      (signature + prose, same row)
+ *   `  start (--goal …)`                            (signature only, prose below)
+ *
+ * `documentedSubcommands()` already walked this block for the names and
+ * discarded everything after them, which is why the generated docs page for
+ * every command rendered "Subcommand action for <command>". The prose was
+ * never missing; it was parsed and dropped.
+ *
+ * A continued row belongs to the signature when it starts with a bracket or a
+ * flag, and to the summary otherwise — that is the one rule that separates the
+ * `--record-version <v>` continuation lines from real sentences.
+ *
+ * @param {string} command
+ * @returns {Record<string, {signature: string, summary: string}>}
+ */
+function documentedSubcommandDetails(command) {
+	const help = COMMAND_DEFINITIONS[command]?.help;
+	const lines = Array.isArray(help) ? help : [help];
+	const parsed = {};
+	let inSubcommands = false;
+	let current = null;
+
+	const flush = () => {
+		if (!current) return;
+		const summary = current.summary.join(" ").replace(/\s+/g, " ").trim();
+		const signature = current.signature.replace(/\s+/g, " ").trim();
+		for (const name of current.names) parsed[name] = { signature, summary };
+		current = null;
+	};
+
+	for (const line of lines) {
+		const text = String(line || "");
+		const trimmed = text.trim();
+		if (["Subcommands:", "Actions:"].includes(trimmed)) {
+			flush();
+			inSubcommands = true;
+			continue;
+		}
+		if (inSubcommands && /^[A-Z][A-Za-z -]+:$/.test(trimmed)) {
+			flush();
+			inSubcommands = false;
+			continue;
+		}
+		if (!inSubcommands) continue;
+
+		if (/^ {2}\S/.test(text)) {
+			flush();
+			const names = [];
+			for (const alternative of trimmed.split(/\s+\/\s+/)) {
+				const match = alternative.match(/^([a-z][a-z0-9-]*)/);
+				if (match) names.push(match[1]);
+			}
+			if (names.length === 0) continue;
+			const after = trimmed.slice(trimmed.indexOf(names[0]) + names[0].length).trim();
+			const columns = after
+				.split(/\s{2,}/)
+				.map((part) => part.trim())
+				.filter(Boolean);
+			const summary = [];
+			let signature = "";
+			if (columns.length > 1) {
+				signature = columns[0];
+				summary.push(columns.slice(1).join(" "));
+			} else if (columns.length === 1) {
+				if (/^[([<]|^-/.test(columns[0])) signature = columns[0];
+				else summary.push(columns[0]);
+			}
+			current = { names, signature, summary };
+			continue;
+		}
+
+		if (current && /^ {4,}\S/.test(text)) {
+			if (/^[([<]|^-/.test(trimmed)) current.signature += ` ${trimmed}`;
+			else current.summary.push(trimmed);
+		}
+	}
+	flush();
+	return parsed;
+}
+
 function requiredOptionsIn(syntax) {
 	const required = [];
 	let optionalDepth = 0;
@@ -2654,6 +2740,7 @@ module.exports = {
 	TYPED_COMMANDS,
 	KNOWN_UNTYPED_SUBCOMMANDS,
 	commandSummary,
+	documentedSubcommandDetails,
 	commandUsageLine,
 	commandInvocationContract,
 	capabilityFor,

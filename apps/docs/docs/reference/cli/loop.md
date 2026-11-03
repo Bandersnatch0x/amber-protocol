@@ -39,14 +39,14 @@ amber loop <inspect|recommend|run|approve|verify-ledger|record|status|validate-l
 
 | Subcommand | Description |
 | --- | --- |
-| <code>approve</code> | Subcommand action for <code>loop</code> |
-| <code>inspect</code> | Subcommand action for <code>loop</code> |
-| <code>recommend</code> | Subcommand action for <code>loop</code> |
-| <code>record</code> | Subcommand action for <code>loop</code> |
-| <code>run</code> | Subcommand action for <code>loop</code> |
-| <code>status</code> | Subcommand action for <code>loop</code> |
-| <code>validate-loop</code> | Subcommand action for <code>loop</code> |
-| <code>verify-ledger</code> | Subcommand action for <code>loop</code> |
+| <code>approve</code> | — |
+| <code>inspect</code> | — |
+| <code>recommend</code> | — |
+| <code>record</code> | — |
+| <code>run</code> | — |
+| <code>status</code> | — |
+| <code>validate-loop</code> | — |
+| <code>verify-ledger</code> | — |
 
 ## Command Details
 

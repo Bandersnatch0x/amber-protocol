@@ -50,17 +50,17 @@ amber adapter <register|read|candidate|compare|comparisons|cutover|rollback|cuto
 
 | Subcommand | Description |
 | --- | --- |
-| <code>candidate</code> | Subcommand action for <code>adapter</code> |
-| <code>compare</code> | Subcommand action for <code>adapter</code> |
-| <code>comparisons</code> | Subcommand action for <code>adapter</code> |
-| <code>cutover</code> | Subcommand action for <code>adapter</code> |
-| <code>cutovers</code> | Subcommand action for <code>adapter</code> |
-| <code>list</code> | Subcommand action for <code>adapter</code> |
-| <code>read</code> | Subcommand action for <code>adapter</code> |
-| <code>receipts</code> | Subcommand action for <code>adapter</code> |
-| <code>register</code> | Subcommand action for <code>adapter</code> |
-| <code>rollback</code> | Subcommand action for <code>adapter</code> |
-| <code>show</code> | Subcommand action for <code>adapter</code> |
+| <code>candidate</code> | `--id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <v>] [--expected-source-hash <hash>] [--scope <scope>]` |
+| <code>compare</code> | `--id <id> --fixture <json> [--scope <scope>]` |
+| <code>comparisons</code> | `[--id <adapter-id>] [--scope <scope>]` |
+| <code>cutover</code> | `--id <id> --cutover-id <id> --artifact-type <type> --generation <gen> --comparison-index <n> --decision-identity <identity> --revision <n> --confirmed-by <owner> --rollback-evidence <ref> [--scope <scope>]` |
+| <code>cutovers</code> | `[--id <adapter-id>] [--scope <scope>]` |
+| <code>list</code> | — |
+| <code>read</code> | `--id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <v>] [--expected-source-hash <hash>] [--scope <scope>]` |
+| <code>receipts</code> | `[--id <adapter-id>]` |
+| <code>register</code> | `--id <id> --adapter-owner <owner> --record-type <type> --record-version <v> --scope <scope> --identity-map <strategy> --freshness-ms <n> [--allow-path <prefix>] [--adapter-version <v>]` |
+| <code>rollback</code> | `--cutover-id <id> --decision-identity <identity> --revision <n> --confirmed-by <owner> --evidence <ref>` |
+| <code>show</code> | `--id <id>` |
 
 ## Command Details
 

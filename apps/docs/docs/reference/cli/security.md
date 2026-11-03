@@ -39,7 +39,7 @@ amber security --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>audit</code> | Subcommand action for <code>security</code> |
+| <code>audit</code> | Generate a security audit report without mutating target code. |
 
 ## Command Details
 

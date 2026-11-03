@@ -39,7 +39,7 @@ amber break-loop --target <repo> --issue <n> --title "<title>" --recurrence <n> 
 
 | Subcommand | Description |
 | --- | --- |
-| <code>validate</code> | Subcommand action for <code>break-loop</code> |
+| <code>validate</code> | Check every section is filled: ids chosen, write-back surface + test anchor + runnable verification command present. |
 
 ## Command Details
 

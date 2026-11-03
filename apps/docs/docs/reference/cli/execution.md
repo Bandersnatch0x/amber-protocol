@@ -39,8 +39,8 @@ amber execution --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>readiness</code> | Subcommand action for <code>execution</code> |
-| <code>validate-integration</code> | Subcommand action for <code>execution</code> |
+| <code>readiness</code> | Review plan for execution boundary violations. |
+| <code>validate-integration</code> | Validate integration contract structure and hardstops. |
 
 ## Command Details
 

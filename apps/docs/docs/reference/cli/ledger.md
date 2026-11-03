@@ -39,10 +39,10 @@ amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|o
 
 | Subcommand | Description |
 | --- | --- |
-| <code>export</code> | Subcommand action for <code>ledger</code> |
-| <code>seal</code> | Subcommand action for <code>ledger</code> |
-| <code>verify</code> | Subcommand action for <code>ledger</code> |
-| <code>verify-anchoring</code> | Subcommand action for <code>ledger</code> |
+| <code>export</code> | — |
+| <code>seal</code> | — |
+| <code>verify</code> | — |
+| <code>verify-anchoring</code> | — |
 
 ## Command Details
 

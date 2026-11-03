@@ -39,19 +39,19 @@ amber session <start|status|list|abort|continue|complete-check|complete|verify|a
 
 | Subcommand | Description |
 | --- | --- |
-| <code>abort</code> | Subcommand action for <code>session</code> |
-| <code>approve</code> | Subcommand action for <code>session</code> |
-| <code>complete</code> | Subcommand action for <code>session</code> |
-| <code>complete-check</code> | Subcommand action for <code>session</code> |
-| <code>continue</code> | Subcommand action for <code>session</code> |
-| <code>lease</code> | Subcommand action for <code>session</code> |
-| <code>list</code> | Subcommand action for <code>session</code> |
-| <code>run</code> | Subcommand action for <code>session</code> |
-| <code>settle</code> | Subcommand action for <code>session</code> |
-| <code>start</code> | Subcommand action for <code>session</code> |
-| <code>status</code> | Subcommand action for <code>session</code> |
-| <code>verify</code> | Subcommand action for <code>session</code> |
-| <code>verify-ledger</code> | Subcommand action for <code>session</code> |
+| <code>abort</code> | Set session status to aborted, write abort event, cleanup worktree. |
+| <code>approve</code> | Record a gate_passed event so complete-check sees approval evidence. |
+| <code>complete</code> | Mark a session completed (governance terminal state). Requires complete-check to pass. |
+| <code>complete-check</code> | Report whether a session has enough evidence to be treated as complete. |
+| <code>continue</code> | Continue a paused or incomplete session from its current stage. |
+| <code>lease</code> | Reacquire the session lease for the current owner: a fresh token and a new fence (explicit, owner-bound; ADR-0029 §8.1). |
+| <code>list</code> | List all sessions in reverse chronological order. |
+| <code>run</code> | Execute the current verb stage (F062). Dry-run resolves without executing. |
+| <code>settle</code> | Settle a pending host-agent request and advance the cursor on success. |
+| <code>start</code> | Create a new session, write manifest + timeline, optionally create worktree. |
+| <code>status</code> | Show status of current session or specified session by ID. |
+| <code>verify</code> | Record verification evidence. Without --execute, records a self-reported claim. With --execute, runs --command and records the real exit code (default 5-minute budget; raise it for long suites, capped at 60). |
+| <code>verify-ledger</code> | — |
 
 ## Command Details
 

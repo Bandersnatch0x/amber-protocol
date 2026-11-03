@@ -41,8 +41,8 @@ amber handoff --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>bundle</code> | Subcommand action for <code>handoff</code> |
-| <code>validate</code> | Subcommand action for <code>handoff</code> |
+| <code>bundle</code> | Write README, summary, evidence, next-actions, risks, recovery commands, and manifest. |
+| <code>validate</code> | Validate a handoff bundle directory. |
 
 ## Command Details
 

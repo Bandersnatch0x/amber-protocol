@@ -43,10 +43,10 @@ amber workflow <assess|findings|plan|compare> --target <repo>
 
 | Subcommand | Description |
 | --- | --- |
-| <code>assess</code> | Subcommand action for <code>workflow</code> |
-| <code>compare</code> | Subcommand action for <code>workflow</code> |
-| <code>findings</code> | Subcommand action for <code>workflow</code> |
-| <code>plan</code> | Subcommand action for <code>workflow</code> |
+| <code>assess</code> | Produce a workflow-effectiveness report. Sessions (amber-native) are included by default; --no-sessions emits a repository-only baseline. --format json is the default output. --output-dir writes the report to a file instead of stdout (assess only). |
+| <code>compare</code> | `(P3) Compare two reports across schema versions.` |
+| <code>findings</code> | `(P2) List findings from a prior report.` |
+| <code>plan</code> | Bridge a finding to a dry-run amber plan draft (review before applying). |
 
 ## Command Details
 

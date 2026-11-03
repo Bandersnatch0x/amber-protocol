@@ -39,8 +39,8 @@ amber migrate --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>state</code> | Subcommand action for <code>migrate</code> |
-| <code>wiki</code> | Subcommand action for <code>migrate</code> |
+| <code>state</code> | Merge legacy .harness state into .amber without overwriting. |
+| <code>wiki</code> | Rename docs/wiki/agent/harness.md to amber.md and fix links. |
 
 ## Command Details
 

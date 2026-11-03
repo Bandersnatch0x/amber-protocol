@@ -39,12 +39,12 @@ amber phase --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>evidence</code> | Subcommand action for <code>phase</code> |
-| <code>invariants</code> | Subcommand action for <code>phase</code> |
-| <code>promote</code> | Subcommand action for <code>phase</code> |
-| <code>rollback</code> | Subcommand action for <code>phase</code> |
-| <code>transitions</code> | Subcommand action for <code>phase</code> |
-| <code>validate</code> | Subcommand action for <code>phase</code> |
+| <code>evidence</code> | Show the gate evidence. |
+| <code>invariants</code> | Check invariant non-regression. |
+| <code>promote</code> | Promote with complete evidence + explicit authorization. |
+| <code>rollback</code> | Roll back to a checkpoint (never destructive). |
+| <code>transitions</code> | List append-only lineage. |
+| <code>validate</code> | Check evidence completeness. |
 
 ## Command Details
 

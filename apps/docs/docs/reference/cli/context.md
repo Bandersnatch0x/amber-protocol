@@ -39,20 +39,20 @@ amber context --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>benchmark</code> | Subcommand action for <code>context</code> |
-| <code>delete</code> | Subcommand action for <code>context</code> |
-| <code>ingest</code> | Subcommand action for <code>context</code> |
-| <code>list</code> | Subcommand action for <code>context</code> |
-| <code>load</code> | Subcommand action for <code>context</code> |
-| <code>preview</code> | Subcommand action for <code>context</code> |
-| <code>projection</code> | Subcommand action for <code>context</code> |
-| <code>refresh</code> | Subcommand action for <code>context</code> |
-| <code>request</code> | Subcommand action for <code>context</code> |
-| <code>retention</code> | Subcommand action for <code>context</code> |
-| <code>show</code> | Subcommand action for <code>context</code> |
-| <code>source-adapter</code> | Subcommand action for <code>context</code> |
-| <code>stats</code> | Subcommand action for <code>context</code> |
-| <code>verify</code> | Subcommand action for <code>context</code> |
+| <code>benchmark</code> | Run deterministic Loadout quality metrics against a target-local fixture. |
+| <code>delete</code> | / show --page <id> / delete --page <id> Inspect or manage accepted pages. list accepts --knowledge-kind <kind>. |
+| <code>ingest</code> | Judge the agent's output: schema, citation completeness, payload-to-request binding, request-owned scope, and source freshness. The matching request is required for every accepted or no-change outcome. A payload of {"outcome":"no-change"} rebases hashes without touching content. |
+| <code>list</code> | / show --page <id> / delete --page <id> Inspect or manage accepted pages. list accepts --knowledge-kind <kind>. |
+| <code>load</code> | Assemble a task-scoped Loadout: three target-local Required Artifacts plus a freshness-gated, budgeted selection of Context Pages, written to .amber/context/loadouts/<route>[-<feature>][--<run>].json. With --subject <s> --purpose <p> ([--run <id>]) the F069 firewall verdict gates every candidate page: allowed pages cite the covering grant (id + snapshot + validUntil), denied pages are excluded with reason firewall and the closed deny reason (each denial on the trail); without --subject the build is byte-identical and the artifact carries no firewall section (visibly not grant-governed). build without --run, which the held-out leak check depends on. |
+| <code>preview</code> | Assemble and print the same Loadout without writing files or events. Firewall mode (--subject/--purpose) requires `load` — preview never carries the firewall section; it prints the ungoverned shape. |
+| <code>projection</code> | Check or rebuild the disposable, hash-bound Context index projection. |
+| <code>refresh</code> | Scan pages for source changes: cosmetic changes absorbed silently |
+| <code>request</code> | Scan evidence, bundle hash-bearing sources, write a distillation contract to .amber/context/requests/. Sources are mutable by default; refs under .amber/ and docs/adr/ are immutable (excerpt-snapshotted). |
+| <code>retention</code> | Report age, reachability, lineage protection, and eligibility. Never deletes. |
+| <code>show</code> | / show --page <id> / delete --page <id> Inspect or manage accepted pages. list accepts --knowledge-kind <kind>. |
+| <code>source-adapter</code> | Produce unaccepted Source Bundle candidates from the local fixture adapter. Disabled by default; transcript sources require explicit opt-in and redaction. |
+| <code>stats</code> | Report over .amber/context/events.jsonl: filter rate, pass rate, no-change rate, unknown-block share, assurance, and source density. |
+| <code>verify</code> | Re-check Required Artifacts and required-tier Pages (path and hash) right before the agent loads them; missing, escaped, or changed inputs fail closed. |
 
 ## Command Details
 

@@ -54,21 +54,21 @@ amber retention <classify|evaluate|classifications|hold|release|holds|holder|hol
 
 | Subcommand | Description |
 | --- | --- |
-| <code>authorize</code> | Subcommand action for <code>retention</code> |
-| <code>candidate</code> | Subcommand action for <code>retention</code> |
-| <code>candidates</code> | Subcommand action for <code>retention</code> |
-| <code>classifications</code> | Subcommand action for <code>retention</code> |
-| <code>classify</code> | Subcommand action for <code>retention</code> |
-| <code>evaluate</code> | Subcommand action for <code>retention</code> |
-| <code>execute</code> | Subcommand action for <code>retention</code> |
-| <code>hold</code> | Subcommand action for <code>retention</code> |
-| <code>holder</code> | Subcommand action for <code>retention</code> |
-| <code>holders</code> | Subcommand action for <code>retention</code> |
-| <code>holds</code> | Subcommand action for <code>retention</code> |
-| <code>proof</code> | Subcommand action for <code>retention</code> |
-| <code>release</code> | Subcommand action for <code>retention</code> |
-| <code>settle</code> | Subcommand action for <code>retention</code> |
-| <code>status</code> | Subcommand action for <code>retention</code> |
+| <code>authorize</code> | `--id <candidate-id> --approval <id> --decision-identity <identity> --body <markdown> [--trace decides:<type>:<identity>] [--scope <scope>]` |
+| <code>candidate</code> | `--id <candidate-id> [--now <iso>]` |
+| <code>candidates</code> | `[--status <prepared\|authorized>]` |
+| <code>classifications</code> | `[--type <type>] [--id <identity>]` |
+| <code>classify</code> | `--record <type>:<identity>@<rev> --retention-class <class> --policy <identity>@<rev> [--sensitivity <none\|secret\|personal>] [--minimized]` |
+| <code>evaluate</code> | `[--now <iso>]` |
+| <code>execute</code> | `--id <transaction-id> --candidate <candidate-id>` |
+| <code>hold</code> | `--id <hold-id> (--record <type>:<identity>@<rev> \| --subject <identity>) --reason <text> --decision-identity <identity> --revision <n>` |
+| <code>holder</code> | `--id <holder-id> --holder-version <v> --surface <surface> --adapter <adapter-id> --adapter-version <v> --decision-identity <identity> --revision <n>` |
+| <code>holders</code> | — |
+| <code>holds</code> | `[--status <active\|released>]` |
+| <code>proof</code> | `--id <transaction-id>` |
+| <code>release</code> | `--id <hold-id> --decision-identity <identity> --revision <n>` |
+| <code>settle</code> | `--id <transaction-id> --holder <holder-id> --holder-version <v> --status <settled\|refused\|failed\|unavailable> --receipt-hash <sha256:...>` |
+| <code>status</code> | `--id <transaction-id>` |
 
 ## Command Details
 

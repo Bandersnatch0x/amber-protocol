@@ -47,14 +47,14 @@ amber breakglass <grant|revoke|grants|use|show|settle|review|status> --target <r
 
 | Subcommand | Description |
 | --- | --- |
-| <code>grant</code> | Subcommand action for <code>breakglass</code> |
-| <code>grants</code> | Subcommand action for <code>breakglass</code> |
-| <code>review</code> | Subcommand action for <code>breakglass</code> |
-| <code>revoke</code> | Subcommand action for <code>breakglass</code> |
-| <code>settle</code> | Subcommand action for <code>breakglass</code> |
-| <code>show</code> | Subcommand action for <code>breakglass</code> |
-| <code>status</code> | Subcommand action for <code>breakglass</code> |
-| <code>use</code> | Subcommand action for <code>breakglass</code> |
+| <code>grant</code> | `--id <grant-id> --incident <incident> --purpose <purpose> --capability <runner:...\|external:...> --exact-target <target> --scope <scope> --environment <env> --risk <low\|medium\|high\|critical> --credential <none\|scoped> --valid-from <iso> --valid-until <iso> --review-by <iso> --decision-identity <identity> --revision <n> [--now <iso>]` |
+| <code>grants</code> | `[--status <granted\|used\|revoked\|expired>] [--now <iso>]` |
+| <code>review</code> | `--id <grant-id> --outcome <text> --necessity <text> --impact <text> --follow-up <text> --decision-identity <identity> --revision <n> [--now <iso>]` |
+| <code>revoke</code> | `--id <grant-id> --reason <text> --decision-identity <identity> --revision <n> [--now <iso>]` |
+| <code>settle</code> | `--id <grant-id> --receipt <underlying-receipt> [--now <iso>]` |
+| <code>show</code> | `--id <grant-id> [--now <iso>]` |
+| <code>status</code> | `--id <grant-id> [--now <iso>]` |
+| <code>use</code> | `--id <grant-id> --request <underlying-reference> [--now <iso>]` |
 
 ## Command Details
 

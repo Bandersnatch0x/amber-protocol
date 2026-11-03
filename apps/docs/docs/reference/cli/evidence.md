@@ -43,10 +43,10 @@ amber evidence <record|verify|show|list> --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>list</code> | Subcommand action for <code>evidence</code> |
-| <code>record</code> | Subcommand action for <code>evidence</code> |
-| <code>show</code> | Subcommand action for <code>evidence</code> |
-| <code>verify</code> | Subcommand action for <code>evidence</code> |
+| <code>list</code> | List every derived record in first-recorded order. |
+| <code>record</code> | Record one receipt. --scope, --input, --tool, --env <key=value>, its run outcome explicitly), and --replay-of (required for replayable, forbidden otherwise) qualify it. |
+| <code>show</code> | Show one derived record (effective assurance, verifiers). |
+| <code>verify</code> | Append one independent verification event; promotes the effective assurance to verified. A verification is recorded exactly once per verifier (AMBER_E_EVIDENCE_ALREADY_VERIFIED). |
 
 ## Command Details
 

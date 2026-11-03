@@ -48,15 +48,15 @@ amber release <prepare|authorize|deploy|rollback|transactions|status|receipts|sh
 
 | Subcommand | Description |
 | --- | --- |
-| <code>authorize</code> | Subcommand action for <code>release</code> |
-| <code>deploy</code> | Subcommand action for <code>release</code> |
-| <code>list</code> | Subcommand action for <code>release</code> |
-| <code>prepare</code> | Subcommand action for <code>release</code> |
-| <code>receipts</code> | Subcommand action for <code>release</code> |
-| <code>rollback</code> | Subcommand action for <code>release</code> |
-| <code>show</code> | Subcommand action for <code>release</code> |
-| <code>status</code> | Subcommand action for <code>release</code> |
-| <code>transactions</code> | Subcommand action for <code>release</code> |
+| <code>authorize</code> | staging: --approval <id> --decision-identity <identity> --body <markdown> production: --branch-protection <evidence-id> --code-owner <identity>@<rev> |
+| <code>deploy</code> | `--id <release-id> --request-hash <sha256:...>` |
+| <code>list</code> | `[--environment <env>]` |
+| <code>prepare</code> | `--id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev> [--change-artifact ...] --evidence-item <evidence-id> [--evidence-item ...] --review-logic <evidence-id> --review-security <evidence-id> --review-spec <evidence-id> --environment <development\|staging\|production> --release-policy <identity>@<rev> --runner <runner-id> --runner-version <v> --capability <name> --capability-version <v> --credential <none\|scoped> --rollback <evidence-id>` |
+| <code>receipts</code> | `--id <release-id>` |
+| <code>rollback</code> | `--id <release-id> --request-hash <sha256:...>` |
+| <code>show</code> | `--id <release-id>` |
+| <code>status</code> | `--id <release-id>` |
+| <code>transactions</code> | `[--id <release-id>]` |
 
 ## Command Details
 

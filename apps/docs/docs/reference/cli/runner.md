@@ -51,18 +51,18 @@ amber runner <register|capability|request|authorize|requests|prepare|settle|abor
 
 | Subcommand | Description |
 | --- | --- |
-| <code>abort</code> | Subcommand action for <code>runner</code> |
-| <code>authorize</code> | Subcommand action for <code>runner</code> |
-| <code>capability</code> | Subcommand action for <code>runner</code> |
-| <code>executions</code> | Subcommand action for <code>runner</code> |
-| <code>list</code> | Subcommand action for <code>runner</code> |
-| <code>prepare</code> | Subcommand action for <code>runner</code> |
-| <code>register</code> | Subcommand action for <code>runner</code> |
-| <code>request</code> | Subcommand action for <code>runner</code> |
-| <code>requests</code> | Subcommand action for <code>runner</code> |
-| <code>rolled-back</code> | Subcommand action for <code>runner</code> |
-| <code>settle</code> | Subcommand action for <code>runner</code> |
-| <code>show</code> | Subcommand action for <code>runner</code> |
+| <code>abort</code> | `--request-hash <sha256:...> --reason <text>` |
+| <code>authorize</code> | `--request-hash <sha256:...> --approval <id> --decision-identity <identity> --body <markdown> [--trace decides:<type>:<identity>] [--scope <scope>]` |
+| <code>capability</code> | `--id <runner-id> --runner-version <v> --capability <name> --capability-version <v> --effect <effect> [--effect <effect> ...] [--path-prefix <prefix> ...] --timeout-ms <n> --credential <none\|scoped> --rollback <declaration> --decision-identity <identity> --revision <n>` |
+| <code>executions</code> | `[--status <attempted\|timed-out\|failed\|committed\|rolled-back>]` |
+| <code>list</code> | — |
+| <code>prepare</code> | `--request-hash <sha256:...> --id <runner-id> --runner-version <v> --integrity <sha256:...>` |
+| <code>register</code> | `--id <id> --runner-version <v> --integrity <sha256:...> --runner-owner <owner> --decision-identity <identity> --revision <n>` |
+| <code>request</code> | `--id <runner-id> --runner-version <v> --capability <name> --capability-version <v> --repository <repo> --path <path> [--path <path> ...] --environment <development\|staging\|production> [--scope <scope>] [--input-hash <sha256:...> ...] --timeout-ms <n> --effect <effect> [...] --credential <none\|scoped> [--credential-handle <id> --credential-purpose <p> --credential-scope <s> --credential-expires <iso>] [--rehearsal <evidence-id>] --rollback <declaration>` |
+| <code>requests</code> | `[--environment <env>] [--status <requested\|authorized\|denied>]` |
+| <code>rolled-back</code> | `--request-hash <sha256:...> --evidence <evidence-id> --reason <text>` |
+| <code>settle</code> | `--request-hash <sha256:...> --receipt <json-file>` |
+| <code>show</code> | `--id <id>` |
 
 ## Command Details
 

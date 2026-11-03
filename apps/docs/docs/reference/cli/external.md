@@ -50,17 +50,17 @@ amber external <register|effects|propose|authorize|proposals|execute|settle|reco
 
 | Subcommand | Description |
 | --- | --- |
-| <code>authorize</code> | Subcommand action for <code>external</code> |
-| <code>compensate</code> | Subcommand action for <code>external</code> |
-| <code>effects</code> | Subcommand action for <code>external</code> |
-| <code>execute</code> | Subcommand action for <code>external</code> |
-| <code>proposals</code> | Subcommand action for <code>external</code> |
-| <code>propose</code> | Subcommand action for <code>external</code> |
-| <code>reconcile</code> | Subcommand action for <code>external</code> |
-| <code>register</code> | Subcommand action for <code>external</code> |
-| <code>settle</code> | Subcommand action for <code>external</code> |
-| <code>status</code> | Subcommand action for <code>external</code> |
-| <code>transactions</code> | Subcommand action for <code>external</code> |
+| <code>authorize</code> | `--id <proposal-id> --approval <id> --decision-identity <identity> --body <markdown> [--trace decides:<type>:<identity>] [--scope <scope>]` |
+| <code>compensate</code> | `--id <proposal-id> --execution <execution-id> --payload-hash <sha256:...> [--now <iso>]` |
+| <code>effects</code> | `[--system <system>]` |
+| <code>execute</code> | `--id <execution-id> --request <proposal-id> [--credential-purpose <p> --credential-scope <s> --credential-expires <iso>] [--now <iso>]` |
+| <code>proposals</code> | `[--status <proposed\|authorized>]` |
+| <code>propose</code> | `--id <proposal-id> --effect <effect-id>@<version> --payload-hash <sha256:...>` |
+| <code>reconcile</code> | `--id <execution-id> --evidence <evidence-id> --external-record <id> [--now <iso>]` |
+| <code>register</code> | `--id <effect-id> --effect-version <v> --owner <owner> --system <system> --operation <operation> --external-target <target> --scope <scope> --input-schema <json-schema> --idempotency <idempotent\|at-most-once> --credential <none\|scoped> --receipt-field <name> [--receipt-field <name> ...] (--compensation-effect <effect-id> \| --irreversible) --timeout-ms <n> --adapter <adapter-id> --adapter-version <v> --decision-identity <identity> --revision <n>` |
+| <code>settle</code> | `--id <execution-id> --request-digest <sha256:...> --status <committed\|failed\|denied\|unknown> [--external-record <id>] [--response-digest <sha256:...>] [--now <iso>]` |
+| <code>status</code> | `--id <execution-id>` |
+| <code>transactions</code> | `[--request <proposal-id>]` |
 
 ## Command Details
 

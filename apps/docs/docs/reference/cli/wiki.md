@@ -39,7 +39,7 @@ amber wiki --target <repo> [--json] [--dry-run]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>knowledge</code> | Subcommand action for <code>wiki</code> |
+| <code>knowledge</code> | Knowledge Plan + Structured Knowledge Base (declarative plan format). knowledge plan Pre-flight inspection + propose or update the plan. knowledge scaffold Scaffold docs/wiki/knowledge-plan.json (or --yaml). knowledge inspect Dump the loaded plan. knowledge report Coverage report against declared documents + notes + cards. knowledge validate Schema validation of the plan. knowledge build Materialize structured knowledge pages under docs/wiki/knowledge/. |
 
 ## Command Details
 

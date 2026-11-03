@@ -39,16 +39,16 @@ amber memory <request|ingest|approve|book|abandon|status> [--target <repo>] [--j
 
 | Subcommand | Description |
 | --- | --- |
-| <code>abandon</code> | Subcommand action for <code>memory</code> |
-| <code>approve</code> | Subcommand action for <code>memory</code> |
-| <code>book</code> | Subcommand action for <code>memory</code> |
-| <code>conversion</code> | Subcommand action for <code>memory</code> |
-| <code>escape-hatch</code> | Subcommand action for <code>memory</code> |
-| <code>gamma</code> | Subcommand action for <code>memory</code> |
-| <code>ingest</code> | Subcommand action for <code>memory</code> |
-| <code>ratification</code> | Subcommand action for <code>memory</code> |
-| <code>request</code> | Subcommand action for <code>memory</code> |
-| <code>status</code> | Subcommand action for <code>memory</code> |
+| <code>abandon</code> | Explicit human abandon of a request or entry (terminal ledger marker). |
+| <code>approve</code> | Human, entry-level approval gate (--entry-id, --decision approve\|reject, --reason). |
+| <code>book</code> | Register a MEMORY.md surface hash and promote booked entries to active. |
+| <code>conversion</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
+| <code>escape-hatch</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
+| <code>gamma</code> | Read-only three-section projection (entries / gamma / alpha). |
+| <code>ingest</code> | Mechanically admit request entries into the registry as proposals (all-or-nothing). |
+| <code>ratification</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
+| <code>request</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
+| <code>status</code> | Read-only three-section projection (entries / gamma / alpha). |
 
 ## Command Details
 

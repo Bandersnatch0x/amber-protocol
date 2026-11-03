@@ -42,10 +42,10 @@ amber principal register --target <repo> --id <id> --kind <human|service> [--rol
 
 | Subcommand | Description |
 | --- | --- |
-| <code>list</code> | Subcommand action for <code>principal</code> |
-| <code>register</code> | Subcommand action for <code>principal</code> |
-| <code>revoke</code> | Subcommand action for <code>principal</code> |
-| <code>show</code> | Subcommand action for <code>principal</code> |
+| <code>list</code> | List every registered Principal with its status, in first-registration order. |
+| <code>register</code> | Register a Principal. --role, --membership, --capability, half-open [from, to)) are optional qualifications; the window is evaluated against the admission-time clock when a Decision binds the Principal. |
+| <code>revoke</code> | Revoke a Principal terminally. A revoked Principal can no longer bind new Decisions; already-committed Decisions keep their recorded Principal snapshots. |
+| <code>show</code> | Show one Principal's record and current status: active \| revoked \| expired \| not-yet-valid. |
 
 ## Command Details
 
