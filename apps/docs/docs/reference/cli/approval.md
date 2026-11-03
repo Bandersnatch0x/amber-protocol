@@ -45,7 +45,7 @@ amber approval <grant|revoke|consume|show|list> --target <repo> [--json]
 | Subcommand | Description |
 | --- | --- |
 | <code>consume</code> | Settle the authorization as one approval Decision. the Decision decides (the Decision admission's required lineage); --scope must match the approval's scope when it carries one. |
-| <code>grant</code> | Grant one authorization. --valid-until <iso> is the required expiry instant (ISO-8601; a date-time must carry an explicit zone); --scope <tag> is an optional confinement tag. |
+| <code>grant</code> | Grant one authorization. --valid-until &lt;iso&gt; is the required expiry instant (ISO-8601; a date-time must carry an explicit zone); --scope &lt;tag&gt; is an optional confinement tag. |
 | <code>list</code> | List every derived record in grant order. |
 | <code>revoke</code> | Revoke terminally (revocation is a human act; history is never rewritten). |
 | <code>show</code> | Show one derived record (status, decision binding when consumed). |

@@ -43,7 +43,7 @@ amber gate <evaluate|show|list> --target <repo> [--json]  (F050 Gate Contracts)
 
 | Subcommand | Description |
 | --- | --- |
-| <code>evaluate</code> | Evaluate one gate against the recorded Evidence and append the outcome. --revision <n> selects the committed gate revision (default: the current committed head); --now <iso> injects the evaluation clock. A FAIL verdict is a completed evaluation, not a command error: the outcome is appended and returned with exit code 0. |
+| <code>evaluate</code> | Evaluate one gate against the recorded Evidence and append the outcome. --revision &lt;n&gt; selects the committed gate revision (default: the current committed head); --now &lt;iso&gt; injects the evaluation clock. A FAIL verdict is a completed evaluation, not a command error: the outcome is appended and returned with exit code 0. |
 | <code>list</code> | List outcome records in append order, optionally filtered. |
 | <code>show</code> | Show one outcome record: by 0-based ledger line (--index), or the latest matching --gate (narrowed by --subject). |
 

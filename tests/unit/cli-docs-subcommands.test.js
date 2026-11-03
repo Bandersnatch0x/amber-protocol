@@ -30,6 +30,27 @@ test("no generated CLI page carries a placeholder subcommand description", () =>
 	);
 });
 
+test("a subcommand description carries no unescaped MDX tag", () => {
+	// These pages are .md compiled as MDX. A help-block summary such as
+	// "Required: --file <contract.json>" reaches the table verbatim, and MDX
+	// reads <contract.json> as an unclosed JSX tag — the docs build dies on a
+	// page no unit test was looking at. Signatures are already safe in backticks.
+	const pages = fs.readdirSync(CLI_DOCS).filter((name) => name.endsWith(".md"));
+	for (const file of pages) {
+		const page = fs.readFileSync(path.join(CLI_DOCS, file), "utf8");
+		for (const line of page.split("\n")) {
+			if (!line.startsWith("| <code>")) continue;
+			const outsideCode = line.replace(/`[^`]*`/g, "").replace(/<\/?code>/g, "");
+			// Only `<tag` and `</tag` start JSX. A bare `>` (as in "recurrence >= 2")
+			// is inert inside a table cell, so it must not trip this guard.
+			assert.ok(
+				!/<[A-Za-z/]/.test(outsideCode),
+				`${file} has an unescaped MDX tag opener: ${line.slice(0, 120)}`,
+			);
+		}
+	}
+});
+
 test("the help block yields prose from all three documented layouts", () => {
 	const route = documentedSubcommandDetails("route");
 	// Signature and prose on the same row, split by the alignment gutter.

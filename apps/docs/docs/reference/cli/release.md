@@ -48,7 +48,7 @@ amber release <prepare|authorize|deploy|rollback|transactions|status|receipts|sh
 
 | Subcommand | Description |
 | --- | --- |
-| <code>authorize</code> | staging: --approval <id> --decision-identity <identity> --body <markdown> production: --branch-protection <evidence-id> --code-owner <identity>@<rev> |
+| <code>authorize</code> | staging: --approval &lt;id&gt; --decision-identity &lt;identity&gt; --body &lt;markdown&gt; production: --branch-protection &lt;evidence-id&gt; --code-owner &lt;identity&gt;@&lt;rev&gt; |
 | <code>deploy</code> | `--id <release-id> --request-hash <sha256:...>` |
 | <code>list</code> | `[--environment <env>]` |
 | <code>prepare</code> | `--id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev> [--change-artifact ...] --evidence-item <evidence-id> [--evidence-item ...] --review-logic <evidence-id> --review-security <evidence-id> --review-spec <evidence-id> --environment <development\|staging\|production> --release-policy <identity>@<rev> --runner <runner-id> --runner-version <v> --capability <name> --capability-version <v> --credential <none\|scoped> --rollback <evidence-id>` |

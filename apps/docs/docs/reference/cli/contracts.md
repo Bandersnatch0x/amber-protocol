@@ -39,7 +39,7 @@ amber contracts validate [--target <amber-checkout>] [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>validate</code> | Check schema conformance, entry self-consistency, the compatibility matrix, and that every pointer resolves. Optional: --target <amber-checkout>. |
+| <code>validate</code> | Check schema conformance, entry self-consistency, the compatibility matrix, and that every pointer resolves. Optional: --target &lt;amber-checkout&gt;. |
 
 ## Command Details
 

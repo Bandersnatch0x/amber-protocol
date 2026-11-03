@@ -149,10 +149,19 @@ function generateCommandDoc(commandName, pkgMeta) {
 		// it is still real information, and still not a placeholder.
 		const details = documentedSubcommandDetails(commandName);
 		const cell = (text) => String(text).replace(/\|/g, "\\|");
+		// The page is MDX, not Markdown: a bare `<contract.json>` in prose reads as
+		// a JSX tag and fails the docs build. Signatures stay inside backticks,
+		// where MDX does not parse JSX, so only prose needs escaping.
+		const prose = (text) =>
+			cell(text)
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
+				.replace(/\{/g, "&#123;")
+				.replace(/\}/g, "&#125;");
 		for (const sub of subcommands) {
 			const detail = details[sub];
 			const description = detail?.summary
-				? cell(detail.summary)
+				? prose(detail.summary)
 				: detail?.signature
 					? `\`${cell(detail.signature)}\``
 					: "—";
