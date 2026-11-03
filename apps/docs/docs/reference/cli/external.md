@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber external
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.3</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>EXPERIMENTAL</code>
 </div>

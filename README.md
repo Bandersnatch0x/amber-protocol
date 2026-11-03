@@ -34,7 +34,7 @@
 
 </div>
 
-**Version:** 2.0.3 · **Status:** Stable · [Milestones & test status →](./ROADMAP.md)
+**Version:** 2.0.4 · **Status:** Stable · [Milestones & test status →](./ROADMAP.md)
 
 ---
 

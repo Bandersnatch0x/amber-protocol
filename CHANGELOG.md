@@ -5,6 +5,16 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-11-03
+
+v2.0.3 never reached npm: its docs gate failed on `about/version-history.md`, which still
+announced v2.0.2, before the publish job could run. This release carries the same changes
+listed under 2.0.3 plus the fix below.
+
+### Fixed
+
+- keep `about/version-history.md` in step with the released version
+
 ## [2.0.3] - 2026-11-03
 
 ### Fixed
