@@ -30,16 +30,24 @@ gate rejects a plan that omits or contradicts them.
    1 or skips a number fails with a renumbering remedy.
 2. **`paths:`** the repo-relative paths the slice touches. Non-empty, relative, inside the target,
    at most **5** entries, spanning at most **2** subsystems. A subsystem is
-   `scripts/lib/<name>` for a module under that directory, otherwise the first path segment. This is
+   `scripts/lib/<name>` for a module under that directory, otherwise the first path segment.
+   Equivalent spellings of one repository-relative path (`scripts/./lib/x/a.js`, backslash
+   separators) classify identically; the safety check runs before that normalization, so a `..`
+   segment or drive qualifier is still rejected. This is
    the slice-size ceiling: a change that needs more is two slices.
 3. **`depends-on:`** earlier slice numbers, or `none`. Every dependency must name a slice that
    appears **before** this one. Self, forward, and non-numeric references fail. The declared edges
    are a DAG by construction.
 4. **`verify:`** the one command that proves this slice. Non-empty, not a scaffold placeholder.
 
-Metadata bullets must be indented under their slice. The scaffolded plan carries all three bullets
-with `<fill: …>` placeholders, so a freshly scaffolded plan fails the gate until a human curates it —
-the same rule the Context manifests section already follows.
+Metadata bullets must be indented under their slice. The scaffolded plan fills `paths:` and `verify:`
+with `<fill: …>` placeholders and writes `depends-on: none` as the explicit default, so a freshly
+scaffolded plan fails the gate on the two unfilled fields until a human curates it — the same rule
+the Context manifests section already follows. `none` is a declaration, not a placeholder: a slice
+with no dependency states that fact rather than leaving the edge unstated. A metadata bullet counts
+as a declaration wherever it appears: a bullet that is not indented under a slice (same-indent, no
+header, or dangling after prose between slices) is itself an error, not the absence of a
+declaration, so a terminal status cannot freeze it away.
 
 ### Which plans the contract binds
 

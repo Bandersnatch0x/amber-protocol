@@ -69,13 +69,18 @@ function isUncuratedManifestValue(value) {
 // Split a role bullet into individual entries (comma- or space-separated
 // BARE paths). Markdown wrappers (backticks/asterisks/quotes) are stripped
 // the same way scopeMentionTokens strips them, so `docs/a.md` parses.
-function splitManifestEntries(value) {
+//
+// Callers that validate path safety pass `preserveTrailingColon`: a bare drive
+// designator (`C:`) is a path fact the validator must see, not sentence
+// punctuation, so it may not be shortened to a harmless-looking `C`.
+function splitManifestEntries(value, { preserveTrailingColon = false } = {}) {
+	const trailing = preserveTrailingColon ? /["'`)\]}>.,;*_~]+$/ : /["'`)\]}>.,;:*_~]+$/;
 	return value
 		.split(/[,\s]+/)
 		.map((entry) =>
 			entry
 				.replace(/^["'`([{<*_~]+/, "")
-				.replace(/["'`)\]}>.,;:*_~]+$/, "")
+				.replace(trailing, "")
 				.trim(),
 		)
 		.filter(Boolean);
@@ -119,8 +124,11 @@ const SLICE_MAX_SUBSYSTEMS = 2;
 // `1. text`, `1) text`, `- [ ] Slice 1: text`, and `Slice 1: text` are all
 // accepted so existing plans stay readable; the number is the slice identity.
 const SLICE_HEADER_RE = /^\s*(?:[-*+]\s*\[[ xX]\]\s*)?(?:Slice\s+)?(\d+)\s*[:.)-]\s*(.*)$/;
-// The unambiguous forms: a checkbox bullet or the literal `Slice` prefix.
-const SLICE_EXPLICIT_HEADER_RE = /^\s*[-*+]\s*\[[ xX]\]\s*(?:Slice\s+)?\d+/i;
+// The unambiguous forms: a checkbox bullet or the literal `Slice` prefix. A
+// bare numbered line ("2. of these is optional") stays prose until its block
+// carries metadata.
+const SLICE_EXPLICIT_HEADER_RE =
+	/^\s*(?:[-*+]\s*\[[ xX]\]\s*(?:Slice\s+)?|[-*+]\s*Slice\s+|Slice\s+)\d+/i;
 const SLICE_METADATA_RE = /^\s*[-*+]\s*(paths|depends-on|verify)\s*:\s*(.*)$/i;
 
 // A bare numbered line ("2. of these is optional") is prose unless the block
@@ -153,12 +161,17 @@ function hasIndentedMetadata(lines, startIndex, headerIndent) {
 // by the validator. Slices are read in document order and never renumbered.
 function parseVerticalSlicesDetailed(content) {
 	const body = getSectionBody(content, "Vertical Slices");
-	if (body === null) return { slices: null, rejected: [] };
+	if (body === null) return { slices: null, rejected: [], misplaced: [] };
 	const lines = body.split(/\r?\n/);
 	const slices = [];
 	const rejected = [];
+	const misplaced = [];
 	let current = null;
 	let currentIndent = null;
+	const recordMisplaced = (line) => {
+		const metadata = line.match(SLICE_METADATA_RE);
+		if (metadata) misplaced.push(metadata[1].toLowerCase());
+	};
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index];
 		const indent = line.match(/^(\s*)/)[1].length;
@@ -186,12 +199,19 @@ function parseVerticalSlicesDetailed(content) {
 			slices.push(current);
 			continue;
 		}
-		if (!current) continue;
 		if (line.trim() === "") continue;
+		// A metadata bullet with no slice to belong to is a declaration the author
+		// wrote, not prose. Record it so the validator refuses the mis-indented
+		// form instead of treating the plan as pre-contract.
+		if (!current) {
+			recordMisplaced(line);
+			continue;
+		}
 		// Outdented or sibling content ends this slice's metadata block; the
 		// section keeps scanning so a later slice header is still found.
 		if (indent <= currentIndent) {
 			current = null;
+			recordMisplaced(line);
 			continue;
 		}
 		const metadata = line.match(SLICE_METADATA_RE);
@@ -202,7 +222,7 @@ function parseVerticalSlicesDetailed(content) {
 		else if (key === "depends-on") current.dependsOn = value;
 		else current.verify = value;
 	}
-	return { slices, rejected };
+	return { slices, rejected, misplaced };
 }
 
 function parseVerticalSlices(content) {
@@ -211,9 +231,12 @@ function parseVerticalSlices(content) {
 
 // The deterministic subsystem key used by the slice budget: a module under
 // scripts/lib/<name>/ counts as its own subsystem; every other path uses its
-// first segment.
+// first segment. The entry is normalized first so equivalent spellings of one
+// repository-relative path (`scripts/./lib/x/a.js`, backslashes) cannot land in
+// different subsystems. Callers run slicePathProblem BEFORE this, so
+// normalization never hides a rejected `..` segment or drive qualifier.
 function sliceSubsystemOf(entry) {
-	const segments = entry.replace(/\\/g, "/").replace(/^\.\//, "").split("/").filter(Boolean);
+	const segments = path.posix.normalize(entry.replace(/\\/g, "/")).split("/").filter(Boolean);
 	if (segments[0] === "scripts" && segments[1] === "lib" && segments[2]) {
 		return `scripts/lib/${segments[2]}`;
 	}
@@ -222,7 +245,10 @@ function sliceSubsystemOf(entry) {
 
 function slicePathProblem(entry) {
 	const normalized = entry.replace(/\\/g, "/").replace(/^\.\//, "");
-	if (path.isAbsolute(entry) || /^[A-Za-z]:\//.test(normalized)) {
+	// `C:outside/a.js` is drive-relative: not absolute by path.isAbsolute, but
+	// still anchored outside the target once the OS resolves it. Reject every
+	// drive-qualified form, not just `C:/`.
+	if (path.isAbsolute(entry) || /^[A-Za-z]:/.test(normalized)) {
 		return "must be relative to the target repository";
 	}
 	if (normalized.split("/").includes("..")) return "must not escape the target repository";
@@ -234,11 +260,6 @@ function slicePathProblem(entry) {
 // change, so re-validating it enforces nothing. Everything else — including
 // proposed, draft, blocked, paused, and any settled word carrying a qualifier
 // ("implemented-pending-verification") — still has work left and is gated.
-//
-// The match is anchored to the END of the status token, not a word boundary,
-// so an intra-token hyphen keeps the plan gated. A trailing parenthesised or
-// spaced-dash qualifier is dropped first, so "accepted (2026-09-24)" reads as
-// accepted while "proposed — pending re-review" reads as proposed (gated).
 const SLICE_CONTRACT_EXEMPT_STATUS_RE =
 	/^(accepted|complete|completed|done|implemented|superseded|retired|obsolete|abandoned|rejected)$/i;
 
@@ -262,7 +283,7 @@ function sliceContractApplies(content) {
 }
 
 function validateVerticalSlices(content) {
-	const { slices, rejected } = parseVerticalSlicesDetailed(content);
+	const { slices, rejected, misplaced } = parseVerticalSlicesDetailed(content);
 	if (slices === null) return [];
 	// A header that does not continue the sequence is a numbering defect, and it
 	// is reported for a terminal plan too: the exemption covers the contract, not
@@ -272,12 +293,25 @@ function validateVerticalSlices(content) {
 			`Vertical Slices must be numbered 1..N with no gaps (found slice ${rejected[0]} out of sequence). → fix: renumber the slices in document order.`,
 		];
 	}
+	const errors = [];
+	// Declaring metadata anywhere in the section opts the plan into the contract,
+	// even when the bullet is badly indented or has no slice to belong to. The
+	// misplacement is itself an error — a terminal status cannot freeze a
+	// declaration the author never properly made.
+	if (misplaced.length > 0) {
+		const keys = [...new Set(misplaced)].sort().join(", ");
+		errors.push(
+			`Vertical slice metadata (${keys}) must be indented under its slice header. → fix: indent each paths:/depends-on:/verify: bullet under the slice it belongs to.`,
+		);
+	}
 	// Compatible extension: a section with no declared metadata is a pre-contract
 	// plan. It is grandfathered so accepted history stays readable; a curated
 	// plan that declares any metadata is held to the whole contract.
-	const curated = slices.some(
-		(slice) => slice.paths !== null || slice.dependsOn !== null || slice.verify !== null,
-	);
+	const curated =
+		misplaced.length > 0 ||
+		slices.some(
+			(slice) => slice.paths !== null || slice.dependsOn !== null || slice.verify !== null,
+		);
 	if (!curated) {
 		return sliceContractApplies(content)
 			? [
@@ -285,7 +319,6 @@ function validateVerticalSlices(content) {
 				]
 			: [];
 	}
-	const errors = [];
 	if (slices.length === 0) {
 		errors.push(
 			"Vertical Slices must define at least one slice. → fix: add a `- [ ] Slice 1: <outcome>` bullet with `paths:`, `depends-on:`, and `verify:` metadata.",
@@ -310,7 +343,7 @@ function validateVerticalSlices(content) {
 				`Vertical slice ${position} still carries scaffold placeholders in paths:. → fix: replace them with the paths this slice touches.`,
 			);
 		} else {
-			const entries = splitManifestEntries(slice.paths);
+			const entries = splitManifestEntries(slice.paths, { preserveTrailingColon: true });
 			if (entries.length === 0) {
 				errors.push(
 					`Vertical slice ${position} lists no paths. → fix: name at least one repo-relative path.`,
@@ -355,12 +388,15 @@ function validateVerticalSlices(content) {
 			);
 		} else {
 			const value = slice.dependsOn.trim();
-			if (value === "") {
+			// The token list, not the raw string, is the declaration: a value made
+			// only of separators (",", " , ") declares no dependency at all and
+			// must read as empty rather than as a valid zero-dependency slice.
+			const tokens = value.split(/[,\s]+/).filter(Boolean);
+			if (tokens.length === 0) {
 				errors.push(
 					`Vertical slice ${position} has an empty depends-on: value. → fix: name earlier slice numbers, or "none".`,
 				);
-			} else if (!/^(none|-|—)$/i.test(value)) {
-				const tokens = value.split(/[,\s]+/).filter(Boolean);
+			} else if (!/^none$/i.test(value)) {
 				for (const token of tokens) {
 					if (!/^\d+$/.test(token)) {
 						errors.push(

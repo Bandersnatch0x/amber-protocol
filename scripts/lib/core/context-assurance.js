@@ -9,6 +9,7 @@ const { statePathForCreate } = require("../state-dir-resolver");
 const {
 	summarizeFreshnessActivity,
 	revisionInstantFor,
+	revisionIndexFor,
 	feedbackForPage,
 	effectiveConfidence,
 } = require("./context-freshness");
@@ -108,7 +109,7 @@ function deriveAssurance(targetRoot, page, events = null, activity = null) {
 	// cannot drift apart.
 	const folded = activity || summarizeFreshnessActivity(log);
 	const revisionAt = revisionInstantFor(page, folded);
-	const feedback = feedbackForPage(log, page.pageId, revisionAt);
+	const feedback = feedbackForPage(log, page.pageId, revisionAt, revisionIndexFor(page, folded));
 	const storedConfidence = page.assurance?.confidence || null;
 	return {
 		// Effective confidence is derived, never written back: each recorded

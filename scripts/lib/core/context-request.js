@@ -275,6 +275,8 @@ function buildRequest(targetRoot, opts, input) {
 	};
 	if (scope.length > 0) target.scope = scope;
 	if (opts.knowledgeKind) target.knowledgeKind = opts.knowledgeKind;
+	// Set by ttl-driven refreshes; the request schema validates the date-time.
+	if (opts.expiredAt) target.expiredAt = opts.expiredAt;
 	const supersedes = normalizePageIds(opts.supersedes);
 	if (supersedes.length > 0) target.supersedes = supersedes;
 	return {

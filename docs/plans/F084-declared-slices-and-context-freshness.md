@@ -62,13 +62,14 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 - [ ] Slice 7: specs, ADR, and CLI reference.
   - paths: docs/specs/plan-slice-contract.md, docs/specs/context-freshness-loop.md, docs/adr/0109-declarations-carry-gates.md, docs/CLI_REFERENCE.md
   - depends-on: 6
-  - verify: node scripts/amber.js docs:gen:check
+  - verify: npm run docs:gen:check
 
 ## Resume Checkpoint
 
-- Resume Point: all four slices are implemented in the working tree; focused suites are green.
-- Blockers: none. Remaining work is the full gate run and stage-7 review.
-- Next Action: run `npm test`, then `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`, `npm run docs:gen:check`, lint and format.
+- Resume Point: all seven slices are implemented in the working tree; focused suites, the full
+  `npm test` (4258/4258, 0 skipped), and the repository gates are green.
+- Blockers: none. Remaining work is the independent review; nothing is accepted.
+- Next Action: hand the working tree to the reviewer; do not run acceptance until that review completes.
 - Recovery Instructions: reopen this plan and continue at the first unchecked slice; do not regenerate unless the plan file is missing.
 
 ## Acceptance Criteria

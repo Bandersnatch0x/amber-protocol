@@ -61,6 +61,7 @@ function seedPage(root, pageId, extra = {}) {
 		title: pageId,
 		reason: "explicit",
 		sources: [{ ref: "docs/adr/0001-x.md" }],
+		...(Array.isArray(extra.scope) ? { scope: extra.scope } : {}),
 	});
 	assert.deepEqual(request.errors, []);
 	const source = request.request.sources[0];
@@ -633,6 +634,233 @@ describe("loadout and verify agree on the derived expiry", () => {
 			assert.deepEqual(preview.errors, [], JSON.stringify(preview.errors));
 			assert.equal(preview.loadout.pages["gone"], undefined);
 			assert.equal(preview.loadout.excluded.find((e) => e.pageId === "gone").reason, "expired");
+		} finally {
+			cleanup(root);
+		}
+	});
+});
+
+describe("page ids that collide with Object.prototype", () => {
+	function rewriteEvents(root, events) {
+		fs.writeFileSync(eventsPath(root), `${events.map((e) => JSON.stringify(e)).join("\n")}\n`);
+	}
+
+	it("derives the expiry from an accepted ingest for a page named constructor", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "constructor", { ttl: "PT1H" });
+			backdateEvents(root, "constructor", "2026-01-01T00:00:00.000Z");
+			const page = verifyPages(root).pages.find((p) => p.pageId === "constructor");
+			assert.equal(page.expiresAt, "2026-01-01T01:00:00.000Z");
+			assert.equal(page.status, "stale-by-time");
+			assert.ok(page.findings.some((f) => f.code === "AMBER_E_CONTEXT_PAGE_TIME_STALE"));
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("derives the expiry from a no-change ingest for a page named constructor", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "constructor", { ttl: "PT1H" });
+			rewriteEvents(root, [
+				{
+					kind: "ingest",
+					requestId: "r1",
+					pageId: "constructor",
+					outcome: "no-change",
+					at: "2026-01-01T00:00:00.000Z",
+				},
+			]);
+			const page = verifyPages(root).pages.find((p) => p.pageId === "constructor");
+			assert.equal(page.expiresAt, "2026-01-01T01:00:00.000Z");
+			assert.equal(page.timeStale, true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("keeps the page-written fallback for a page named constructor with no ingest", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "constructor", { ttl: "PT1H" });
+			rewriteEvents(root, [
+				{
+					kind: "page-written",
+					pageId: "constructor",
+					at: "2026-01-01T00:00:00.000Z",
+				},
+			]);
+			const page = verifyPages(root).pages.find((p) => p.pageId === "constructor");
+			assert.equal(page.expiresAt, "2026-01-01T01:00:00.000Z");
+			assert.equal(page.timeStale, true);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("keeps the created_at fallback for a page named constructor with no ingest", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "constructor", {
+				ttl: "PT1H",
+				created_at: "2026-01-01T00:00:00.000Z",
+			});
+			rewriteEvents(root, [
+				{
+					kind: "page-written",
+					pageId: "constructor",
+					at: "2026-06-01T00:00:00.000Z",
+				},
+			]);
+			const page = verifyPages(root).pages.find((p) => p.pageId === "constructor");
+			assert.equal(page.expiresAt, "2026-01-01T01:00:00.000Z");
+			assert.equal(page.timeStale, true);
+		} finally {
+			cleanup(root);
+		}
+	});
+});
+
+describe("feedback at the revision instant", () => {
+	function writeEvents(root, events) {
+		fs.writeFileSync(eventsPath(root), `${events.map((e) => JSON.stringify(e)).join("\n")}\n`);
+	}
+
+	it("counts a contradiction appended after the ingest at the same instant", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "same-instant", { assurance: { confidence: "high" } });
+			const at = "2026-01-01T00:00:00.000Z";
+			writeEvents(root, [
+				{ kind: "ingest", requestId: "r1", pageId: "same-instant", outcome: "accepted", at },
+				{
+					kind: "knowledge-feedback",
+					pageId: "same-instant",
+					verdict: "contradicted",
+					at,
+				},
+			]);
+			const checked = verifyPages(root).pages.find((p) => p.pageId === "same-instant");
+			assert.deepEqual(checked.assurance.feedback, { contradicted: 1, confirmed: 0 });
+			assert.equal(checked.assurance.confidence, "medium");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("clears same-instant feedback that precedes a re-ingest", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "re-ingested", { assurance: { confidence: "high" } });
+			const at = "2026-01-01T00:00:00.000Z";
+			writeEvents(root, [
+				{ kind: "ingest", requestId: "r1", pageId: "re-ingested", outcome: "accepted", at },
+				{
+					kind: "knowledge-feedback",
+					pageId: "re-ingested",
+					verdict: "contradicted",
+					at,
+				},
+				{ kind: "ingest", requestId: "r2", pageId: "re-ingested", outcome: "accepted", at },
+				{
+					kind: "knowledge-feedback",
+					pageId: "re-ingested",
+					verdict: "contradicted",
+					at,
+				},
+			]);
+			const checked = verifyPages(root).pages.find((p) => p.pageId === "re-ingested");
+			// Only the feedback appended after the second ingest counts.
+			assert.deepEqual(checked.assurance.feedback, { contradicted: 1, confirmed: 0 });
+			assert.equal(checked.assurance.confidence, "medium");
+		} finally {
+			cleanup(root);
+		}
+	});
+});
+
+describe("refresh requests carry the ttl fact", () => {
+	it("keeps expiredAt when a source change wins the reason, in the result and on disk", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "both-triggers", { ttl: "PT1H" });
+			const page = readPage(root, "both-triggers");
+			page.sources = {
+				s1: {
+					kind: "code",
+					ref: "scripts/lib/core/mutable.js",
+					rawHash: "sha256:" + "a".repeat(64),
+					normHash: "sha256:" + "b".repeat(64),
+					mutable: true,
+				},
+			};
+			writePage(root, page);
+			regenerateIndex(root);
+			backdateEvents(root, "both-triggers", "2026-01-01T00:00:00.000Z");
+			const result = refreshPages(root);
+			assert.equal(result.requests.length, 1);
+			assert.equal(result.requests[0].reason, "source-change");
+			assert.equal(result.requests[0].expiredAt, "2026-01-01T01:00:00.000Z");
+			const request = JSON.parse(
+				fs.readFileSync(
+					path.join(root, ".amber", "context", "requests", `${result.requests[0].requestId}.json`),
+					"utf8",
+				),
+			);
+			assert.equal(request.target.expiredAt, "2026-01-01T01:00:00.000Z");
+			assert.equal(request.target.reason, "source-change");
+		} finally {
+			cleanup(root);
+		}
+	});
+});
+
+describe("loadout keeps derived assurance", () => {
+	it("projects lower confidence onto required, priority, and optional pages", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "required-page", {
+				assurance: { confidence: "high" },
+				classification: "internal",
+				scope: ["probe"],
+			});
+			seedPage(root, "priority-page", {
+				assurance: { confidence: "high" },
+				classification: "internal",
+				scope: ["probe"],
+			});
+			seedPage(root, "optional-page", {
+				assurance: { confidence: "high" },
+				classification: "internal",
+				scope: ["other"],
+			});
+			for (const pageId of ["required-page", "priority-page", "optional-page"]) {
+				assert.equal(recordFeedback(root, { pageId, verdict: "contradicted" }).ok, true);
+			}
+			const preview = previewLoadout(root, {
+				route: "probe",
+				budget: 4000,
+				required: ["required-page"],
+			});
+			assert.deepEqual(preview.errors, [], JSON.stringify(preview.errors));
+			const { loadout } = preview;
+			assert.deepEqual(loadout.tiers.required, ["required-page"]);
+			assert.deepEqual(loadout.tiers.priority, ["priority-page"]);
+			assert.deepEqual(loadout.tiers.optional, ["optional-page"]);
+			for (const pageId of ["required-page", "priority-page", "optional-page"]) {
+				assert.deepEqual(
+					loadout.pages[pageId].assurance,
+					{
+						confidence: "medium",
+						storedConfidence: "high",
+						feedback: { contradicted: 1, confirmed: 0 },
+					},
+					`${pageId}: ${JSON.stringify(loadout.pages[pageId])}`,
+				);
+				// Derived only: the stored page keeps its own confidence.
+				assert.equal(readPage(root, pageId).assurance.confidence, "high");
+			}
 		} finally {
 			cleanup(root);
 		}

@@ -1200,6 +1200,177 @@ test("validateVerticalSlices rejects absolute and escaping paths", () => {
 	assert.ok(escaping.some((e) => /must not escape the target repository/.test(e)));
 });
 
+test("validateVerticalSlices rejects Windows drive-relative paths", () => {
+	// `C:outside/a.js` is not absolute to path.isAbsolute, but resolves outside
+	// the repository once Windows anchors it to the drive's current directory.
+	for (const path of ["C:outside/a.js", "C:\\outside\\a.js", "z:docs/a.md"]) {
+		const errors = validateVerticalSlices(
+			["## Vertical Slices", slicePlan({ paths: path })].join("\n"),
+		);
+		assert.ok(
+			errors.some((e) => /must be relative to the target repository/.test(e)),
+			`${path} must be rejected: ${JSON.stringify(errors)}`,
+		);
+	}
+});
+
+test("drive designators survive tokenization and are rejected", () => {
+	// A bare drive designator must reach slicePathProblem with its colon intact;
+	// stripping punctuation first turned "C:" into the relative path "C".
+	for (const entry of ["C:", "z:", "`C:`", "**C:**"]) {
+		const errors = validateVerticalSlices(
+			["## Vertical Slices", slicePlan({ paths: entry })].join("\n"),
+		);
+		assert.ok(
+			errors.some((e) => /must be relative to the target repository/.test(e)),
+			`${entry} must be rejected: ${JSON.stringify(errors)}`,
+		);
+	}
+	assert.deepEqual(
+		validateVerticalSlices(["## Vertical Slices", slicePlan({ paths: "docs/a.md" })].join("\n")),
+		[],
+	);
+});
+
+test("sliceSubsystemOf normalizes interior dot segments and backslashes", () => {
+	assert.equal(sliceSubsystemOf("scripts/lib/core/planning.js"), "scripts/lib/core");
+	assert.equal(sliceSubsystemOf("scripts/./lib/context/index.js"), "scripts/lib/context");
+	assert.equal(sliceSubsystemOf("scripts\\lib\\context\\index.js"), "scripts/lib/context");
+	assert.equal(sliceSubsystemOf("./scripts/lib/core/planning.js"), "scripts/lib/core");
+});
+
+test("dot segments cannot hide a third subsystem", () => {
+	const threeModules =
+		"scripts/lib/core/planning.js, scripts/./lib/context/index.js, scripts/./lib/harness/run-state-machine.js";
+	const errors = validateVerticalSlices(
+		["## Vertical Slices", slicePlan({ paths: threeModules })].join("\n"),
+	);
+	assert.ok(
+		errors.some((e) => /spans 3 subsystems/.test(e)),
+		JSON.stringify(errors),
+	);
+	const twoModules = "scripts/lib/core/planning.js, scripts/./lib/context/index.js";
+	assert.deepEqual(
+		validateVerticalSlices(["## Vertical Slices", slicePlan({ paths: twoModules })].join("\n")),
+		[],
+	);
+});
+
+test("depends-on accepts only none or earlier slice numbers", () => {
+	for (const value of ["-", "—"]) {
+		const errors = validateVerticalSlices(
+			["## Vertical Slices", slicePlan({ paths: "docs/a.md", dependsOn: value })].join("\n"),
+		);
+		assert.ok(
+			errors.some((e) => /is not a slice number/.test(e)),
+			`depends-on ${value} must be rejected: ${JSON.stringify(errors)}`,
+		);
+	}
+	assert.deepEqual(
+		validateVerticalSlices(
+			["## Vertical Slices", slicePlan({ paths: "docs/a.md", dependsOn: "none" })].join("\n"),
+		),
+		[],
+	);
+});
+
+test("misplaced slice metadata adopts the contract and is rejected", () => {
+	const unindented = validateVerticalSlices(
+		[
+			"Status: accepted",
+			"",
+			"## Vertical Slices",
+			"Slice 1: incomplete",
+			"- paths: docs/specs/probe.md",
+		].join("\n"),
+	);
+	assert.ok(
+		unindented.some((e) => /must be indented under its slice/.test(e)),
+		JSON.stringify(unindented),
+	);
+	assert.ok(unindented.some((e) => /Vertical slice 1 must declare a depends-on/.test(e)));
+
+	const noHeader = validateVerticalSlices(
+		["Status: accepted", "", "## Vertical Slices", "- paths: docs/a.md"].join("\n"),
+	);
+	assert.ok(
+		noHeader.some((e) => /must be indented under its slice/.test(e)),
+		JSON.stringify(noHeader),
+	);
+
+	const danglingAfterProse = validateVerticalSlices(
+		[
+			"Status: accepted",
+			"",
+			"## Vertical Slices",
+			"- [ ] Slice 1: a",
+			"  - paths: docs/a.md",
+			"  - depends-on: none",
+			"  - verify: node a.js",
+			"",
+			"A note between slices.",
+			"  - verify: node b.js",
+		].join("\n"),
+	);
+	assert.ok(
+		danglingAfterProse.some((e) => /must be indented under its slice/.test(e)),
+		JSON.stringify(danglingAfterProse),
+	);
+});
+
+test("a terminal plan cannot exempt misplaced metadata through the gate", () => {
+	const result = validatePlanContent({
+		content: `Status: accepted\n${validPlanContent({
+			verticalSlices: "Slice 1: incomplete\n- paths: docs/specs/probe.md",
+		})}`,
+		resolveFeature: foundResolver,
+	});
+	assert.ok(
+		result.errors.some((e) => /must be indented under its slice/.test(e)),
+		JSON.stringify(result.errors),
+	);
+});
+
+test("a bare Slice N: header is a slice even without metadata", () => {
+	const content = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"- [ ] Slice 1: first.",
+		"  - paths: docs/a.md",
+		"  - depends-on: none",
+		"  - verify: node a.js",
+		"Slice 2: missing metadata",
+		"",
+	].join("\n");
+	assert.deepEqual(
+		parseVerticalSlices(content).map((s) => s.number),
+		[1, 2],
+	);
+	const errors = validateVerticalSlices(content);
+	assert.ok(errors.some((e) => /Vertical slice 2 must declare a paths: bullet/.test(e)));
+	assert.ok(errors.some((e) => /Vertical slice 2 must declare a depends-on: bullet/.test(e)));
+	assert.ok(errors.some((e) => /Vertical slice 2 must name a verify: command/.test(e)));
+});
+
+test("a bare Slice N: header takes part in numbering checks", () => {
+	const content = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"- [ ] Slice 1: first.",
+		"  - paths: docs/a.md",
+		"  - depends-on: none",
+		"  - verify: node a.js",
+		"Slice 3: skipped a number",
+		"",
+	].join("\n");
+	assert.ok(
+		validateVerticalSlices(content).some((e) => /found slice 3 out of sequence/.test(e)),
+		JSON.stringify(validateVerticalSlices(content)),
+	);
+});
+
 test("validatePlanContent surfaces slice-contract errors through the gate", () => {
 	const result = validatePlanContent({
 		content: validPlanContent({ verticalSlices: "- [ ] Slice 1: no metadata." }),
@@ -1288,4 +1459,16 @@ test("validateVerticalSlices requires an explicit depends-on on curated slices",
 		),
 	);
 	assert.ok(empty.some((e) => /has an empty depends-on: value/.test(e)));
+});
+
+test("depends-on values made only of separators name no dependency", () => {
+	for (const value of [",", ", ,", " , "]) {
+		const errors = validateVerticalSlices(
+			["## Vertical Slices", slicePlan({ paths: "docs/a.md", dependsOn: value })].join("\n"),
+		);
+		assert.ok(
+			errors.some((e) => /has an empty depends-on: value/.test(e)),
+			`depends-on ${JSON.stringify(value)} must not pass: ${JSON.stringify(errors)}`,
+		);
+	}
 });

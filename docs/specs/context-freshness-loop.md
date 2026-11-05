@@ -51,7 +51,9 @@ fact rather than a status tally.
 
 `refreshPages` gains a second trigger. A page with an elapsed TTL and unchanged sources produces a
 request with `reason: "ttl-expired"`; a page that also changed sources produces
-`reason: "source-change"` (one request covers both). The request carries `expiredAt`. The
+`reason: "source-change"` (one request covers both). The request carries `expiredAt` whenever the
+ttl had elapsed, including when a source change supplies the reason; the persisted request records
+the same instant at `target.expiredAt`, validated as a `date-time` by the request schema. The
 `request-created` event's `trigger` records the same reason, so `stats` can count them.
 
 `verify --loadout` reads the same answer: a required page whose recorded `expiresAt` has passed
@@ -67,8 +69,14 @@ the check the operator is told to run immediately before the agent loads the art
 - **Effective confidence** is derived at read time: each `contradicted` event since the page's
   current revision drops one level (`high → medium → low`, floored at `low`); an unspecified
   confidence becomes `low` on the first contradiction. `deriveAssurance` returns the effective
-  `confidence` alongside `storedConfidence` and the `feedback` counts.
+  `confidence` alongside `storedConfidence` and the `feedback` counts. When an event shares the
+  revision's millisecond instant, append position decides: feedback logged after the revision
+  event counts, feedback logged before a re-ingest stays outside the window.
 - **A re-ingest clears prior decay**, because the window starts at the new revision.
+- **Loadout visibility.** `context load` projects the derived `confidence`, `storedConfidence`, and
+  `feedback` counts into every selected page's metadata, at the required, priority, and optional
+  tiers alike, so a contradicted page is visibly lower to the agent that loads the artifact. The
+  page bytes are unchanged and confidence never affects inclusion.
 - `context stats` reports `feedback: { contradicted, confirmed }`.
 
 Feedback is a write action in the Action registry (`approvalRequired: true`), matching every other

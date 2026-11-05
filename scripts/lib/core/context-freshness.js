@@ -17,22 +17,43 @@ const CONFIDENCE_LEVELS = Object.freeze(["low", "medium", "high"]);
 //   - the latest page-written event is the fallback when a page predates
 //     ingest evidence.
 function summarizeFreshnessActivity(events) {
-	const latestIngestAtByPage = {};
-	const latestWriteAtByPage = {};
-	for (const event of events) {
+	// Page ids are kebab-case strings, so a legal id like "constructor" would
+	// read Object.prototype members from a plain object index and turn the
+	// revision instant into a function. Null-prototype dictionaries keep every
+	// lookup own-property-only; no id blacklist is needed.
+	const latestIngestAtByPage = Object.create(null);
+	const latestWriteAtByPage = Object.create(null);
+	// Append-order indices disambiguate events that share one instant. The last
+	// appended event among timestamp ties is the revision event, and feedback
+	// after it in the log belongs to the new revision.
+	const latestIngestIndexByPage = Object.create(null);
+	const latestWriteIndexByPage = Object.create(null);
+	for (let index = 0; index < events.length; index += 1) {
+		const event = events[index];
 		if (!event || !event.at || !event.pageId) continue;
 		if (
 			event.kind === "ingest" &&
 			(event.outcome === "accepted" || event.outcome === "no-change")
 		) {
 			const previous = latestIngestAtByPage[event.pageId];
-			if (!previous || event.at > previous) latestIngestAtByPage[event.pageId] = event.at;
+			if (!previous || event.at >= previous) {
+				latestIngestAtByPage[event.pageId] = event.at;
+				latestIngestIndexByPage[event.pageId] = index;
+			}
 		} else if (event.kind === "page-written") {
 			const previous = latestWriteAtByPage[event.pageId];
-			if (!previous || event.at > previous) latestWriteAtByPage[event.pageId] = event.at;
+			if (!previous || event.at >= previous) {
+				latestWriteAtByPage[event.pageId] = event.at;
+				latestWriteIndexByPage[event.pageId] = index;
+			}
 		}
 	}
-	return { latestIngestAtByPage, latestWriteAtByPage };
+	return {
+		latestIngestAtByPage,
+		latestWriteAtByPage,
+		latestIngestIndexByPage,
+		latestWriteIndexByPage,
+	};
 }
 
 // The instant the page's current revision began. This is the single answer for
@@ -61,6 +82,24 @@ function pageBaseInstant(page, activity) {
 	return revisionInstantFor(page, activity);
 }
 
+// The append-order position of the event the revision instant came from. Null
+// when the instant has no anchoring event (a stored created_at) or when the
+// caller passed an activity summary without indices.
+function revisionIndexFor(page, activity) {
+	const ingestAt = activity.latestIngestAtByPage[page.pageId];
+	if (ingestAt) {
+		const index = activity.latestIngestIndexByPage
+			? activity.latestIngestIndexByPage[page.pageId]
+			: undefined;
+		return index === undefined ? null : index;
+	}
+	if (typeof page.created_at === "string" && page.created_at.trim() !== "") return null;
+	const writtenIndex = activity.latestWriteIndexByPage
+		? activity.latestWriteIndexByPage[page.pageId]
+		: undefined;
+	return writtenIndex === undefined ? null : writtenIndex;
+}
+
 function pageExpiresAt(page, activity) {
 	return expiresAtFromTtl(page, pageBaseInstant(page, activity));
 }
@@ -82,14 +121,24 @@ function isTimeExpired(expiresAt, now = new Date()) {
 // ("2026-01-01T10:00:00+08:00" is 02:00Z) would sort after a later Z-stamped
 // event and silently drop that feedback. Events Amber writes itself are
 // Z-stamped, so this only matters for migrated and hand-written pages.
-function feedbackForPage(events, pageId, sinceInstant) {
+//
+// A millisecond-resolution clock cannot order two events that share an
+// instant. When the caller supplies the revision event's append index, equal
+// instants are decided by log order instead: feedback appended after the
+// revision counts, and feedback appended before a re-ingest stays cleared.
+// Without an index (a stored created_at base), equal instants remain outside
+// the window exactly as before.
+function feedbackForPage(events, pageId, sinceInstant, sinceIndex = null) {
 	const counts = { contradicted: 0, confirmed: 0 };
 	const since = sinceInstant ? Date.parse(sinceInstant) : null;
-	for (const event of events) {
+	const ordered = Number.isInteger(sinceIndex);
+	for (let index = 0; index < events.length; index += 1) {
+		const event = events[index];
 		if (event.kind !== "knowledge-feedback" || event.pageId !== pageId) continue;
 		if (since !== null && Number.isFinite(since) && event.at) {
 			const at = Date.parse(event.at);
-			if (!Number.isFinite(at) || at <= since) continue;
+			if (!Number.isFinite(at) || at < since) continue;
+			if (at === since && (!ordered || index <= sinceIndex)) continue;
 		}
 		if (event.verdict === "contradicted") counts.contradicted += 1;
 		else if (event.verdict === "confirmed") counts.confirmed += 1;
@@ -142,6 +191,7 @@ module.exports = {
 	CONFIDENCE_LEVELS,
 	summarizeFreshnessActivity,
 	revisionInstantFor,
+	revisionIndexFor,
 	pageBaseInstant,
 	pageExpiresAt,
 	isTimeExpired,

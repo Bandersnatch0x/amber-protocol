@@ -198,6 +198,58 @@
 								"format": "date-time"
 							}
 						]
+					},
+					"assurance": {
+						"description": "Derived assurance (never written back onto the page): effective confidence after append-only knowledge feedback, the stored level, and the feedback counts since the current revision. A contradicted page still loads, at every tier, with visibly lower confidence.",
+						"anyOf": [
+							{
+								"type": "null"
+							},
+							{
+								"type": "object",
+								"additionalProperties": false,
+								"required": ["confidence", "storedConfidence", "feedback"],
+								"properties": {
+									"confidence": {
+										"description": "Effective confidence: stored level decayed one level per contradiction since the current revision.",
+										"anyOf": [
+											{
+												"type": "null"
+											},
+											{
+												"enum": ["low", "medium", "high"]
+											}
+										]
+									},
+									"storedConfidence": {
+										"description": "The page's recorded confidence, before feedback decay.",
+										"anyOf": [
+											{
+												"type": "null"
+											},
+											{
+												"enum": ["low", "medium", "high"]
+											}
+										]
+									},
+									"feedback": {
+										"type": "object",
+										"additionalProperties": false,
+										"required": ["contradicted", "confirmed"],
+										"properties": {
+											"contradicted": {
+												"type": "integer",
+												"minimum": 0
+											},
+											"confirmed": {
+												"type": "integer",
+												"minimum": 0
+											}
+										}
+									}
+								}
+							}
+						]
 					}
 				}
 			}

@@ -3177,6 +3177,24 @@
 					"result": "4235/4236 pass; 1 unrelated retention-ledger lock flake, green on 3 consecutive solo runs",
 					"date": "2026-11-05",
 					"notes": "Second-round review fixes: slice-gate fail-open closed, status qualifier bypass closed, verify --loadout reads TTL, instant-based feedback window, shared revision instant, index states it reports source health only"
+				},
+				{
+					"command": "npm test",
+					"result": "4251 pass / 0 fail / 0 skipped (full suite, exit 0, 932.6s)",
+					"date": "2026-11-06",
+					"notes": "Third-round review fixes: bare Slice N: headers and Windows drive-relative paths rejected; prototype-safe page-id activity maps; append-order same-instant feedback window; refresh requests persist expiredAt on both triggers; Loadout pages carry derived assurance at every tier. Each fix proved by a failing assertion before implementation and a fix-then-revert red run; related suites 243/243; CLI smoke on a disposable target passed"
+				},
+				{
+					"command": "npm test",
+					"result": "4257 pass / 0 fail / 0 skipped (full suite, exit 0, 466.2s)",
+					"date": "2026-11-06",
+					"notes": "Stage-7 review round 2: drive designators preserved until path validation, misplaced slice metadata refused instead of terminal-exempt, equivalent relative path spellings normalized for subsystem classification, depends-on aliases removed. planning 88/88; reviewer spec probe 3 previous failures to 0; standards probe and real amber gate refuse paths: C:. Context behaviour unchanged"
+				},
+				{
+					"command": "npm test",
+					"result": "4258 pass / 0 fail / 0 skipped (full suite, exit 0, 503.3s)",
+					"date": "2026-11-06",
+					"notes": "Spec closure round-2 gap: separator-only depends-on values now parse to an empty token list and are refused; separator regressions added and fix-then-revert proved. planning 89/89; the reviewer 8-group closure probe is 8 PASS / 0 fail with real CLI refusals. Context behaviour untouched"
 				}
 			],
 			"notes": [],

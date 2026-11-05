@@ -136,6 +136,34 @@
 							},
 							"expiresAt": {
 								"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+							},
+							"assurance": {
+								"description": "Derived assurance projected by the Loadout (never written back onto the page).",
+								"anyOf": [
+									{ "type": "null" },
+									{
+										"type": "object",
+										"additionalProperties": false,
+										"required": ["confidence", "storedConfidence", "feedback"],
+										"properties": {
+											"confidence": {
+												"anyOf": [{ "type": "null" }, { "enum": ["low", "medium", "high"] }]
+											},
+											"storedConfidence": {
+												"anyOf": [{ "type": "null" }, { "enum": ["low", "medium", "high"] }]
+											},
+											"feedback": {
+												"type": "object",
+												"additionalProperties": false,
+												"required": ["contradicted", "confirmed"],
+												"properties": {
+													"contradicted": { "type": "integer", "minimum": 0 },
+													"confirmed": { "type": "integer", "minimum": 0 }
+												}
+											}
+										}
+									}
+								]
 							}
 						}
 					}

@@ -201,6 +201,7 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 				classificationSource: e.classificationSource,
 				purpose: e.purpose,
 				expiresAt: e.expiresAt,
+				assurance: e.assurance,
 			};
 			remaining -= e.words;
 		} else {
@@ -357,7 +358,8 @@ function loadBuildConfig(targetRoot, opts) {
 }
 
 function summarizeEvents(events) {
-	const latestAtByPage = {};
+	// Null-prototype: page ids are caller data, and "constructor" is a legal id.
+	const latestAtByPage = Object.create(null);
 	let generatedAt = EPOCH;
 	for (const event of events) {
 		if (!event || !event.at) continue;
@@ -384,8 +386,14 @@ function collectPageEntries(targetRoot, route, feature) {
 			error: { code: verified.code, detail: verified.detail },
 		};
 	}
-	const statusById = {};
-	for (const page of verified.pages) statusById[page.pageId] = page.status;
+	const statusById = Object.create(null);
+	const assuranceById = Object.create(null);
+	for (const page of verified.pages) {
+		statusById[page.pageId] = page.status;
+		// The verify pass already derived assurance from the same event log and
+		// revision instant; the Loadout projects it rather than deriving again.
+		assuranceById[page.pageId] = page.assurance;
+	}
 	const pageEntries = [];
 	const knowledgeGraph = readKnowledgeGraph(targetRoot);
 	let anyScope = false;
@@ -399,6 +407,7 @@ function collectPageEntries(targetRoot, route, feature) {
 		// classificationSource, never written back onto the page); the hard
 		// expiry derives from the page ttl at its ingest/refresh instant.
 		const effective = effectiveClassificationOf({ stored: page.classification, governed: true });
+		const derived = assuranceById[pageId] || null;
 		pageEntries.push({
 			pageId,
 			page,
@@ -413,6 +422,15 @@ function collectPageEntries(targetRoot, route, feature) {
 			classificationSource: effective.classificationSource,
 			purpose: typeof page.purpose === "string" ? page.purpose : null,
 			expiresAt: pageExpiresAt(page, activity),
+			// Derived at read time and never written back onto the page: a
+			// contradicted page still loads, with visibly lower confidence.
+			assurance: derived
+				? {
+						confidence: derived.confidence,
+						storedConfidence: derived.storedConfidence,
+						feedback: derived.feedback,
+					}
+				: null,
 		});
 	}
 	for (const entry of pageEntries) {
@@ -500,6 +518,7 @@ function selectRequiredPages(pageEntries, requiredPins, state) {
 			classificationSource: entry.classificationSource,
 			purpose: entry.purpose,
 			expiresAt: entry.expiresAt,
+			assurance: entry.assurance,
 		};
 	}
 	return state;

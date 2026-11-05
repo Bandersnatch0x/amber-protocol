@@ -61,11 +61,15 @@ function createPageRefreshRequest(targetRoot, page, changedRefs, freshness = {})
 	const reason =
 		changedRefs.length > 0 ? "source-change" : freshness.timeExpired ? "ttl-expired" : null;
 	if (!reason) return { request: null, errors: [] };
+	// The ttl fact rides the request even when a source change supplies the
+	// reason: one request covers both triggers, so neither is lost.
+	const expiredAt = freshness.timeExpired ? freshness.expiresAt : null;
 	const created = createRequest(targetRoot, {
 		pageId: page.pageId,
 		title: page.title,
 		reason,
 		sources: Object.values(page.sources).map((source) => ({ ref: source.ref })),
+		...(expiredAt ? { expiredAt } : {}),
 		force: true,
 	});
 	if (created.errors.length > 0) {
@@ -77,7 +81,7 @@ function createPageRefreshRequest(targetRoot, page, changedRefs, freshness = {})
 			requestId: created.requestId,
 			reason,
 			changedSources: changedRefs,
-			...(reason === "ttl-expired" ? { expiredAt: freshness.expiresAt } : {}),
+			...(expiredAt ? { expiredAt } : {}),
 		},
 		errors: [],
 	};
