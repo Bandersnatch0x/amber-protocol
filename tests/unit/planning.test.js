@@ -1043,11 +1043,34 @@ test("validateVerticalSlices requires slices to be numbered in order", () => {
 		"  - verify: node a.js",
 		"",
 	].join("\n");
+	// A section whose first header is not slice 1 has no slices at all, and the
+	// diagnostic names the misnumbering instead of asking for a missing section.
 	assert.ok(
 		validateVerticalSlices(content).some((e) =>
-			/appears in position 1; slices are numbered/.test(e),
+			/numbered 1\.\.N with no gaps \(found slice 2 where slice 1 was expected\)/.test(e),
 		),
 	);
+});
+
+test("parseVerticalSlices ignores prose inside the section that starts with a number", () => {
+	const content = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"",
+		"- [ ] Slice 1: x",
+		"  - paths: docs/a.md",
+		"  - depends-on: none",
+		"  - verify: node --test",
+		"",
+		"2. of these is optional.",
+		"",
+	].join("\n");
+	assert.deepEqual(
+		parseVerticalSlices(content).map((s) => s.number),
+		[1],
+	);
+	assert.deepEqual(validateVerticalSlices(content), []);
 });
 
 test("validateVerticalSlices rejects absolute and escaping paths", () => {
@@ -1066,6 +1089,87 @@ test("validatePlanContent surfaces slice-contract errors through the gate", () =
 		content: validPlanContent({ verticalSlices: "- [ ] Slice 1: no metadata." }),
 		resolveFeature: foundResolver,
 	});
-	assert.ok(result.errors.some((e) => /must declare a paths: bullet/.test(e)));
-	assert.ok(result.errors.some((e) => /must name a verify: command/.test(e)));
+	// A curated plan that declares no metadata at all is the pre-contract shape:
+	// one error pointing at the whole contract beats five per-slice errors.
+	assert.ok(
+		result.errors.some((e) =>
+			/must declare paths:, depends-on:, and verify: for each slice/.test(e),
+		),
+	);
+});
+
+function bareSlicePlan(statusLine) {
+	return [statusLine, "", "## Vertical Slices", "- [ ] Slice 1: x", ""].join("\n");
+}
+
+test("validateVerticalSlices exempts settled-lifecycle plans from the whole contract", () => {
+	for (const status of [
+		"Status: accepted",
+		"Status: accepted (2026-09-24)",
+		"Status: implemented",
+		"Status: superseded",
+		"Status: retired",
+	]) {
+		assert.deepEqual(
+			validateVerticalSlices(bareSlicePlan(status)),
+			[],
+			`${status} is frozen history and must stay readable`,
+		);
+	}
+});
+
+test("validateVerticalSlices still gates plans that can move to implementation", () => {
+	for (const status of [
+		"Status: implementation-ready",
+		"Status: in-progress",
+		"Status: pending",
+		// A qualifier makes an otherwise-settled word in-motion: the plan still
+		// has work left, so it must declare.
+		"Status: implemented-pending-verification",
+		"Status: accepted-pending-review",
+		"Status: proposed — pending re-review",
+		"Status: proposed",
+		"Status: draft",
+		"Status: blocked",
+		"",
+	]) {
+		assert.ok(
+			validateVerticalSlices(bareSlicePlan(status)).length > 0,
+			`${status || "(unlabelled)"} is still in motion and must declare the contract`,
+		);
+	}
+});
+
+test("opting into the contract holds an exempt-status plan to every rule", () => {
+	// Declaring any metadata means the author adopted the contract, so the
+	// settled-lifecycle exemption no longer applies to that plan.
+	const curatedButIncomplete = [
+		"Status: accepted",
+		"",
+		"## Vertical Slices",
+		"- [ ] Slice 1: x",
+		"  - paths: docs/a.md",
+		"  - verify: node --test",
+		"",
+	].join("\n");
+	assert.ok(
+		validateVerticalSlices(curatedButIncomplete).some((e) =>
+			/must declare a depends-on: bullet/.test(e),
+		),
+	);
+});
+
+test("validateVerticalSlices requires an explicit depends-on on curated slices", () => {
+	const missing = validateVerticalSlices(
+		["Status: implementation-ready", "", "## Vertical Slices", slicePlan({ dependsOn: null })].join(
+			"\n",
+		),
+	);
+	assert.ok(missing.some((e) => /must declare a depends-on: bullet/.test(e)));
+	const empty = validateVerticalSlices(
+		["Status: implementation-ready", "", "## Vertical Slices", slicePlan({ dependsOn: "" })].join(
+			"\n",
+		),
+	);
+	assert.ok(empty.some((e) => /has an empty depends-on: value/.test(e)));
 });

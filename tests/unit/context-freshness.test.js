@@ -442,6 +442,26 @@ describe("knowledge feedback", () => {
 });
 
 describe("loadout and verify agree on the derived expiry", () => {
+	it("records one exclusion per page even when expiry and supersession both apply", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "old-page", { ttl: "PT1H" });
+			seedPage(root, "new-page");
+			const successor = readPage(root, "new-page");
+			successor.supersedes = ["old-page"];
+			writePage(root, successor);
+			regenerateIndex(root);
+			backdateEvents(root, "old-page", "2026-01-01T00:00:00.000Z");
+			const preview = previewLoadout(root, { route: "probe", budget: 4000 });
+			assert.deepEqual(preview.errors, [], JSON.stringify(preview.errors));
+			const forOld = preview.loadout.excluded.filter((e) => e.pageId === "old-page");
+			assert.equal(forOld.length, 1, JSON.stringify(forOld));
+			assert.equal(forOld[0].reason, "expired");
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	it("previews the same expiresAt the verify surface reports", () => {
 		const root = makeTarget();
 		try {

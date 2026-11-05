@@ -119,25 +119,57 @@ const SLICE_MAX_SUBSYSTEMS = 2;
 // `1. text`, `1) text`, `- [ ] Slice 1: text`, and `Slice 1: text` are all
 // accepted so existing plans stay readable; the number is the slice identity.
 const SLICE_HEADER_RE = /^\s*(?:[-*+]\s*\[[ xX]\]\s*)?(?:Slice\s+)?(\d+)\s*[:.)-]\s*(.*)$/;
+// The unambiguous forms: a checkbox bullet or the literal `Slice` prefix.
+const SLICE_EXPLICIT_HEADER_RE = /^\s*[-*+]\s*\[[ xX]\]\s*(?:Slice\s+)?\d+/i;
 const SLICE_METADATA_RE = /^\s*[-*+]\s*(paths|depends-on|verify)\s*:\s*(.*)$/i;
+
+// A bare numbered line ("2. of these is optional") is prose unless the block
+// under it is slice metadata. This is the one ambiguous shape, so it needs the
+// structural evidence rather than the number alone.
+function hasIndentedMetadata(lines, startIndex, headerIndent) {
+	for (let index = startIndex + 1; index < lines.length; index += 1) {
+		const line = lines[index];
+		if (line.trim() === "") continue;
+		const indent = line.match(/^(\s*)/)[1].length;
+		if (indent <= headerIndent) return false;
+		return SLICE_METADATA_RE.test(line);
+	}
+	return false;
+}
 
 // Parse the `## Vertical Slices` section. Returns null when the section is
 // absent, otherwise one entry per slice in document order. Metadata bullets
 // must be indented under their slice; anything at or above the slice
 // indentation that is not another slice ends the list.
-function parseVerticalSlices(content) {
+//
+// A header line only counts when it continues the sequence: slice N is
+// accepted only if every earlier slice 1..N-1 was already read. A misnumbered
+// plan is reported as such instead of silently losing its slices.
+function parseVerticalSlicesDetailed(content) {
 	const body = getSectionBody(content, "Vertical Slices");
-	if (body === null) return null;
+	if (body === null) return { slices: null, rejected: [] };
+	const lines = body.split(/\r?\n/);
 	const slices = [];
+	const rejected = [];
 	let sliceIndent = null;
 	let current = null;
-	for (const line of body.split(/\r?\n/)) {
+	let expected = 1;
+	for (let index = 0; index < lines.length; index += 1) {
+		const line = lines[index];
 		const indent = line.match(/^(\s*)/)[1].length;
 		const header = line.match(SLICE_HEADER_RE);
 		if (header && (sliceIndent === null || indent <= sliceIndent)) {
+			const explicit = SLICE_EXPLICIT_HEADER_RE.test(line);
+			if (!explicit && !hasIndentedMetadata(lines, index, indent)) continue;
+			const number = Number(header[1]);
+			if (number !== expected) {
+				rejected.push(number);
+				continue;
+			}
 			sliceIndent = indent;
+			expected += 1;
 			current = {
-				number: Number(header[1]),
+				number,
 				title: header[2].trim(),
 				paths: null,
 				dependsOn: null,
@@ -157,7 +189,11 @@ function parseVerticalSlices(content) {
 		else if (key === "depends-on") current.dependsOn = value;
 		else current.verify = value;
 	}
-	return slices;
+	return { slices, rejected };
+}
+
+function parseVerticalSlices(content) {
+	return parseVerticalSlicesDetailed(content).slices;
 }
 
 // The deterministic subsystem key used by the slice budget: a module under
@@ -180,9 +216,57 @@ function slicePathProblem(entry) {
 	return null;
 }
 
+// The slice contract binds plans that are still moving. Only a TERMINAL
+// lifecycle is frozen history: the work is over and the plan can no longer
+// change, so re-validating it enforces nothing. Everything else — including
+// proposed, draft, blocked, paused, and any settled word carrying a qualifier
+// ("implemented-pending-verification") — still has work left and is gated.
+//
+// The match is anchored to the END of the status token, not a word boundary,
+// so an intra-token hyphen keeps the plan gated. A trailing parenthesised or
+// spaced-dash qualifier is dropped first, so "accepted (2026-09-24)" reads as
+// accepted while "proposed — pending re-review" reads as proposed (gated).
+const SLICE_CONTRACT_EXEMPT_STATUS_RE =
+	/^(accepted|complete|completed|done|implemented|superseded|retired|obsolete|abandoned|rejected)$/i;
+
+function sliceContractApplies(content) {
+	const status = readPlanField(content, "Status");
+	if (!status) return true; // an unlabelled plan is not exempt
+	const token = status
+		.trim()
+		.replace(/\s*\([\s\S]*\)\s*$/, "")
+		// Only a SPACED dash is a separator ("proposed — pending re-review").
+		// An intra-token hyphen ("completed-pending-verification") is part of the
+		// status word and must keep the plan gated.
+		.replace(/\s+[—–-]\s+[\s\S]*$/, "")
+		.trim();
+	return !SLICE_CONTRACT_EXEMPT_STATUS_RE.test(token);
+}
+
 function validateVerticalSlices(content) {
-	const slices = parseVerticalSlices(content);
+	const { slices, rejected } = parseVerticalSlicesDetailed(content);
 	if (slices === null) return [];
+	// A header that did not continue the sequence is a numbering defect, not a
+	// missing contract: report it before the curated/empty branches so the
+	// message names what the author actually wrote.
+	if (slices.length === 0 && rejected.length > 0) {
+		return [
+			`Vertical Slices must be numbered 1..N with no gaps (found slice ${rejected[0]} where slice 1 was expected). → fix: renumber the slices in document order.`,
+		];
+	}
+	// Compatible extension: a section with no declared metadata is a pre-contract
+	// plan. It is grandfathered so accepted history stays readable; a curated
+	// plan that declares any metadata is held to the whole contract.
+	const curated = slices.some(
+		(slice) => slice.paths !== null || slice.dependsOn !== null || slice.verify !== null,
+	);
+	if (!curated) {
+		return sliceContractApplies(content)
+			? [
+					"Vertical Slices must declare paths:, depends-on:, and verify: for each slice. → fix: add `- paths: <repo-relative paths>` (at most 5), `- depends-on: <earlier slice numbers | none>`, and `- verify: <one command>` under each slice.",
+				]
+			: [];
+	}
 	const errors = [];
 	if (slices.length === 0) {
 		errors.push(
@@ -242,9 +326,20 @@ function validateVerticalSlices(content) {
 				`Vertical slice ${position} has an empty or placeholder verify: value. → fix: name the one command that proves this slice.`,
 			);
 		}
-		if (slice.dependsOn !== null && slice.dependsOn !== "") {
+		// depends-on is a declared edge, required as part of the contract: a
+		// curated slice states "none" explicitly rather than staying silent, so
+		// a missing bullet is indistinguishable from an omitted dependency.
+		if (slice.dependsOn === null) {
+			errors.push(
+				`Vertical slice ${position} must declare a depends-on: bullet. → fix: add \`- depends-on: none\` (or the earlier slice numbers this one needs).`,
+			);
+		} else {
 			const value = slice.dependsOn.trim();
-			if (!/^(none|-|—)$/i.test(value)) {
+			if (value === "") {
+				errors.push(
+					`Vertical slice ${position} has an empty depends-on: value. → fix: name earlier slice numbers, or "none".`,
+				);
+			} else if (!/^(none|-|—)$/i.test(value)) {
 				const tokens = value.split(/[,\s]+/).filter(Boolean);
 				for (const token of tokens) {
 					if (!/^\d+$/.test(token)) {
@@ -1202,8 +1297,10 @@ module.exports = {
 	extractContextManifests,
 	isKnowledgeSurfacePath,
 	parseVerticalSlices,
+	parseVerticalSlicesDetailed,
 	validateVerticalSlices,
 	sliceSubsystemOf,
+	sliceContractApplies,
 	SLICE_MAX_PATHS,
 	SLICE_MAX_SUBSYSTEMS,
 };

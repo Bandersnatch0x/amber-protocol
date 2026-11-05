@@ -549,6 +549,10 @@ function appendStatusExclusions(pageEntries, state) {
 	]);
 	for (const entry of pageEntries) {
 		if (included.has(entry.pageId)) continue;
+		// Authority exclusions (expired/ceiling/firewall/knowledge-kind) already
+		// recorded this page and marked it seen. Re-recording a second reason
+		// here would list one page twice and imply two independent causes.
+		if (state.seen.has(entry.pageId)) continue;
 		if (entry.supersededBy.length > 0) {
 			state.excluded.push({
 				pageId: entry.pageId,

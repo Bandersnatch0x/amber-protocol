@@ -38,6 +38,11 @@ function summarizeFreshnessActivity(events) {
 // The TTL base is the page's ingest/refresh instant, exactly as the page
 // schema describes it. A stored created_at only applies to pages that carry no
 // ingest evidence (pre-existing pages and hand-written fixtures).
+//
+// A raw-only rebase is not a re-distillation, so it does not restart the
+// window: cosmetic source edits still let the page expire on wall-clock time.
+// Re-ingest is the operation that restarts it, because it writes an accepted
+// ingest event.
 function pageBaseInstant(page, activity) {
 	const ingestAt = activity.latestIngestAtByPage[page.pageId];
 	if (ingestAt) return ingestAt;

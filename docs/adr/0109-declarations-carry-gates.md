@@ -32,7 +32,9 @@ here and recorded as refused rather than silently dropped.
    spanning at most 2 subsystems), its dependencies (earlier slices only, so the edges form a DAG
    by construction), and the one command that proves it. The gate rejects a plan that omits or
    contradicts the declaration. It never inspects the eventual diff — scope drift stays a reviewer
-   judgment.
+   judgment. The contract binds plans still in motion; only a terminal lifecycle is frozen history
+   and stays readable, while any plan that declares even one metadata bullet has opted in and is
+   held to every rule.
 
 2. **Knowledge freshness has exactly one derivation.** `scripts/lib/core/context-freshness.js`
    computes the page's revision instant (latest accepted ingest, falling back to `created_at`), the
@@ -54,9 +56,11 @@ here and recorded as refused rather than silently dropped.
 
 ## Consequences
 
-- Plans written before this contract fail the gate until their slices are declared. That is
-  intentional: a contract that grandfathers undeclared work is not a contract. The cost is one edit
-  per open plan.
+- Plans still in motion fail the gate until their slices are declared; terminal history is exempt
+  and stays readable. The first draft exempted nothing, which would have failed 62 of the 65 plans
+  already in `docs/plans/` — a contract that invalidates every historical record it cannot change
+  buys no enforcement and costs the corpus. The exemption is deliberately narrow: `proposed`,
+  `draft`, and `blocked` are still gated, because those plans can move again.
 - `amber context verify` now disagrees with `amber context load` in one fewer case: an expired page
   is no longer `ok` at verify while excluded at load. Operators see the same fact on both paths.
 - `deriveAssurance` returns a derived `confidence` and keeps `storedConfidence`, so a reader can
@@ -77,3 +81,7 @@ here and recorded as refused rather than silently dropped.
   disagree with the page file, and it destroys the original human judgment.
 - **Auto-exclude contradicted pages from Loadouts.** Rejected for now: one agent's note would
   silently remove shared knowledge from every other agent's context.
+- **Exempt every status that sounds settled (`proposed`, `draft`, `blocked`).** Rejected: those
+  plans can move again, so exempting them would gate nothing at exactly the moment the declaration
+  matters. The first implementation used a word-boundary regex, which also exempted
+  `completed-pending-verification` and `accepted-pending-review` — a qualifier means work remains.

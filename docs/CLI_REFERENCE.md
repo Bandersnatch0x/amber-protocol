@@ -918,7 +918,10 @@ gate-check unchanged. The plan gate checks declarations deterministically (ADR-0
 `## Vertical Slices` entry must carry `paths:` (at most 5 repo-relative paths spanning at most 2
 subsystems), `depends-on:` (earlier slice numbers only, so the edges form a DAG by construction),
 and `verify:` (one non-empty command). The scaffolded plan carries `<fill: …>` placeholders, so a
-freshly scaffolded plan fails until a human curates it. The gate checks the declaration, never the
+freshly scaffolded plan fails until a human curates it. The contract binds plans still in motion: only a terminal
+`Status:` (`accepted`, `complete`, `implemented`, `superseded`, `retired`, …) is frozen history and
+stays readable, while a plan that declares any metadata bullet has opted in and is held to every
+rule. `proposed`, `draft`, and `blocked` plans are still gated. The gate checks the declaration, never the
 eventual diff — scope drift stays a reviewer judgment.
 
 ```bash

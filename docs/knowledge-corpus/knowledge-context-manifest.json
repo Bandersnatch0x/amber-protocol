@@ -484,8 +484,8 @@
       "sourcePath": "docs/adr/0109-declarations-carry-gates.md",
       "title": "Declarations Carry Gates; Knowledge Expires on a Deterministic Clock",
       "source": {
-        "rawHash": "sha256:a4c8f4fec0bb7256b8caf4b2f53c6b7dfb56a5e316490787309cf9114d0c9b6e",
-        "normHash": "sha256:7b98339c7b2faa4654d53d7bacef24523b0ac47cb36362cb32cba1ec93359eb4"
+        "rawHash": "sha256:32b8f4f5c97095933a6d0d2e5c93da0bf26025b86d3ba8712061416a62bab94a",
+        "normHash": "sha256:c30f68ae78fbfe81be4a331044905bef1f60ad3a2368bf016dd9f9719f9e51f4"
       }
     },
     {
@@ -705,5 +705,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:de42243ea9900066b108e594eaaa92605b1657ed9528deb50a2534a634ecf14b"
+  "manifestHash": "sha256:4df77f130bf710befaa63236fd40975520b1a37d05e17b8398b63668e204ad92"
 }
