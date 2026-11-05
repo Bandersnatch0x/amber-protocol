@@ -2731,8 +2731,8 @@ node scripts/amber.js context delete --target . --page <id>
 
 # Freshness feedback (ADR-0109): each contradiction since the page's current ingest
 # drops its effective confidence one level; the page is never rewritten.
-node scripts/amber.js context feedback --target . --page <id> --verdict contradicted --note "page predates the new gate"
-node scripts/amber.js context feedback --target . --page <id> --verdict confirmed
+node scripts/amber.js context feedback --target . --page <id> --verdict contradicted --note "page predates the new gate" --yes
+node scripts/amber.js context feedback --target . --page <id> --verdict confirmed --yes
 
 # Task-scoped Loadout
 node scripts/amber.js context load --target . --route feature-standard

@@ -132,7 +132,7 @@ Examples:
   amber context benchmark --target . --fixture fixtures/context-benchmark.json
   amber context source-adapter --target . --fixture fixtures/context-source.json --enable
   amber context retention --target . --older-than-days 90
-  amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate"
+  amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate" --yes
   amber context stats --target .
 ```
 
@@ -183,7 +183,7 @@ amber context retention --target . --older-than-days 90
 ```
 
 ```bash
-amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate"
+amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate" --yes
 ```
 
 ```bash

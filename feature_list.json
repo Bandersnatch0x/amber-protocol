@@ -3171,6 +3171,12 @@
 					"result": "4220 pass / 0 fail (full suite)",
 					"date": "2026-11-05",
 					"notes": "P1 plan slice contract + P2 context freshness loop; focused suites planning 69/69 and context-freshness 21/21; fix-then-revert proved both directions"
+				},
+				{
+					"command": "npm test",
+					"result": "4235/4236 pass; 1 unrelated retention-ledger lock flake, green on 3 consecutive solo runs",
+					"date": "2026-11-05",
+					"notes": "Second-round review fixes: slice-gate fail-open closed, status qualifier bypass closed, verify --loadout reads TTL, instant-based feedback window, shared revision instant, index states it reports source health only"
 				}
 			],
 			"notes": [],

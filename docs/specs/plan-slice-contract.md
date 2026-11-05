@@ -57,6 +57,15 @@ Opting in is explicit: a plan that declares **any** metadata bullet adopts the c
 held to every rule, including on a settled status. Silence means "pre-contract", a partial
 declaration means "I am using this and must finish it".
 
+A qualifier on a terminal word is not settled. Only a date annotation is stripped before the
+status is classified: `accepted (2026-09-24)` is accepted, while `accepted (pending review)`,
+`implemented (verification pending)`, and `accepted — pending re-review` still name work that
+remains and stay gated.
+
+Numbering is checked over the whole section and reported even for a terminal plan: a duplicate,
+a gap, or a first header that is not 1 fails with a renumbering remedy. The section is scanned
+past prose, so a note between slices cannot hide the slices after it.
+
 ## Design Decisions
 
 - **Deterministic only.** No scoring, no weights, no confidence. The gate either sees the

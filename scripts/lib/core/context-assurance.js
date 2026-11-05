@@ -8,6 +8,7 @@ const { pagePath, readEvents } = require("./context-store");
 const { statePathForCreate } = require("../state-dir-resolver");
 const {
 	summarizeFreshnessActivity,
+	revisionInstantFor,
 	feedbackForPage,
 	effectiveConfidence,
 } = require("./context-freshness");
@@ -98,13 +99,15 @@ function readAcceptedEvidence(targetRoot, pageId, events = null) {
 	return evidence;
 }
 
-function deriveAssurance(targetRoot, page, events = null) {
+function deriveAssurance(targetRoot, page, events = null, activity = null) {
 	const log = events || readEvents(targetRoot);
 	const evidence = readAcceptedEvidence(targetRoot, page.pageId, log);
-	const activity = summarizeFreshnessActivity(log);
-	const revisionAt =
-		activity.latestIngestAtByPage[page.pageId] ||
-		(typeof page.created_at === "string" ? page.created_at : null);
+	// The caller folds the event log once per verify pass; deriving it again
+	// here would make the fold O(pages x events). The revision instant comes
+	// from the shared policy helper so the ttl base and the feedback window
+	// cannot drift apart.
+	const folded = activity || summarizeFreshnessActivity(log);
+	const revisionAt = revisionInstantFor(page, folded);
 	const feedback = feedbackForPage(log, page.pageId, revisionAt);
 	const storedConfidence = page.assurance?.confidence || null;
 	return {

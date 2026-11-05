@@ -35,21 +35,30 @@ function summarizeFreshnessActivity(events) {
 	return { latestIngestAtByPage, latestWriteAtByPage };
 }
 
-// The TTL base is the page's ingest/refresh instant, exactly as the page
-// schema describes it. A stored created_at only applies to pages that carry no
-// ingest evidence (pre-existing pages and hand-written fixtures).
+// The instant the page's current revision began. This is the single answer for
+// both the ttl base and the feedback window, so a page cannot be expired by one
+// rule and refreshed by the other.
+//
+// The revision is the latest accepted/no-change ingest, exactly as the page
+// schema describes it. A stored created_at applies only to pages with no ingest
+// evidence (pre-existing and hand-written pages); page-written is the last
+// fallback.
 //
 // A raw-only rebase is not a re-distillation, so it does not restart the
 // window: cosmetic source edits still let the page expire on wall-clock time.
 // Re-ingest is the operation that restarts it, because it writes an accepted
 // ingest event.
-function pageBaseInstant(page, activity) {
+function revisionInstantFor(page, activity) {
 	const ingestAt = activity.latestIngestAtByPage[page.pageId];
 	if (ingestAt) return ingestAt;
 	if (typeof page.created_at === "string" && page.created_at.trim() !== "") {
 		return page.created_at;
 	}
 	return activity.latestWriteAtByPage[page.pageId] || null;
+}
+
+function pageBaseInstant(page, activity) {
+	return revisionInstantFor(page, activity);
 }
 
 function pageExpiresAt(page, activity) {
@@ -67,11 +76,21 @@ function isTimeExpired(expiresAt, now = new Date()) {
 // Feedback counts since the page's current revision. A re-ingest starts a new
 // revision, so an old contradiction cannot keep decaying a freshly distilled
 // page.
+//
+// Timestamps are compared as INSTANTS, not as strings: the page schema accepts
+// any `date-time`, so a hand-written created_at carrying an offset
+// ("2026-01-01T10:00:00+08:00" is 02:00Z) would sort after a later Z-stamped
+// event and silently drop that feedback. Events Amber writes itself are
+// Z-stamped, so this only matters for migrated and hand-written pages.
 function feedbackForPage(events, pageId, sinceInstant) {
 	const counts = { contradicted: 0, confirmed: 0 };
+	const since = sinceInstant ? Date.parse(sinceInstant) : null;
 	for (const event of events) {
 		if (event.kind !== "knowledge-feedback" || event.pageId !== pageId) continue;
-		if (sinceInstant && event.at && !(event.at > sinceInstant)) continue;
+		if (since !== null && Number.isFinite(since) && event.at) {
+			const at = Date.parse(event.at);
+			if (!Number.isFinite(at) || at <= since) continue;
+		}
 		if (event.verdict === "contradicted") counts.contradicted += 1;
 		else if (event.verdict === "confirmed") counts.confirmed += 1;
 	}
@@ -122,6 +141,7 @@ module.exports = {
 	FEEDBACK_VERDICTS,
 	CONFIDENCE_LEVELS,
 	summarizeFreshnessActivity,
+	revisionInstantFor,
 	pageBaseInstant,
 	pageExpiresAt,
 	isTimeExpired,

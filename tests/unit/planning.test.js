@@ -18,6 +18,7 @@ const {
 	parseVerticalSlices,
 	validateVerticalSlices,
 	sliceSubsystemOf,
+	sliceContractApplies,
 } = require("../../scripts/lib/core/planning");
 
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
@@ -1043,11 +1044,12 @@ test("validateVerticalSlices requires slices to be numbered in order", () => {
 		"  - verify: node a.js",
 		"",
 	].join("\n");
-	// A section whose first header is not slice 1 has no slices at all, and the
-	// diagnostic names the misnumbering instead of asking for a missing section.
+	// A section whose first header is not slice 1 has no readable slices, and
+	// the diagnostic names the misnumbering instead of asking for a missing
+	// section the author can see.
 	assert.ok(
 		validateVerticalSlices(content).some((e) =>
-			/numbered 1\.\.N with no gaps \(found slice 2 where slice 1 was expected\)/.test(e),
+			/numbered 1\.\.N with no gaps \(found slice 2 out of sequence\)/.test(e),
 		),
 	);
 });
@@ -1071,6 +1073,120 @@ test("parseVerticalSlices ignores prose inside the section that starts with a nu
 		[1],
 	);
 	assert.deepEqual(validateVerticalSlices(content), []);
+});
+
+test("validateVerticalSlices reports a duplicate or gap AFTER slice 1", () => {
+	const dup = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"- [ ] Slice 1: a",
+		"  - paths: docs/a.md",
+		"  - depends-on: none",
+		"  - verify: node a.js",
+		"- [ ] Slice 1: b",
+		"  - paths: docs/b.md",
+		"  - depends-on: none",
+		"  - verify: node b.js",
+		"",
+	].join("\n");
+	assert.ok(
+		validateVerticalSlices(dup).some((e) => /numbered 1..N with no gaps/.test(e)),
+		JSON.stringify(validateVerticalSlices(dup)),
+	);
+
+	const gap = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"- [ ] Slice 1: a",
+		"  - paths: docs/a.md",
+		"  - depends-on: none",
+		"  - verify: node a.js",
+		"- [ ] Slice 3: c",
+		"  - paths: docs/c.md",
+		"  - depends-on: 1",
+		"  - verify: node c.js",
+		"",
+	].join("\n");
+	assert.ok(
+		validateVerticalSlices(gap).some((e) => /numbered 1..N with no gaps/.test(e)),
+		JSON.stringify(validateVerticalSlices(gap)),
+	);
+});
+
+test("prose between slices does not hide the slices after it", () => {
+	// A note at slice indentation used to end the section, so slice 2 was never
+	// parsed and its (escaping) path was never checked.
+	const content = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"- [ ] Slice 1: a",
+		"  - paths: docs/a.md",
+		"  - depends-on: none",
+		"  - verify: node a.js",
+		"",
+		"Some note at slice indentation.",
+		"",
+		"- [ ] Slice 2: b",
+		"  - paths: ../../outside/secret.js",
+		"  - depends-on: none",
+		"  - verify: node b.js",
+		"",
+	].join("\n");
+	const slices = parseVerticalSlices(content);
+	assert.deepEqual(
+		slices.map((s) => s.number),
+		[1, 2],
+	);
+	assert.ok(
+		validateVerticalSlices(content).some((e) => /must not escape the target repository/.test(e)),
+		JSON.stringify(validateVerticalSlices(content)),
+	);
+});
+
+test("a bare numbered header still counts when a prose line precedes its metadata", () => {
+	const content = [
+		"Status: implementation-ready",
+		"",
+		"## Vertical Slices",
+		"",
+		"1. First slice",
+		"   This slice does the first thing.",
+		"   - paths: docs/a.md",
+		"   - depends-on: none",
+		"   - verify: node a.js",
+		"",
+	].join("\n");
+	assert.deepEqual(validateVerticalSlices(content), []);
+	assert.equal(parseVerticalSlices(content).length, 1);
+});
+
+test("a word qualifier keeps a settled status gated; a date annotation does not", () => {
+	for (const status of [
+		"Status: accepted (pending review)",
+		"Status: accepted (pending human approval)",
+		"Status: implemented (verification pending)",
+		"Status: accepted — pending re-review",
+	]) {
+		const content = `${status}\n\n## Vertical Slices\n- [ ] Slice 1: x\n`;
+		assert.ok(sliceContractApplies(content), `${status} still has work left and must be gated`);
+	}
+	for (const status of [
+		"Status: accepted (2026-09-24)",
+		"Status: accepted — 2026-09-24",
+		"Status: **accepted**",
+	]) {
+		const content = `${status}\n\n## Vertical Slices\n- [ ] Slice 1: x\n`;
+		assert.equal(sliceContractApplies(content), false, `${status} is settled`);
+	}
+});
+
+test("a numbering defect is reported even for a terminal plan", () => {
+	const content =
+		"Status: accepted\n\n## Vertical Slices\n- [ ] Slice 2: x\n  - paths: docs/a.md\n  - depends-on: none\n  - verify: node a.js";
+	assert.ok(validateVerticalSlices(content).some((e) => /numbered 1..N with no gaps/.test(e)));
 });
 
 test("validateVerticalSlices rejects absolute and escaping paths", () => {

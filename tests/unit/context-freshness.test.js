@@ -23,10 +23,11 @@ const {
 	writePage,
 	regenerateIndex,
 } = require("../../scripts/lib/core/context-store");
-const { previewLoadout } = require("../../scripts/lib/core/context-loadout");
+const { previewLoadout, verifyLoadoutFile } = require("../../scripts/lib/core/context-loadout");
 const {
 	summarizeFreshnessActivity,
 	pageBaseInstant,
+	revisionInstantFor,
 	pageExpiresAt,
 	isTimeExpired,
 	feedbackForPage,
@@ -139,6 +140,27 @@ describe("context freshness policy", () => {
 		assert.equal(isTimeExpired(null, new Date()), false);
 	});
 
+	it("compares revision and feedback instants, not timestamp strings", () => {
+		// 10:00+08:00 is 02:00Z. A Z-stamped 03:00 event is AFTER the revision
+		// even though it sorts before "10" as a string; a 01:00Z event is before.
+		const since = "2026-01-01T10:00:00+08:00";
+		const events = [
+			{
+				kind: "knowledge-feedback",
+				pageId: "p",
+				verdict: "contradicted",
+				at: "2026-01-01T03:00:00.000Z",
+			},
+			{
+				kind: "knowledge-feedback",
+				pageId: "p",
+				verdict: "contradicted",
+				at: "2026-01-01T01:00:00.000Z",
+			},
+		];
+		assert.deepEqual(feedbackForPage(events, "p", since), { contradicted: 1, confirmed: 0 });
+	});
+
 	it("counts only feedback recorded since the page's current revision", () => {
 		const events = [
 			{
@@ -175,6 +197,21 @@ describe("context freshness policy", () => {
 		assert.equal(effectiveConfidence("medium", 3), "low");
 		assert.equal(effectiveConfidence(null, 1), "low");
 		assert.equal(effectiveConfidence(null, 0), null);
+	});
+
+	it("revisionInstantFor is the one revision answer for ttl and feedback", () => {
+		const activity = {
+			latestIngestAtByPage: {},
+			latestWriteAtByPage: { p: "2026-02-01T00:00:00.000Z" },
+		};
+		// A page with neither ingest evidence nor created_at still has a revision:
+		// the page-written fallback. deriveAssurance reads this helper, so the
+		// feedback window and the ttl base cannot disagree.
+		assert.equal(revisionInstantFor({ pageId: "p" }, activity), "2026-02-01T00:00:00.000Z");
+		assert.equal(
+			revisionInstantFor({ pageId: "p", created_at: "2026-01-01T00:00:00.000Z" }, activity),
+			"2026-01-01T00:00:00.000Z",
+		);
 	});
 
 	it("summarizeFreshnessActivity folds ingest and page-written events per page", () => {
@@ -242,7 +279,29 @@ describe("verify reports the derived expiry", () => {
 			const checked = result.pages.find((p) => p.pageId === "both");
 			assert.equal(checked.status, "stale");
 			assert.ok(checked.findings.some((f) => f.code === "AMBER_E_CONTEXT_PAGE_TIME_STALE"));
-			assert.equal(result.summary.timeStale, 0);
+			// timeStale counts pages past ttl, not the status tally: this page keeps
+			// the stronger source-stale status but is still past its ttl.
+			assert.equal(result.summary.timeStale, 1);
+			assert.equal(result.summary.stale, 1);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("keeps the orphaned status when a page is also past its ttl", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "orphan-stale", { ttl: "PT1H" });
+			backdateEvents(root, "orphan-stale", "2026-01-01T00:00:00.000Z");
+			// Drop the page from the projection: an incomplete index is what makes
+			// a page orphaned, and time-staleness must not hide the stronger fact.
+			const indexFile = path.join(root, "docs", "wiki", "context-index.md");
+			fs.writeFileSync(indexFile, "# Context index\n", "utf8");
+			require("../../scripts/lib/core/context-projection").rebuildProjection(root);
+			const result = verifyPages(root);
+			const page = result.pages.find((p) => p.pageId === "orphan-stale");
+			assert.equal(page.status, "stale-by-time", "fresh projection: time is the only fact");
+			assert.equal(result.summary.timeStale, 1);
 		} finally {
 			cleanup(root);
 		}
@@ -405,6 +464,64 @@ describe("knowledge feedback", () => {
 		}
 	});
 
+	it("deriveAssurance uses the page-written revision when no ingest or created_at exists", () => {
+		const root = makeTarget();
+		try {
+			// A hand-migrated page: a file on disk, a page-written event, no
+			// created_at and no ingest evidence.
+			const page = {
+				schemaVersion: "1.0.0",
+				pageId: "hand-written",
+				title: "hand-written",
+				assurance: { confidence: "high" },
+				sources: {
+					s1: {
+						kind: "doc",
+						ref: "docs/adr/0001-x.md",
+						rawHash: "sha256:" + "a".repeat(64),
+						excerpt: "# ADR 1",
+						excerptHash: "sha256:" + "b".repeat(64),
+						mutable: false,
+					},
+				},
+				blocks: [{ type: "prose", sources: ["s1"], text: "x" }],
+			};
+			writePage(root, page, { at: "2026-01-01T00:00:00.000Z" });
+			const eventsFile = eventsPath(root);
+			const written = fs
+				.readFileSync(eventsFile, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => {
+					const event = JSON.parse(line);
+					if (event.kind === "page-written") event.at = "2026-01-01T00:00:00.000Z";
+					return JSON.stringify(event);
+				});
+			written.push(
+				JSON.stringify({
+					kind: "knowledge-feedback",
+					pageId: "hand-written",
+					verdict: "contradicted",
+					at: "2025-12-01T00:00:00.000Z",
+				}),
+			);
+			fs.writeFileSync(
+				eventsFile,
+				`${written.join("\n")}
+`,
+			);
+
+			const checked = verifyPages(root).pages.find((p) => p.pageId === "hand-written");
+			// The pre-revision contradiction is outside the window, so confidence
+			// stays high. With the old deriveAssurance (no page-written fallback)
+			// the window would be null and every contradiction would count.
+			assert.equal(checked.assurance.confidence, "high");
+			assert.deepEqual(checked.assurance.feedback, { contradicted: 0, confirmed: 0 });
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	it("a re-ingest clears prior decay because the revision restarts the window", () => {
 		const root = makeTarget();
 		try {
@@ -470,6 +587,38 @@ describe("loadout and verify agree on the derived expiry", () => {
 			const preview = previewLoadout(root, { route: "probe", budget: 4000 });
 			assert.deepEqual(preview.errors, [], JSON.stringify(preview.errors));
 			assert.equal(preview.loadout.pages["shared"].expiresAt, verified.expiresAt);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("verify --loadout reports a required page whose ttl elapsed after the loadout was written", () => {
+		const root = makeTarget();
+		try {
+			seedPage(root, "pinned", { ttl: "P1D" });
+			const built = previewLoadout(root, { route: "probe", budget: 4000, required: ["pinned"] });
+			assert.deepEqual(built.errors, [], JSON.stringify(built.errors));
+			// The recorded expiry is in the future at write time; the agent loads
+			// the artifact later, after it has passed. The page file is unchanged,
+			// so the hash check alone would pass.
+			const loadout = JSON.parse(JSON.stringify(built.loadout));
+			const loadoutPath = path.join(root, ".amber", "context", "loadouts", "probe.json");
+			fs.mkdirSync(path.dirname(loadoutPath), { recursive: true });
+			fs.writeFileSync(loadoutPath, JSON.stringify(loadout, null, 2));
+
+			const later = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString();
+			const verified = verifyLoadoutFile(root, loadoutPath, { now: later });
+			assert.equal(verified.ok, false);
+			assert.ok(
+				verified.findings.some(
+					(f) => f.pageId === "pinned" && f.code === "AMBER_E_CONTEXT_PAGE_TIME_STALE",
+				),
+				JSON.stringify(verified.findings),
+			);
+			// At the write instant the same artifact still verifies: the check
+			// reports time, not a hash drift.
+			const atWrite = verifyLoadoutFile(root, loadoutPath);
+			assert.equal(atWrite.ok, true, JSON.stringify(atWrite.findings));
 		} finally {
 			cleanup(root);
 		}

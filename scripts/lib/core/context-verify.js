@@ -52,7 +52,7 @@ function checkPage(targetRoot, page, activity = null, now = new Date(), events =
 		expiresAt,
 		timeStale,
 		findings,
-		assurance: deriveAssurance(targetRoot, page, log),
+		assurance: deriveAssurance(targetRoot, page, log, activity),
 		...knowledge,
 	};
 }
@@ -82,14 +82,19 @@ function verifyPages(targetRoot, options = {}) {
 					page.pageId,
 				),
 			);
-			if (page.status === "ok") page.status = "orphaned";
+			// A page missing from the projection is orphaned regardless of why
+			// else it is unhealthy; time-stale must not mask the stronger fact.
+			if (page.status === "ok" || page.status === "stale-by-time") page.status = "orphaned";
 		}
 	}
+	// timeStale counts pages past their ttl, not the status tally: a page that
+	// is both source-stale and time-expired keeps status "stale" but is still
+	// a page past ttl, and doctor renders this number.
 	const summary = {
 		total: checked.length,
 		ok: checked.filter((p) => p.status === "ok").length,
 		stale: checked.filter((p) => p.status === "stale").length,
-		timeStale: checked.filter((p) => p.status === "stale-by-time").length,
+		timeStale: checked.filter((p) => p.timeStale).length,
 		tampered: checked.filter((p) => p.status === "tampered").length,
 		obsolete: checked.filter((p) => p.status === "obsolete").length,
 		orphaned: checked.filter((p) => p.status === "orphaned").length,

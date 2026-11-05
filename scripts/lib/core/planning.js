@@ -125,49 +125,56 @@ const SLICE_METADATA_RE = /^\s*[-*+]\s*(paths|depends-on|verify)\s*:\s*(.*)$/i;
 
 // A bare numbered line ("2. of these is optional") is prose unless the block
 // under it is slice metadata. This is the one ambiguous shape, so it needs the
-// structural evidence rather than the number alone.
+// structural evidence rather than the number alone. The whole block is scanned,
+// not just its first line: a slice may open with a prose sentence before its
+// metadata bullets.
 function hasIndentedMetadata(lines, startIndex, headerIndent) {
 	for (let index = startIndex + 1; index < lines.length; index += 1) {
 		const line = lines[index];
 		if (line.trim() === "") continue;
 		const indent = line.match(/^(\s*)/)[1].length;
 		if (indent <= headerIndent) return false;
-		return SLICE_METADATA_RE.test(line);
+		if (SLICE_METADATA_RE.test(line)) return true;
 	}
 	return false;
 }
 
 // Parse the `## Vertical Slices` section. Returns null when the section is
-// absent, otherwise one entry per slice in document order. Metadata bullets
-// must be indented under their slice; anything at or above the slice
-// indentation that is not another slice ends the list.
+// absent, otherwise one entry per slice in document order.
 //
-// A header line only counts when it continues the sequence: slice N is
-// accepted only if every earlier slice 1..N-1 was already read. A misnumbered
-// plan is reported as such instead of silently losing its slices.
+// Every slice header in the section is recognised, wherever it sits: an
+// explicit `- [ ]` / `Slice N:` header always counts, and a bare numbered line
+// counts when its block carries metadata. A non-slice line ends the CURRENT
+// slice's metadata block but never the section, so prose between slices cannot
+// hide the slices after it.
+//
+// Numbering is checked against the order slices were read: a gap, a duplicate,
+// or a header that does not start at 1 is recorded in `rejected` and reported
+// by the validator. Slices are read in document order and never renumbered.
 function parseVerticalSlicesDetailed(content) {
 	const body = getSectionBody(content, "Vertical Slices");
 	if (body === null) return { slices: null, rejected: [] };
 	const lines = body.split(/\r?\n/);
 	const slices = [];
 	const rejected = [];
-	let sliceIndent = null;
 	let current = null;
-	let expected = 1;
+	let currentIndent = null;
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index];
 		const indent = line.match(/^(\s*)/)[1].length;
 		const header = line.match(SLICE_HEADER_RE);
-		if (header && (sliceIndent === null || indent <= sliceIndent)) {
+		// A header indented deeper than the running slice is that slice's body
+		// (a nested bullet), not a new slice.
+		const isHeader = header && (currentIndent === null || indent <= currentIndent);
+		if (isHeader) {
 			const explicit = SLICE_EXPLICIT_HEADER_RE.test(line);
-			if (!explicit && !hasIndentedMetadata(lines, index, indent)) continue;
-			const number = Number(header[1]);
-			if (number !== expected) {
-				rejected.push(number);
+			if (!explicit && !hasIndentedMetadata(lines, index, indent)) {
+				current = null;
 				continue;
 			}
-			sliceIndent = indent;
-			expected += 1;
+			const number = Number(header[1]);
+			const expected = slices.length + 1;
+			if (number !== expected) rejected.push(number);
 			current = {
 				number,
 				title: header[2].trim(),
@@ -175,12 +182,18 @@ function parseVerticalSlicesDetailed(content) {
 				dependsOn: null,
 				verify: null,
 			};
+			currentIndent = indent;
 			slices.push(current);
 			continue;
 		}
 		if (!current) continue;
 		if (line.trim() === "") continue;
-		if (indent <= sliceIndent) break;
+		// Outdented or sibling content ends this slice's metadata block; the
+		// section keeps scanning so a later slice header is still found.
+		if (indent <= currentIndent) {
+			current = null;
+			continue;
+		}
 		const metadata = line.match(SLICE_METADATA_RE);
 		if (!metadata) continue;
 		const key = metadata[1].toLowerCase();
@@ -232,13 +245,18 @@ const SLICE_CONTRACT_EXEMPT_STATUS_RE =
 function sliceContractApplies(content) {
 	const status = readPlanField(content, "Status");
 	if (!status) return true; // an unlabelled plan is not exempt
+	// A date annotation is the only qualifier that does not change the status:
+	// "accepted (2026-09-24)" and "accepted — 2026-09-24" are both accepted.
+	// Strip it, then require the remainder to be EXACTLY a terminal word. Any
+	// other trailing prose ("accepted — pending re-review",
+	// "implemented (verification pending)") names work that remains, so it
+	// stays gated. Exact matching keeps that rule honest without a word list
+	// that would rot.
 	const token = status
 		.trim()
-		.replace(/\s*\([\s\S]*\)\s*$/, "")
-		// Only a SPACED dash is a separator ("proposed — pending re-review").
-		// An intra-token hyphen ("completed-pending-verification") is part of the
-		// status word and must keep the plan gated.
-		.replace(/\s+[—–-]\s+[\s\S]*$/, "")
+		.replace(/\*\*/g, "")
+		.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/, "")
+		.replace(/\s+[—–-]\s+\d{4}-\d{2}-\d{2}\s*$/, "")
 		.trim();
 	return !SLICE_CONTRACT_EXEMPT_STATUS_RE.test(token);
 }
@@ -246,12 +264,12 @@ function sliceContractApplies(content) {
 function validateVerticalSlices(content) {
 	const { slices, rejected } = parseVerticalSlicesDetailed(content);
 	if (slices === null) return [];
-	// A header that did not continue the sequence is a numbering defect, not a
-	// missing contract: report it before the curated/empty branches so the
-	// message names what the author actually wrote.
-	if (slices.length === 0 && rejected.length > 0) {
+	// A header that does not continue the sequence is a numbering defect, and it
+	// is reported for a terminal plan too: the exemption covers the contract, not
+	// a section that cannot be read. The message names what the author wrote.
+	if (rejected.length > 0) {
 		return [
-			`Vertical Slices must be numbered 1..N with no gaps (found slice ${rejected[0]} where slice 1 was expected). → fix: renumber the slices in document order.`,
+			`Vertical Slices must be numbered 1..N with no gaps (found slice ${rejected[0]} out of sequence). → fix: renumber the slices in document order.`,
 		];
 	}
 	// Compatible extension: a section with no declared metadata is a pre-contract
@@ -276,6 +294,8 @@ function validateVerticalSlices(content) {
 	}
 	slices.forEach((slice, index) => {
 		const position = index + 1;
+		// A slice number that does not match its position is a duplicate or a
+		// gap; either way two declarations collide, so it always fails.
 		if (slice.number !== position) {
 			errors.push(
 				`Vertical slice ${slice.number} appears in position ${position}; slices are numbered 1..N in document order. → fix: renumber the slices.`,

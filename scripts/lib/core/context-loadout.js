@@ -51,7 +51,7 @@ const {
 	effectiveClassificationOf,
 	admittedUnderCeiling,
 } = require("./classification");
-const { summarizeFreshnessActivity, pageExpiresAt } = require("./context-freshness");
+const { summarizeFreshnessActivity, pageExpiresAt, isTimeExpired } = require("./context-freshness");
 const {
 	KNOWLEDGE_KINDS,
 	normalizeKnowledgeKind,
@@ -974,7 +974,7 @@ function verifyRequiredArtifacts(targetRoot, loadout) {
 	return findings;
 }
 
-function verifyRequiredPages(targetRoot, loadout) {
+function verifyRequiredPages(targetRoot, loadout, now = new Date()) {
 	const required = Array.isArray(loadout.tiers?.required) ? loadout.tiers.required : [];
 	const findings = [];
 	for (const pageId of required) {
@@ -995,6 +995,19 @@ function verifyRequiredPages(targetRoot, loadout) {
 				code: "AMBER_E_CONTEXT_SOURCE_STALE",
 				detail: "required-tier page changed since loadout generation",
 			});
+			continue;
+		}
+		// The pre-load check reads the same TTL answer the build did: a page whose
+		// hash still matches but whose ttl has elapsed since the loadout was
+		// written is not fresh, and loading it would defeat the whole point of
+		// running this check right before the agent reads the artifact.
+		const expiresAt = loadout.pages?.[pageId]?.expiresAt || null;
+		if (expiresAt && isTimeExpired(expiresAt, now)) {
+			findings.push({
+				pageId,
+				code: "AMBER_E_CONTEXT_PAGE_TIME_STALE",
+				detail: `required-tier page ttl expired at ${expiresAt}`,
+			});
 		}
 	}
 	return findings;
@@ -1011,15 +1024,16 @@ function verifyRequiredPages(targetRoot, loadout) {
  * @param {string} loadoutPath
  * @returns {{ok: boolean, findings: Array<{pageId, code, detail}>}}
  */
-function verifyLoadoutFile(targetRoot, loadoutPath) {
+function verifyLoadoutFile(targetRoot, loadoutPath, options = {}) {
 	const loaded = readLoadoutForVerify(targetRoot, loadoutPath);
 	if (loaded.finding) return { ok: false, findings: [loaded.finding] };
 	const { loadout } = loaded;
 	const findings = [];
+	const now = options.now === undefined ? new Date() : new Date(options.now);
 
 	findings.push(...verifyRequiredArtifacts(targetRoot, loadout));
 
-	findings.push(...verifyRequiredPages(targetRoot, loadout));
+	findings.push(...verifyRequiredPages(targetRoot, loadout, now));
 	return { ok: findings.length === 0, findings };
 }
 

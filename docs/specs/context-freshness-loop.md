@@ -43,7 +43,9 @@ expiry.
 `checkPage` gains `expiresAt` and a `stale-by-time` status with the closed code
 `AMBER_E_CONTEXT_PAGE_TIME_STALE`. Source-level facts keep precedence: a page that is both
 source-stale and time-stale reports `stale` and still carries the time-stale finding. The summary
-gains a `timeStale` count. `verifyPages(target, { now })` accepts an injected clock.
+gains a `timeStale` count. `verifyPages(target, { now })` accepts an injected clock. `summary.timeStale` counts pages past
+their ttl — including pages whose status is the stronger `stale` — so the doctor line reports the
+fact rather than a status tally.
 
 ### 3. Refresh requests cover TTL
 
@@ -51,6 +53,11 @@ gains a `timeStale` count. `verifyPages(target, { now })` accepts an injected cl
 request with `reason: "ttl-expired"`; a page that also changed sources produces
 `reason: "source-change"` (one request covers both). The request carries `expiredAt`. The
 `request-created` event's `trigger` records the same reason, so `stats` can count them.
+
+`verify --loadout` reads the same answer: a required page whose recorded `expiresAt` has passed
+is reported `AMBER_E_CONTEXT_PAGE_TIME_STALE` even when its hash still matches, because that is
+the check the operator is told to run immediately before the agent loads the artifact.
+`verifyLoadoutFile(target, path, { now })` accepts the injected clock.
 
 ### 4. Append-only knowledge feedback
 
