@@ -3160,7 +3160,7 @@
 			"area": "governance",
 			"title": "Declared plan slices and a deterministic context freshness loop",
 			"user_visible_behavior": "Plan slices declare paths (<=5, <=2 subsystems), earlier-only dependencies, and a verify command, and the gate rejects an undeclared plan. Context pages report their derived ttl expiry at verify, generate ttl-expired refresh requests, and accept append-only knowledge feedback that decays effective confidence one level per contradiction.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/planning.test.js tests/unit/context-freshness.test.js",
 				"npm test"
@@ -3221,7 +3221,14 @@
 				"docs/plans/F084-declared-slices-and-context-freshness.md",
 				"docs/adr/0109-declarations-carry-gates.md",
 				"docs/CLI_REFERENCE.md"
-			]
+			],
+			"updated": "2026-11-06",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-06",
+				"surfaces": ["docs/specs/plan-slice-contract.md", "docs/specs/context-freshness-loop.md"],
+				"owner": "script"
+			}
 		}
 	]
 }

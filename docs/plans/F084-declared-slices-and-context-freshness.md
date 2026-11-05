@@ -1,7 +1,7 @@
 # F084 Plan: Declared Plan Slices and a Deterministic Context Freshness Loop
 
 Feature: F084
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 Spec: docs/specs/plan-slice-contract.md, docs/specs/context-freshness-loop.md
 Decision records: ADR-0109
@@ -35,42 +35,41 @@ Entries are bare, comma- or space-separated knowledge-surface paths only — doc
 Each slice names the paths it touches, the earlier slices it depends on, and the one command that proves it.
 A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or a first path segment).
 
-- [ ] Slice 1: plan slice contract.
+- [x] Slice 1: plan slice contract.
   - paths: scripts/lib/core/planning.js, tests/unit/planning.test.js
   - depends-on: none
   - verify: node --test tests/unit/planning.test.js
-- [ ] Slice 2: one freshness policy module.
+- [x] Slice 2: one freshness policy module.
   - paths: scripts/lib/core/context-freshness.js, tests/unit/context-freshness.test.js
   - depends-on: 1
   - verify: node --test tests/unit/context-freshness.test.js
-- [ ] Slice 3: verify, refresh, loadout, and assurance read the derived expiry.
+- [x] Slice 3: verify, refresh, loadout, and assurance read the derived expiry.
   - paths: scripts/lib/core/context-verify.js, scripts/lib/core/context-refresh.js, scripts/lib/core/context-loadout.js, scripts/lib/core/context-assurance.js, scripts/lib/core/context-stats.js
   - depends-on: 2
   - verify: node --test tests/unit/context-verify-refresh-stats.test.js
-- [ ] Slice 4: read-path suites pin the new expiry and feedback behaviour.
+- [x] Slice 4: read-path suites pin the new expiry and feedback behaviour.
   - paths: tests/unit/context-verify-refresh-stats.test.js, tests/unit/context-loadout.test.js, tests/unit/context-classification.test.js, tests/unit/context-adapter.test.js
   - depends-on: 3
   - verify: node --test tests/unit/context-verify-refresh-stats.test.js tests/unit/context-loadout.test.js tests/unit/context-classification.test.js tests/unit/context-adapter.test.js
-- [ ] Slice 5: the feedback verb wired through the context adapter.
+- [x] Slice 5: the feedback verb wired through the context adapter.
   - paths: scripts/lib/context/action-registry.js, scripts/lib/context/index.js, scripts/lib/context/adapters/command.js, scripts/lib/core/cli-output.js
   - depends-on: 3
   - verify: node --test tests/unit/context-dispatch.test.js
-- [ ] Slice 6: verb tests and command help.
+- [x] Slice 6: verb tests and command help.
   - paths: tests/unit/context-dispatch.test.js, tests/unit/context-action-registry.test.js, scripts/lib/command-registry.js
   - depends-on: 5
   - verify: node --test tests/unit/context-dispatch.test.js tests/unit/context-action-registry.test.js
-- [ ] Slice 7: specs, ADR, and CLI reference.
+- [x] Slice 7: specs, ADR, and CLI reference.
   - paths: docs/specs/plan-slice-contract.md, docs/specs/context-freshness-loop.md, docs/adr/0109-declarations-carry-gates.md, docs/CLI_REFERENCE.md
   - depends-on: 6
   - verify: npm run docs:gen:check
 
 ## Resume Checkpoint
 
-- Resume Point: all seven slices are implemented in the working tree; focused suites, the full
-  `npm test` (4258/4258, 0 skipped), and the repository gates are green.
-- Blockers: none. Remaining work is the independent review; nothing is accepted.
-- Next Action: hand the working tree to the reviewer; do not run acceptance until that review completes.
-- Recovery Instructions: reopen this plan and continue at the first unchecked slice; do not regenerate unless the plan file is missing.
+- Resume Point: all seven slices shipped in PR #391 at `ef0519a9acaf5470b14089bf2bc05a6a94aef488` on master. Standards passed, Spec passed with recorded notes, and F084 was accepted on 2026-11-06.
+- Blockers: none for F084. Retained limitations and verification evidence are recorded in `docs/quality/reviews/F084-delivery.md`.
+- Next Action: no further implementation is required for F084. Treat the retained benchmark limitation as separate work.
+- Recovery Instructions: read the delivery record and confirm PR #391 and its merge commit before reopening this feature. Do not regenerate the accepted plan.
 
 ## Acceptance Criteria
 
@@ -93,7 +92,7 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 
 ## Evidence Schema
 
-- Command:
-- Result:
-- Date:
-- Notes:
+- Command: `npm test`; manifests; doctor; wiki validation; generated agents and CLI documentation; lint; format; independent gate and CLI probes.
+- Result: 4258 tests passed, 0 failed, 0 skipped, exit 0. Required local gates and PR CI passed. Standards PASS and Spec PASS+NOTES have no remaining F084 blockers.
+- Date: 2026-11-06
+- Notes: PR #391 merged into master; the merged tree matches reviewed head `28fc2051c30750878085a765edb1b49443956e6c`. See `docs/quality/reviews/F084-delivery.md` for review provenance and retained limits.
