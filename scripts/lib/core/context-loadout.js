@@ -50,8 +50,8 @@ const {
 	CLASSIFICATIONS,
 	effectiveClassificationOf,
 	admittedUnderCeiling,
-	expiresAtFromTtl,
 } = require("./classification");
+const { summarizeFreshnessActivity, pageExpiresAt, isTimeExpired } = require("./context-freshness");
 const {
 	KNOWLEDGE_KINDS,
 	normalizeKnowledgeKind,
@@ -201,6 +201,7 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 				classificationSource: e.classificationSource,
 				purpose: e.purpose,
 				expiresAt: e.expiresAt,
+				assurance: e.assurance,
 			};
 			remaining -= e.words;
 		} else {
@@ -357,7 +358,8 @@ function loadBuildConfig(targetRoot, opts) {
 }
 
 function summarizeEvents(events) {
-	const latestAtByPage = {};
+	// Null-prototype: page ids are caller data, and "constructor" is a legal id.
+	const latestAtByPage = Object.create(null);
 	let generatedAt = EPOCH;
 	for (const event of events) {
 		if (!event || !event.at) continue;
@@ -369,7 +371,7 @@ function summarizeEvents(events) {
 			latestAtByPage[event.pageId] = event.at;
 		}
 	}
-	return { latestAtByPage, generatedAt };
+	return { latestAtByPage, ...summarizeFreshnessActivity(events), generatedAt };
 }
 
 function collectPageEntries(targetRoot, route, feature) {
@@ -384,8 +386,14 @@ function collectPageEntries(targetRoot, route, feature) {
 			error: { code: verified.code, detail: verified.detail },
 		};
 	}
-	const statusById = {};
-	for (const page of verified.pages) statusById[page.pageId] = page.status;
+	const statusById = Object.create(null);
+	const assuranceById = Object.create(null);
+	for (const page of verified.pages) {
+		statusById[page.pageId] = page.status;
+		// The verify pass already derived assurance from the same event log and
+		// revision instant; the Loadout projects it rather than deriving again.
+		assuranceById[page.pageId] = page.assurance;
+	}
 	const pageEntries = [];
 	const knowledgeGraph = readKnowledgeGraph(targetRoot);
 	let anyScope = false;
@@ -399,7 +407,7 @@ function collectPageEntries(targetRoot, route, feature) {
 		// classificationSource, never written back onto the page); the hard
 		// expiry derives from the page ttl at its ingest/refresh instant.
 		const effective = effectiveClassificationOf({ stored: page.classification, governed: true });
-		const baseInstant = page.created_at || activity.latestAtByPage[pageId] || null;
+		const derived = assuranceById[pageId] || null;
 		pageEntries.push({
 			pageId,
 			page,
@@ -413,7 +421,16 @@ function collectPageEntries(targetRoot, route, feature) {
 			classification: effective.classification,
 			classificationSource: effective.classificationSource,
 			purpose: typeof page.purpose === "string" ? page.purpose : null,
-			expiresAt: expiresAtFromTtl(page, baseInstant),
+			expiresAt: pageExpiresAt(page, activity),
+			// Derived at read time and never written back onto the page: a
+			// contradicted page still loads, with visibly lower confidence.
+			assurance: derived
+				? {
+						confidence: derived.confidence,
+						storedConfidence: derived.storedConfidence,
+						feedback: derived.feedback,
+					}
+				: null,
 		});
 	}
 	for (const entry of pageEntries) {
@@ -501,6 +518,7 @@ function selectRequiredPages(pageEntries, requiredPins, state) {
 			classificationSource: entry.classificationSource,
 			purpose: entry.purpose,
 			expiresAt: entry.expiresAt,
+			assurance: entry.assurance,
 		};
 	}
 	return state;
@@ -550,6 +568,10 @@ function appendStatusExclusions(pageEntries, state) {
 	]);
 	for (const entry of pageEntries) {
 		if (included.has(entry.pageId)) continue;
+		// Authority exclusions (expired/ceiling/firewall/knowledge-kind) already
+		// recorded this page and marked it seen. Re-recording a second reason
+		// here would list one page twice and imply two independent causes.
+		if (state.seen.has(entry.pageId)) continue;
 		if (entry.supersededBy.length > 0) {
 			state.excluded.push({
 				pageId: entry.pageId,
@@ -971,7 +993,7 @@ function verifyRequiredArtifacts(targetRoot, loadout) {
 	return findings;
 }
 
-function verifyRequiredPages(targetRoot, loadout) {
+function verifyRequiredPages(targetRoot, loadout, now = new Date()) {
 	const required = Array.isArray(loadout.tiers?.required) ? loadout.tiers.required : [];
 	const findings = [];
 	for (const pageId of required) {
@@ -992,6 +1014,19 @@ function verifyRequiredPages(targetRoot, loadout) {
 				code: "AMBER_E_CONTEXT_SOURCE_STALE",
 				detail: "required-tier page changed since loadout generation",
 			});
+			continue;
+		}
+		// The pre-load check reads the same TTL answer the build did: a page whose
+		// hash still matches but whose ttl has elapsed since the loadout was
+		// written is not fresh, and loading it would defeat the whole point of
+		// running this check right before the agent reads the artifact.
+		const expiresAt = loadout.pages?.[pageId]?.expiresAt || null;
+		if (expiresAt && isTimeExpired(expiresAt, now)) {
+			findings.push({
+				pageId,
+				code: "AMBER_E_CONTEXT_PAGE_TIME_STALE",
+				detail: `required-tier page ttl expired at ${expiresAt}`,
+			});
 		}
 	}
 	return findings;
@@ -1008,15 +1043,16 @@ function verifyRequiredPages(targetRoot, loadout) {
  * @param {string} loadoutPath
  * @returns {{ok: boolean, findings: Array<{pageId, code, detail}>}}
  */
-function verifyLoadoutFile(targetRoot, loadoutPath) {
+function verifyLoadoutFile(targetRoot, loadoutPath, options = {}) {
 	const loaded = readLoadoutForVerify(targetRoot, loadoutPath);
 	if (loaded.finding) return { ok: false, findings: [loaded.finding] };
 	const { loadout } = loaded;
 	const findings = [];
+	const now = options.now === undefined ? new Date() : new Date(options.now);
 
 	findings.push(...verifyRequiredArtifacts(targetRoot, loadout));
 
-	findings.push(...verifyRequiredPages(targetRoot, loadout));
+	findings.push(...verifyRequiredPages(targetRoot, loadout, now));
 	return { ok: findings.length === 0, findings };
 }
 

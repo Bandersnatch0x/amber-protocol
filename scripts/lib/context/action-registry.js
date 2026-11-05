@@ -24,6 +24,7 @@ const DEFINITIONS = [
 	contract("benchmark", "write", ["context-benchmark"], true),
 	contract("source-adapter", "read", ["source-bundle"], false),
 	contract("retention", "read", ["context-retention-report"], false),
+	contract("feedback", "write", ["context-feedback"], true),
 ];
 
 const PROJECTION_VARIANTS = Object.freeze({

@@ -45,7 +45,12 @@ function createConfirmedPlan(target) {
 			.replace(
 				"- review: <fill: knowledge-surface paths the reviewer needs>",
 				"- review: docs/wiki/engineering/runbook.md",
-			),
+			)
+			.replace(
+				"  - paths: <fill: repo-relative paths this slice touches>",
+				"  - paths: docs/wiki/engineering/verification.md",
+			)
+			.replace("  - verify: <fill: one command that proves this slice>", "  - verify: node --test"),
 	);
 	return plan;
 }
@@ -336,7 +341,12 @@ test("task prepare records trace-derived replay and regression proposal", () => 
 			.replace(
 				"- review: <fill: knowledge-surface paths the reviewer needs>",
 				"- review: docs/wiki/engineering/runbook.md",
-			),
+			)
+			.replace(
+				"  - paths: <fill: repo-relative paths this slice touches>",
+				"  - paths: docs/wiki/engineering/verification.md",
+			)
+			.replace("  - verify: <fill: one command that proves this slice>", "  - verify: node --test"),
 	);
 	startSession(target, "prepare trace regression task");
 

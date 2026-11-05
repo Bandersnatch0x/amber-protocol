@@ -25,6 +25,7 @@ const {
 	runBenchmark,
 	importSourceBundle,
 	retentionReport,
+	recordFeedback,
 } = require("../index");
 const { ACTIONS, resolveContextAction } = require("../action-registry");
 
@@ -65,12 +66,13 @@ function renderVerify(result) {
 	const lines = [];
 	const { summary, pages } = result;
 	lines.push(
-		`context pages: ${summary.total} (ok ${summary.ok}, stale ${summary.stale}, tampered ${summary.tampered}, obsolete ${summary.obsolete}, orphaned ${summary.orphaned})`,
+		`context pages: ${summary.total} (ok ${summary.ok}, stale ${summary.stale}, time-stale ${summary.timeStale || 0}, tampered ${summary.tampered}, obsolete ${summary.obsolete}, orphaned ${summary.orphaned})`,
 	);
 	for (const p of pages) {
 		const assurance = `${p.assurance.confidence || "-"}/${p.assurance.maturity || "-"}`;
+		const expiry = p.expiresAt ? `, expires ${p.expiresAt}` : "";
 		lines.push(
-			`  [${p.status}] ${p.pageId} (${p.knowledgeKind}, ${p.lifecycle}, assurance ${assurance}, verified ${p.assurance.verifiedAt || "unavailable"})`,
+			`  [${p.status}] ${p.pageId} (${p.knowledgeKind}, ${p.lifecycle}, assurance ${assurance}, verified ${p.assurance.verifiedAt || "unavailable"}${expiry})`,
 		);
 		for (const f of p.findings) lines.push(`    ${f.code}: ${f.detail}`);
 	}
@@ -109,6 +111,11 @@ function renderStats(stats) {
 	lines.push(
 		`maturity: validated ${stats.assurance.maturity.validated}, reviewed ${stats.assurance.maturity.reviewed}, provisional ${stats.assurance.maturity.provisional}, unspecified ${stats.assurance.maturity.unspecified}`,
 	);
+	if (stats.feedback && stats.feedback.contradicted + stats.feedback.confirmed > 0) {
+		lines.push(
+			`feedback: contradicted ${stats.feedback.contradicted}, confirmed ${stats.feedback.confirmed}`,
+		);
+	}
 	const codes = Object.entries(stats.errorCodes);
 	if (codes.length > 0) {
 		lines.push("rejected by code:");
@@ -443,7 +450,10 @@ function refreshBody(args, targetRoot) {
 			? `${result.requests.length} refresh request(s) generated:`
 			: "no refresh requests needed",
 		...result.requests.map(
-			(r) => `  ${r.requestId} -> ${r.pageId} (changed: ${r.changedSources.join(", ")})`,
+			(r) =>
+				`  ${r.requestId} -> ${r.pageId} (reason: ${r.reason}${
+					r.changedSources.length > 0 ? `; changed: ${r.changedSources.join(", ")}` : ""
+				})`,
 		),
 		result.rawOnlyRebases.length > 0
 			? `${result.rawOnlyRebases.length} cosmetic change(s) absorbed silently`
@@ -610,6 +620,29 @@ function retentionBody(args, targetRoot) {
 	};
 }
 
+function feedbackBody(args, targetRoot) {
+	const result = recordFeedback(targetRoot, {
+		pageId: args.page,
+		verdict: args.verdict,
+		note: args.note,
+	});
+	if (!result.ok) {
+		return {
+			target: undefined,
+			errors: result.errors,
+			warnings: [],
+			bypassPrint: false,
+		};
+	}
+	return {
+		text: `recorded ${result.event.verdict} feedback for ${result.event.pageId}`,
+		errors: [],
+		warnings: [],
+		pageId: result.event.pageId,
+		verdict: result.event.verdict,
+	};
+}
+
 // Error bodies that the legacy errResult pair shaped with `target: undefined`
 // carry that key explicitly so the dispatcher's args.target prepend cannot
 // resurrect a concrete target on the wire.
@@ -645,6 +678,7 @@ function contextDispatch(action, args = {}) {
 			benchmark: (a) => benchmarkBody(a, targetRoot),
 			"source-adapter": (a) => sourceAdapterBody(a, targetRoot),
 			retention: (a) => retentionBody(a, targetRoot),
+			feedback: (a) => feedbackBody(a, targetRoot),
 		},
 		unknown: () => ({
 			target: undefined,

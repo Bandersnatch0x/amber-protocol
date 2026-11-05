@@ -253,8 +253,10 @@ describe("amber context end-to-end through the adapter", () => {
 			const verified = contextDispatch("verify", args({ _: ["context", "verify"], json: true }));
 			assert.deepEqual(verified.result.pages[0].assurance, {
 				confidence: "high",
+				storedConfidence: "high",
 				maturity: "validated",
 				verifiedAt: evidence.verifiedAt,
+				feedback: { contradicted: 0, confirmed: 0 },
 			});
 			const listed = contextDispatch("list", args({ _: ["context", "list"] }));
 			assert.match(listed.result.text, /high\/validated/);

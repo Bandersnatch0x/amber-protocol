@@ -728,6 +728,15 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_SOURCE_MISSING"],
 	},
+	AMBER_E_CONTEXT_PAGE_TIME_STALE: {
+		title: "Context page's declared ttl has elapsed",
+		cause:
+			"The page's ttl, measured from its current revision instant (latest accepted or no-change ingest), has passed while its sources are unchanged.",
+		remedy:
+			"Run `amber context refresh` to generate a ttl-expired request, re-distill the page, or record `amber context feedback --verdict contradicted` if it is now wrong.",
+		layer: "Context",
+		related: ["AMBER_E_CONTEXT_SOURCE_STALE", "AMBER_E_CONTEXT_PAGE_OBSOLETE"],
+	},
 	// --- Governed Memory Layer (spec 2026-08-21 §12; extends, never rebuilds) ---
 	// layer is Context for the whole family, inheriting the AMBER_E_CONTEXT_* tier.
 	AMBER_E_MEMORY_RATE_LIMITED: {
