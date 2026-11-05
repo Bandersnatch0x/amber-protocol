@@ -6,6 +6,11 @@ const { canonicalJson, sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
 const { pagePath, readEvents } = require("./context-store");
 const { statePathForCreate } = require("../state-dir-resolver");
+const {
+	summarizeFreshnessActivity,
+	feedbackForPage,
+	effectiveConfidence,
+} = require("./context-freshness");
 
 const EVIDENCE_SCHEMA_VERSION = "1.0.0";
 
@@ -59,7 +64,7 @@ function writeVerificationEvidence(targetRoot, pageId, details = {}) {
 	return evidence;
 }
 
-function readAcceptedEvidence(targetRoot, pageId) {
+function readAcceptedEvidence(targetRoot, pageId, events = null) {
 	const file = evidencePath(targetRoot, pageId);
 	if (!fs.existsSync(file)) return null;
 	let evidence;
@@ -68,7 +73,7 @@ function readAcceptedEvidence(targetRoot, pageId) {
 	} catch {
 		return null;
 	}
-	const matchingEvent = readEvents(targetRoot).find(
+	const matchingEvent = (events || readEvents(targetRoot)).find(
 		(event) =>
 			event.kind === "ingest" &&
 			event.pageId === pageId &&
@@ -93,12 +98,23 @@ function readAcceptedEvidence(targetRoot, pageId) {
 	return evidence;
 }
 
-function deriveAssurance(targetRoot, page) {
-	const evidence = readAcceptedEvidence(targetRoot, page.pageId);
+function deriveAssurance(targetRoot, page, events = null) {
+	const log = events || readEvents(targetRoot);
+	const evidence = readAcceptedEvidence(targetRoot, page.pageId, log);
+	const activity = summarizeFreshnessActivity(log);
+	const revisionAt =
+		activity.latestIngestAtByPage[page.pageId] ||
+		(typeof page.created_at === "string" ? page.created_at : null);
+	const feedback = feedbackForPage(log, page.pageId, revisionAt);
+	const storedConfidence = page.assurance?.confidence || null;
 	return {
-		confidence: page.assurance?.confidence || null,
+		// Effective confidence is derived, never written back: each recorded
+		// contradiction since the current revision drops one level.
+		confidence: effectiveConfidence(storedConfidence, feedback.contradicted),
+		storedConfidence,
 		maturity: page.assurance?.maturity || null,
 		verifiedAt: evidence ? evidence.verifiedAt : null,
+		feedback,
 	};
 }
 

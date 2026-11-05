@@ -6,17 +6,22 @@
 
 const fs = require("node:fs");
 
-const { listPages, readPage, indexPath } = require("./context-store");
+const { listPages, readPage, readEvents, indexPath } = require("./context-store");
 const { inspectPageHealth } = require("./context-page-health");
 const { finding } = require("./context-sources");
 const { deriveAssurance } = require("./context-assurance");
 const { describeKnowledge } = require("./context-knowledge");
 const { projectionStatus } = require("./context-projection");
+const { summarizeFreshnessActivity, pageExpiresAt, isTimeExpired } = require("./context-freshness");
 
-function checkPage(targetRoot, page) {
+function checkPage(targetRoot, page, activity = null, now = new Date(), events = null) {
 	const pageId = page.pageId;
 	const health = inspectPageHealth(targetRoot, page);
 	const knowledge = describeKnowledge(targetRoot, page);
+	const log = events || readEvents(targetRoot);
+	const resolvedActivity = activity || summarizeFreshnessActivity(log);
+	const expiresAt = pageExpiresAt(page, resolvedActivity);
+	const timeStale = isTimeExpired(expiresAt, now);
 
 	const findings = [...health.findings];
 	if (health.allMutableSourcesMissing) {
@@ -28,10 +33,26 @@ function checkPage(targetRoot, page) {
 			),
 		);
 	}
+	if (timeStale) {
+		findings.push(
+			finding(
+				"AMBER_E_CONTEXT_PAGE_TIME_STALE",
+				`hard expiry ${expiresAt} has passed (ttl)`,
+				pageId,
+			),
+		);
+	}
+	// Source-level facts win the status; a page that is both source-stale and
+	// time-stale keeps the more specific source status and still carries the
+	// time-stale finding. Time is the only reason to leave `ok` here.
+	const status = health.status === "ok" && timeStale ? "stale-by-time" : health.status;
 	return {
 		...health,
+		status,
+		expiresAt,
+		timeStale,
 		findings,
-		assurance: deriveAssurance(targetRoot, page),
+		assurance: deriveAssurance(targetRoot, page, log),
 		...knowledge,
 	};
 }
@@ -40,12 +61,15 @@ function checkPage(targetRoot, page) {
  * Verify all accepted pages.
  * @returns {{ pages: Array, summary: Object }}
  */
-function verifyPages(targetRoot) {
+function verifyPages(targetRoot, options = {}) {
 	const projection = projectionStatus(targetRoot);
 	const pages = listPages(targetRoot)
 		.map(({ pageId }) => readPage(targetRoot, pageId))
 		.filter(Boolean);
-	const checked = pages.map((page) => checkPage(targetRoot, page));
+	const events = readEvents(targetRoot);
+	const activity = summarizeFreshnessActivity(events);
+	const now = options.now === undefined ? new Date() : new Date(options.now);
+	const checked = pages.map((page) => checkPage(targetRoot, page, activity, now, events));
 	if (!projection.ok) {
 		const index = indexPath(targetRoot);
 		const output = fs.existsSync(index) ? fs.readFileSync(index, "utf8") : "";
@@ -65,6 +89,7 @@ function verifyPages(targetRoot) {
 		total: checked.length,
 		ok: checked.filter((p) => p.status === "ok").length,
 		stale: checked.filter((p) => p.status === "stale").length,
+		timeStale: checked.filter((p) => p.status === "stale-by-time").length,
 		tampered: checked.filter((p) => p.status === "tampered").length,
 		obsolete: checked.filter((p) => p.status === "obsolete").length,
 		orphaned: checked.filter((p) => p.status === "orphaned").length,

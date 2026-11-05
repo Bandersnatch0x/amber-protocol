@@ -41,12 +41,13 @@ amber context --target <repo> [--json]
 | --- | --- |
 | <code>benchmark</code> | Run deterministic Loadout quality metrics against a target-local fixture. |
 | <code>delete</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
+| <code>feedback</code> | Record append-only knowledge feedback when an injected page contradicts ingest drops its effective confidence one level; the page is not rewritten. |
 | <code>ingest</code> | Judge the agent's output: schema, citation completeness, payload-to-request binding, request-owned scope, and source freshness. The matching request is required for every accepted or no-change outcome. A payload of &#123;"outcome":"no-change"&#125; rebases hashes without touching content. |
 | <code>list</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
 | <code>load</code> | Assemble a task-scoped Loadout: three target-local Required Artifacts plus a freshness-gated, budgeted selection of Context Pages, written to .amber/context/loadouts/&lt;route&gt;[-&lt;feature&gt;][--&lt;run&gt;].json. With --subject &lt;s&gt; --purpose &lt;p&gt; ([--run &lt;id&gt;]) the F069 firewall verdict gates every candidate page: allowed pages cite the covering grant (id + snapshot + validUntil), denied pages are excluded with reason firewall and the closed deny reason (each denial on the trail); without --subject the build is byte-identical and the artifact carries no firewall section (visibly not grant-governed). build without --run, which the held-out leak check depends on. |
 | <code>preview</code> | Assemble and print the same Loadout without writing files or events. Firewall mode (--subject/--purpose) requires `load` — preview never carries the firewall section; it prints the ungoverned shape. |
 | <code>projection</code> | Check or rebuild the disposable, hash-bound Context index projection. |
-| <code>refresh</code> | Scan pages for source changes: cosmetic changes absorbed silently |
+| <code>refresh</code> | Scan pages for source changes and elapsed ttl: cosmetic changes are absorbed silently (raw-only), real changes and expired pages generate refresh requests (trigger source-change \| ttl-expired). |
 | <code>request</code> | Scan evidence, bundle hash-bearing sources, write a distillation contract to .amber/context/requests/. Sources are mutable by default; refs under .amber/ and docs/adr/ are immutable (excerpt-snapshotted). |
 | <code>retention</code> | Report age, reachability, lineage protection, and eligibility. Never deletes. |
 | <code>show</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
@@ -73,13 +74,19 @@ Subcommands:
         is required for every accepted or no-change outcome.
         A payload of {"outcome":"no-change"} rebases hashes without touching content.
   verify [--json]
-        Health-check every page: stale / tampered / missing / obsolete / orphaned,
-        with AMBER_E_CONTEXT_* codes plus separately derived lifecycle and assurance.
+        Health-check every page: stale / time-stale / tampered / missing /
+        obsolete / orphaned, with AMBER_E_CONTEXT_* codes plus separately
+        derived lifecycle, expiry, and assurance.
   list / show --page <id> / delete --page <id>
         Inspect or manage accepted pages. list accepts --knowledge-kind <kind>.
   refresh
-        Scan pages for source changes: cosmetic changes absorbed silently
-        (raw-only), real changes generate refresh requests.
+        Scan pages for source changes and elapsed ttl: cosmetic changes are
+        absorbed silently (raw-only), real changes and expired pages generate
+        refresh requests (trigger source-change | ttl-expired).
+  feedback --page <id> --verdict <contradicted|confirmed> [--note <text>]
+        Record append-only knowledge feedback when an injected page contradicts
+        (or still matches) the code. Each contradiction since the page's current
+        ingest drops its effective confidence one level; the page is not rewritten.
   stats [--window <n>] [--knowledge-kind <kind>]
         Report over .amber/context/events.jsonl: filter rate, pass rate,
         no-change rate, unknown-block share, assurance, and source density.
@@ -125,6 +132,7 @@ Examples:
   amber context benchmark --target . --fixture fixtures/context-benchmark.json
   amber context source-adapter --target . --fixture fixtures/context-source.json --enable
   amber context retention --target . --older-than-days 90
+  amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate"
   amber context stats --target .
 ```
 
@@ -172,6 +180,10 @@ amber context source-adapter --target . --fixture fixtures/context-source.json -
 
 ```bash
 amber context retention --target . --older-than-days 90
+```
+
+```bash
+amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate"
 ```
 
 ```bash

@@ -50,8 +50,8 @@ const {
 	CLASSIFICATIONS,
 	effectiveClassificationOf,
 	admittedUnderCeiling,
-	expiresAtFromTtl,
 } = require("./classification");
+const { summarizeFreshnessActivity, pageExpiresAt } = require("./context-freshness");
 const {
 	KNOWLEDGE_KINDS,
 	normalizeKnowledgeKind,
@@ -369,7 +369,7 @@ function summarizeEvents(events) {
 			latestAtByPage[event.pageId] = event.at;
 		}
 	}
-	return { latestAtByPage, generatedAt };
+	return { latestAtByPage, ...summarizeFreshnessActivity(events), generatedAt };
 }
 
 function collectPageEntries(targetRoot, route, feature) {
@@ -399,7 +399,6 @@ function collectPageEntries(targetRoot, route, feature) {
 		// classificationSource, never written back onto the page); the hard
 		// expiry derives from the page ttl at its ingest/refresh instant.
 		const effective = effectiveClassificationOf({ stored: page.classification, governed: true });
-		const baseInstant = page.created_at || activity.latestAtByPage[pageId] || null;
 		pageEntries.push({
 			pageId,
 			page,
@@ -413,7 +412,7 @@ function collectPageEntries(targetRoot, route, feature) {
 			classification: effective.classification,
 			classificationSource: effective.classificationSource,
 			purpose: typeof page.purpose === "string" ? page.purpose : null,
-			expiresAt: expiresAtFromTtl(page, baseInstant),
+			expiresAt: pageExpiresAt(page, activity),
 		});
 	}
 	for (const entry of pageEntries) {

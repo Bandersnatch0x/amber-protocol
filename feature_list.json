@@ -3153,6 +3153,51 @@
 				"docs/adr/0101-run-unit-of-auditable-execution.md"
 			],
 			"updated": "2026-10-21"
+		},
+		{
+			"id": "F084",
+			"priority": 84,
+			"area": "governance",
+			"title": "Declared plan slices and a deterministic context freshness loop",
+			"user_visible_behavior": "Plan slices declare paths (<=5, <=2 subsystems), earlier-only dependencies, and a verify command, and the gate rejects an undeclared plan. Context pages report their derived ttl expiry at verify, generate ttl-expired refresh requests, and accept append-only knowledge feedback that decays effective confidence one level per contradiction.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/planning.test.js tests/unit/context-freshness.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "4220 pass / 0 fail (full suite)",
+					"date": "2026-11-05",
+					"notes": "P1 plan slice contract + P2 context freshness loop; focused suites planning 69/69 and context-freshness 21/21; fix-then-revert proved both directions"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/planning.js",
+				"scripts/lib/core/context-freshness.js",
+				"scripts/lib/core/context-verify.js",
+				"scripts/lib/core/context-refresh.js",
+				"scripts/lib/core/context-loadout.js",
+				"scripts/lib/core/context-assurance.js",
+				"scripts/lib/core/context-stats.js",
+				"scripts/lib/context/action-registry.js",
+				"scripts/lib/context/index.js",
+				"scripts/lib/context/adapters/command.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/core/classification.js",
+				"tests/unit/planning.test.js",
+				"tests/unit/context-freshness.test.js",
+				"tests/unit/context-adapter.test.js",
+				"tests/unit/context-classification.test.js",
+				"docs/specs/plan-slice-contract.md",
+				"docs/specs/context-freshness-loop.md",
+				"docs/plans/F084-declared-slices-and-context-freshness.md",
+				"docs/adr/0109-declarations-carry-gates.md",
+				"docs/CLI_REFERENCE.md"
+			]
 		}
 	]
 }

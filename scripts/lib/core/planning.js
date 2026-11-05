@@ -106,6 +106,166 @@ function extractContextManifests(content) {
 	return block;
 }
 
+// ── Vertical-slice contract (F084) ──────────────────────────────────────────
+//
+// A plan's slices are executable units, not prose headings. Each slice
+// declares the paths it touches, the earlier slices it depends on, and the one
+// command that proves it. The gate enforces the declaration deterministically:
+// no model, no scoring, no hidden weights.
+
+const SLICE_MAX_PATHS = 5;
+const SLICE_MAX_SUBSYSTEMS = 2;
+
+// `1. text`, `1) text`, `- [ ] Slice 1: text`, and `Slice 1: text` are all
+// accepted so existing plans stay readable; the number is the slice identity.
+const SLICE_HEADER_RE = /^\s*(?:[-*+]\s*\[[ xX]\]\s*)?(?:Slice\s+)?(\d+)\s*[:.)-]\s*(.*)$/;
+const SLICE_METADATA_RE = /^\s*[-*+]\s*(paths|depends-on|verify)\s*:\s*(.*)$/i;
+
+// Parse the `## Vertical Slices` section. Returns null when the section is
+// absent, otherwise one entry per slice in document order. Metadata bullets
+// must be indented under their slice; anything at or above the slice
+// indentation that is not another slice ends the list.
+function parseVerticalSlices(content) {
+	const body = getSectionBody(content, "Vertical Slices");
+	if (body === null) return null;
+	const slices = [];
+	let sliceIndent = null;
+	let current = null;
+	for (const line of body.split(/\r?\n/)) {
+		const indent = line.match(/^(\s*)/)[1].length;
+		const header = line.match(SLICE_HEADER_RE);
+		if (header && (sliceIndent === null || indent <= sliceIndent)) {
+			sliceIndent = indent;
+			current = {
+				number: Number(header[1]),
+				title: header[2].trim(),
+				paths: null,
+				dependsOn: null,
+				verify: null,
+			};
+			slices.push(current);
+			continue;
+		}
+		if (!current) continue;
+		if (line.trim() === "") continue;
+		if (indent <= sliceIndent) break;
+		const metadata = line.match(SLICE_METADATA_RE);
+		if (!metadata) continue;
+		const key = metadata[1].toLowerCase();
+		const value = metadata[2].trim();
+		if (key === "paths") current.paths = value;
+		else if (key === "depends-on") current.dependsOn = value;
+		else current.verify = value;
+	}
+	return slices;
+}
+
+// The deterministic subsystem key used by the slice budget: a module under
+// scripts/lib/<name>/ counts as its own subsystem; every other path uses its
+// first segment.
+function sliceSubsystemOf(entry) {
+	const segments = entry.replace(/\\/g, "/").replace(/^\.\//, "").split("/").filter(Boolean);
+	if (segments[0] === "scripts" && segments[1] === "lib" && segments[2]) {
+		return `scripts/lib/${segments[2]}`;
+	}
+	return segments[0] || "";
+}
+
+function slicePathProblem(entry) {
+	const normalized = entry.replace(/\\/g, "/").replace(/^\.\//, "");
+	if (path.isAbsolute(entry) || /^[A-Za-z]:\//.test(normalized)) {
+		return "must be relative to the target repository";
+	}
+	if (normalized.split("/").includes("..")) return "must not escape the target repository";
+	return null;
+}
+
+function validateVerticalSlices(content) {
+	const slices = parseVerticalSlices(content);
+	if (slices === null) return [];
+	const errors = [];
+	if (slices.length === 0) {
+		errors.push(
+			"Vertical Slices must define at least one slice. → fix: add a `- [ ] Slice 1: <outcome>` bullet with `paths:`, `depends-on:`, and `verify:` metadata.",
+		);
+		return errors;
+	}
+	slices.forEach((slice, index) => {
+		const position = index + 1;
+		if (slice.number !== position) {
+			errors.push(
+				`Vertical slice ${slice.number} appears in position ${position}; slices are numbered 1..N in document order. → fix: renumber the slices.`,
+			);
+		}
+		if (slice.paths === null) {
+			errors.push(
+				`Vertical slice ${position} must declare a paths: bullet. → fix: add \`- paths: <repo-relative paths, at most ${SLICE_MAX_PATHS}>\` under the slice.`,
+			);
+		} else if (isUncuratedManifestValue(slice.paths)) {
+			errors.push(
+				`Vertical slice ${position} still carries scaffold placeholders in paths:. → fix: replace them with the paths this slice touches.`,
+			);
+		} else {
+			const entries = splitManifestEntries(slice.paths);
+			if (entries.length === 0) {
+				errors.push(
+					`Vertical slice ${position} lists no paths. → fix: name at least one repo-relative path.`,
+				);
+			} else {
+				if (entries.length > SLICE_MAX_PATHS) {
+					errors.push(
+						`Vertical slice ${position} declares ${entries.length} paths; the limit is ${SLICE_MAX_PATHS}. → fix: split the slice or drop unrelated paths.`,
+					);
+				}
+				const subsystems = new Set();
+				for (const entry of entries) {
+					const problem = slicePathProblem(entry);
+					if (problem) {
+						errors.push(`Vertical slice ${position} path ${entry} ${problem}.`);
+						continue;
+					}
+					subsystems.add(sliceSubsystemOf(entry));
+				}
+				if (subsystems.size > SLICE_MAX_SUBSYSTEMS) {
+					errors.push(
+						`Vertical slice ${position} spans ${subsystems.size} subsystems (${[...subsystems].sort().join(", ")}); the limit is ${SLICE_MAX_SUBSYSTEMS}. → fix: split the slice by subsystem.`,
+					);
+				}
+			}
+		}
+		if (slice.verify === null) {
+			errors.push(
+				`Vertical slice ${position} must name a verify: command. → fix: add \`- verify: <one command that proves this slice>\` under the slice.`,
+			);
+		} else if (slice.verify === "" || isUncuratedManifestValue(slice.verify)) {
+			errors.push(
+				`Vertical slice ${position} has an empty or placeholder verify: value. → fix: name the one command that proves this slice.`,
+			);
+		}
+		if (slice.dependsOn !== null && slice.dependsOn !== "") {
+			const value = slice.dependsOn.trim();
+			if (!/^(none|-|—)$/i.test(value)) {
+				const tokens = value.split(/[,\s]+/).filter(Boolean);
+				for (const token of tokens) {
+					if (!/^\d+$/.test(token)) {
+						errors.push(
+							`Vertical slice ${position} depends-on value ${token} is not a slice number. → fix: name earlier slice numbers, or "none".`,
+						);
+						continue;
+					}
+					const target = Number(token);
+					if (target < 1 || target >= position) {
+						errors.push(
+							`Vertical slice ${position} depends-on slice ${target}, which is not an earlier slice. → fix: dependencies must name a slice that appears before this one.`,
+						);
+					}
+				}
+			}
+		}
+	});
+	return errors;
+}
+
 function resolveRelativePlanPath(targetRoot, planRelativePath) {
 	if (path.isAbsolute(planRelativePath)) {
 		return {
@@ -166,7 +326,13 @@ function buildPlanContent(feature, title, options = {}) {
 		"",
 		"## Vertical Slices",
 		"",
+		"Each slice names the paths it touches, the earlier slices it depends on, and the one command that proves it.",
+		`A slice carries at most ${SLICE_MAX_PATHS} paths and ${SLICE_MAX_SUBSYSTEMS} subsystems (a scripts/lib/<name> module or a first path segment).`,
+		"",
 		"- [ ] Slice 1: make the smallest safe change that advances the feature.",
+		"  - paths: <fill: repo-relative paths this slice touches>",
+		"  - depends-on: none",
+		"  - verify: <fill: one command that proves this slice>",
 		"",
 		"## Resume Checkpoint",
 		"",
@@ -387,6 +553,11 @@ function validatePlanContent({ content, resolveFeature, resolveExists }) {
 			}
 		}
 	}
+
+	// Vertical slices (F084): every slice declares its paths, dependencies, and
+	// verification command. Runs only when the section exists; the required-
+	// sections rule above already reports a missing section exactly once.
+	errors.push(...validateVerticalSlices(content));
 
 	const checkpointBody = getSectionBody(content, "Resume Checkpoint");
 	if (checkpointBody !== null) {
@@ -1030,4 +1201,9 @@ module.exports = {
 	parseContextManifests,
 	extractContextManifests,
 	isKnowledgeSurfacePath,
+	parseVerticalSlices,
+	validateVerticalSlices,
+	sliceSubsystemOf,
+	SLICE_MAX_PATHS,
+	SLICE_MAX_SUBSYSTEMS,
 };

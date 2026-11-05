@@ -10,8 +10,16 @@ const fs = require("node:fs");
 
 const { hashFile } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
-const { listPages, readPage, writePage, regenerateIndex, appendEvent } = require("./context-store");
+const {
+	listPages,
+	readPage,
+	readEvents,
+	writePage,
+	regenerateIndex,
+	appendEvent,
+} = require("./context-store");
 const { createRequest } = require("./context-request");
+const { summarizeFreshnessActivity, pageExpiresAt, isTimeExpired } = require("./context-freshness");
 
 function scanPageSources(targetRoot, page) {
 	const rebased = { ...page, sources: { ...page.sources } };
@@ -46,12 +54,17 @@ function scanPageSources(targetRoot, page) {
 	return { rebased, changedRefs, errors, rebaseChanged };
 }
 
-function createPageRefreshRequest(targetRoot, page, changedRefs) {
-	if (changedRefs.length === 0) return { request: null, errors: [] };
+// A page needs a refresh request for one of two reasons: its sources changed
+// (normalized hash), or its ttl elapsed with no source change. The source
+// change wins when both apply — one request covers both.
+function createPageRefreshRequest(targetRoot, page, changedRefs, freshness = {}) {
+	const reason =
+		changedRefs.length > 0 ? "source-change" : freshness.timeExpired ? "ttl-expired" : null;
+	if (!reason) return { request: null, errors: [] };
 	const created = createRequest(targetRoot, {
 		pageId: page.pageId,
 		title: page.title,
-		reason: "source-change",
+		reason,
 		sources: Object.values(page.sources).map((source) => ({ ref: source.ref })),
 		force: true,
 	});
@@ -59,12 +72,18 @@ function createPageRefreshRequest(targetRoot, page, changedRefs) {
 		return { request: null, errors: created.errors.map((error) => `${page.pageId}: ${error}`) };
 	}
 	return {
-		request: { pageId: page.pageId, requestId: created.requestId, changedSources: changedRefs },
+		request: {
+			pageId: page.pageId,
+			requestId: created.requestId,
+			reason,
+			changedSources: changedRefs,
+			...(reason === "ttl-expired" ? { expiredAt: freshness.expiresAt } : {}),
+		},
 		errors: [],
 	};
 }
 
-function refreshPage(targetRoot, page) {
+function refreshPage(targetRoot, page, activity, now) {
 	const scan = scanPageSources(targetRoot, page);
 	let rawOnlyRebase = null;
 	if (scan.rebaseChanged) {
@@ -74,7 +93,11 @@ function refreshPage(targetRoot, page) {
 			sources: Object.keys(scan.rebased.sources).filter((sid) => scan.rebased.sources[sid].mutable),
 		};
 	}
-	const requestResult = createPageRefreshRequest(targetRoot, page, scan.changedRefs);
+	const expiresAt = pageExpiresAt(page, activity);
+	const requestResult = createPageRefreshRequest(targetRoot, page, scan.changedRefs, {
+		expiresAt,
+		timeExpired: isTimeExpired(expiresAt, now),
+	});
 	return {
 		request: requestResult.request,
 		rawOnlyRebase,
@@ -86,7 +109,7 @@ function refreshPage(targetRoot, page) {
  * Refresh pass.
  * @returns {{ requests: Array, rawOnlyRebases: Array, errors: Array }}
  */
-function refreshPages(targetRoot) {
+function refreshPages(targetRoot, options = {}) {
 	const requests = [];
 	const rawOnlyRebases = [];
 	const errors = [];
@@ -94,9 +117,11 @@ function refreshPages(targetRoot) {
 	const pages = listPages(targetRoot)
 		.map(({ pageId }) => readPage(targetRoot, pageId))
 		.filter(Boolean);
+	const activity = summarizeFreshnessActivity(readEvents(targetRoot));
+	const now = options.now === undefined ? new Date() : new Date(options.now);
 
 	for (const page of pages) {
-		const result = refreshPage(targetRoot, page);
+		const result = refreshPage(targetRoot, page, activity, now);
 		if (result.request) requests.push(result.request);
 		if (result.rawOnlyRebase) rawOnlyRebases.push(result.rawOnlyRebase);
 		errors.push(...result.errors);

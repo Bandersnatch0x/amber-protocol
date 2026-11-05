@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 39,
+    "adr": 40,
     "wiki": 9,
     "architecture": 9,
-    "total": 57
+    "total": 58
   },
   "rows": [
     {
@@ -477,6 +477,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0109",
+      "category": "adr",
+      "sourceNodeId": "adr:0109",
+      "pageId": "knowledge-adr-0109",
+      "sourcePath": "docs/adr/0109-declarations-carry-gates.md",
+      "title": "Declarations Carry Gates; Knowledge Expires on a Deterministic Clock",
+      "source": {
+        "rawHash": "sha256:a4c8f4fec0bb7256b8caf4b2f53c6b7dfb56a5e316490787309cf9114d0c9b6e",
+        "normHash": "sha256:7b98339c7b2faa4654d53d7bacef24523b0ac47cb36362cb32cba1ec93359eb4"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -693,5 +705,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:166509b86045b6dc8a1397c927374b605b0207c746125098bbfc96a0da1ab801"
+  "manifestHash": "sha256:de42243ea9900066b108e594eaaa92605b1657ed9528deb50a2534a634ecf14b"
 }

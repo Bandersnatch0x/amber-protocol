@@ -15,6 +15,9 @@ const {
 	extractScopeBullet,
 	buildScopeDiscipline,
 	SCOPE_DISCIPLINE_CHECKLIST,
+	parseVerticalSlices,
+	validateVerticalSlices,
+	sliceSubsystemOf,
 } = require("../../scripts/lib/core/planning");
 
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
@@ -37,7 +40,13 @@ function validPlanContent(overrides = {}) {
 		overrides.contextManifests ?? "- implement: docs/specs/contract.md\n- review: docs/adr/0001.md",
 		"",
 		"## Vertical Slices",
-		overrides.verticalSlices ?? "- slice 1",
+		overrides.verticalSlices ??
+			[
+				"- [ ] Slice 1: make the change.",
+				"  - paths: scripts/lib/core/planning.js",
+				"  - depends-on: none",
+				"  - verify: node --test tests/unit/planning.test.js",
+			].join("\n"),
 		"",
 		"## Resume Checkpoint",
 		overrides.resumeCheckpoint ??
@@ -891,4 +900,172 @@ test("isKnowledgeSurfacePath matches extensions case-insensitively", () => {
 	assert.equal(isKnowledgeSurfacePath("README.MD"), true);
 	assert.equal(isKnowledgeSurfacePath("Docs/Specs/Contract.Md"), true);
 	assert.equal(isKnowledgeSurfacePath("src/App.JS"), false);
+});
+
+// ---- vertical-slice contract (F084): declared paths, DAG, verification ----
+
+function slicePlan({ paths, dependsOn = "none", verify = "node --test tests/unit/x.test.js" }) {
+	const lines = ["- [ ] Slice 1: do the work."];
+	if (paths !== null) lines.push(`  - paths: ${paths}`);
+	if (dependsOn !== null) lines.push(`  - depends-on: ${dependsOn}`);
+	if (verify !== null) lines.push(`  - verify: ${verify}`);
+	return lines.join("\n");
+}
+
+test("buildPlanContent scaffolds slice paths, depends-on, and verify bullets", () => {
+	const out = buildPlanContent(
+		{ id: "F-100", user_visible_behavior: "X", verification: ["v"] },
+		"Slices",
+	);
+	assert.match(out, /- \[ \] Slice 1:/);
+	assert.match(out, / {2}- paths: <fill:/);
+	assert.match(out, / {2}- depends-on: none/);
+	assert.match(out, / {2}- verify: <fill:/);
+	assert.match(out, /at most 5 paths and 2 subsystems/);
+});
+
+test("parseVerticalSlices reads both checkbox and numbered slice headers", () => {
+	const content = [
+		"## Vertical Slices",
+		"- [ ] Slice 1: first.",
+		"  - paths: scripts/lib/core/a.js",
+		"  - depends-on: none",
+		"  - verify: node --test a.test.js",
+		"2. **Second**",
+		"   - paths: docs/specs/b.md",
+		"   - depends-on: 1",
+		"   - verify: node --test b.test.js",
+		"",
+	].join("\n");
+	const slices = parseVerticalSlices(content);
+	assert.equal(slices.length, 2);
+	assert.equal(slices[0].number, 1);
+	assert.equal(slices[1].number, 2);
+	assert.equal(slices[1].dependsOn, "1");
+	assert.equal(slices[1].paths, "docs/specs/b.md");
+});
+
+test("validateVerticalSlices accepts a declared DAG over earlier slices", () => {
+	const content = [
+		"## Vertical Slices",
+		"- [ ] Slice 1: first.",
+		"  - paths: scripts/lib/core/a.js, tests/unit/a.test.js",
+		"  - depends-on: none",
+		"  - verify: node --test tests/unit/a.test.js",
+		"- [ ] Slice 2: second.",
+		"  - paths: scripts/lib/core/b.js",
+		"  - depends-on: 1",
+		"  - verify: node --test tests/unit/b.test.js",
+		"- [ ] Slice 3: third.",
+		"  - paths: docs/specs/c.md",
+		"  - depends-on: 1, 2",
+		"  - verify: node scripts/validate-docs.js",
+		"",
+	].join("\n");
+	assert.deepEqual(validateVerticalSlices(content), []);
+});
+
+test("validateVerticalSlices requires paths and verify metadata", () => {
+	const missingPaths = validateVerticalSlices(
+		["## Vertical Slices", slicePlan({ paths: null })].join("\n"),
+	);
+	assert.ok(missingPaths.some((e) => /must declare a paths: bullet/.test(e)));
+	const missingVerify = validateVerticalSlices(
+		["## Vertical Slices", slicePlan({ paths: "docs/a.md", verify: null })].join("\n"),
+	);
+	assert.ok(missingVerify.some((e) => /must name a verify: command/.test(e)));
+});
+
+test("validateVerticalSlices rejects scaffold placeholders", () => {
+	const result = validateVerticalSlices(
+		[
+			"## Vertical Slices",
+			slicePlan({
+				paths: "<fill: repo-relative paths this slice touches>",
+				verify: "<fill: one command that proves this slice>",
+			}),
+		].join("\n"),
+	);
+	assert.ok(result.some((e) => /scaffold placeholders in paths/.test(e)));
+	assert.ok(result.some((e) => /empty or placeholder verify/.test(e)));
+});
+
+test("validateVerticalSlices caps a slice at five paths", () => {
+	const paths = ["a.md", "b.md", "c.md", "d.md", "e.md", "f.md"].join(", ");
+	const result = validateVerticalSlices(["## Vertical Slices", slicePlan({ paths })].join("\n"));
+	assert.ok(result.some((e) => /declares 6 paths; the limit is 5/.test(e)));
+});
+
+test("validateVerticalSlices caps a slice at two subsystems", () => {
+	const paths = "scripts/lib/core/a.js, scripts/lib/context/b.js, tests/unit/c.test.js";
+	const result = validateVerticalSlices(["## Vertical Slices", slicePlan({ paths })].join("\n"));
+	assert.ok(result.some((e) => /spans 3 subsystems/.test(e)));
+});
+
+test("sliceSubsystemOf treats a scripts/lib module as one subsystem", () => {
+	assert.equal(sliceSubsystemOf("scripts/lib/core/a.js"), "scripts/lib/core");
+	assert.equal(sliceSubsystemOf("scripts/lib/core/deep/b.js"), "scripts/lib/core");
+	assert.equal(sliceSubsystemOf("scripts/lib/context/c.js"), "scripts/lib/context");
+	assert.equal(sliceSubsystemOf("tests/unit/d.test.js"), "tests");
+	assert.equal(sliceSubsystemOf("docs/specs/e.md"), "docs");
+});
+
+test("validateVerticalSlices rejects self, forward, and unknown dependencies", () => {
+	const content = [
+		"## Vertical Slices",
+		"- [ ] Slice 1: first.",
+		"  - paths: docs/a.md",
+		"  - depends-on: 1",
+		"  - verify: node a.js",
+		"- [ ] Slice 2: second.",
+		"  - paths: docs/b.md",
+		"  - depends-on: 3",
+		"  - verify: node b.js",
+		"",
+	].join("\n");
+	const errors = validateVerticalSlices(content);
+	assert.ok(errors.some((e) => /depends-on slice 1, which is not an earlier slice/.test(e)));
+	assert.ok(errors.some((e) => /depends-on slice 3, which is not an earlier slice/.test(e)));
+});
+
+test("validateVerticalSlices rejects non-numeric dependencies", () => {
+	const result = validateVerticalSlices(
+		["## Vertical Slices", slicePlan({ paths: "docs/a.md", dependsOn: "slice-one" })].join("\n"),
+	);
+	assert.ok(result.some((e) => /not a slice number/.test(e)));
+});
+
+test("validateVerticalSlices requires slices to be numbered in order", () => {
+	const content = [
+		"## Vertical Slices",
+		"- [ ] Slice 2: first.",
+		"  - paths: docs/a.md",
+		"  - verify: node a.js",
+		"",
+	].join("\n");
+	assert.ok(
+		validateVerticalSlices(content).some((e) =>
+			/appears in position 1; slices are numbered/.test(e),
+		),
+	);
+});
+
+test("validateVerticalSlices rejects absolute and escaping paths", () => {
+	const absolute = validateVerticalSlices(
+		["## Vertical Slices", slicePlan({ paths: "C:/outside/a.js" })].join("\n"),
+	);
+	assert.ok(absolute.some((e) => /must be relative to the target repository/.test(e)));
+	const escaping = validateVerticalSlices(
+		["## Vertical Slices", slicePlan({ paths: "../outside/a.js" })].join("\n"),
+	);
+	assert.ok(escaping.some((e) => /must not escape the target repository/.test(e)));
+});
+
+test("validatePlanContent surfaces slice-contract errors through the gate", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({ verticalSlices: "- [ ] Slice 1: no metadata." }),
+		resolveFeature: foundResolver,
+	});
+	assert.ok(result.errors.some((e) => /must declare a paths: bullet/.test(e)));
+	assert.ok(result.errors.some((e) => /must name a verify: command/.test(e)));
 });

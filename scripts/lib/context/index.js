@@ -12,6 +12,7 @@ const { projectionStatus, rebuildProjection } = require("../core/context-project
 const { runBenchmark } = require("../core/context-benchmark");
 const { importSourceBundle, sourceTargetBinding } = require("../core/context-source-adapter");
 const { retentionReport } = require("../core/context-retention");
+const { recordFeedback } = require("../core/context-freshness");
 
 module.exports = {
 	createRequest,
@@ -32,4 +33,5 @@ module.exports = {
 	importSourceBundle,
 	sourceTargetBinding,
 	retentionReport,
+	recordFeedback,
 };
