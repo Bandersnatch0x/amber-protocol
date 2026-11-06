@@ -3328,7 +3328,7 @@
 			"area": "memory",
 			"title": "Retire the memory alpha budget and keep surface usage observable",
 			"user_visible_behavior": "amber memory status reports physical MEMORY.md usage as entries and bytes with no budget ceiling or utilisation percentage, ingest no longer refuses an entry because the surface is large, supersession keeps working as ordinary knowledge replacement, and amber doctor checks the memory layer for product repositories instead of skipping it.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/memory-dispatch.test.js tests/integration/memory-commands.test.js",
 				"node --test tests/unit/doctor-remedy.test.js tests/integration/amber-mcp.test.js",
@@ -3392,7 +3392,13 @@
 				"tests/phase-v1-5.test.js",
 				"CHANGELOG.md"
 			],
-			"updated": "2026-11-06"
+			"updated": "2026-11-07",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-07",
+				"surfaces": [],
+				"owner": "standard"
+			}
 		}
 	]
 }
