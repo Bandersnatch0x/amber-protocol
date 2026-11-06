@@ -115,7 +115,7 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
   - depends-on: 9
   - verify: amber gate --target . --plan docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md
 
-- [ ] Slice 11: run the whole suite, the public documentation seam and doctor, then mark the feature passing.
+- [x] Slice 11: run the whole suite, the public documentation seam and doctor, then mark the feature passing.
   - paths: feature_list.json
   - depends-on: 10
   - verify: npm test
@@ -147,6 +147,6 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 ## Evidence Schema
 
 - Command: `node --test` on the memory, doctor, MCP and phase suites; `node scripts/verify-public-docs.js`; `npm run docs:gen:check`; `node scripts/amber.js doctor --target .`; `npm test`.
-- Result:
+- Result: 4300 tests, 4296 passed, 4 skipped (`sh` is not on this host's PATH), 0 failed, exit 0; `docs:gen:check` and `verify-public-docs.js` exit 0; the memory, doctor, phase and MCP suites pass; `amber doctor` reports memory findings for the product repository and exits 1 on this checkout because ten entries genuinely drifted.
 - Date: 2026-11-06
-- Notes:
+- Notes: The first whole-suite run failed only on the F063 stray-untracked-roots guard because the new plan file was untracked; the run above is on the committed tree. `amber doctor` now exits 1 here until the drifted entries are reviewed, superseded, or abandoned — that is the intended visibility change, not a regression.
