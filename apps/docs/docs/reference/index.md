@@ -17,7 +17,7 @@ This section provides authoritative reference documentation for experienced deve
 | Task / Goal | Primary Command | Read/Write Nature |
 | --- | --- | --- |
 | **Inspect repository readiness** | [`amber audit --target .`](/reference/cli/audit) | `read-only` |
-| **Verify setup and guardrails** | [`amber doctor --target .`](/reference/cli/doctor) | `read-only` |
+| **Verify setup and guardrails** | [`amber doctor --target .`](/reference/cli/doctor) | `idempotent-write` (may mark a drifted memory entry `needs-re-review`) |
 | **Scaffold missing Amber files** | [`amber init --target .`](/reference/cli/init) | `idempotent-write` |
 | **Start a tracked session** | [`amber session start --goal "..."`](/reference/cli/session) | `governed-write` |
 | **Inspect active session status** | [`amber session status`](/reference/cli/session) | `read-only` |

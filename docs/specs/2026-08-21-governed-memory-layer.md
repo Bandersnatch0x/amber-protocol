@@ -10,7 +10,7 @@ tags: [memory, governance, promotion, dreaming, registry, mcp]
 
 # Governed Memory Layer 实现 Spec
 
-> 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、α/β/γ 预算闸门、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
+> 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、γ 限速与物理用量观测（α/β 预算已于 F086 退役）、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
 
 **Date:** 2026-08-21 ｜ **Status:** accepted（与 ADR-0018 Accepted、F033/F034 accepted 对齐；批次 A + T1/T2 已落地）｜ **ADR:** [ADR-0018 Governed Memory Layer](../adr/0018-governed-memory-layer.md)
 
@@ -395,7 +395,7 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 
 ### 10.3 MEMORY.md 条目分隔结构与物理用量观测
 
-现状缺口：`templates/MEMORY.md` 仅 21 行 creed，未定义条目格式——#173-Q5 的 α 计数依赖本节定义（**Spec-defined**）：
+现状缺口：`templates/MEMORY.md` 仅 21 行 creed，未定义条目格式——status 的 surface 计数依赖本节定义（**Spec-defined**）：
 
 - **条目区**：二级标题 `## Entries`（既有 creed 小节保留不动）。
 - **条目分隔**：条目区内每个 `^### `（三级标题行）起始一个条目，至下一个 `^### ` 行或文件末尾。
@@ -490,7 +490,7 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 
 ### 15.2 Spec-defined 落地项汇总（评审聚焦清单）
 
-§4.1 needs-re-review 复位通道（重新 book）｜§5.1 T2 挂载点定位｜§5.3 signal 强制通道清单｜§5.5 追认 book 机械形态（直接创建 active、不耗 γ）｜§6.1 信号 id 映射｜§6.3 α 准入算术（耗尽判定 + bookText 预估）｜§6.5 K1 的 T1/T2 工件锚定、C4×M14 合成语义｜§7.2-M12 batchId 格式、pack steps 不声明｜§8.2 status 字段名｜§9 事件载荷字段｜§10.1–§10.4 两 schema 字段/schemaVersion "1.0.0"/MEMORY.md 分隔结构/bookText/request 存储/entryId 规范化/身份门细节｜§11 规则 9 pack 三件套检查｜§12 十条新增错误码｜§14 验收标准。
+§4.1 needs-re-review 复位通道（重新 book）｜§5.1 T2 挂载点定位｜§5.3 signal 强制通道清单｜§5.5 追认 book 机械形态（直接创建 active、不耗 γ）｜§6.1 信号 id 映射｜§6.3 表面用量观测（F086 退役 α 预算与 β 义务）｜§6.5 K1 的 T1/T2 工件锚定、C4×M14 合成语义｜§7.2-M12 batchId 格式、pack steps 不声明｜§8.2 status 字段名（entries/gamma/surface）｜§9 事件载荷字段｜§10.1–§10.4 两 schema 字段/schemaVersion "1.0.0"/MEMORY.md 分隔结构与物理用量/request 存储/entryId 规范化/身份门细节｜§11 规则 9 pack 三件套检查｜§12 十条新增错误码（预算码已退役）｜§14 验收标准。
 
 ### 15.3 待裁决问题
 
