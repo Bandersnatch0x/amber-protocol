@@ -80,3 +80,7 @@ a doctor ratification-class warning.
 ### Plugin dependency ranges can be wider than bundled imports
 
 - A plugin's declared dependency range can be wider than what its bundled code actually imports: eslint-plugin-react-hooks 7.1.1 declares zod-validation-error ^3.5.0 || ^4.0.0 yet unconditionally requires the zod-validation-error/v4 subpath — npm resolves 3.5.4 and the plugin crashes at config load with ERR_PACKAGE_PATH_NOT_EXPORTED. Fix with a package.json overrides pin, not a downgrade. Verify exact latest versions (npm view) before installing; guessed ranges age fast.
+
+### A shape check is not validation
+
+- A declared freshness floor must refuse a day that does not exist. `Date.parse` rolls `2026-02-30` into March 2, so a shape-only check let both the gate and the loadout accept a floor its author never declared. Validate the calendar fields in the shared parser, and test an impossible-but-parsable value next to the valid ones.
