@@ -405,3 +405,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md`
 - Review status: ready
 - Feature: F085 status → accepted in feature_list.json
+
+## 2026-11-07 docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md
+
+- Plan: `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`
+- Review status: ready
+- Feature: F086 status → accepted in feature_list.json

@@ -1,7 +1,7 @@
 # Plan: Retire the memory alpha budget and keep surface usage observable
 
 Feature: F086
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
