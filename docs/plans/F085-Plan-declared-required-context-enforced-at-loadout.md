@@ -1,7 +1,7 @@
 # Plan: Plan-declared required context enforced at loadout
 
 Feature: F085
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
