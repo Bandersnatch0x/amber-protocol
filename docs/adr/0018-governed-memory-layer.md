@@ -61,17 +61,20 @@ entry state and provenance; `MEMORY.md` is the authority for its own content tex
 entry goes to re-review, and neither side silently wins. The registry is a rebuildable catalog; recovery
 after `clean` follows the re-admission contract from surviving L3 surfaces plus git history. → spec §3–§4
 
-### D3 — Supersession is the only retirement verb, capped by deterministic budget gates
+### D3 — Supersession is the only retirement verb; growth is curated, not capped
 
 Nothing is ever physically deleted; retirement is supersession only (`active → superseded`), approved by a
-human, with the text removal in `MEMORY.md` performed by hand while Amber only books it. Unbounded growth
-is capped by three deterministic gates (#170-Q4, #173): **α** — a physical budget on `MEMORY.md`
-(≤ 50 entries ∧ ≤ 8 KB; a priori values, with a mandatory 50%-utilisation doctor review); **β** —
-one-in-one-out: once the budget is exhausted, admission requires a `supersedeTarget` pointer to an
-existing registry entry, approved atomically in the same call; **γ** — an admission rate limit of 5
-entries per 168-hour rolling window over the shared event ledger, enforced at ingest with all-or-nothing
-semantics and a deterministic K1/K2/K3 ordering (staleness, supersession pressure, content-hash
-tiebreak — reproducible, never FIFO). → spec §6
+human, with the text removal in `MEMORY.md` performed by hand while Amber only books it. → spec §3–§4
+
+*Amended by F086 (2026-11-06).* The **α** physical budget (≤ 50 entries ∧ ≤ 8 KB) and the **β**
+one-in-one-out obligation it triggered are retired. The gate did not measure what it capped —
+`bookText` projected a 20,009-byte claim as 50 bytes — the β credit never verified that the replaced
+text left the file, admission reserved no space for pending proposals, and §6.3 and §6.4 contradicted
+each other at exhaustion. Growth is now curated: the `MEMORY.md` creed, entry-level human approval, and
+the **γ** admission rate limit of 5 entries per 168-hour rolling window with K1/K2/K3 ordering
+(staleness, supersession pressure, content-hash tiebreak). Supersession remains an independent
+capability; it is no longer a budget duty. The accepted cost is that there is no automatic total
+ceiling. → spec §6, `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`
 
 ### D4 — One event ledger: the `memory-*` closed set
 
@@ -144,10 +147,10 @@ bounded (γ = 5 approvals + 1 book per window) but non-zero. Evidence kinds reus
 
 ## Consequences
 
-**Positive:** the three missing verb lifecycles land on one object model and one ledger; unbounded growth
-is mathematically capped with zero destructive automation; every promotion carries provenance, audit
-events, and lineage; the seams add no new mechanisms (whitelist split, reused hash/event/validation parts,
-an extended error-code family); human ceremony is bounded by γ.
+**Positive:** the three missing verb lifecycles land on one object model and one ledger; growth is
+rate-limited with zero destructive automation (the total cap was retired in F086); every promotion
+carries provenance, audit events, and lineage; the seams add no new mechanisms (whitelist split, reused
+hash/event/validation parts, an extended error-code family); human ceremony is bounded by γ.
 
 **Negative:** human approval ceremony has a hard upper bound but is non-zero — sustained weekly batches
 cost real attention; registry rebuildability depends on the re-admission contract and on `MEMORY.md`

@@ -621,7 +621,7 @@ const COMMAND_HELP = {
 		"  book       Register a MEMORY.md surface hash and promote booked entries to active.",
 		"             --ratify --claim <text> ratifies a human direct edit directly (γ-free).",
 		"  abandon    Explicit human abandon of a request or entry (terminal ledger marker).",
-		"  status     Read-only three-section projection (entries / gamma / alpha).",
+		"  status     Read-only three-section projection (entries / gamma / surface).",
 		"",
 		"Boundary: Amber detects, admits, and registers; humans curate MEMORY.md and approve.",
 		"",

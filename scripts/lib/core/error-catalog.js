@@ -744,7 +744,7 @@ const CATALOG = {
 		cause: "entries[] 超剩余配额（γ 168h 滚动窗口内 memory-ingest 准入事件 ≥ 5）。",
 		remedy: "缩减后重交，或待窗口滚动（request 保留）。",
 		layer: "Context",
-		related: ["AMBER_E_MEMORY_BUDGET_EXCEEDED"],
+		related: [],
 	},
 	AMBER_E_MEMORY_SOURCE_STALE: {
 		title: "条目 provenance 源 normHash 漂移或源失效",
@@ -773,13 +773,6 @@ const CATALOG = {
 		remedy: "重新生成 request。",
 		layer: "Context",
 		related: ["AMBER_E_MEMORY_SOURCE_STALE"],
-	},
-	AMBER_E_MEMORY_BUDGET_EXCEEDED: {
-		title: "α 预算耗尽状态拒绝新准入",
-		cause: "MEMORY.md 物理条目数或字节数达上限（条目数 ≥ 50 或字节数 ≥ 8192）。",
-		remedy: "拆分为多条、或经 β 指认 supersedeTarget 腾出预算（禁止裸拒绝）。",
-		layer: "Context",
-		related: ["AMBER_E_MEMORY_RATE_LIMITED"],
 	},
 	AMBER_E_MEMORY_SIGNAL_INVALID: {
 		title: "provenance.signal 缺失或不属 6 闭集",

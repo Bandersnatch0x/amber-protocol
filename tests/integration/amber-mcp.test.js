@@ -249,6 +249,13 @@ test("memory approve/abandon are approval-required; status executes read-only", 
 	assert.equal(status.approvalRequired, false);
 	assert.equal(status.exitCode, 0);
 	assert.match(status.command, /amber memory status --json --target /);
+
+	// F086: the projection exposes a physical surface and no budget ceiling.
+	// F086: the projection exposes a physical surface and no budget ceiling.
+	const projection = JSON.parse(status.stdout);
+	assert.equal(projection.alpha, undefined, "the retired alpha object must not appear");
+	assert.equal(typeof projection.surface.bytes, "number");
+	assert.equal(typeof projection.surface.entries, "number");
 });
 
 test("object.query executes in default mode for every object family", () => {

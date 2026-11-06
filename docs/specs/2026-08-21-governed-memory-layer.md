@@ -210,18 +210,16 @@ spec 约束：dreaming proposal 必须引用闭集信号之一，**禁止单次�
 - **合法对象约束**：转换仅限候选中的**决策知识成分**（"为何/应当如何决策"）；行为性修正（regression test、standard diff）留在原管道落行为面；approve 时审批人以 creed 排除项第 4 条（仓库已自记的机械事实）为拒绝依据，A4 reason 留痕。
 - **双权威规则**：同一候选同时走行为面晋升与记忆转换时，目标物不同不构成权威重复；若记忆条目与已落面 standard 表述同一事实，适用 β supersede 逻辑（提名人声明 supersedeTarget 或 approve 时说明分工）；转换 request 的 provenance 反向指针使两条管道关联可被 doctor 审计。
 
-### 6.3 α 预算闸门（#173-Q5 钉死）
+### 6.3 表面用量观测（F086 退役 α 预算）
 
-- **计数对象**：MEMORY.md 的 **surface 物理量**（不计 registry 条目数）——条目数 = MEMORY.md 中条目分隔结构（§10.3）的确定性解析计数；字节数 = 文件归一化后字节数。两者零语义判断、可机械扫描。
-- **初始值**：**条目数 ≤ 50 ∧ 字节数 ≤ 8 KB**（明文标注：先验值，非实证值）。
-- **闸门语义**：预算耗尽时晋升准入被机械拒绝（新 proposal 排队而非旧条目被删），fail-closed 零删除；α 拒绝输出必须携带 remedy 指引（拆分为多条、或经 β 指认 supersedeTarget 腾出预算），**禁止裸拒绝**。
-- **准入算术（Spec-defined）**：预算耗尽状态 = 当前条目数 ≥ 50 或当前字节数 ≥ 8192；该状态下 ingest 拒绝 targetSurface=MEMORY.md 的新准入（`AMBER_E_MEMORY_BUDGET_EXCEEDED` + remedy）；未耗尽时准入检查 = 当前条目数 + 本批拟准入 MEMORY.md 条目数（β pair 被指条目计入腾出）≤ 50 **且** 当前字节数 + Σ 该批 bookText（§10.3）字节数 ≤ 8192。
-- **50% 强制复审**：任一维度首次达到 50% 利用率（25 条或 4 KB）时 doctor 输出强制复审提示（§11）。
-- **调整程序**：调整须走与 #173 同级裁决议题；批准调整时若存量超限，迁移计划随裁决一并钉死，禁止"先调数后处置"。
+- **退役记录**：α 硬预算（条目数 ≤ 50 ∧ 字节数 ≤ 8 KB）与 §6.4 的强制 β 一进一出于 F086 退役，取代原 #173-Q5 裁决。退役依据是实测缺陷，不是阈值偏好：准入估算 `bookText` 只渲染 claim 首行加溯源桩（20,009 字节的 claim 计为 50 字节）；β 的额度抵扣只减 registry 条目，不校验被指条目是否绑定到对应 Markdown 区块；准入不为待落盘 proposal 预留空间、`book` 也不复核；§6.3 的"耗尽即拒绝"与 §6.4 的"耗尽可一进一出"互相矛盾；"拆分为多条"的 remedy 无法减少内容字节。裁决正文见 `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`。
+- **保留的观测**：`amber memory status` 仍投影 MEMORY.md 的物理条目数（`## Entries` 区内 `^### ` 行数）与归一化字节数（CRLF→LF、去 BOM、去行尾空白），但不给上限、利用率，也不产生拒绝。
+- **保留的增长约束**：γ 限速（§6.5）与人工审批（§5.4）继续生效。γ 压的是准入速率，不是总量，不能当作 α 的替代物。
+- **接受的代价**：不再有自动总量封顶。MEMORY.md 的增长由 creed、逐条审批与人工整理承担。
 
-### 6.4 β one-in-one-out（#170 条款 β + #172-C3）
+### 6.4 supersession（原 β 一进一出退役）
 
-预算耗尽状态下，提案获准的**必要条件**是提名人指明被 supersede 的既有条目（`supersedeTarget` 一对一指针）且该 supersession 同批获人批准——"进一条必须出一条"，膨胀数学上封顶为预算值。指针只能指向 registry 内条目（直编内容先 book 追认）；approve 批准带指针条目时同调用原子完成 pair（§5.4）。
+supersession 保留为独立能力，不再与预算绑定：条目可携带 `supersedeTarget` 指向既有 registry 条目（直编内容先 book 追认），approve 批准带指针条目时同调用原子完成 pair（§5.4），`needs-re-review` 亦为合法来源状态。它不再是"预算耗尽时的必要条件"，也不计算腾出额度；空 surface 的第一条条目无需配对即可准入。
 
 ### 6.5 γ 提案限速与 K1/K2/K3 排序（#174-M7/M14/M16）
 

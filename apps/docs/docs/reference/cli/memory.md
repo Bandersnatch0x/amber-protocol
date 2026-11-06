@@ -44,11 +44,11 @@ amber memory <request|ingest|approve|book|abandon|status> [--target <repo>] [--j
 | <code>book</code> | Register a MEMORY.md surface hash and promote booked entries to active. |
 | <code>conversion</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
 | <code>escape-hatch</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
-| <code>gamma</code> | Read-only three-section projection (entries / gamma / alpha). |
+| <code>gamma</code> | Read-only three-section projection (entries / gamma / surface). |
 | <code>ingest</code> | Mechanically admit request entries into the registry as proposals (all-or-nothing). |
 | <code>ratification</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
 | <code>request</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
-| <code>status</code> | Read-only three-section projection (entries / gamma / alpha). |
+| <code>status</code> | Read-only three-section projection (entries / gamma / surface). |
 
 ## Command Details
 
@@ -66,7 +66,7 @@ Subcommands:
   book       Register a MEMORY.md surface hash and promote booked entries to active.
              --ratify --claim <text> ratifies a human direct edit directly (γ-free).
   abandon    Explicit human abandon of a request or entry (terminal ledger marker).
-  status     Read-only three-section projection (entries / gamma / alpha).
+  status     Read-only three-section projection (entries / gamma / surface).
 
 Boundary: Amber detects, admits, and registers; humans curate MEMORY.md and approve.
 

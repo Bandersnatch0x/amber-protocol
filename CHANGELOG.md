@@ -5,6 +5,20 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- retire the memory α budget (F086): `amber memory status` reports `surface` (physical entry count
+  and normalized byte size) in place of the `alpha` object, `ingest` no longer refuses a batch because
+  `MEMORY.md` is large, and `AMBER_E_MEMORY_BUDGET_EXCEEDED` is retired — a breaking change to the
+  status JSON and to hosts that watch that code
+
+### Fixed
+
+- `amber doctor` now runs the memory-layer checks for product repositories instead of returning
+  before them, so source drift and ledger inconsistencies are visible
+
 ## [2.0.4] - 2026-11-03
 
 v2.0.3 never reached npm: its docs gate failed on `about/version-history.md`, which still

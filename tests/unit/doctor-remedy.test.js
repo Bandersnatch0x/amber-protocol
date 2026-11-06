@@ -124,3 +124,70 @@ describe("product-repo doctor feature_list (#66)", () => {
 		);
 	});
 });
+
+describe("product-repo doctor memory layer (F086)", () => {
+	it("runs the memory checks on a product repo so source drift is visible", () => {
+		const dir = tmpRepo();
+		fs.writeFileSync(path.join(dir, "SPEC.md"), "# spec");
+		fs.writeFileSync(path.join(dir, "ROADMAP.md"), "# roadmap");
+		fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+		fs.writeFileSync(path.join(dir, "scripts", "amber.js"), "// cli");
+		fs.mkdirSync(path.join(dir, "templates"), { recursive: true });
+		fs.writeFileSync(
+			path.join(dir, "feature_list.json"),
+			JSON.stringify({
+				features: [
+					{
+						id: "F001",
+						priority: 1,
+						area: "a",
+						title: "A",
+						user_visible_behavior: "A",
+						status: "accepted",
+						verification: ["check"],
+						evidence: ["npm test"],
+						notes: [],
+					},
+				],
+			}),
+		);
+		fs.writeFileSync(path.join(dir, "source.md"), "current bytes\n");
+
+		const memoryStore = require("../../scripts/lib/core/memory-store");
+		const memoryPolicy = require("../../scripts/lib/core/memory-policy");
+		const entry = memoryPolicy.withEntryId({
+			claim: "drift probe",
+			knowledgeKind: "unspecified",
+			targetSurface: "MEMORY.md",
+			provenance: {
+				sources: [
+					{
+						kind: "file",
+						ref: "source.md",
+						rawHash: "sha256:" + "0".repeat(64),
+						normHash: "sha256:" + "0".repeat(64),
+						mutable: true,
+					},
+				],
+			},
+		});
+		const stamp = new Date().toISOString();
+		memoryStore.writeEntry(dir, {
+			...entry,
+			status: "active",
+			createdAt: stamp,
+			updatedAt: stamp,
+		});
+
+		const result = doctor(dir);
+		assert.equal(result.classification.type, "product-repo");
+		assert.ok(
+			result.errors.some((e) => e.includes("AMBER_E_MEMORY_SOURCE_STALE")),
+			`expected a memory drift error, got: ${result.errors.join("; ")}`,
+		);
+		assert.ok(
+			result.productChecks.some((c) => c.name === "memory-layer" && c.errors > 0),
+			"product checks must report the memory layer",
+		);
+	});
+});
