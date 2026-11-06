@@ -308,6 +308,10 @@ function loadBody(args, targetRoot) {
 		subject: args.subject,
 		purpose: args.purpose,
 		runId: args.run,
+		// F085: a plan-bound build places every surface its role declares in
+		// the required tier or refuses the whole build.
+		plan: args.plan,
+		role: args.role,
 	});
 	if (result.errors.length > 0) {
 		return {
@@ -342,6 +346,8 @@ function previewBody(args, targetRoot) {
 		since: args.since,
 		required: args.page ? (Array.isArray(args.page) ? args.page : [args.page]) : undefined,
 		knowledgeKinds: args.knowledgeKind,
+		plan: args.plan,
+		role: args.role,
 	});
 	if (result.errors.length > 0) {
 		return {

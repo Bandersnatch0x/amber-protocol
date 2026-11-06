@@ -1442,3 +1442,383 @@ describe("buildLoadout — firewall verdict wiring (F071 H3b)", () => {
 		}
 	});
 });
+
+describe("buildLoadout — plan-declared required context (F085)", () => {
+	const PLAN_PATH = "docs/plans/F085.md";
+	const SURFACE = "docs/specs/plan-required-context.md";
+
+	function writePlan(root, { implement, review, implementFloor } = {}) {
+		const lines = ["# Plan", "", "## Context manifests", ""];
+		if (implement !== undefined) {
+			lines.push(`- implement: ${implement}`);
+			// `!== undefined` so an explicitly empty floor stays expressible.
+			if (implementFloor !== undefined) lines.push(`  - freshness: ${implementFloor}`);
+		}
+		if (review !== undefined) lines.push(`- review: ${review}`);
+		lines.push("");
+		writeMutable(root, PLAN_PATH, lines.join("\n"));
+	}
+
+	function seedSurfacePage(root, { pageId = "surface-page", ref = SURFACE, at } = {}) {
+		writeMutable(root, ref, "surface contract\n");
+		writePage(root, freshPage(root, { pageId, ref }));
+		regenerateIndex(root);
+		writeEvents(root, [{ kind: "page-written", pageId, at: at || "2026-10-15T00:00:00.000Z" }]);
+	}
+
+	it("places every declared surface in the required tier", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.deepEqual(result.loadout.tiers.required, ["surface-page"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("fails closed with the surface, role, and reason when no page covers it", () => {
+		const root = makeTarget();
+		try {
+			writePlan(root, { implement: "docs/specs/uncovered.md" });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.loadoutPath, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED");
+			assert.match(result.errors[0].detail, /docs\/specs\/uncovered\.md/);
+			assert.match(result.errors[0].detail, /reason missing/);
+			assert.equal(
+				!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0,
+				true,
+				"no loadout file may be written on a refused build",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses a surface covered by two current pages as ambiguous", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { pageId: "surface-a" });
+			writeMutable(root, "docs/specs/other.md", "other\n");
+			const { hashFile } = require("../../scripts/lib/core/context-hash");
+			const h = hashFile(path.join(root, SURFACE));
+			writePage(
+				root,
+				pageFixture({
+					pageId: "surface-b",
+					ref: SURFACE,
+					rawHash: h.rawHash,
+					normHash: h.normHash,
+				}),
+			);
+			regenerateIndex(root);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.loadout, null);
+			assert.match(result.errors[0].detail, /reason ambiguous/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses a page older than the declared freshness floor", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { at: "2026-01-01T00:00:00.000Z" });
+			writePlan(root, { implement: SURFACE, implementFloor: "2026-10-01" });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.loadout, null);
+			assert.match(result.errors[0].detail, /reason stale-floor/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("accepts a page at or after the floor", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { at: "2026-10-15T00:00:00.000Z" });
+			writePlan(root, { implement: SURFACE, implementFloor: "2026-10-01" });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("ignores a declaration aimed at the other role", () => {
+		const root = makeTarget();
+		try {
+			writePlan(root, { implement: "docs/specs/uncovered.md", review: SURFACE });
+			seedSurfacePage(root);
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "review",
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.deepEqual(result.loadout.tiers.required, ["surface-page"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("unions declared pages with --page pins", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root);
+			writeMutable(root, "src/pinned.js", "pin\n");
+			writePage(root, freshPage(root, { pageId: "pinned-page", ref: "src/pinned.js" }));
+			regenerateIndex(root);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				required: ["pinned-page"],
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.deepEqual(result.loadout.tiers.required, ["pinned-page", "surface-page"]);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("rejects --plan without --role, and an unknown role", () => {
+		const root = makeTarget();
+		try {
+			writePlan(root, { implement: SURFACE });
+			const noRole = buildLoadout(root, { route: "bugfix-quick", plan: PLAN_PATH });
+			assert.equal(noRole.loadout, null);
+			assert.equal(noRole.errors[0].code, "AMBER_E_INVALID_ARG");
+
+			const badRole = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "auditor",
+			});
+			assert.equal(badRole.loadout, null);
+			assert.equal(badRole.errors[0].code, "AMBER_E_INVALID_ARG");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("stays byte-identical when the plan declares no surfaces", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root);
+			writeMutable(root, PLAN_PATH, "# Plan\n\n## Context manifests\n\n- implement:\n\n");
+			const bound = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(bound.errors.length, 0, JSON.stringify(bound.errors));
+			assert.deepEqual(bound.loadout.tiers.required, []);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses when the firewall drops the page covering a declared surface", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				subject: "worker",
+				purpose: "review",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED");
+			assert.match(result.errors[0].detail, /docs\/specs\/plan-required-context\.md/);
+			assert.match(result.errors[0].detail, /reason unhealthy/);
+			assert.match(result.errors[0].detail, /firewall/);
+			assert.equal(
+				!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0,
+				true,
+				"no loadout file may be written on a refused build",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses when the classification ceiling drops the page covering a declared surface", () => {
+		const root = makeTarget();
+		try {
+			writeMutable(root, SURFACE, "surface contract\n");
+			const page = freshPage(root, { pageId: "surface-page", ref: SURFACE });
+			page.classification = "restricted";
+			writePage(root, page);
+			regenerateIndex(root);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "surface-page", at: "2026-10-15T00:00:00.000Z" },
+			]);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				maxClassification: "internal",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED");
+			assert.match(result.errors[0].detail, /reason unhealthy/);
+			assert.match(result.errors[0].detail, /classification restricted exceeds/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("keeps plan-declared required pages through --since and leaves ordinary pins in the delta", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { at: "2026-10-15T00:00:00.000Z" });
+			writeMutable(root, "src/old.js", "old\n");
+			writePage(root, freshPage(root, { pageId: "old-page", ref: "src/old.js" }));
+			writeMutable(root, "src/new.js", "new\n");
+			writePage(root, freshPage(root, { pageId: "new-page", ref: "src/new.js" }));
+			regenerateIndex(root);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "surface-page", at: "2026-10-15T00:00:00.000Z" },
+				{ kind: "page-written", pageId: "old-page", at: "2026-08-01T00:00:00.000Z" },
+				{ kind: "page-written", pageId: "new-page", at: "2026-11-02T00:00:00.000Z" },
+			]);
+			writePlan(root, { implement: SURFACE });
+			const since = "2026-11-01T00:00:00.000Z";
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				// The surface page is also pinned here: a plan-declared page must
+				// survive even when it is requested through --page, while the
+				// ordinary pin predates --since and keeps plain delta semantics.
+				required: ["surface-page", "old-page"],
+				since,
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.equal(result.loadout.deltaSince, since);
+			assert.deepEqual(result.loadout.tiers.required, ["surface-page"]);
+			assert.deepEqual(result.loadout.tiers.priority, ["new-page"]);
+			assert.deepEqual(result.loadout.tiers.optional, []);
+			assert.deepEqual(
+				result.loadout.references.map((reference) => reference.pageId),
+				["new-page", "surface-page"],
+			);
+			assert.equal(result.loadout.pages["old-page"], undefined);
+			const check = verifyLoadoutFile(root, path.relative(root, result.loadoutPath));
+			assert.equal(check.ok, true, JSON.stringify(check.findings));
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses a present-but-invalid freshness floor before writing", () => {
+		for (const floor of ["", "   ", "next week", "2026/10/01"]) {
+			const root = makeTarget();
+			try {
+				seedSurfacePage(root, { at: "2026-01-01T00:00:00.000Z" });
+				writePlan(root, { implement: SURFACE, implementFloor: floor });
+				const result = buildLoadout(root, {
+					route: "bugfix-quick",
+					plan: PLAN_PATH,
+					role: "implement",
+				});
+				const label = JSON.stringify(floor);
+				assert.equal(result.loadout, null, label);
+				assert.equal(result.loadoutPath, null, label);
+				assert.equal(result.errors[0].code, "AMBER_E_INVALID_ARG", label);
+				assert.match(result.errors[0].detail, /implement/, label);
+				assert.match(result.errors[0].detail, /docs\/plans\/F085\.md/, label);
+				assert.match(result.errors[0].detail, /freshness/i, label);
+				assert.equal(
+					!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0,
+					true,
+					`no loadout file may be written for ${label}`,
+				);
+			} finally {
+				cleanup(root);
+			}
+		}
+	});
+
+	it("refuses an invalid floor on a terminal plan too", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { at: "2026-01-01T00:00:00.000Z" });
+			writeMutable(
+				root,
+				PLAN_PATH,
+				[
+					"# Plan",
+					"",
+					"Status: accepted",
+					"",
+					"## Context manifests",
+					"",
+					`- implement: ${SURFACE}`,
+					"  - freshness: next week",
+					"",
+				].join("\n"),
+			);
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_INVALID_ARG");
+			assert.match(result.errors[0].detail, /freshness/i);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("accepts a valid ISO date and an offset-instant floor", () => {
+		for (const floor of ["2026-10-01", "2026-10-01T08:00:00+08:00"]) {
+			const root = makeTarget();
+			try {
+				seedSurfacePage(root, { at: "2026-10-15T00:00:00.000Z" });
+				writePlan(root, { implement: SURFACE, implementFloor: floor });
+				const result = buildLoadout(root, {
+					route: "bugfix-quick",
+					plan: PLAN_PATH,
+					role: "implement",
+				});
+				assert.equal(result.errors.length, 0, `${floor}: ${JSON.stringify(result.errors)}`);
+				assert.deepEqual(result.loadout.tiers.required, ["surface-page"]);
+			} finally {
+				cleanup(root);
+			}
+		}
+	});
+});

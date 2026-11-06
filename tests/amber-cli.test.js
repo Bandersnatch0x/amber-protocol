@@ -9,6 +9,8 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const { readSessionArtifacts } = require("./helpers/session-artifacts");
 const { installTargetRoutes } = require("./helpers/target-routes");
+const { writePage, regenerateIndex, eventsPath } = require("../scripts/lib/core/context-store");
+const { hashFile } = require("../scripts/lib/core/context-hash");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -98,6 +100,87 @@ test("Context CLI approval follows the selected Action variant", () => {
 	const status = runHarness(["context", "projection", "status", "--target", target, "--json"]);
 	assert.equal(status.status, 0, status.stderr || status.stdout);
 	assert.equal(JSON.parse(status.stdout).approvalRequired, undefined);
+});
+
+// Minimal plan-bound Loadout fixture: Required Artifacts, one route, one plan,
+// and one accepted page covering the declared surface at a fixed revision.
+function seedPlanLoadoutTarget(name, { manifests, pageAt }) {
+	const target = tempDir(name);
+	const agentDir = path.join(target, "docs", "wiki", "agent");
+	fs.mkdirSync(agentDir, { recursive: true });
+	fs.writeFileSync(path.join(agentDir, "amber.md"), "# manual\n");
+	fs.writeFileSync(path.join(agentDir, "context-loadout.md"), "# definition\n");
+	fs.mkdirSync(path.join(target, "routes"), { recursive: true });
+	fs.writeFileSync(
+		path.join(target, "routes", "bugfix-quick.route.json"),
+		JSON.stringify({ routeId: "bugfix-quick", schemaVersion: "1.0.0", stages: [] }, null, 2),
+	);
+	const ref = "docs/specs/required.md";
+	const source = path.join(target, ref);
+	fs.mkdirSync(path.dirname(source), { recursive: true });
+	fs.writeFileSync(source, "surface contract\n");
+	const hashes = hashFile(source);
+	writePage(target, {
+		schemaVersion: "1.0.0",
+		pageId: "surface-page",
+		title: "surface",
+		sources: {
+			s1: { kind: "code", ref, rawHash: hashes.rawHash, normHash: hashes.normHash, mutable: true },
+		},
+		blocks: [{ type: "prose", sources: ["s1"], text: "surface body." }],
+	});
+	regenerateIndex(target);
+	fs.mkdirSync(path.dirname(eventsPath(target)), { recursive: true });
+	fs.writeFileSync(
+		eventsPath(target),
+		`${JSON.stringify({ kind: "page-written", pageId: "surface-page", at: pageAt })}\n`,
+	);
+	fs.mkdirSync(path.join(target, "docs", "plans"), { recursive: true });
+	fs.writeFileSync(
+		path.join(target, "docs", "plans", "F085.md"),
+		["# Plan", "", "## Context manifests", "", ...manifests, ""].join("\n"),
+	);
+	return target;
+}
+
+test("context load --plan keeps required pages under --since and refuses an invalid floor", () => {
+	const loadoutArgs = (target) => [
+		"context",
+		"load",
+		"--target",
+		target,
+		"--route",
+		"bugfix-quick",
+		"--plan",
+		"docs/plans/F085.md",
+		"--role",
+		"implement",
+		"--confirm",
+		"--json",
+	];
+
+	const target = seedPlanLoadoutTarget("context-plan-since", {
+		manifests: ["- implement: docs/specs/required.md"],
+		pageAt: "2026-10-15T00:00:00.000Z",
+	});
+	const loaded = runHarness([...loadoutArgs(target), "--since", "2026-11-01T00:00:00.000Z"]);
+	assert.equal(loaded.status, 0, loaded.stderr || loaded.stdout);
+	const payload = JSON.parse(loaded.stdout);
+	assert.deepEqual(payload.errors, []);
+	assert.deepEqual(payload.loadout.tiers.required, ["surface-page"]);
+	assert.equal(payload.loadout.deltaSince, "2026-11-01T00:00:00.000Z");
+
+	const invalidTarget = seedPlanLoadoutTarget("context-plan-bad-floor", {
+		manifests: ["- implement: docs/specs/required.md", "  - freshness: next week"],
+		pageAt: "2026-10-15T00:00:00.000Z",
+	});
+	const refused = runHarness(loadoutArgs(invalidTarget));
+	assert.equal(refused.status, 1, refused.stderr || refused.stdout);
+	const refusal = JSON.parse(refused.stdout);
+	assert.match(refusal.errors[0], /AMBER_E_INVALID_ARG/);
+	assert.match(refusal.errors[0], /freshness/);
+	const loadouts = path.join(invalidTarget, ".amber", "context", "loadouts");
+	assert.equal(!fs.existsSync(loadouts) || fs.readdirSync(loadouts).length === 0, true);
 });
 
 test("default help projects journey and core commands", () => {

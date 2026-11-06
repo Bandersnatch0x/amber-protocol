@@ -48,6 +48,7 @@ run `amber context verify` for the authoritative status (`stale-by-time`).
 | knowledge-adr-0107 | Verification Execution Has One Pipeline | 1 | 1 | ok |
 | knowledge-adr-0108 | Subcommand Dispatch Owns The Second Level Too | 1 | 1 | ok |
 | knowledge-adr-0109 | Declarations Carry Gates; Knowledge Expires on a Deterministic Clock | 1 | 1 | ok |
+| knowledge-adr-0110 | Required Context Is Enforced Where It Is Loaded | 1 | 1 | ok |
 | knowledge-architecture-context-threat-model | Context Threat Model | 1 | 1 | ok |
 | knowledge-architecture-data-flow | Data Flow | 1 | 1 | ok |
 | knowledge-architecture-distributed-governance-baseline | Distributed Governance Architecture Baseline | 1 | 1 | ok |

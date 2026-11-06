@@ -100,6 +100,52 @@ test("unknown action: exit 1, guidance on the printResult path, no target on the
 	assert.equal(JSON.stringify(envelope.result).includes('"target"'), false);
 });
 
+test("load/preview pass --plan and --role through (F085)", () => {
+	const root = tmpRoot();
+	fs.mkdirSync(path.join(root, "docs", "plans"), { recursive: true });
+	fs.writeFileSync(
+		path.join(root, "docs", "plans", "F085.md"),
+		"# Plan\n\n## Context manifests\n\n- implement: docs/specs/required.md\n",
+		"utf8",
+	);
+	const plan = "docs/plans/F085.md";
+
+	// A half-declared pair never reaches the build: it is a usage error, not
+	// an unbound loadout.
+	const missingRole = contextDispatch("preview", {
+		target: root,
+		_: ["context", "preview"],
+		route: "feature-standard",
+		plan,
+	});
+	assert.equal(missingRole.exitCode, 1);
+	assert.match(missingRole.result.errors[0], /AMBER_E_INVALID_ARG/);
+
+	const badRole = contextDispatch("preview", {
+		target: root,
+		_: ["context", "preview"],
+		route: "feature-standard",
+		plan,
+		role: "auditor",
+	});
+	assert.equal(badRole.exitCode, 1);
+	assert.match(badRole.result.errors[0], /AMBER_E_INVALID_ARG/);
+
+	// A declared surface nothing covers refuses the build with the stable code.
+	const uncovered = contextDispatch("preview", {
+		target: root,
+		_: ["context", "preview"],
+		route: "feature-standard",
+		plan,
+		role: "implement",
+	});
+	assert.equal(uncovered.exitCode, 1);
+	assert.match(uncovered.result.errors[0], /AMBER_E_CONTEXT_LOADOUT_REQUIRED/);
+	assert.match(uncovered.result.errors[0], /docs\/specs\/required\.md/);
+
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("projection routing: aliases pin the variant, the bare action reads it off _", () => {
 	const root = tmpRoot();
 	const viaAlias = contextDispatch("projection-status", {

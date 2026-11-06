@@ -44,7 +44,7 @@ amber context --target <repo> [--json]
 | <code>feedback</code> | Record append-only knowledge feedback when an injected page contradicts ingest drops its effective confidence one level; the page is not rewritten. |
 | <code>ingest</code> | Judge the agent's output: schema, citation completeness, payload-to-request binding, request-owned scope, and source freshness. The matching request is required for every accepted or no-change outcome. A payload of &#123;"outcome":"no-change"&#125; rebases hashes without touching content. |
 | <code>list</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
-| <code>load</code> | Assemble a task-scoped Loadout: three target-local Required Artifacts plus a freshness-gated, budgeted selection of Context Pages, written to .amber/context/loadouts/&lt;route&gt;[-&lt;feature&gt;][--&lt;run&gt;].json. With --subject &lt;s&gt; --purpose &lt;p&gt; ([--run &lt;id&gt;]) the F069 firewall verdict gates every candidate page: allowed pages cite the covering grant (id + snapshot + validUntil), denied pages are excluded with reason firewall and the closed deny reason (each denial on the trail); without --subject the build is byte-identical and the artifact carries no firewall section (visibly not grant-governed). build without --run, which the held-out leak check depends on. |
+| <code>load</code> | Assemble a task-scoped Loadout: three target-local Required Artifacts plus a freshness-gated, budgeted selection of Context Pages, written to .amber/context/loadouts/&lt;route&gt;[-&lt;feature&gt;][--&lt;run&gt;].json. With --subject &lt;s&gt; --purpose &lt;p&gt; ([--run &lt;id&gt;]) the F069 firewall verdict gates every candidate page: allowed pages cite the covering grant (id + snapshot + validUntil), denied pages are excluded with reason firewall and the closed deny reason (each denial on the trail); without --subject the build is byte-identical and the artifact carries no firewall section (visibly not grant-governed). build without --run, which the held-out leak check depends on. With --plan &lt;path&gt; --role &lt;implement\|review&gt; (both required together) every knowledge surface the plan's `## Context manifests` names for that role is required: exactly one current, healthy page must cover it at or after the declared freshness floor, else the build exits AMBER_E_CONTEXT_LOADOUT_REQUIRED naming the surface, role, and reason and writes no file. A plan-declared required page stays in the required tier under --since; ordinary --page pins and other pages keep the delta filter. A malformed or empty `freshness:` floor is AMBER_E_INVALID_ARG before anything is written. |
 | <code>preview</code> | Assemble and print the same Loadout without writing files or events. Firewall mode (--subject/--purpose) requires `load` — preview never carries the firewall section; it prints the ungoverned shape. |
 | <code>projection</code> | Check or rebuild the disposable, hash-bound Context index projection. |
 | <code>refresh</code> | Scan pages for source changes and elapsed ttl: cosmetic changes are absorbed silently (raw-only), real changes and expired pages generate refresh requests (trigger source-change \| ttl-expired). |
@@ -91,7 +91,7 @@ Subcommands:
         Report over .amber/context/events.jsonl: filter rate, pass rate,
         no-change rate, unknown-block share, assurance, and source density.
         --window considers only the last <n> events (trend regression).
-  load --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
+  load --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>] [--plan <path> --role <implement|review>]
         Assemble a task-scoped Loadout: three target-local Required Artifacts plus
         a freshness-gated, budgeted selection of Context Pages, written to
         .amber/context/loadouts/<route>[-<feature>][--<run>].json.
@@ -103,7 +103,17 @@ Subcommands:
         artifact carries no firewall section (visibly not grant-governed).
         --run <id> writes a per-run snapshot; the run's page set survives a later
         build without --run, which the held-out leak check depends on.
-  preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
+        With --plan <path> --role <implement|review> (both required together) every
+        knowledge surface the plan's `## Context manifests` names for that role is
+        required: exactly one current, healthy page must cover it at or after the
+        declared freshness floor, else the build exits
+        AMBER_E_CONTEXT_LOADOUT_REQUIRED naming the surface, role, and reason
+        (missing | ambiguous | unhealthy | superseded | time-expired | stale-floor)
+        and writes no file. A plan-declared required page stays in the required
+        tier under --since; ordinary --page pins and other pages keep the delta
+        filter. A malformed or empty `freshness:` floor is AMBER_E_INVALID_ARG
+        before anything is written.
+  preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>] [--plan <path> --role <implement|review>]
         Assemble and print the same Loadout without writing files or events.
         Firewall mode (--subject/--purpose) requires `load` — preview never
         carries the firewall section; it prints the ungoverned shape.
