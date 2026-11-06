@@ -16,7 +16,7 @@ tags: [memory, governance, promotion, dreaming, registry, mcp]
 
 **Tracker:** map [#169](https://github.com/Bandersnatch0x/amber-protocol/issues/169) · #171 业界调研 · [#170](https://github.com/Bandersnatch0x/amber-protocol/issues/170) 对象模型 · [#172](https://github.com/Bandersnatch0x/amber-protocol/issues/172) 写回闸门 · [#173](https://github.com/Bandersnatch0x/amber-protocol/issues/173) 晋升规则 · [#174](https://github.com/Bandersnatch0x/amber-protocol/issues/174) dreaming loop · [#175](https://github.com/Bandersnatch0x/amber-protocol/issues/175) 动词表面
 
-**Implementation status (2026-09):** Batch A (F033) and T1/T2 write-back mounting (F034) are **accepted**. Core verb surface (`request`/`ingest`/`approve`/`book`/`abandon`/`status`), registry, doctor rules, and MEMORY.md `## Entries` + `###` α-count shape are in tree. **Deferred (no code in this change):** dreaming loop enable (`memory-maintenance-dreaming` trigger remains `enabled: false`); maintenance verb surface (`collect`/`inspect` and product persistence path — §15.1 / #174-M6).
+**Implementation status (2026-09):** Batch A (F033) and T1/T2 write-back mounting (F034) are **accepted**. Core verb surface (`request`/`ingest`/`approve`/`book`/`abandon`/`status`), registry, doctor rules, and MEMORY.md `## Entries` + `###` surface-count shape are in tree (the alpha budget those counts once fed was retired by F086). **Deferred (no code in this change):** dreaming loop enable (`memory-maintenance-dreaming` trigger remains `enabled: false`); maintenance verb surface (`collect`/`inspect` and product persistence path — §15.1 / #174-M6).
 
 ---
 
@@ -186,7 +186,7 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 - **F4 消费面过滤**：loadout/governance/web 读取一律过滤 abandoned；doctor 只报统计 warning。
 - **ceremony 上限**（#172-系统性二）：一次触发 → 1 request（1..N 条目）→ 1 ingest（全有或全无）→ N 次条目级 approve → 1 book；稳态人工 ceremony 上限 = γ = 5 审批 + 1 book / 周期，机器 ceremony O(1)/触发。
 
-## 6. 晋升资格与预算（α/β/γ）
+## 6. 晋升资格与约束（γ 限速；α/β 预算已退役）
 
 ### 6.1 信号闭集（机械地板 + 人治天花板，#173-Q1）
 
