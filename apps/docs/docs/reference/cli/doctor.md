@@ -2,7 +2,7 @@
 id: doctor
 title: "amber doctor"
 sidebar_label: "doctor"
-description: "Run Amber guardrail checks and target classification."
+description: "Run Amber guardrail checks and target classification. Conditional write: when an active memory entry's provenance or booked surface has drifted, doctor marks that entry needs-re-review (registry only; MEMORY.md is never written)."
 ---
 
 import CommandBlock from '@site/src/components/command-block';
@@ -19,7 +19,7 @@ import CommandBlock from '@site/src/components/command-block';
 
 ## Summary
 
-Run Amber guardrail checks and target classification.
+Run Amber guardrail checks and target classification. Conditional write: when an active memory entry's provenance or booked surface has drifted, doctor marks that entry needs-re-review (registry only; MEMORY.md is never written).
 
 ## Usage
 
@@ -31,14 +31,14 @@ amber doctor --target <repo> [--json]
 
 <CommandBlock
   context="Target Repository"
-  nature="read-only"
+  nature="idempotent-write"
   command="amber doctor --target path/to/repo"
 />
 
 ## Command Details
 
 ```text
-Run Amber guardrail checks and target classification.
+Run Amber guardrail checks and target classification. Conditional write: when an active memory entry's provenance or booked surface has drifted, doctor marks that entry needs-re-review (registry only; MEMORY.md is never written).
 ```
 
 ## Boundaries & Safety

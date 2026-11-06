@@ -187,7 +187,7 @@ function computeSurfaceHash(content) {
 	return sha256(normalizeMemoryMd(content));
 }
 
-// Normalize MEMORY.md for the α byte dimension (§10.3): strip BOM, CRLF→LF,
+// Normalize MEMORY.md for the surface byte count (§10.3): strip BOM, CRLF→LF,
 // strip trailing whitespace per line.
 function normalizeMemoryMd(content) {
 	return String(content)
@@ -196,7 +196,7 @@ function normalizeMemoryMd(content) {
 		.replace(/[ \t]+$/gm, "");
 }
 
-// Parse MEMORY.md into the α counts (§10.3, deterministic, zero semantic
+// Parse MEMORY.md into the surface counts (§10.3, deterministic, zero semantic
 // judgment): entryCount = number of `^### ` lines inside the `## Entries`
 // region; bytes = normalized UTF-8 byte length of the whole file.
 function parseMEMORYMd(content) {

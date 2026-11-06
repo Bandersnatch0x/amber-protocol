@@ -2016,6 +2016,9 @@ Reports:
 - Missing files
 - Configuration issues
 - Compatibility warnings
+- Memory findings: source drift, ledger inconsistencies, surface drift. When an active entry's
+  source or booked surface has drifted, `doctor` marks that entry `needs-re-review` in the
+  registry; it never writes `MEMORY.md`.
 
 Failing checks carry an actionable `→ fix:` remedy (e.g. missing harness files → `amber init`).
 

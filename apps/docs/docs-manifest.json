@@ -159,7 +159,7 @@
       "path": "reference/cli/doctor.md",
       "group": "Reference",
       "title": "amber doctor",
-      "description": "Run Amber guardrail checks and target classification.",
+      "description": "Run Amber guardrail checks and target classification. Conditional write: when an active memory entry's provenance or booked surface has drifted, doctor marks that entry needs-re-review (registry only; MEMORY.md is never written).",
       "layer": "Generated"
     },
     {

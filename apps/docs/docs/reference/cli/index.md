@@ -40,7 +40,7 @@ amber <command> --target <repo> [options]
 | --- | --- | --- | --- | --- |
 | <code>audit</code> | core | Inspect an existing project without writing files. Supports --summary for bounded text output. | No | [Docs](/reference/cli/audit) |
 | <code>init</code> | core | Create missing Amber starter files without overwriting existing files. Supports --dry-run. | No | [Docs](/reference/cli/init) |
-| <code>doctor</code> | core | Run Amber guardrail checks and target classification. | No | [Docs](/reference/cli/doctor) |
+| <code>doctor</code> | core | Run Amber guardrail checks and target classification. Conditional write: when an active memory entry's provenance or booked surface has drifted, doctor marks that entry needs-re-review (registry only; MEMORY.md is never written). | No | [Docs](/reference/cli/doctor) |
 | <code>plan</code> | core | Create a feature-linked vertical-slice plan from a registered feature. | No | [Docs](/reference/cli/plan) |
 | <code>handoff</code> | core | Regenerate live handoff state or produce the portable handoff bundle. | No | [Docs](/reference/cli/handoff) |
 | <code>session</code> | core | Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle. | Yes | [Docs](/reference/cli/session) |

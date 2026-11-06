@@ -17,7 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `amber doctor` now runs the memory-layer checks for product repositories instead of returning
-  before them, so source drift and ledger inconsistencies are visible
+  before them, so source drift and ledger inconsistencies are visible. The command is no longer
+  purely read-only: when an active entry's provenance or booked surface has drifted, it marks that
+  entry `needs-re-review` in the registry and never writes `MEMORY.md`.
 
 ## [2.0.4] - 2026-11-03
 

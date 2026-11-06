@@ -131,7 +131,7 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 
 - `amber memory status --json` exposes `entries`, `gamma` and `surface: {entries, bytes}` and no `alpha` object, `maxBytes`, `maxEntries` or `utilizationPct`.
 - An ingest batch whose projected surface exceeds the retired numbers is admitted like any other batch; no `AMBER_E_MEMORY_BUDGET_EXCEEDED` is emitted, and no code path reads a budget ceiling.
-- Supersession still replaces an entry through `supersedeTarget` with the atomic approval pair, and `needs-re-review` remains a valid source state for it.
+- Supersession still replaces an entry through `supersedeTarget` in the same approval call, and `needs-re-review` remains a valid source state for it. This is a same-call pairing, not a crash-atomic transaction.
 - `amber doctor` reports memory findings for a product repository, including source drift, and runs the memory checks once.
 - Existing Amber guardrails still pass.
 
