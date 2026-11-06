@@ -1643,4 +1643,58 @@ describe("buildLoadout — plan-declared required context (F085)", () => {
 			cleanup(root);
 		}
 	});
+
+	it("refuses when the firewall drops the page covering a declared surface", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				subject: "worker",
+				purpose: "review",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED");
+			assert.match(result.errors[0].detail, /docs\/specs\/plan-required-context\.md/);
+			assert.match(result.errors[0].detail, /reason unhealthy/);
+			assert.match(result.errors[0].detail, /firewall/);
+			assert.equal(
+				!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0,
+				true,
+				"no loadout file may be written on a refused build",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses when the classification ceiling drops the page covering a declared surface", () => {
+		const root = makeTarget();
+		try {
+			writeMutable(root, SURFACE, "surface contract\n");
+			const page = freshPage(root, { pageId: "surface-page", ref: SURFACE });
+			page.classification = "restricted";
+			writePage(root, page);
+			regenerateIndex(root);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "surface-page", at: "2026-10-15T00:00:00.000Z" },
+			]);
+			writePlan(root, { implement: SURFACE });
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				maxClassification: "internal",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED");
+			assert.match(result.errors[0].detail, /reason unhealthy/);
+			assert.match(result.errors[0].detail, /classification restricted exceeds/);
+		} finally {
+			cleanup(root);
+		}
+	});
 });

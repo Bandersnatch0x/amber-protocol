@@ -3265,7 +3265,7 @@
 				},
 				{
 					"command": "npm test",
-					"result": "4286 tests, 0 failed, 0 skipped",
+					"result": "4291 tests, 0 failed, 0 skipped, exit 0",
 					"date": "2026-11-06",
 					"notes": "Full suite green after `npm run docs:gen` refreshed the generated CLI reference and the tree was committed."
 				},

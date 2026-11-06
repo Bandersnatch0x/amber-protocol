@@ -80,6 +80,7 @@ function resolveRequiredContext({
 			? Date.parse(freshnessFloor)
 			: null;
 	const pageIds = [];
+	const surfacesByPageId = new Map();
 	const findings = [];
 	for (const surface of paths) {
 		const wanted = normalizeSurfacePath(surface);
@@ -175,8 +176,9 @@ function resolveRequiredContext({
 			}
 		}
 		pageIds.push(page.pageId);
+		surfacesByPageId.set(page.pageId, surface);
 	}
-	return { pageIds: [...new Set(pageIds)].sort(), findings };
+	return { pageIds: [...new Set(pageIds)].sort(), surfacesByPageId, findings };
 }
 
 module.exports = {

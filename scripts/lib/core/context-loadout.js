@@ -923,6 +923,7 @@ function previewLoadout(targetRoot, opts = {}) {
 	// F085: the plan's role declaration resolves against the collected pages
 	// first. Any refusal fails the whole build before a tier is chosen — a
 	// partial required tier is the failure this feature exists to prevent.
+	let declaredSurfaces = new Map();
 	if (config.planRole) {
 		const resolution = resolveRequiredContext({
 			pageEntries: pageState.pageEntries,
@@ -943,6 +944,7 @@ function previewLoadout(targetRoot, opts = {}) {
 			};
 		}
 		config.requiredPins = [...new Set([...config.requiredPins, ...resolution.pageIds])].sort();
+		declaredSurfaces = resolution.surfacesByPageId;
 	}
 
 	// 4. Required tier (pinned). D4: tampered/obsolete excluded; stale included
@@ -951,6 +953,34 @@ function previewLoadout(targetRoot, opts = {}) {
 	if (selection.error) {
 		errors.push(selection.error);
 		return { loadout: null, loadoutPath: null, errors, warnings };
+	}
+
+	// F085: resolution runs before tier selection, so the authority layers
+	// (classification ceiling, hard expiry, firewall) can still drop a page the
+	// plan declared. A requirement the loadout omits is the failure this feature
+	// exists to prevent, so re-check every resolved page against the required
+	// tier and refuse on the first one that did not survive.
+	// Only plan-declared pages are re-checked: `--page` pins keep their existing
+	// drop-on-denial semantics (a deliberate, tested authority behavior).
+	const missingRequired = [...declaredSurfaces.keys()].filter(
+		(pageId) => !selection.requiredPageIds.includes(pageId),
+	);
+	if (missingRequired.length > 0) {
+		return {
+			loadout: null,
+			loadoutPath: null,
+			errors: missingRequired.map((pageId) => {
+				const excluded = (selection.excluded || []).find((entry) => entry.pageId === pageId);
+				const fact = excluded
+					? `${excluded.reason}: ${excluded.detail}`
+					: "not in the required tier";
+				return {
+					code: "AMBER_E_CONTEXT_LOADOUT_REQUIRED",
+					detail: `page ${pageId} covering required surface ${declaredSurfaces.get(pageId) || pageId} was dropped by the authority layer (role ${config.planRole}, reason unhealthy: ${fact})`,
+				};
+			}),
+			warnings,
+		};
 	}
 
 	// 9. Delta-since semantics (D6): emit only pages added/re-hashed after `since`.

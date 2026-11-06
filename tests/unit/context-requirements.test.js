@@ -75,7 +75,9 @@ describe("resolveRequiredContext — resolution", () => {
 
 	it("an empty declaration resolves to no pages and no findings", () => {
 		const result = resolve([entry("page-a", ["docs/a.md"])], []);
-		assert.deepEqual(result, { pageIds: [], findings: [] });
+		assert.deepEqual(result.pageIds, []);
+		assert.deepEqual(result.findings, []);
+		assert.equal(result.surfacesByPageId.size, 0);
 	});
 });
 
