@@ -23,6 +23,11 @@
 				"pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
 				"title": { "type": "string", "minLength": 1 },
 				"reason": { "type": "string" },
+				"expiredAt": {
+					"description": "The page's effective hard expiry, present when its ttl had elapsed at refresh time — including when a source change supplies the reason (one request covers both triggers).",
+					"type": "string",
+					"format": "date-time"
+				},
 				"existingHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
 				"scope": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
 				"knowledgeKind": {

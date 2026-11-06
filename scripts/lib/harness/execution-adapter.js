@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Execution Adapter + boundary comparison (F068 H2a; F070 H2b wiring).
 //
 // GitWorktreeAdapter and LocalAdapter prepare a workspace and report the
@@ -37,6 +39,7 @@ const { runGovernedCommand } = require("../core/governed-runner");
 const { recordAttempt } = require("./attempt-core");
 const { cancellationAttribution } = require("./execution-cancel");
 const { resolvePathWithin } = require("../core/fs-utils");
+const { defineVerdictSurface } = require("../core/verdict-surface");
 
 const CODE_PREPARE_FAILED = "AMBER_E_HARNESS_EXEC_PREPARE_FAILED";
 const CODE_ALREADY_PREPARED = "AMBER_E_HARNESS_EXEC_ALREADY_PREPARED";
@@ -51,13 +54,15 @@ const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 // human-recovered (blocked→running), never executed through.
 const RUN_EXECUTABLE_STATES = ["created", "admitted", "running", "paused"];
 
-const EXECUTION_VERDICTS = Object.freeze(["ok", "violation", "unevaluated"]);
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
+// ADR-0106: the boundary cannot substantiate a verdict it could not observe,
+// so `unevaluated` is a third status value — never folded into `ok`.
+const EXECUTION_VERDICT = defineVerdictSurface({
+	name: "execution verdict",
+	notRun: "status",
+	outcomes: ["ok", "violation"],
+	notRunValue: "unevaluated",
+});
+const EXECUTION_VERDICTS = EXECUTION_VERDICT.outcomes;
 
 function confinedWorkspacePath(targetRoot, candidate) {
 	try {

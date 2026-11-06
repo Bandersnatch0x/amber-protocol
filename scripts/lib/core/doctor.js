@@ -591,7 +591,7 @@ function doctor(target, options = {}) {
 			errors.push(detail);
 		} else if (ctx.summary.total > 0) {
 			const hardFailures = ctx.summary.tampered + ctx.summary.obsolete + ctx.summary.orphaned;
-			const detail = `${ctx.summary.total} pages: ok ${ctx.summary.ok}, stale ${ctx.summary.stale}, tampered ${ctx.summary.tampered}, obsolete ${ctx.summary.obsolete}, orphaned ${ctx.summary.orphaned}`;
+			const detail = `${ctx.summary.total} pages: ok ${ctx.summary.ok}, stale ${ctx.summary.stale}, time-stale ${ctx.summary.timeStale || 0}, tampered ${ctx.summary.tampered}, obsolete ${ctx.summary.obsolete}, orphaned ${ctx.summary.orphaned}`;
 			addCheck(
 				"Context pages",
 				hardFailures === 0,

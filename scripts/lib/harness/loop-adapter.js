@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Loop ↔ Run mapping adapter (F066; ADR-0101 decision 4, proposal §52 Rule 5).
 //
 // The ONE sanctioned bridge between the loop execution surface (ADR-0003) and
@@ -19,12 +21,6 @@ const { cancellationAttribution } = require("./execution-cancel");
 
 const CODE_LOOP_APPROVAL_MISSING = "AMBER_E_HARNESS_LOOP_APPROVAL_MISSING";
 const CODE_LOOP_OUTCOME_MISSING = "AMBER_E_HARNESS_LOOP_OUTCOME_MISSING";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function readLoopLedgerRecords(targetRoot, loopContractId) {
 	const file = statePath(targetRoot, "loops", loopContractId, "ledger.jsonl");

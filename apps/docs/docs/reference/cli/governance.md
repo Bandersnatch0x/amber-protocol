@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber governance
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>core</code>
 </div>
@@ -41,14 +41,14 @@ amber governance <docs|evidence|policy|audit|readiness|report|standards|rules> [
 
 | Subcommand | Description |
 | --- | --- |
-| <code>audit</code> | Subcommand action for <code>governance</code> |
-| <code>docs</code> | Subcommand action for <code>governance</code> |
-| <code>evidence</code> | Subcommand action for <code>governance</code> |
-| <code>policy</code> | Subcommand action for <code>governance</code> |
-| <code>readiness</code> | Subcommand action for <code>governance</code> |
-| <code>report</code> | Subcommand action for <code>governance</code> |
-| <code>rules</code> | Subcommand action for <code>governance</code> |
-| <code>standards</code> | Subcommand action for <code>governance</code> |
+| <code>audit</code> | Generate comprehensive audit report with policy, sessions, and executions. |
+| <code>docs</code> | Generate governance documents (CODE_OF_CONDUCT.md, CONTRIBUTING.md, GOVERNANCE.md). |
+| <code>evidence</code> | Export governance evidence from sessions or tasks. |
+| <code>policy</code> | Show governance policy (defaults and overrides). |
+| <code>readiness</code> | Report local governance readiness for higher-autonomy agent work. |
+| <code>report</code> | Score the delivery loop and emit structured next actions. |
+| <code>rules</code> | — |
+| <code>standards</code> | — |
 
 ## Command Details
 

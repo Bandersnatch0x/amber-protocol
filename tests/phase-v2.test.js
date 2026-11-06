@@ -88,7 +88,12 @@ test("gate blocks implementation-ready plans without user confirmation", () => {
 			.replace(
 				"- review: <fill: knowledge-surface paths the reviewer needs>",
 				"- review: docs/wiki/engineering/runbook.md",
-			),
+			)
+			.replace(
+				"  - paths: <fill: repo-relative paths this slice touches>",
+				"  - paths: docs/wiki/engineering/verification.md",
+			)
+			.replace("  - verify: <fill: one command that proves this slice>", "  - verify: node --test"),
 	);
 	const accepted = runHarness([
 		"gate",

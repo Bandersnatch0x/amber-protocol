@@ -17,6 +17,7 @@
 // Command modules are required inside the handler that runs them, so a CLI
 // call loads only its own command chain.
 const { bindCommandHandlers } = require("./command-registry");
+const { defineCliCommand } = require("./subcommand-dispatcher");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -92,166 +93,235 @@ function handleLedger(args) {
 	);
 }
 
-async function handleSession(args) {
-	const action = args._?.[0];
-	const targetRoot = require("./command-helpers").resolveTarget(args);
-	let sessionResult;
+// The session verb table (F039). The same verb set used to be written in three
+// unlinked places: the if/else chain that routed it, the hand-typed
+// "session requires …" string in that chain's else branch, and the help usage
+// line (which had already drifted — it never listed `complete`). Routing and the
+// envelope now come from `defineCommand`; this list is where a verb is declared,
+// and the unknown hint is generated from it instead of re-typed.
+const SESSION_ACTIONS = Object.freeze([
+	"start",
+	"status",
+	"list",
+	"abort",
+	"continue",
+	"complete-check",
+	"complete",
+	"verify",
+	"verify-ledger",
+	"approve",
+	"lease",
+	"run",
+	"settle",
+]);
 
-	if (action === "start") {
-		let parsedBudget;
-		if (args.budget) {
-			parsedBudget = parseInt(args.budget, 10);
-			if (isNaN(parsedBudget) || parsedBudget <= 0) {
-				sessionResult = { text: "Error: --budget must be a positive integer", exitCode: 1 };
+function sessionActionHint() {
+	return `session requires ${SESSION_ACTIONS.slice(0, -1).join(", ")}, or ${SESSION_ACTIONS.at(-1)}.`;
+}
+
+const sessionTarget = (args) => require("./command-helpers").resolveTarget(args);
+
+// `session-commands` returns `{ text, exitCode, sessionId? }`. The command
+// envelope additionally mirrors the text into errors on failure and forwards
+// sessionId — the shape this handler built by hand before the table existed.
+function sessionBody(sessionResult) {
+	return {
+		text: sessionResult.text,
+		errors: sessionResult.exitCode === 0 ? [] : [sessionResult.text],
+		exitCode: sessionResult.exitCode,
+		...(sessionResult.sessionId ? { sessionId: sessionResult.sessionId } : {}),
+	};
+}
+
+// F062 seam boundary (spec §"Legacy and external seams"): the run/settle seam
+// rejects arbitrary stage selection and free-form command text. --stage and
+// --command exist for OTHER session subcommands; binding them here would smuggle
+// selection through a typed seam.
+function sessionRunSettleGuard(action) {
+	return {
+		text:
+			`Error: session ${action} takes no --stage or --command. ` +
+			"Stage selection, capability, and adapter come from the session's own state (F062 closed seam).",
+		exitCode: 1,
+	};
+}
+
+const sessionDispatch = defineCliCommand({
+	command: "session",
+	actions: SESSION_ACTIONS,
+	handlers: {
+		start: async (args) => {
+			let parsedBudget;
+			if (args.budget) {
+				parsedBudget = parseInt(args.budget, 10);
+				if (isNaN(parsedBudget) || parsedBudget <= 0) {
+					return sessionBody({
+						text: "Error: --budget must be a positive integer",
+						exitCode: 1,
+					});
+				}
 			}
-		}
-		if (!sessionResult) {
-			sessionResult = await require("./session-commands").startSession(targetRoot, {
-				goal: args.goal || args._?.[1],
-				route: args.route,
-				budget: parsedBudget,
-				worktree: args.worktree,
-				mode: args.mode,
-				feature: args.feature,
-				agent: args.agent,
-			});
-		}
-	} else if (action === "status") {
-		sessionResult = require("./session-commands").statusSession(targetRoot, {
-			sessionId: args._?.[1] || args.session,
-		});
-	} else if (action === "list") {
-		sessionResult = require("./session-commands").listSessions(targetRoot, {});
-	} else if (action === "abort") {
-		sessionResult = await require("./session-commands").abortSession(targetRoot, {
-			sessionId: args._?.[1] || args.session,
-			requestId: args.requestId,
-		});
-	} else if (action === "continue") {
-		sessionResult = await require("./session-commands").continueSession(targetRoot, {
-			sessionId: args._?.[1] || args.session,
-			requestId: args.requestId,
-		});
-	} else if (action === "complete-check") {
-		sessionResult = require("./command-helpers").requireSessionId(args, "complete-check");
-		if (!sessionResult) {
+			return sessionBody(
+				await require("./session-commands").startSession(sessionTarget(args), {
+					goal: args.goal || args._?.[1],
+					route: args.route,
+					budget: parsedBudget,
+					worktree: args.worktree,
+					mode: args.mode,
+					feature: args.feature,
+					agent: args.agent,
+				}),
+			);
+		},
+		status: (args) =>
+			sessionBody(
+				require("./session-commands").statusSession(sessionTarget(args), {
+					sessionId: args._?.[1] || args.session,
+				}),
+			),
+		list: (args) =>
+			sessionBody(require("./session-commands").listSessions(sessionTarget(args), {})),
+		abort: async (args) =>
+			sessionBody(
+				await require("./session-commands").abortSession(sessionTarget(args), {
+					sessionId: args._?.[1] || args.session,
+					requestId: args.requestId,
+				}),
+			),
+		continue: async (args) =>
+			sessionBody(
+				await require("./session-commands").continueSession(sessionTarget(args), {
+					sessionId: args._?.[1] || args.session,
+					requestId: args.requestId,
+				}),
+			),
+		"complete-check": (args) => {
+			const missing = require("./command-helpers").requireSessionId(args, "complete-check");
+			if (missing) return sessionBody(missing);
 			const { buildCompletionResult } = require("./completion-check");
-			const completion = buildCompletionResult(targetRoot, args.session, args);
-			sessionResult = { text: completion.text, exitCode: completion.errors.length > 0 ? 1 : 0 };
-		}
-	} else if (action === "complete") {
-		sessionResult = require("./command-helpers").requireSessionId(args, "complete");
-		if (!sessionResult) {
-			sessionResult = await require("./session-commands").completeSession(targetRoot, {
-				sessionId: args.session,
-				strict: args.strict,
-				requestId: args.requestId,
+			const completion = buildCompletionResult(sessionTarget(args), args.session, args);
+			return sessionBody({
+				text: completion.text,
+				exitCode: completion.errors.length > 0 ? 1 : 0,
 			});
-		}
-	} else if (action === "verify") {
-		sessionResult = require("./command-helpers").requireSessionId(args, "verify");
-		if (!sessionResult) {
-			sessionResult = await require("./session-commands").verifySession(targetRoot, {
-				sessionId: args.session,
-				stage: args.stage,
-				command: args.command,
-				result: args.result,
-				execute: args.execute,
-				feature: args.feature,
-				budgetMinutes: args.budgetMinutes,
-			});
-		}
-	} else if (action === "approve") {
-		sessionResult = require("./command-helpers").requireSessionId(args, "approve");
-		if (!sessionResult) {
-			sessionResult = await require("./session-commands").approveSession(targetRoot, {
-				sessionId: args.session,
-				gate: args.gate || args._?.[1],
-				yes: args.yes,
-			});
-		}
-	} else if (action === "verify-ledger") {
-		sessionResult = require("./command-helpers").requireSessionId(args, "verify-ledger");
-		if (!sessionResult) {
-			sessionResult = require("./session-commands").verifyLedgerSession(targetRoot, args.session);
-		}
-	} else if (action === "lease") {
+		},
+		complete: async (args) => {
+			const missing = require("./command-helpers").requireSessionId(args, "complete");
+			if (missing) return sessionBody(missing);
+			return sessionBody(
+				await require("./session-commands").completeSession(sessionTarget(args), {
+					sessionId: args.session,
+					strict: args.strict,
+					requestId: args.requestId,
+				}),
+			);
+		},
+		verify: async (args) => {
+			const missing = require("./command-helpers").requireSessionId(args, "verify");
+			if (missing) return sessionBody(missing);
+			return sessionBody(
+				await require("./session-commands").verifySession(sessionTarget(args), {
+					sessionId: args.session,
+					stage: args.stage,
+					command: args.command,
+					result: args.result,
+					execute: args.execute,
+					feature: args.feature,
+					budgetMinutes: args.budgetMinutes,
+				}),
+			);
+		},
+		approve: async (args) => {
+			const missing = require("./command-helpers").requireSessionId(args, "approve");
+			if (missing) return sessionBody(missing);
+			return sessionBody(
+				await require("./session-commands").approveSession(sessionTarget(args), {
+					sessionId: args.session,
+					gate: args.gate || args._?.[1],
+					yes: args.yes,
+				}),
+			);
+		},
+		"verify-ledger": (args) => {
+			const missing = require("./command-helpers").requireSessionId(args, "verify-ledger");
+			if (missing) return sessionBody(missing);
+			return sessionBody(
+				require("./session-commands").verifyLedgerSession(sessionTarget(args), args.session),
+			);
+		},
 		// F062 lease reacquisition (ADR-0029 §8.1): explicit, owner-bound, new
 		// fence. Owner proof is the same digest the run/settle seam uses.
-		sessionResult = require("./command-helpers").requireSessionId(args, "lease");
-		if (!sessionResult) {
-			sessionResult = await require("./session-commands").leaseSession(targetRoot, {
-				sessionId: args.session,
-				ownerId: args.ownerId,
-				tokenHash: args.tokenHash,
-			});
-		}
-	} else if (action === "run" || action === "settle") {
-		// F062 seam boundary (spec §"Legacy and external seams"): the run/settle
-		// seam rejects arbitrary stage selection and free-form command text.
-		// --stage and --command exist for OTHER session subcommands; binding
-		// them here would smuggle selection through a typed seam.
-		if (args.stage || args.command) {
-			sessionResult = {
-				text:
-					`Error: session ${action} takes no --stage or --command. ` +
-					"Stage selection, capability, and adapter come from the session's own state (F062 closed seam).",
-				exitCode: 1,
-			};
-		} else if (action === "run") {
-			sessionResult = require("./command-helpers").requireSessionId(args, "run");
-			if (!sessionResult) {
-				sessionResult = await require("./session-commands").runSession(targetRoot, {
+		lease: async (args) => {
+			const missing = require("./command-helpers").requireSessionId(args, "lease");
+			if (missing) return sessionBody(missing);
+			return sessionBody(
+				await require("./session-commands").leaseSession(sessionTarget(args), {
+					sessionId: args.session,
+					ownerId: args.ownerId,
+					tokenHash: args.tokenHash,
+				}),
+			);
+		},
+		run: async (args) => {
+			if (args.stage || args.command) return sessionBody(sessionRunSettleGuard("run"));
+			const missing = require("./command-helpers").requireSessionId(args, "run");
+			if (missing) return sessionBody(missing);
+			return sessionBody(
+				await require("./session-commands").runSession(sessionTarget(args), {
 					sessionId: args.session,
 					execute: args.execute === true,
 					ownerId: args.ownerId,
 					tokenHash: args.tokenHash,
 					leaseFence: args.leaseFence === undefined ? undefined : Number(args.leaseFence),
-				});
-			}
-		} else {
-			sessionResult = require("./command-helpers").requireSessionId(args, "settle");
-			if (!sessionResult) {
-				let parsedResult;
-				let parseError = null;
-				if (typeof args.result === "string") {
-					try {
-						parsedResult = JSON.parse(args.result);
-					} catch (error) {
-						parseError = `Error: --result must be a JSON object: ${error.message}`;
-					}
-				} else {
-					parsedResult = args.result;
+				}),
+			);
+		},
+		settle: async (args) => {
+			if (args.stage || args.command) return sessionBody(sessionRunSettleGuard("settle"));
+			const missing = require("./command-helpers").requireSessionId(args, "settle");
+			if (missing) return sessionBody(missing);
+			let parsedResult;
+			let parseError = null;
+			if (typeof args.result === "string") {
+				try {
+					parsedResult = JSON.parse(args.result);
+				} catch (error) {
+					parseError = `Error: --result must be a JSON object: ${error.message}`;
 				}
-				sessionResult = parseError
-					? { text: parseError, exitCode: 1 }
-					: await require("./session-commands").settleSession(targetRoot, {
-							sessionId: args.session,
-							requestId: args.requestId,
-							attemptId: args.attemptId,
-							requestHash: args.requestHash,
-							settlementResult: parsedResult,
-							ownerId: args.ownerId,
-							tokenHash: args.tokenHash,
-							leaseFence: args.leaseFence === undefined ? undefined : Number(args.leaseFence),
-						});
+			} else {
+				parsedResult = args.result;
 			}
-		}
-	} else {
-		sessionResult = {
-			text: "session requires start, status, list, abort, continue, complete-check, complete, verify, verify-ledger, approve, lease, run, or settle.",
+			if (parseError) return sessionBody({ text: parseError, exitCode: 1 });
+			return sessionBody(
+				await require("./session-commands").settleSession(sessionTarget(args), {
+					sessionId: args.session,
+					requestId: args.requestId,
+					attemptId: args.attemptId,
+					requestHash: args.requestHash,
+					settlementResult: parsedResult,
+					ownerId: args.ownerId,
+					tokenHash: args.tokenHash,
+					leaseFence: args.leaseFence === undefined ? undefined : Number(args.leaseFence),
+				}),
+			);
+		},
+	},
+});
+
+async function handleSession(args) {
+	if (!SESSION_ACTIONS.includes(args._?.[0])) {
+		// Unknown or missing action keeps this surface's legacy envelope: the hint
+		// prints through the bypass path (stdout) AND as the ERROR line (stderr).
+		// `defineCommand` leaves unknown-action output to printResult, which would
+		// render the same sentence as a diagnostic block instead.
+		const text = sessionActionHint();
+		return {
+			result: { target: args.target, text, errors: [text], warnings: [] },
 			exitCode: 1,
+			bypassPrint: !args.json,
 		};
 	}
-
-	const result = {
-		target: args.target,
-		text: sessionResult.text,
-		errors: sessionResult.exitCode === 0 ? [] : [sessionResult.text],
-		warnings: [],
-		...(sessionResult.sessionId ? { sessionId: sessionResult.sessionId } : {}),
-	};
-	return { result, exitCode: sessionResult.exitCode, bypassPrint: !args.json };
+	return sessionDispatch(args);
 }
 
 function handleGovernance(args) {
@@ -1259,4 +1329,4 @@ function dispatch(command, args) {
 		: addDeprecationWarning(response);
 }
 
-module.exports = { dispatch, COMMAND_REGISTRY, DEPRECATED_COMMANDS };
+module.exports = { dispatch, COMMAND_REGISTRY, DEPRECATED_COMMANDS, SESSION_ACTIONS };

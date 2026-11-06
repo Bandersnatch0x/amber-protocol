@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber hooks
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,11 +39,11 @@ amber hooks <check|install|uninstall|status> --target <repo> | amber hooks bread
 
 | Subcommand | Description |
 | --- | --- |
-| <code>breadcrumb</code> | Subcommand action for <code>hooks</code> |
-| <code>check</code> | Subcommand action for <code>hooks</code> |
-| <code>install</code> | Subcommand action for <code>hooks</code> |
-| <code>status</code> | Subcommand action for <code>hooks</code> |
-| <code>uninstall</code> | Subcommand action for <code>hooks</code> |
+| <code>breadcrumb</code> | status Report whether the breadcrumb hook is installed (and echo its command). |
+| <code>check</code> | Run the governance checks now (this is what the hook invokes). |
+| <code>install</code> | Install a .git/hooks/pre-commit guard. --warn-only never blocks; --force overwrites a foreign hook. |
+| <code>status</code> | Report whether the guard is installed and its mode. |
+| <code>uninstall</code> | Remove the Amber guard (restores any backed-up hook). |
 
 ## Command Details
 

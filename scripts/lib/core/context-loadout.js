@@ -50,14 +50,27 @@ const {
 	CLASSIFICATIONS,
 	effectiveClassificationOf,
 	admittedUnderCeiling,
-	expiresAtFromTtl,
 } = require("./classification");
+const {
+	summarizeFreshnessActivity,
+	pageExpiresAt,
+	isTimeExpired,
+	revisionInstantFor,
+} = require("./context-freshness");
 const {
 	KNOWLEDGE_KINDS,
 	normalizeKnowledgeKind,
 	readKnowledgeGraph,
 } = require("./context-knowledge");
 const { compileSchema } = require("./schema-contract");
+// F085: plan-declared required context. The resolver is pure; the plan reader
+// and the shared floor parser are the only plan-side coupling.
+const { resolveRequiredContext } = require("./context-requirements");
+const {
+	CONTEXT_MANIFEST_ROLES,
+	readRoleContextRequirements,
+	parseFreshnessFloor,
+} = require("./planning");
 // F071 H3b: the ONE firewall verdict — the build never re-implements it.
 const { checkContextAccess } = require("../harness/context-core");
 
@@ -201,6 +214,7 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 				classificationSource: e.classificationSource,
 				purpose: e.purpose,
 				expiresAt: e.expiresAt,
+				assurance: e.assurance,
 			};
 			remaining -= e.words;
 		} else {
@@ -216,6 +230,31 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 
 function loadBuildConfig(targetRoot, opts) {
 	const runIdDeclared = opts.runId !== undefined && opts.runId !== null;
+	// F085: --plan/--role are a pair. Declaring one without the other is a
+	// usage error, never "no requirements" — a caller that meant to bind the
+	// plan and mistyped the flag must not get an unbound loadout.
+	const planDeclared = opts.plan !== undefined && opts.plan !== null;
+	const roleDeclared = opts.role !== undefined && opts.role !== null;
+	if (planDeclared !== roleDeclared) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_INVALID_ARG",
+					detail: `--plan and --role must be given together (got plan=${JSON.stringify(opts.plan)}, role=${JSON.stringify(opts.role)})`,
+				},
+			],
+		};
+	}
+	if (roleDeclared && !CONTEXT_MANIFEST_ROLES.includes(opts.role)) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_INVALID_ARG",
+					detail: `--role must be one of ${CONTEXT_MANIFEST_ROLES.join("|")} (got ${JSON.stringify(opts.role)})`,
+				},
+			],
+		};
+	}
 	if (runIdDeclared && (typeof opts.runId !== "string" || !RUN_ID_RE.test(opts.runId))) {
 		return {
 			errors: [
@@ -267,6 +306,58 @@ function loadBuildConfig(targetRoot, opts) {
 				},
 			],
 		};
+	}
+	// F085: read the plan's declared surfaces for the requested role. A plan
+	// path that escapes the target is refused here for the same reason every
+	// other target-relative read is.
+	let planRequirements = null;
+	let freshnessFloor = null;
+	if (planDeclared) {
+		let planPath;
+		try {
+			planPath = resolvePathWithin(targetRoot, opts.plan, {
+				label: "Plan path",
+				canonicalExisting: true,
+			});
+		} catch (error) {
+			return { errors: [{ code: "AMBER_E_INVALID_ARG", detail: error.message }] };
+		}
+		let planContent;
+		try {
+			planContent = fs.readFileSync(planPath, "utf8");
+		} catch (error) {
+			return {
+				errors: [
+					{
+						code: "AMBER_E_INVALID_ARG",
+						detail: `plan ${opts.plan} is not a readable file (${error.message})`,
+					},
+				],
+			};
+		}
+		// A plan with no Context manifests section declares nothing; the build
+		// stays byte-identical to the pre-F085 shape.
+		planRequirements = readRoleContextRequirements(planContent, opts.role) || {
+			surfaces: [],
+			freshnessFloor: null,
+		};
+		// F085: a present-but-malformed or empty floor is a declaration error, not
+		// "no floor". The shared parser owns the ISO-8601 grammar; the loadout
+		// never re-interprets the raw string.
+		const rawFloor = planRequirements.freshnessFloor;
+		if (rawFloor !== null) {
+			freshnessFloor = parseFreshnessFloor(rawFloor);
+			if (freshnessFloor === null) {
+				return {
+					errors: [
+						{
+							code: "AMBER_E_INVALID_ARG",
+							detail: `plan ${opts.plan} declares a freshness floor for role ${opts.role} that is not an ISO-8601 date or instant: ${rawFloor === "" ? "(empty)" : rawFloor}`,
+						},
+					],
+				};
+			}
+		}
 	}
 	const requiredArtifacts = collectRequiredArtifacts(targetRoot, route);
 	if (requiredArtifacts.errors.length > 0) return { errors: requiredArtifacts.errors };
@@ -342,6 +433,11 @@ function loadBuildConfig(targetRoot, opts) {
 		budget: Number.isInteger(opts.budget) && opts.budget > 0 ? opts.budget : 4000,
 		since: opts.since || null,
 		requiredPins: Array.isArray(opts.required) ? opts.required.slice() : [],
+		// F085: the plan's role declaration, resolved against pages later (the
+		// resolver needs the collected entries). Null means the build is unbound.
+		planRole: roleDeclared ? opts.role : null,
+		planSurfaces: planRequirements ? planRequirements.surfaces : [],
+		freshnessFloor,
 		knowledgeKinds: [...new Set(knowledgeKinds)].sort(),
 		requiredArtifacts,
 		maxClassification,
@@ -357,7 +453,8 @@ function loadBuildConfig(targetRoot, opts) {
 }
 
 function summarizeEvents(events) {
-	const latestAtByPage = {};
+	// Null-prototype: page ids are caller data, and "constructor" is a legal id.
+	const latestAtByPage = Object.create(null);
 	let generatedAt = EPOCH;
 	for (const event of events) {
 		if (!event || !event.at) continue;
@@ -369,7 +466,7 @@ function summarizeEvents(events) {
 			latestAtByPage[event.pageId] = event.at;
 		}
 	}
-	return { latestAtByPage, generatedAt };
+	return { latestAtByPage, ...summarizeFreshnessActivity(events), generatedAt };
 }
 
 function collectPageEntries(targetRoot, route, feature) {
@@ -384,8 +481,14 @@ function collectPageEntries(targetRoot, route, feature) {
 			error: { code: verified.code, detail: verified.detail },
 		};
 	}
-	const statusById = {};
-	for (const page of verified.pages) statusById[page.pageId] = page.status;
+	const statusById = Object.create(null);
+	const assuranceById = Object.create(null);
+	for (const page of verified.pages) {
+		statusById[page.pageId] = page.status;
+		// The verify pass already derived assurance from the same event log and
+		// revision instant; the Loadout projects it rather than deriving again.
+		assuranceById[page.pageId] = page.assurance;
+	}
 	const pageEntries = [];
 	const knowledgeGraph = readKnowledgeGraph(targetRoot);
 	let anyScope = false;
@@ -399,7 +502,7 @@ function collectPageEntries(targetRoot, route, feature) {
 		// classificationSource, never written back onto the page); the hard
 		// expiry derives from the page ttl at its ingest/refresh instant.
 		const effective = effectiveClassificationOf({ stored: page.classification, governed: true });
-		const baseInstant = page.created_at || activity.latestAtByPage[pageId] || null;
+		const derived = assuranceById[pageId] || null;
 		pageEntries.push({
 			pageId,
 			page,
@@ -413,7 +516,19 @@ function collectPageEntries(targetRoot, route, feature) {
 			classification: effective.classification,
 			classificationSource: effective.classificationSource,
 			purpose: typeof page.purpose === "string" ? page.purpose : null,
-			expiresAt: expiresAtFromTtl(page, baseInstant),
+			expiresAt: pageExpiresAt(page, activity),
+			// F085: the declared freshness floor compares against the same
+			// revision instant the TTL base uses — one clock, one answer.
+			revisionAt: revisionInstantFor(page, activity),
+			// Derived at read time and never written back onto the page: a
+			// contradicted page still loads, with visibly lower confidence.
+			assurance: derived
+				? {
+						confidence: derived.confidence,
+						storedConfidence: derived.storedConfidence,
+						feedback: derived.feedback,
+					}
+				: null,
 		});
 	}
 	for (const entry of pageEntries) {
@@ -501,6 +616,7 @@ function selectRequiredPages(pageEntries, requiredPins, state) {
 			classificationSource: entry.classificationSource,
 			purpose: entry.purpose,
 			expiresAt: entry.expiresAt,
+			assurance: entry.assurance,
 		};
 	}
 	return state;
@@ -550,6 +666,10 @@ function appendStatusExclusions(pageEntries, state) {
 	]);
 	for (const entry of pageEntries) {
 		if (included.has(entry.pageId)) continue;
+		// Authority exclusions (expired/ceiling/firewall/knowledge-kind) already
+		// recorded this page and marked it seen. Re-recording a second reason
+		// here would list one page twice and imply two independent causes.
+		if (state.seen.has(entry.pageId)) continue;
 		if (entry.supersededBy.length > 0) {
 			state.excluded.push({
 				pageId: entry.pageId,
@@ -635,11 +755,10 @@ function applyFirewallExclusions(pageEntries, state, config, now) {
 	return { grants: [...covering.values()], deniedCount, checkedAt: at };
 }
 
-function selectPageTiers(pageEntries, config) {
+function selectPageTiers(pageEntries, config, now = new Date()) {
 	const state = { excluded: [], pagesMap: {}, seen: new Set(), requiredPageIds: [] };
 	// One build, one instant: expiry, ceiling, and the firewall verdict all
 	// read the same clock (TTL is a half-open window with no skew tolerance).
-	const now = new Date();
 	// §3.3 authority exclusions run FIRST: classification-denied and expired
 	// pages never enter any tier, required pins included.
 	applyAuthorityExclusions(pageEntries, state, config, now);
@@ -693,14 +812,20 @@ function selectPageTiers(pageEntries, config) {
 	return state;
 }
 
-function applyDeltaSelection(selection, latestAtByPage, since) {
+// D6 delta filter, with the F085 exception: a page the plan declared as
+// required is never omitted by --since, because the required tier is the
+// feature's guarantee. Ordinary --page pins and priority/optional pages keep
+// plain delta semantics.
+function applyDeltaSelection(selection, latestAtByPage, since, declaredPageIds = null) {
 	let required = selection.requiredPageIds;
 	let priority = selection.priorityPageIds;
 	let optional = selection.optionalPageIds;
 	let pages = selection.pagesMap;
 	if (since) {
 		const inDelta = (pageId) => Boolean(latestAtByPage[pageId] && latestAtByPage[pageId] >= since);
-		required = required.filter(inDelta);
+		const keepRequired = (pageId) =>
+			inDelta(pageId) || Boolean(declaredPageIds && declaredPageIds.has(pageId));
+		required = required.filter(keepRequired);
 		priority = priority.filter(inDelta);
 		optional = optional.filter(inDelta);
 		pages = {};
@@ -811,6 +936,9 @@ function previewLoadout(targetRoot, opts = {}) {
 		return { loadout: null, loadoutPath: null, errors: config.errors, warnings };
 	}
 	const errors = [];
+	// One build, one instant: the plan-requirement resolution and the later
+	// tier selection must not straddle a clock tick.
+	const now = new Date();
 
 	const pageState = collectPageEntries(targetRoot, config.route, config.feature);
 	if (pageState.error) {
@@ -818,16 +946,77 @@ function previewLoadout(targetRoot, opts = {}) {
 		return { loadout: null, loadoutPath: null, errors, warnings };
 	}
 
+	// F085: the plan's role declaration resolves against the collected pages
+	// first. Any refusal fails the whole build before a tier is chosen — a
+	// partial required tier is the failure this feature exists to prevent.
+	let declaredSurfaces = new Map();
+	if (config.planRole) {
+		const resolution = resolveRequiredContext({
+			pageEntries: pageState.pageEntries,
+			requiredPaths: config.planSurfaces,
+			role: config.planRole,
+			freshnessFloor: config.freshnessFloor,
+			now,
+		});
+		if (resolution.findings.length > 0) {
+			return {
+				loadout: null,
+				loadoutPath: null,
+				errors: resolution.findings.map((finding) => ({
+					code: finding.code,
+					detail: `${finding.detail} (role ${finding.role}, reason ${finding.reason})`,
+				})),
+				warnings,
+			};
+		}
+		config.requiredPins = [...new Set([...config.requiredPins, ...resolution.pageIds])].sort();
+		declaredSurfaces = resolution.surfacesByPageId;
+	}
+
 	// 4. Required tier (pinned). D4: tampered/obsolete excluded; stale included
 	//    with status "stale"; ok included with status "ok".
-	const selection = selectPageTiers(pageState.pageEntries, config);
+	const selection = selectPageTiers(pageState.pageEntries, config, now);
 	if (selection.error) {
 		errors.push(selection.error);
 		return { loadout: null, loadoutPath: null, errors, warnings };
 	}
 
+	// F085: resolution runs before tier selection, so the authority layers
+	// (classification ceiling, hard expiry, firewall) can still drop a page the
+	// plan declared. A requirement the loadout omits is the failure this feature
+	// exists to prevent, so re-check every resolved page against the required
+	// tier and report each one that did not survive.
+	// Only plan-declared pages are re-checked: `--page` pins keep their existing
+	// drop-on-denial semantics (a deliberate, tested authority behavior).
+	const missingRequired = [...declaredSurfaces.keys()].filter(
+		(pageId) => !selection.requiredPageIds.includes(pageId),
+	);
+	if (missingRequired.length > 0) {
+		return {
+			loadout: null,
+			loadoutPath: null,
+			errors: missingRequired.map((pageId) => {
+				const excluded = (selection.excluded || []).find((entry) => entry.pageId === pageId);
+				const fact = excluded
+					? `${excluded.reason}: ${excluded.detail}`
+					: "not in the required tier";
+				return {
+					code: "AMBER_E_CONTEXT_LOADOUT_REQUIRED",
+					detail: `page ${pageId} covering required surface ${declaredSurfaces.get(pageId) || pageId} was dropped by the authority layer (role ${config.planRole}, reason unhealthy: ${fact})`,
+				};
+			}),
+			warnings,
+		};
+	}
+
 	// 9. Delta-since semantics (D6): emit only pages added/re-hashed after `since`.
-	const delta = applyDeltaSelection(selection, pageState.latestAtByPage, config.since);
+	//    Plan-declared required pages are the F085 exception and always stay.
+	const delta = applyDeltaSelection(
+		selection,
+		pageState.latestAtByPage,
+		config.since,
+		declaredSurfaces,
+	);
 	const loadout = assembleLoadout(config, pageState, selection, delta);
 	const shapeErrors = validateLoadoutShape(loadout);
 	if (shapeErrors.length > 0) {
@@ -971,7 +1160,7 @@ function verifyRequiredArtifacts(targetRoot, loadout) {
 	return findings;
 }
 
-function verifyRequiredPages(targetRoot, loadout) {
+function verifyRequiredPages(targetRoot, loadout, now = new Date()) {
 	const required = Array.isArray(loadout.tiers?.required) ? loadout.tiers.required : [];
 	const findings = [];
 	for (const pageId of required) {
@@ -992,6 +1181,19 @@ function verifyRequiredPages(targetRoot, loadout) {
 				code: "AMBER_E_CONTEXT_SOURCE_STALE",
 				detail: "required-tier page changed since loadout generation",
 			});
+			continue;
+		}
+		// The pre-load check reads the same TTL answer the build did: a page whose
+		// hash still matches but whose ttl has elapsed since the loadout was
+		// written is not fresh, and loading it would defeat the whole point of
+		// running this check right before the agent reads the artifact.
+		const expiresAt = loadout.pages?.[pageId]?.expiresAt || null;
+		if (expiresAt && isTimeExpired(expiresAt, now)) {
+			findings.push({
+				pageId,
+				code: "AMBER_E_CONTEXT_PAGE_TIME_STALE",
+				detail: `required-tier page ttl expired at ${expiresAt}`,
+			});
 		}
 	}
 	return findings;
@@ -1008,15 +1210,16 @@ function verifyRequiredPages(targetRoot, loadout) {
  * @param {string} loadoutPath
  * @returns {{ok: boolean, findings: Array<{pageId, code, detail}>}}
  */
-function verifyLoadoutFile(targetRoot, loadoutPath) {
+function verifyLoadoutFile(targetRoot, loadoutPath, options = {}) {
 	const loaded = readLoadoutForVerify(targetRoot, loadoutPath);
 	if (loaded.finding) return { ok: false, findings: [loaded.finding] };
 	const { loadout } = loaded;
 	const findings = [];
+	const now = options.now === undefined ? new Date() : new Date(options.now);
 
 	findings.push(...verifyRequiredArtifacts(targetRoot, loadout));
 
-	findings.push(...verifyRequiredPages(targetRoot, loadout));
+	findings.push(...verifyRequiredPages(targetRoot, loadout, now));
 	return { ok: findings.length === 0, findings };
 }
 

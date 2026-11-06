@@ -675,3 +675,27 @@ test("execution readiness refuses a --plan outside the target", async () => {
 		fs.rmSync(outside, { recursive: true, force: true });
 	}
 });
+
+test("maintenance distill confines --output to the target", async () => {
+	const target = tempDir("distill");
+	const outside = tempDir("distill-out");
+	const escapePath = path.join(outside, "escape.md");
+	try {
+		await assert.rejects(
+			() => run(["maintenance", "distill", "--target", target, "--output", escapePath]),
+			/outside the target root/,
+		);
+		assert.equal(fs.existsSync(escapePath), false, "the refusal precedes the write");
+
+		// A target-relative --output still writes, inside the target.
+		const relative = path.join("docs", "quality", "distill.md");
+		assert.equal(
+			await run(["maintenance", "distill", "--target", target, "--output", relative]),
+			0,
+		);
+		assert.ok(fs.existsSync(path.join(target, relative)));
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});

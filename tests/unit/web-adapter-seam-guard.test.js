@@ -327,6 +327,31 @@ describe("seam guard detector (self-check against silent no-op scans)", () => {
 	});
 });
 
+describe("single verification pipeline (ADR-0107)", () => {
+	it("the evidence job service never spawns a process of its own", () => {
+		// The web console's job service owns job state and session audit writes;
+		// the execution itself is `runEvidenceCommand` in evidence-runner, reached
+		// through this seam. A `child_process` import here means a second
+		// implementation is growing back — it already drifted once (shell:true vs
+		// the CLI's shell:false over the same policy verdict).
+		const file = path.join(SERVER_DIR, "services", "evidence-jobs.ts");
+		const source = blankOutComments(fs.readFileSync(file, "utf8"));
+		const spawnSpecifiers = extractModuleSpecifiers(source)
+			.filter(({ specifier }) => /^(node:)?child_process$/.test(specifier))
+			.map(({ specifier, line }) => `${path.basename(file)}:${line} → ${specifier}`);
+		assert.deepEqual(
+			spawnSpecifiers,
+			[],
+			"evidence execution must go through web-adapter's runEvidenceCommand",
+		);
+		assert.match(
+			source,
+			/runEvidenceCommand\(/,
+			"the evidence job service must still call the shared runner",
+		);
+	});
+});
+
 describe("web-adapter seam guard (apps/web/server)", () => {
 	it("has TypeScript sources to scan (scan path is alive)", () => {
 		assert.ok(fs.existsSync(SERVER_DIR), `missing scan root: ${SERVER_DIR}`);

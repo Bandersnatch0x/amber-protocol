@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Replay core (F073 H5; proposal §7/§26/§34/§43/§46.5).
 //
 // Replay is VERIFICATION, not re-execution: the §43 gate is that
@@ -31,6 +33,7 @@ const { listAttempts } = require("./attempt-core");
 const { toolsSnapshot } = require("./tool-core");
 const { readExecutionRecord } = require("./execution-adapter");
 const { isFinal } = require("./run-state-machine");
+const { defineVerdictSurface } = require("../core/verdict-surface");
 
 const CODE_CORRUPT = "AMBER_E_HARNESS_REPLAY_CORRUPT";
 const CODE_NOTHING_TO_PROPOSE = "AMBER_E_HARNESS_REGRESSION_NOTHING_TO_PROPOSE";
@@ -47,13 +50,15 @@ const DRIFT_KINDS = Object.freeze([
 	"non-determinism",
 ]);
 
-const AXIS_VERDICTS = Object.freeze(["equivalent", "drift", "unevaluated"]);
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
+// ADR-0106: an axis with no frozen fact to compare is `unevaluated` — disclosed,
+// never guessed into `equivalent`.
+const AXIS_VERDICT = defineVerdictSurface({
+	name: "replay axis verdict",
+	notRun: "status",
+	outcomes: ["equivalent", "drift"],
+	notRunValue: "unevaluated",
+});
+const AXIS_VERDICTS = AXIS_VERDICT.outcomes;
 
 function safeId(id) {
 	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
@@ -494,7 +499,15 @@ function listReplays(targetRoot, { runId } = {}) {
 // already reports). Response-only: a diff of two immutable records is
 // reproducible by re-running the command — no receipt/proposal artifact.
 const DIFF_AXIS_VERDICTS = Object.freeze(["same", "differs", "only-a", "only-b"]);
-const DIFF_VERDICTS = Object.freeze(["equivalent-world", "world-drift", "incomparable"]);
+// ADR-0106: two runs that share no evaluated axis are `incomparable`, not an
+// equivalent world.
+const DIFF_VERDICT = defineVerdictSurface({
+	name: "replay diff verdict",
+	notRun: "status",
+	outcomes: ["equivalent-world", "world-drift"],
+	notRunValue: "incomparable",
+});
+const DIFF_VERDICTS = DIFF_VERDICT.outcomes;
 
 /**
  * Diff two runs over the replay axes. Both flags are required; the runs must

@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Contract admission core (F065 H0; ADR-0100).
 //
 // Owns every semantic verdict of admitting and reading a Harness Contract:
@@ -23,12 +25,6 @@ const CODE_IMMUTABLE = "AMBER_E_HARNESS_CONTRACT_IMMUTABLE";
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_CONTRACT_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_CONTRACT_CORRUPT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function contractsDirForCreate(targetRoot) {
 	return statePathForCreate(targetRoot, "harness", "contracts");

@@ -13,6 +13,7 @@ const { COMMANDS, DEFAULT_COMMANDS, run } = require("../../scripts/amber.js");
 const {
 	COMMAND_REGISTRY,
 	DEPRECATED_COMMANDS,
+	SESSION_ACTIONS,
 	dispatch,
 } = require("../../scripts/lib/command-dispatcher.js");
 const {
@@ -336,6 +337,45 @@ test("learnings help and usage render canonical owner choices", () => {
 // from KNOWN_UNTYPED_SUBCOMMANDS, so the only remediation `amber ledger seal` ever
 // pointed at could not be run at all. The usage line is the advertised surface, so
 // every subcommand in it must be reachable one way or the other.
+// The session verb set used to live in three unlinked places: the if/else chain
+// that routed it, the hand-typed unknown-action sentence, and the usage line.
+// They had already drifted — `session complete` was routable and listed in the
+// hint, but never advertised. One table now feeds all three; this pins it.
+test("session verbs: handler table, usage line, and unknown hint agree", () => {
+	assert.deepEqual([...SESSION_ACTIONS].sort(), [
+		"abort",
+		"approve",
+		"complete",
+		"complete-check",
+		"continue",
+		"lease",
+		"list",
+		"run",
+		"settle",
+		"start",
+		"status",
+		"verify",
+		"verify-ledger",
+	]);
+
+	const usage = commandUsageLine("session");
+	const group = usage.match(/amber\s+session\s+<([^>]+)>/);
+	assert.ok(group, `session usage line must advertise its verb group: ${usage}`);
+	assert.deepEqual(
+		group[1]
+			.split("|")
+			.map((verb) => verb.trim())
+			.sort(),
+		[...SESSION_ACTIONS].sort(),
+	);
+
+	const bare = runCliProjection(["session"]);
+	assert.equal(bare.status, 1);
+	for (const verb of SESSION_ACTIONS) {
+		assert.match(bare.stdout, new RegExp(`\\b${verb}\\b`), `unknown hint must list ${verb}`);
+	}
+});
+
 test("every usage-line subcommand of a typed command is reachable through the CLI seam", () => {
 	const unreachable = [];
 	for (const command of TYPED_COMMANDS) {

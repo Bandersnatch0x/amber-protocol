@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Release Manifest (R-ET-5 / 0175; plan §3 E).
 //
 // A ValidationReceipt answers "did this run pass"; the manifest answers "what
@@ -32,12 +34,6 @@ const { readExecutionRecord } = require("./execution-adapter");
 
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 // The code axis has exactly two ambient sources — the only axes that can go
 // stale. A missing package.json or a non-repository target is an ABSENT value,

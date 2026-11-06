@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber ledger
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,10 +39,10 @@ amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|o
 
 | Subcommand | Description |
 | --- | --- |
-| <code>export</code> | Subcommand action for <code>ledger</code> |
-| <code>seal</code> | Subcommand action for <code>ledger</code> |
-| <code>verify</code> | Subcommand action for <code>ledger</code> |
-| <code>verify-anchoring</code> | Subcommand action for <code>ledger</code> |
+| <code>export</code> | — |
+| <code>seal</code> | — |
+| <code>verify</code> | — |
+| <code>verify-anchoring</code> | — |
 
 ## Command Details
 

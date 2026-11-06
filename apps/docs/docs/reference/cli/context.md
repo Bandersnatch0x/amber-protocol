@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber context
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,20 +39,21 @@ amber context --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>benchmark</code> | Subcommand action for <code>context</code> |
-| <code>delete</code> | Subcommand action for <code>context</code> |
-| <code>ingest</code> | Subcommand action for <code>context</code> |
-| <code>list</code> | Subcommand action for <code>context</code> |
-| <code>load</code> | Subcommand action for <code>context</code> |
-| <code>preview</code> | Subcommand action for <code>context</code> |
-| <code>projection</code> | Subcommand action for <code>context</code> |
-| <code>refresh</code> | Subcommand action for <code>context</code> |
-| <code>request</code> | Subcommand action for <code>context</code> |
-| <code>retention</code> | Subcommand action for <code>context</code> |
-| <code>show</code> | Subcommand action for <code>context</code> |
-| <code>source-adapter</code> | Subcommand action for <code>context</code> |
-| <code>stats</code> | Subcommand action for <code>context</code> |
-| <code>verify</code> | Subcommand action for <code>context</code> |
+| <code>benchmark</code> | Run deterministic Loadout quality metrics against a target-local fixture. |
+| <code>delete</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
+| <code>feedback</code> | Record append-only knowledge feedback when an injected page contradicts ingest drops its effective confidence one level; the page is not rewritten. |
+| <code>ingest</code> | Judge the agent's output: schema, citation completeness, payload-to-request binding, request-owned scope, and source freshness. The matching request is required for every accepted or no-change outcome. A payload of &#123;"outcome":"no-change"&#125; rebases hashes without touching content. |
+| <code>list</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
+| <code>load</code> | Assemble a task-scoped Loadout: three target-local Required Artifacts plus a freshness-gated, budgeted selection of Context Pages, written to .amber/context/loadouts/&lt;route&gt;[-&lt;feature&gt;][--&lt;run&gt;].json. With --subject &lt;s&gt; --purpose &lt;p&gt; ([--run &lt;id&gt;]) the F069 firewall verdict gates every candidate page: allowed pages cite the covering grant (id + snapshot + validUntil), denied pages are excluded with reason firewall and the closed deny reason (each denial on the trail); without --subject the build is byte-identical and the artifact carries no firewall section (visibly not grant-governed). build without --run, which the held-out leak check depends on. With --plan &lt;path&gt; --role &lt;implement\|review&gt; (both required together) every knowledge surface the plan's `## Context manifests` names for that role is required: exactly one current, healthy page must cover it at or after the declared freshness floor, else the build exits AMBER_E_CONTEXT_LOADOUT_REQUIRED naming the surface, role, and reason and writes no file. A plan-declared required page stays in the required tier under --since; ordinary --page pins and other pages keep the delta filter. A malformed or empty `freshness:` floor is AMBER_E_INVALID_ARG before anything is written. |
+| <code>preview</code> | Assemble and print the same Loadout without writing files or events. Firewall mode (--subject/--purpose) requires `load` — preview never carries the firewall section; it prints the ungoverned shape. |
+| <code>projection</code> | Check or rebuild the disposable, hash-bound Context index projection. |
+| <code>refresh</code> | Scan pages for source changes and elapsed ttl: cosmetic changes are absorbed silently (raw-only), real changes and expired pages generate refresh requests (trigger source-change \| ttl-expired). |
+| <code>request</code> | Scan evidence, bundle hash-bearing sources, write a distillation contract to .amber/context/requests/. Sources are mutable by default; refs under .amber/ and docs/adr/ are immutable (excerpt-snapshotted). |
+| <code>retention</code> | Report age, reachability, lineage protection, and eligibility. Never deletes. |
+| <code>show</code> | / show --page &lt;id&gt; / delete --page &lt;id&gt; Inspect or manage accepted pages. list accepts --knowledge-kind &lt;kind&gt;. |
+| <code>source-adapter</code> | Produce unaccepted Source Bundle candidates from the local fixture adapter. Disabled by default; transcript sources require explicit opt-in and redaction. |
+| <code>stats</code> | Report over .amber/context/events.jsonl: filter rate, pass rate, no-change rate, unknown-block share, assurance, and source density. |
+| <code>verify</code> | Re-check Required Artifacts and required-tier Pages (path and hash) right before the agent loads them; missing, escaped, or changed inputs fail closed. |
 
 ## Command Details
 
@@ -73,18 +74,24 @@ Subcommands:
         is required for every accepted or no-change outcome.
         A payload of {"outcome":"no-change"} rebases hashes without touching content.
   verify [--json]
-        Health-check every page: stale / tampered / missing / obsolete / orphaned,
-        with AMBER_E_CONTEXT_* codes plus separately derived lifecycle and assurance.
+        Health-check every page: stale / time-stale / tampered / missing /
+        obsolete / orphaned, with AMBER_E_CONTEXT_* codes plus separately
+        derived lifecycle, expiry, and assurance.
   list / show --page <id> / delete --page <id>
         Inspect or manage accepted pages. list accepts --knowledge-kind <kind>.
   refresh
-        Scan pages for source changes: cosmetic changes absorbed silently
-        (raw-only), real changes generate refresh requests.
+        Scan pages for source changes and elapsed ttl: cosmetic changes are
+        absorbed silently (raw-only), real changes and expired pages generate
+        refresh requests (trigger source-change | ttl-expired).
+  feedback --page <id> --verdict <contradicted|confirmed> [--note <text>]
+        Record append-only knowledge feedback when an injected page contradicts
+        (or still matches) the code. Each contradiction since the page's current
+        ingest drops its effective confidence one level; the page is not rewritten.
   stats [--window <n>] [--knowledge-kind <kind>]
         Report over .amber/context/events.jsonl: filter rate, pass rate,
         no-change rate, unknown-block share, assurance, and source density.
         --window considers only the last <n> events (trend regression).
-  load --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
+  load --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>] [--plan <path> --role <implement|review>]
         Assemble a task-scoped Loadout: three target-local Required Artifacts plus
         a freshness-gated, budgeted selection of Context Pages, written to
         .amber/context/loadouts/<route>[-<feature>][--<run>].json.
@@ -96,7 +103,17 @@ Subcommands:
         artifact carries no firewall section (visibly not grant-governed).
         --run <id> writes a per-run snapshot; the run's page set survives a later
         build without --run, which the held-out leak check depends on.
-  preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>]
+        With --plan <path> --role <implement|review> (both required together) every
+        knowledge surface the plan's `## Context manifests` names for that role is
+        required: exactly one current, healthy page must cover it at or after the
+        declared freshness floor, else the build exits
+        AMBER_E_CONTEXT_LOADOUT_REQUIRED naming the surface, role, and reason
+        (missing | ambiguous | unhealthy | superseded | time-expired | stale-floor)
+        and writes no file. A plan-declared required page stays in the required
+        tier under --since; ordinary --page pins and other pages keep the delta
+        filter. A malformed or empty `freshness:` floor is AMBER_E_INVALID_ARG
+        before anything is written.
+  preview --route <id> [--feature <id>] [--budget <n>] [--since <ts>] [--page <id>] [--knowledge-kind <kind>] [--plan <path> --role <implement|review>]
         Assemble and print the same Loadout without writing files or events.
         Firewall mode (--subject/--purpose) requires `load` — preview never
         carries the firewall section; it prints the ungoverned shape.
@@ -125,6 +142,7 @@ Examples:
   amber context benchmark --target . --fixture fixtures/context-benchmark.json
   amber context source-adapter --target . --fixture fixtures/context-source.json --enable
   amber context retention --target . --older-than-days 90
+  amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate" --yes
   amber context stats --target .
 ```
 
@@ -172,6 +190,10 @@ amber context source-adapter --target . --fixture fixtures/context-source.json -
 
 ```bash
 amber context retention --target . --older-than-days 90
+```
+
+```bash
+amber context feedback --target . --page governed-execution --verdict contradicted --note "page predates the new gate" --yes
 ```
 
 ```bash

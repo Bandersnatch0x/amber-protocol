@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber gate
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -43,9 +43,9 @@ amber gate <evaluate|show|list> --target <repo> [--json]  (F050 Gate Contracts)
 
 | Subcommand | Description |
 | --- | --- |
-| <code>evaluate</code> | Subcommand action for <code>gate</code> |
-| <code>list</code> | Subcommand action for <code>gate</code> |
-| <code>show</code> | Subcommand action for <code>gate</code> |
+| <code>evaluate</code> | Evaluate one gate against the recorded Evidence and append the outcome. --revision &lt;n&gt; selects the committed gate revision (default: the current committed head); --now &lt;iso&gt; injects the evaluation clock. A FAIL verdict is a completed evaluation, not a command error: the outcome is appended and returned with exit code 0. |
+| <code>list</code> | List outcome records in append order, optionally filtered. |
+| <code>show</code> | Show one outcome record: by 0-based ledger line (--index), or the latest matching --gate (narrowed by --subject). |
 
 ## Command Details
 

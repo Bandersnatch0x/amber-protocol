@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Execution Contract registry core (F068 H2a; Harness v2 §13/§31).
 //
 // Owns every semantic verdict of the DECLARED boundary artifact: schema
@@ -45,12 +47,6 @@ function enforcementRank(level) {
 // provider delivers" — the same defaulting rule the boundary sections use.
 function declaredEnforcementOf(contract) {
 	return contract.enforcement ?? enforcementCeilingForWorkspaceType(contract.workspace.type);
-}
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
 }
 
 function contractsDirForCreate(targetRoot) {

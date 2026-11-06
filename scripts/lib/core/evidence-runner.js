@@ -7,6 +7,12 @@
 // needs no approval: collecting evidence is not a mutating action. It keeps the
 // policy gate (only allow-listed commands run) and the hash-chain ledger, sharing
 // loop-policy + loop-ledger with governed-runner.
+//
+// This is the ONE verification pipeline (ADR-0107). The web console's async
+// evidence-job service calls this same function through web-adapter rather than
+// re-implementing the execution layer: two implementations of "run the command
+// and write the record" drift on exactly the details that make evidence
+// verifiable — spawn mode, output caps, kill semantics, ledger shape.
 const { spawn } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
 const {
@@ -23,6 +29,13 @@ const { signalPidTree } = require("./execution-handles");
 const STDOUT_CAP = 4000;
 const STDERR_CAP = 2000;
 
+// A budget kill signals the tree with SIGTERM first so a well-behaved command
+// can flush and exit. A command that ignores SIGTERM would otherwise hold the
+// caller open past its budget with no exit in sight, so the tree is force-killed
+// this long after the first signal. The timer is unref'd: an ordinary run must
+// not keep a server process alive for the grace window.
+const KILL_GRACE_MS = 2000;
+
 // The default budget is env-overridable so an operator can raise it
 // deliberately for a repository whose verification suite legitimately runs
 // longer (#315: this repo's full `npm test` needs ~9 minutes against the old
@@ -36,6 +49,11 @@ const MAX_FLAG_BUDGET_MINUTES = 60;
  * Resolve the verification budget in minutes. Unset falls back to the
  * AMBER_VERIFY_BUDGET_MINUTES env override or the 5-minute default; a passed
  * value must be an integer within [1, MAX_FLAG_BUDGET_MINUTES].
+ *
+ * This validates the `--budget-minutes` FLAG, at the boundary where a human
+ * types it. `runEvidenceCommand` accepts any positive finite duration instead:
+ * a programmatic caller (the web console's job service) may legitimately ask
+ * for a sub-minute budget, and the executor is not where that policy lives.
  * @param {number|undefined} requested
  * @returns {number}
  * @throws {Error} Typed AMBER_E_INVALID_ARG on an out-of-range request.
@@ -57,6 +75,77 @@ function resolveBudgetMinutes(requested) {
 	return requested;
 }
 
+function resolveExecutableBudgetMinutes(requested) {
+	const minutes =
+		requested === undefined || requested === null ? resolveBudgetMinutes(undefined) : requested;
+	if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes <= 0) {
+		throw typedError(
+			"AMBER_E_INVALID_ARG",
+			`must be a positive number of minutes when passed; got ${String(requested)}`,
+		);
+	}
+	return minutes;
+}
+
+/**
+ * Spawn one argv with no shell, capturing capped output tails. `exitCode` is -1
+ * when the spawn failed OR the budget kill landed, so a timed-out run can never
+ * be mistaken for a command that exited on its own — `timedOut` names which.
+ * @returns {Promise<{exitCode: number, timedOut: boolean, stdout: string, stderr: string}>}
+ */
+function spawnAndCapture(argv, cwd, timeoutMs) {
+	return new Promise((resolve) => {
+		const child = spawn(argv[0], argv.slice(1), {
+			shell: false,
+			cwd,
+			windowsHide: true,
+			// POSIX: lead a process group so a budget kill can address the WHOLE
+			// tree; a bare signal would orphan grandchildren that keep the stdio
+			// pipes open, and 'close' would then wait out their full runtime.
+			detached: process.platform !== "win32",
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		const out = [],
+			err = [];
+		let timedOut = false;
+		let forceTimer = null;
+		let settled = false;
+		const settle = (value) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			if (forceTimer) clearTimeout(forceTimer);
+			resolve(value);
+		};
+		const timer = setTimeout(() => {
+			timedOut = true;
+			signalPidTree(child.pid, "SIGTERM");
+			forceTimer = setTimeout(() => signalPidTree(child.pid, "SIGKILL"), KILL_GRACE_MS);
+			if (typeof forceTimer.unref === "function") forceTimer.unref();
+		}, timeoutMs);
+		child.stdout.on("data", (b) => out.push(Buffer.from(b)));
+		child.stderr.on("data", (b) => err.push(Buffer.from(b)));
+		child.on("error", (e) => settle({ exitCode: -1, timedOut, stdout: "", stderr: e.message }));
+		child.on("close", (code) =>
+			settle({
+				exitCode: timedOut ? -1 : (code ?? -1),
+				timedOut,
+				stdout: Buffer.concat(out).toString(),
+				stderr: Buffer.concat(err).toString(),
+			}),
+		);
+	});
+}
+
+/**
+ * Gate, execute, and record one verification command. Both the CLI
+ * (`session verify --execute`) and the web console reach this function; neither
+ * owns a second copy of the policy verdict, the spawn, or the ledger shape.
+ *
+ * A denial returns `executed: false` and writes a `verification_denied` record
+ * (`executesAnything: false`); an execution writes `verification_passed` or
+ * `verification_failed` with the real exit code.
+ */
 async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, subject = {} }) {
 	const targetRoot = resolveTarget(target);
 
@@ -87,46 +176,16 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 	}
 
 	const startedAt = Date.now();
+	let minutes = null;
 	let exec;
 	try {
+		minutes = resolveExecutableBudgetMinutes(budgetMinutes);
 		const argv = toSpawnArgv(parseGovernedArgv(command));
-		const timeoutMs = resolveBudgetMinutes(budgetMinutes) * 60_000;
-		const res = await new Promise((resolve) => {
-			const child = spawn(argv[0], argv.slice(1), {
-				shell: false,
-				cwd: targetRoot,
-				detached: process.platform !== "win32",
-				stdio: ["ignore", "pipe", "pipe"],
-			});
-			const out = [],
-				err = [];
-			let timedOut = false;
-			const timer = setTimeout(() => {
-				timedOut = true;
-				// Kill the whole tree. A bare signal stops only the direct child, so a
-				// timed-out verification could leave grandchildren running. signalPidTree
-				// already covers both platforms (taskkill /T on win32, process group on POSIX).
-				signalPidTree(child.pid, "SIGTERM");
-			}, timeoutMs);
-			child.stdout.on("data", (b) => out.push(Buffer.from(b)));
-			child.stderr.on("data", (b) => err.push(Buffer.from(b)));
-			child.on("error", (e) => {
-				clearTimeout(timer);
-				resolve({ status: -1, stdout: "", stderr: e.message });
-			});
-			child.on("close", (code, _signal) => {
-				clearTimeout(timer);
-				resolve({
-					status: timedOut ? -1 : (code ?? -1),
-					stdout: Buffer.concat(out).toString(),
-					stderr: Buffer.concat(err).toString(),
-				});
-			});
-		});
-		const exitCode = res.status;
+		const res = await spawnAndCapture(argv, targetRoot, minutes * 60_000);
 		exec = {
 			command,
-			exitCode,
+			exitCode: res.exitCode,
+			timedOut: res.timedOut,
 			stdoutTail: res.stdout.slice(-STDOUT_CAP),
 			stderrTail: res.stderr.slice(-STDERR_CAP),
 		};
@@ -134,6 +193,7 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 		exec = {
 			command,
 			exitCode: -1,
+			timedOut: false,
 			stdoutTail: "",
 			stderrTail: String(e.message).slice(-STDERR_CAP),
 		};
@@ -158,6 +218,8 @@ async function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, 
 		executed: true,
 		denied: false,
 		exitCode: exec.exitCode,
+		timedOut: exec.timedOut,
+		budgetMinutes: minutes,
 		stdoutTail: exec.stdoutTail,
 		stderrTail: exec.stderrTail,
 		durationMs,

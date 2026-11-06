@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber security
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,7 +39,7 @@ amber security --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>audit</code> | Subcommand action for <code>security</code> |
+| <code>audit</code> | Generate a security audit report without mutating target code. |
 
 ## Command Details
 

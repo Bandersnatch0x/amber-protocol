@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Validation core (F073 H5; proposal §16/§17/§34/§51C).
 //
 // A ValidationReceipt is the artifact form of "did this run actually pass
@@ -26,6 +28,7 @@ const { readExecutionRecord } = require("./execution-adapter");
 const { emitHarnessEvent } = require("./event-ledger");
 const { toolsSnapshot } = require("./tool-core");
 const { resolveHeldOutBinding, leakCheck } = require("./held-out-core");
+const { defineVerdictSurface } = require("../core/verdict-surface");
 
 const CODE_CORRUPT = "AMBER_E_HARNESS_VALIDATION_CORRUPT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
@@ -47,8 +50,24 @@ const CHECK_NAMES = Object.freeze([
 // these checks is never silently revised.
 const EVAL_CHECK_NAME = "eval";
 const ALLOWED_CHECK_NAMES = Object.freeze([...CHECK_NAMES, EVAL_CHECK_NAME]);
-const CHECK_STATUSES = Object.freeze(["pass", "fail", "not-run"]);
-const EVAL_OVERALL = Object.freeze(["pass", "fail"]);
+// ADR-0106: every closed verdict vocabulary on this receipt declares where
+// "did not run" goes. The check, receipt, and gate vocabularies place it at a
+// third status value; the eval result's own overall is refusal-shaped, because
+// an eval that did not run leaves no result artifact to record at all.
+const CHECK_STATUS = defineVerdictSurface({
+	name: "harness check status",
+	notRun: "status",
+	outcomes: ["pass", "fail"],
+	notRunValue: "not-run",
+});
+const CHECK_STATUSES = CHECK_STATUS.outcomes;
+
+const EVAL_OVERALL_SURFACE = defineVerdictSurface({
+	name: "eval result overall",
+	notRun: "refusal",
+	outcomes: ["pass", "fail"],
+});
+const EVAL_OVERALL = EVAL_OVERALL_SURFACE.outcomes;
 
 // R-ET-2 (0172): the receipt-level verdict vocabulary. `verdict` answers "was
 // the evidence complete and correct"; `gateVerdict` answers "how strong was
@@ -57,16 +76,29 @@ const EVAL_OVERALL = Object.freeze(["pass", "fail"]);
 // from contradicting. `unknown` is declared but never emitted by the current
 // derivation: it is reserved for a condition that is neither a check status
 // nor an evidence gap.
-const RECEIPT_VERDICTS = Object.freeze(["pass", "fail", "incomplete", "unknown", "not-run"]);
-const GATE_VERDICTS = Object.freeze([
-	"pass",
-	"fail",
-	"incomplete",
-	"unknown",
-	"blocked",
-	"not-run",
-]);
-const COMPLETENESS_VALUES = Object.freeze(["complete", "partial", "not-evaluated"]);
+const RECEIPT_VERDICT = defineVerdictSurface({
+	name: "validation receipt verdict",
+	notRun: "status",
+	outcomes: ["pass", "fail", "incomplete", "unknown"],
+	notRunValue: "not-run",
+});
+const RECEIPT_VERDICTS = RECEIPT_VERDICT.outcomes;
+
+const GATE_VERDICT = defineVerdictSurface({
+	name: "validation gate verdict",
+	notRun: "status",
+	outcomes: ["pass", "fail", "incomplete", "unknown", "blocked"],
+	notRunValue: "not-run",
+});
+const GATE_VERDICTS = GATE_VERDICT.outcomes;
+
+const COMPLETENESS = defineVerdictSurface({
+	name: "validation completeness",
+	notRun: "status",
+	outcomes: ["complete", "partial"],
+	notRunValue: "not-evaluated",
+});
+const COMPLETENESS_VALUES = COMPLETENESS.outcomes;
 
 // R-ET-2.2: every axis is ALWAYS present, mirroring evaluateChecks' always-add
 // rule — there is no "not applicable". Each axis is a projection of the
@@ -104,12 +136,6 @@ const PEP_CEILINGS = Object.freeze({
 	E4: "unavailable", // unobservable host actions — no record point, not even a claim
 });
 const PEP_POINTER = "docs/adr/0001-governance-first-artifact-first.md#amendment-0047-2026-09-16";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function safeId(id) {
 	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");

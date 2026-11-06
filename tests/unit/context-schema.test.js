@@ -323,6 +323,18 @@ describe("context-request schema", () => {
 		req.sources[0].rawHash = "md5:abc";
 		assert.equal(validate(req), false);
 	});
+
+	it("accepts a request whose target carries the elapsed ttl instant", () => {
+		const req = validRequest();
+		req.target.expiredAt = "2026-01-01T01:00:00.000Z";
+		assert.equal(validate(req), true, JSON.stringify(validate.errors));
+	});
+
+	it("rejects a request whose target expiry is not a date-time", () => {
+		const req = validRequest();
+		req.target.expiredAt = "yesterday";
+		assert.equal(validate(req), false);
+	});
 });
 
 describe("context-loadout schema", () => {
@@ -339,6 +351,44 @@ describe("context-loadout schema", () => {
 	it("rejects a loadout without artifacts.required", () => {
 		const loadout = validLoadout();
 		delete loadout.artifacts;
+		assert.equal(validate(loadout), false);
+	});
+
+	it("accepts derived assurance on a page entry", () => {
+		const loadout = validLoadout();
+		loadout.pages = {
+			"page-a": {
+				title: "A",
+				words: 10,
+				rawHash: "sha256:" + "a".repeat(64),
+				status: "ok",
+				scope: [],
+				assurance: {
+					confidence: "low",
+					storedConfidence: "high",
+					feedback: { contradicted: 2, confirmed: 0 },
+				},
+			},
+		};
+		assert.equal(validate(loadout), true, JSON.stringify(validate.errors));
+	});
+
+	it("rejects a derived assurance outside the confidence ladder", () => {
+		const loadout = validLoadout();
+		loadout.pages = {
+			"page-a": {
+				title: "A",
+				words: 10,
+				rawHash: "sha256:" + "a".repeat(64),
+				status: "ok",
+				scope: [],
+				assurance: {
+					confidence: "certain",
+					storedConfidence: "high",
+					feedback: { contradicted: 0, confirmed: 0 },
+				},
+			},
+		};
 		assert.equal(validate(loadout), false);
 	});
 });

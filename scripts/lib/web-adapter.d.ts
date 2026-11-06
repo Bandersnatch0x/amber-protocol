@@ -106,7 +106,11 @@ export type EvidenceCommandResult = {
 	executed: boolean;
 	denied: boolean;
 	reason?: string;
+	/** -1 when the spawn failed or a budget kill landed; `timedOut` names which. */
 	exitCode?: number;
+	timedOut?: boolean;
+	/** The budget actually applied, after the env override / default resolution. */
+	budgetMinutes?: number | null;
 	stdoutTail?: string;
 	stderrTail?: string;
 	durationMs?: number;
@@ -114,9 +118,11 @@ export type EvidenceCommandResult = {
 };
 
 /**
- * Re-export of scripts/lib/core/evidence-runner.js (type SSOT only; no extra depth).
+ * Re-export of scripts/lib/core/evidence-runner.js (type SSOT only; no extra
+ * depth). Async: the single verification pipeline both the CLI and the web
+ * console's evidence-job service execute through.
  */
-export function runEvidenceCommand(input: EvidenceCommandInput): EvidenceCommandResult;
+export function runEvidenceCommand(input: EvidenceCommandInput): Promise<EvidenceCommandResult>;
 
 export type HandoffBundleStatus = {
 	present: boolean;

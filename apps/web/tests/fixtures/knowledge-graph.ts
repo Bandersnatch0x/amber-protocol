@@ -1,4 +1,12 @@
-import type { KnowledgeEdgeDTO, KnowledgeGraphDTO, KnowledgeNode } from './types';
+// Test-only knowledge graph. Lives under tests/ rather than beside the
+// production feature so a page cannot import the demo corpus by accident and
+// so it picks up the relaxed lint profile tests/** already gets.
+
+import type {
+  KnowledgeEdgeDTO,
+  KnowledgeGraphDTO,
+  KnowledgeNode,
+} from '@/features/knowledge/types';
 
 export type {
   GraphLayer,
@@ -7,7 +15,7 @@ export type {
   DriftFinding,
   KnowledgeGraphDTO,
   RecentChangeItem,
-} from './types';
+} from '@/features/knowledge/types';
 
 const ADR_NODES: Array<[string, string, string]> = [
   [

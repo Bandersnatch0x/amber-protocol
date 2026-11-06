@@ -914,7 +914,15 @@ records its clock source (`injected` with `--now`, `system` otherwise) and the f
 
 The legacy plan gate keeps its surface under the same command name: a bare
 `amber gate --plan <path> [--confirm]` (no `evaluate`/`show`/`list` action) routes to the plan
-gate-check unchanged.
+gate-check unchanged. The plan gate checks declarations deterministically (ADR-0109): every
+`## Vertical Slices` entry must carry `paths:` (at most 5 repo-relative paths spanning at most 2
+subsystems), `depends-on:` (earlier slice numbers only, so the edges form a DAG by construction),
+and `verify:` (one non-empty command). The scaffolded plan carries `<fill: …>` placeholders, so a
+freshly scaffolded plan fails until a human curates it. The contract binds plans still in motion: only a terminal
+`Status:` (`accepted`, `complete`, `implemented`, `superseded`, `retired`, …) is frozen history and
+stays readable, while a plan that declares any metadata bullet has opted in and is held to every
+rule. `proposed`, `draft`, and `blocked` plans are still gated. The gate checks the declaration, never the
+eventual diff — scope drift stays a reviewer judgment.
 
 ```bash
 # admit a Gate Contract through the artifact surface (contract keys ride --extension flags)
@@ -2718,8 +2726,13 @@ node scripts/amber.js context verify --target . --json
 node scripts/amber.js context list   --target .
 node scripts/amber.js context list   --target . --knowledge-kind decision
 node scripts/amber.js context show   --target . --page <id>
-node scripts/amber.js context refresh --target .          # absorbs cosmetic changes; requests real ones
+node scripts/amber.js context refresh --target .          # absorbs cosmetic changes; requests real and ttl-expired ones
 node scripts/amber.js context delete --target . --page <id>
+
+# Freshness feedback (ADR-0109): each contradiction since the page's current ingest
+# drops its effective confidence one level; the page is never rewritten.
+node scripts/amber.js context feedback --target . --page <id> --verdict contradicted --note "page predates the new gate" --yes
+node scripts/amber.js context feedback --target . --page <id> --verdict confirmed --yes
 
 # Task-scoped Loadout
 node scripts/amber.js context load --target . --route feature-standard
@@ -2728,6 +2741,12 @@ node scripts/amber.js context load --target . --route feature-standard --feature
 # cite the covering grant, denied pages are excluded (reason firewall, closed deny reason,
 # context.denied on the trail); without --subject the build is byte-identical.
 node scripts/amber.js context load --target . --route feature-standard --subject worker --purpose review
+# Plan-bound load (F085): every knowledge surface the plan's `## Context manifests` declares for
+# the role is required — exactly one current, healthy page must cover it, at or after the role's
+# optional `freshness:` floor. A page that fails exits AMBER_E_CONTEXT_LOADOUT_REQUIRED (surface,
+# role, and reason) and writes no file; a malformed or empty floor is AMBER_E_INVALID_ARG, and
+# exceeding the word budget keeps AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW.
+node scripts/amber.js context load --target . --route feature-standard --plan docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md --role implement --confirm
 node scripts/amber.js context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
 
 # Rebuildable projections and deterministic quality checks
@@ -2763,6 +2782,14 @@ hash-bound verification evidence under `.amber/context/verification/`; mechanica
 is derived from that evidence and becomes unavailable when the accepted page no longer matches it.
 Assurance never grants execution authority and does not weaken policy, approval, isolation, evidence,
 freshness, Required Artifact, or Loadout budget checks.
+
+Freshness is one derived fact (ADR-0109). A page's `ttl` is measured from its current revision — the
+latest accepted or no-change ingest, falling back to `created_at` — so a re-ingest restarts the
+window. `verify` reports the derived `expiresAt` and marks an elapsed page `stale-by-time`
+(`AMBER_E_CONTEXT_PAGE_TIME_STALE`); `refresh` generates a `ttl-expired` request for it; `load`
+excludes it with reason `expired`. Recorded `contradicted` feedback lowers the derived confidence one
+level per event (floored at `low`) without rewriting the page, and `verify` reports both the derived
+`confidence` and the original `storedConfidence`.
 
 `source-adapter` is disabled unless `--enable` is present and only returns unaccepted Source Bundle
 candidates. It never writes Context Pages or Loadouts. Transcript sources additionally require

@@ -124,6 +124,7 @@ const FLAG_SPECS = {
 	"--confirm": { key: "confirm", kind: "boolean" },
 	"--summary": { key: "summary", kind: "boolean" },
 	"--page": { key: "page" },
+	"--note": { key: "note" },
 	"--source": { key: "source", accumulate: "sources" },
 	"--request": { key: "request" },
 	"--payload": { key: "payload" },

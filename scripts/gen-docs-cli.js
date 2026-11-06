@@ -13,6 +13,7 @@ const {
 	TYPED_COMMANDS,
 	commandSummary,
 	commandUsageLine,
+	documentedSubcommandDetails,
 	knownSubcommands,
 } = require("./lib/command-registry");
 
@@ -142,8 +143,29 @@ function generateCommandDoc(commandName, pkgMeta) {
 		lines.push("## Subcommands", "");
 		lines.push("| Subcommand | Description |");
 		lines.push("| --- | --- |");
+		// The prose is already in the command's help block; the generator used to
+		// drop it and emit "Subcommand action for <command>" on every row. Where
+		// the help documents only a signature, the signature is the description —
+		// it is still real information, and still not a placeholder.
+		const details = documentedSubcommandDetails(commandName);
+		const cell = (text) => String(text).replace(/\|/g, "\\|");
+		// The page is MDX, not Markdown: a bare `<contract.json>` in prose reads as
+		// a JSX tag and fails the docs build. Signatures stay inside backticks,
+		// where MDX does not parse JSX, so only prose needs escaping.
+		const prose = (text) =>
+			cell(text)
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
+				.replace(/\{/g, "&#123;")
+				.replace(/\}/g, "&#125;");
 		for (const sub of subcommands) {
-			lines.push(`| <code>${sub}</code> | Subcommand action for <code>${commandName}</code> |`);
+			const detail = details[sub];
+			const description = detail?.summary
+				? prose(detail.summary)
+				: detail?.signature
+					? `\`${cell(detail.signature)}\``
+					: "—";
+			lines.push(`| <code>${sub}</code> | ${description} |`);
 		}
 		lines.push("");
 	}

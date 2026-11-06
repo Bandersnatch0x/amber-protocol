@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber release
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -48,15 +48,15 @@ amber release <prepare|authorize|deploy|rollback|transactions|status|receipts|sh
 
 | Subcommand | Description |
 | --- | --- |
-| <code>authorize</code> | Subcommand action for <code>release</code> |
-| <code>deploy</code> | Subcommand action for <code>release</code> |
-| <code>list</code> | Subcommand action for <code>release</code> |
-| <code>prepare</code> | Subcommand action for <code>release</code> |
-| <code>receipts</code> | Subcommand action for <code>release</code> |
-| <code>rollback</code> | Subcommand action for <code>release</code> |
-| <code>show</code> | Subcommand action for <code>release</code> |
-| <code>status</code> | Subcommand action for <code>release</code> |
-| <code>transactions</code> | Subcommand action for <code>release</code> |
+| <code>authorize</code> | staging: --approval &lt;id&gt; --decision-identity &lt;identity&gt; --body &lt;markdown&gt; production: --branch-protection &lt;evidence-id&gt; --code-owner &lt;identity&gt;@&lt;rev&gt; |
+| <code>deploy</code> | `--id <release-id> --request-hash <sha256:...>` |
+| <code>list</code> | `[--environment <env>]` |
+| <code>prepare</code> | `--id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev> [--change-artifact ...] --evidence-item <evidence-id> [--evidence-item ...] --review-logic <evidence-id> --review-security <evidence-id> --review-spec <evidence-id> --environment <development\|staging\|production> --release-policy <identity>@<rev> --runner <runner-id> --runner-version <v> --capability <name> --capability-version <v> --credential <none\|scoped> --rollback <evidence-id>` |
+| <code>receipts</code> | `--id <release-id>` |
+| <code>rollback</code> | `--id <release-id> --request-hash <sha256:...>` |
+| <code>show</code> | `--id <release-id>` |
+| <code>status</code> | `--id <release-id>` |
+| <code>transactions</code> | `[--id <release-id>]` |
 
 ## Command Details
 

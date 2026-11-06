@@ -5,27 +5,29 @@
 // other explicit dependencies change, Amber records a scoped invalidation
 // receipt. Strict queries consume this read-side evidence and fail closed for
 // affected scopes instead of silently satisfying a Gate with stale data.
+//
+// ADR-0028: this is a governed chained ledger, so the lock → fold → chain-walk
+// → ceiling → append ritual comes from `defineLedgerFamily` and is not written
+// here. Only the domain half of the fold is local: the closed field set, the
+// single `invalidated` kind, the supported schema versions, and the dependency
+// shape. The recorded refusal wording stays byte-identical through the
+// factory's `chainWording` / `ceiling.message` overrides, which exist for
+// exactly this (ADR-0028 Amendments).
 
-const path = require("node:path");
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
-const { redactDeep } = require("./redaction");
 const {
 	GENESIS_HASH,
 	chainHash,
-	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
 	isPlainObject,
 	isNonEmptyString,
 	quotedList,
 	closedFieldProblem,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const STALENESS_SCHEMA_VERSION = 1;
 const SUPPORTED_STALENESS_SCHEMA_VERSIONS = Object.freeze([1]);
 const DEFAULT_MAX_STALENESS_BYTES = 1024 * 1024;
-const LOCK_STALE_MS = 30_000;
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_STALENESS_REGISTRY_CORRUPT";
 const REGISTRY_LOCK_CODE = "AMBER_E_STALENESS_REGISTRY_LOCK";
@@ -43,10 +45,6 @@ const EVENT_FIELDS = Object.freeze([
 	"hash",
 ]);
 const DEPENDENCY_FIELDS = Object.freeze(["type", "identity", "revision", "contentHash"]);
-
-function ledgerPath(cwd) {
-	return statePathForCreate(cwd, "staleness", "receipts.jsonl");
-}
 
 function corrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
@@ -99,67 +97,75 @@ function inputProblem({ subject, dependency, reason }) {
 	return null;
 }
 
-function acquireLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(ledgerPath(cwd)),
-		lockName: "receipts.lock",
-		conflictCode: REGISTRY_LOCK_CODE,
-		corruptCode: REGISTRY_CORRUPT_CODE,
-		label: "staleness receipt ledger",
-		staleMs: LOCK_STALE_MS,
-	});
+// The recorded per-event refusal texts (before ADR-0028 the fold wrote these
+// inline). Each kind overrides the factory's shared chain-link wording so the
+// published messages keep their exact bytes.
+function chainWording(kind, _event, lineIndex) {
+	const head = `staleness receipt ${lineIndex}`;
+	if (kind === "not-object") return `${head} is not an object`;
+	if (kind === "broken") return `${head} breaks the hash chain`;
+	if (kind === "mismatch") return `${head} carries a hash that does not match its content`;
+	return null;
 }
 
-function appendWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: ledgerPath(cwd),
-		event,
-		envName: "AMBER_STALENESS_MAX_RECEIPT_BYTES",
-		defaultBytes: DEFAULT_MAX_STALENESS_BYTES,
-		label: "staleness receipt ledger",
-	});
+// The domain half of the fold: the chain walk has already succeeded, so this
+// sees only a hash-verified event. Every failure is the ledger's corrupt code.
+function applyReceipt(state, event, lineIndex) {
+	const label = `staleness receipt ${lineIndex}`;
+	const closed = closedFieldProblem(event, EVENT_FIELDS, label);
+	if (closed !== null) throw corrupt(closed);
+	if (event.kind !== "invalidated")
+		throw corrupt(`${label} carries unknown kind ${JSON.stringify(event.kind)}`);
+	if (!SUPPORTED_STALENESS_SCHEMA_VERSIONS.includes(event.schemaVersion)) {
+		throw corrupt(
+			`${label} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	}
+	if (!isNonEmptyString(event.at)) throw corrupt(`${label} has no timestamp`);
+	if (!isNonEmptyString(event.subject)) throw corrupt(`${label} has no subject`);
+	const dep = dependencyProblem(event.dependency, `${label}.dependency`);
+	if (dep !== null) throw corrupt(dep);
+	if (!isNonEmptyString(event.reason)) throw corrupt(`${label} has no reason`);
+	state.push({ ...event, index: lineIndex - 1 });
+}
+
+const FAMILY = defineLedgerFamily({
+	dir: "staleness",
+	label: "staleness receipt ledger",
+	ledgers: [
+		{
+			name: "receipts",
+			fileName: "receipts.jsonl",
+			lockName: "receipts.lock",
+			conflictCode: REGISTRY_LOCK_CODE,
+			corruptCode: REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_STALENESS_MAX_RECEIPT_BYTES",
+				defaultBytes: DEFAULT_MAX_STALENESS_BYTES,
+				message: (_event, ceiling) =>
+					`appending the staleness receipt would exceed ${ceiling} bytes`,
+			},
+			label: "staleness receipt ledger",
+			eventLabel: "staleness receipt",
+			fold: {
+				init: () => [],
+				apply: applyReceipt,
+				result: (state) => state,
+				chainWording,
+			},
+		},
+	],
+});
+
+const RECEIPTS = FAMILY.ledgers.receipts;
+
+function ledgerPath(cwd) {
+	return RECEIPTS.path(cwd);
 }
 
 function foldStalenessReceipts(cwd) {
-	const events = readLedgerFailClosed(
-		ledgerPath(cwd),
-		REGISTRY_CORRUPT_CODE,
-		"staleness receipt ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	return events.map((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event)) throw corrupt(`staleness receipt ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
-			throw corrupt(`staleness receipt ${lineIndex} breaks the hash chain`);
-		}
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
-			throw corrupt(
-				`staleness receipt ${lineIndex} carries a hash that does not match its content`,
-			);
-		}
-		const closed = closedFieldProblem(event, EVENT_FIELDS, `staleness receipt ${lineIndex}`);
-		if (closed !== null) throw corrupt(closed);
-		if (event.kind !== "invalidated")
-			throw corrupt(
-				`staleness receipt ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		if (!SUPPORTED_STALENESS_SCHEMA_VERSIONS.includes(event.schemaVersion)) {
-			throw corrupt(
-				`staleness receipt ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		}
-		if (!isNonEmptyString(event.at))
-			throw corrupt(`staleness receipt ${lineIndex} has no timestamp`);
-		if (!isNonEmptyString(event.subject))
-			throw corrupt(`staleness receipt ${lineIndex} has no subject`);
-		const dep = dependencyProblem(event.dependency, `staleness receipt ${lineIndex}.dependency`);
-		if (dep !== null) throw corrupt(dep);
-		if (!isNonEmptyString(event.reason))
-			throw corrupt(`staleness receipt ${lineIndex} has no reason`);
-		prevHash = event.hash;
-		return { ...event, index };
-	});
+	return RECEIPTS.fold(cwd);
 }
 
 function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
@@ -171,10 +177,28 @@ function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
 	if (problem !== null)
 		return { ok: false, code: INVALID_ARG_CODE, receipt: null, errors: [problem] };
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
-	let release;
+	// The factory owns the lock, the in-lock fold, the chain hash, the ceiling,
+	// the append, and the re-fold; `body` is redacted there. The guard has no
+	// domain refusal to add, and `derive` picks the event just appended.
+	let result;
 	try {
-		release = acquireLock(cwd);
+		result = RECEIPTS.append(
+			cwd,
+			{
+				kind: "invalidated",
+				schemaVersion: STALENESS_SCHEMA_VERSION,
+				at,
+				subject,
+				dependency: dep,
+				reason,
+			},
+			() => null,
+			(events) => events[events.length - 1],
+		);
 	} catch (err) {
+		// The shared append deliberately rethrows a malformed size-ceiling as an
+		// argument error; this surface has always reported it as a structured
+		// refusal instead, so keep that shape.
 		return {
 			ok: false,
 			code: err.amberCode || REGISTRY_CORRUPT_CODE,
@@ -182,61 +206,7 @@ function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
 			errors: [err.message || String(err)],
 		};
 	}
-	try {
-		let folded;
-		try {
-			folded = foldStalenessReceipts(cwd);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || REGISTRY_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		const body = redactDeep({
-			kind: "invalidated",
-			schemaVersion: STALENESS_SCHEMA_VERSION,
-			at,
-			subject,
-			dependency: dep,
-			reason,
-		});
-		const prevHash = folded.length > 0 ? folded[folded.length - 1].hash : GENESIS_HASH;
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendWithinCeiling(cwd, event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || REGISTRY_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		if (ceiling.wouldExceed) {
-			return {
-				ok: false,
-				code: SIZE_CEILING_CODE,
-				receipt: null,
-				errors: [`appending the staleness receipt would exceed ${ceiling.ceiling} bytes`],
-			};
-		}
-		try {
-			appendJSONL(ledgerPath(cwd), event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: REGISTRY_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		return { ok: true, code: null, receipt: { ...event, index: folded.length }, errors: [] };
-	} finally {
-		release();
-	}
+	return { ok: result.ok, code: result.code, receipt: result.record, errors: result.errors };
 }
 
 function listInvalidations(cwd, { subject = null } = {}) {

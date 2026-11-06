@@ -67,6 +67,7 @@ const { typedError } = require("./error-catalog");
 const { deletionTombstones } = require("./retention-registry");
 const { GENESIS_HASH, chainHash, isPlainObject, quotedList } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
+const { defineVerdictSurface } = require("./verdict-surface");
 const { parseTimestamp } = require("./principal-registry");
 const { ASSURANCE_LEVELS, listEvidence } = require("./evidence-receipts");
 const { showArtifact } = require("./canonical-artifacts");
@@ -167,7 +168,15 @@ const OUTCOME_EVENT_FIELDS = Object.freeze([
 	"hash",
 ]);
 
-const VERDICTS = Object.freeze(["pass", "fail"]);
+// ADR-0106: a Gate that cannot evaluate refuses before appending, so a
+// recorded "did not evaluate" cannot exist and the vocabulary stays
+// two-valued. Declared, not assumed.
+const GATE_VERDICT = defineVerdictSurface({
+	name: "gate outcome verdict",
+	notRun: "refusal",
+	outcomes: ["pass", "fail"],
+});
+const VERDICTS = GATE_VERDICT.outcomes;
 const REQUIREMENT_DETAIL_FIELDS = Object.freeze([
 	"evidenceType",
 	"subject",

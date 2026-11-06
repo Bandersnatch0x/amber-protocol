@@ -15,7 +15,7 @@ const { execFileSync } = require("node:child_process");
 
 const { createRequest } = require("../../scripts/lib/core/context-request");
 const { ingestPayload } = require("../../scripts/lib/core/context-ingest");
-const { readPage } = require("../../scripts/lib/core/context-store");
+const { readPage, eventsPath } = require("../../scripts/lib/core/context-store");
 const { previewLoadout } = require("../../scripts/lib/core/context-loadout");
 const {
 	rankOf,
@@ -365,13 +365,19 @@ describe("load-build metadata projection and authority exclusions (§3.1-3.3)", 
 			seedPage(root, "quiet-page", { classification: "internal" });
 			seedPage(root, "hot-page", { classification: "restricted" });
 			seedPage(root, "old-page", { classification: "internal", ttl: "PT1H" });
-			// Backdate the old-page ingest stamp so its ttl expiry has passed,
-			// then rebuild the projection whose sourceHash covers the pages.
-			const pagePath = path.join(root, ".amber", "context", "pages", "old-page.json");
-			const page = JSON.parse(fs.readFileSync(pagePath, "utf8"));
-			page.created_at = "2026-01-01T00:00:00.000Z";
-			fs.writeFileSync(pagePath, JSON.stringify(page, null, 2) + "\n");
-			require("../../scripts/lib/core/context-projection").rebuildProjection(root);
+			// TTL is measured from the latest ingest (ADR-0109), so backdate every
+			// old-page event rather than its created_at.
+			const eventsFile = eventsPath(root);
+			const backdated = fs
+				.readFileSync(eventsFile, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => {
+					const event = JSON.parse(line);
+					if (event.pageId === "old-page") event.at = "2026-01-01T00:00:00.000Z";
+					return JSON.stringify(event);
+				});
+			fs.writeFileSync(eventsFile, `${backdated.join("\n")}\n`);
 
 			const preview = previewLoadout(root, {
 				route: "probe",

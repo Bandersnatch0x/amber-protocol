@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber policy
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -42,9 +42,9 @@ amber policy <evaluate|show|list> --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>evaluate</code> | Subcommand action for <code>policy</code> |
-| <code>list</code> | Subcommand action for <code>policy</code> |
-| <code>show</code> | Subcommand action for <code>policy</code> |
+| <code>evaluate</code> | Resolve the policy stack, consumed Approval, passing Gate Outcome, Evidence actors, and optional direct delegation, then append a pass/deny Policy Outcome. |
+| <code>list</code> | List Policy Outcomes in append order, optionally filtered. |
+| <code>show</code> | Show one Policy Outcome by its 0-based ledger line. |
 
 ## Command Details
 

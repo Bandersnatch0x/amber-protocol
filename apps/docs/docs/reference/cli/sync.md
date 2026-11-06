@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber sync
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>EXPERIMENTAL</code>
 </div>
@@ -39,8 +39,8 @@ amber sync --target <repo> [--execute] [--json] | amber sync envelope <pack|unpa
 
 | Subcommand | Description |
 | --- | --- |
-| <code>envelope</code> | Subcommand action for <code>sync</code> |
-| <code>session</code> | Subcommand action for <code>sync</code> |
+| <code>envelope</code> | Pack a governed artifact into a sync envelope under .amber/sync/envelopes/, or validate/unpack/compat-check one. |
+| <code>session</code> | run: pull (admit + apply) then prepare transport. push: prepare transport (report-only by default; the report lists envelopes, affected paths, and proposed git operations as structured, schema-governed ops — schemas/sync-transport-report.schema.json). push --execute --yes: ADR-0020 Stage A (F041) governed local commit — git add .amber/sync/envelopes + transport decision records, then git commit, behind identity, policy, single-use approval, and path-and-state confinement gates; every attempt is recorded in the hash-chained transport ledger executed. approve --reviewer &lt;name&gt;: record the single-use transport approval. ledger: verify the transport ledger chain. pull/replay: apply envelopes through the admission pipeline; version/identity/generation/concurrent-edit refusals are recorded in .amber/sync/conflicts.jsonl. list: show envelopes. conflicts: show the conflict ledger. |
 
 ## Command Details
 

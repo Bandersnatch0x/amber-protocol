@@ -393,3 +393,15 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F082-first-screen-positioning-flip.md`
 - Review status: ready
 - Feature: F082 status → accepted in feature_list.json
+
+## 2026-11-06 docs/plans/F084-declared-slices-and-context-freshness.md
+
+- Plan: `docs/plans/F084-declared-slices-and-context-freshness.md`
+- Review status: ready
+- Feature: F084 status → accepted in feature_list.json
+
+## 2026-11-06 docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md
+
+- Plan: `docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md`
+- Review status: ready
+- Feature: F085 status → accepted in feature_list.json

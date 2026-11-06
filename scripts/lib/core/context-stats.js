@@ -17,6 +17,7 @@ function summarizeEvents(events) {
 	const requests = { total: 0, byTrigger: {} };
 	const ingests = { total: 0, accepted: 0, rejected: 0, noChange: 0 };
 	const errorCodes = {};
+	const feedback = { contradicted: 0, confirmed: 0 };
 	let rawOnlyChanges = 0;
 	for (const event of events) {
 		if (event.kind === "request-created") {
@@ -33,9 +34,12 @@ function summarizeEvents(events) {
 			}
 		} else if (event.kind === "source-raw-only-change") {
 			rawOnlyChanges += 1;
+		} else if (event.kind === "knowledge-feedback") {
+			if (event.verdict === "contradicted") feedback.contradicted += 1;
+			else if (event.verdict === "confirmed") feedback.confirmed += 1;
 		}
 	}
-	return { requests, ingests, errorCodes, rawOnlyChanges };
+	return { requests, ingests, errorCodes, rawOnlyChanges, feedback };
 }
 
 function summarizePageQuality(targetRoot, knowledgeKind) {
@@ -87,7 +91,7 @@ function computeStats(targetRoot, options = {}) {
 	// trend regressions — lifetime aggregates plateau and hide them).
 	const window = Number.isInteger(options.window) && options.window > 0 ? options.window : null;
 	const events = window ? allEvents.slice(-window) : allEvents;
-	const { requests, ingests, errorCodes, rawOnlyChanges } = summarizeEvents(events);
+	const { requests, ingests, errorCodes, rawOnlyChanges, feedback } = summarizeEvents(events);
 
 	// Filter rate: raw-only rebases / (raw-only rebases + refresh requests).
 	// Requests with trigger "source-change" are the normalized changes.
@@ -102,6 +106,7 @@ function computeStats(targetRoot, options = {}) {
 		ingests: { ...ingests, passRate, noChangeRate },
 		errorCodes,
 		rawOnlyChanges,
+		feedback,
 		filterRate,
 		unknownShare: quality.unknownShare,
 		meanSourcesPerBlock: quality.meanSourcesPerBlock,

@@ -5,7 +5,7 @@ import {
   nearestRankPercentile,
 } from './map-analytics';
 import type { KnowledgeEdgeDTO, KnowledgeNode } from '@/lib/knowledge-dto';
-import { knowledgeGraphFixture } from './fixture';
+import { knowledgeGraphFixture } from '../../../tests/fixtures/knowledge-graph';
 
 function node(
   id: string,

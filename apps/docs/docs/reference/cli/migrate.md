@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber migrate
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,8 +39,8 @@ amber migrate --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>state</code> | Subcommand action for <code>migrate</code> |
-| <code>wiki</code> | Subcommand action for <code>migrate</code> |
+| <code>state</code> | Merge legacy .harness state into .amber without overwriting. |
+| <code>wiki</code> | Rename docs/wiki/agent/harness.md to amber.md and fix links. |
 
 ## Command Details
 

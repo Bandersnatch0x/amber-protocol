@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber eval
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>core</code>
 </div>
@@ -43,10 +43,10 @@ amber eval <run|list|show|admit> --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>admit</code> | Subcommand action for <code>eval</code> |
-| <code>list</code> | Subcommand action for <code>eval</code> |
-| <code>run</code> | Subcommand action for <code>eval</code> |
-| <code>show</code> | Subcommand action for <code>eval</code> |
+| <code>admit</code> | Admit the suite definition/result artifacts and record replayable Evidence through the normal receipt ledger. Optional: --definition-id, --outcome-id, --evidence-id, --subject. |
+| <code>list</code> | List registered Eval identities in the suite. |
+| <code>run</code> | Replay the suite against --target. Exit 0 when every Eval passes; exit 1 when any Eval has findings. |
+| <code>show</code> | Show one Eval definition. |
 
 ## Command Details
 

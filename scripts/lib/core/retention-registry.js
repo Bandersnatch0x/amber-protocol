@@ -57,6 +57,7 @@ const {
 	findDecisionSpend,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
+const { defineVerdictSurface } = require("./verdict-surface");
 
 const RETENTION_SCHEMA_VERSION = 1;
 const SUPPORTED_RETENTION_SCHEMA_VERSIONS = Object.freeze([1]);
@@ -110,8 +111,16 @@ const HOLDER_SURFACES = Object.freeze([
 	"external",
 ]);
 const CANDIDATE_STATUSES = Object.freeze(["prepared", "authorized"]);
-// A Holder settles independently; only "settled" counts toward coverage.
-const SETTLEMENT_STATUSES = Object.freeze(["settled", "refused", "failed", "unavailable"]);
+// ADR-0106: a Holder that could not be reached did not delete anything, so
+// "unavailable" is a third status value — retryable alongside refused and
+// failed, and only "settled" counts toward coverage.
+const SETTLEMENT_VERDICT = defineVerdictSurface({
+	name: "retention holder settlement",
+	notRun: "status",
+	outcomes: ["settled", "refused", "failed"],
+	notRunValue: "unavailable",
+});
+const SETTLEMENT_STATUSES = SETTLEMENT_VERDICT.outcomes;
 const TRANSACTION_STATUSES = Object.freeze(["deletion-pending", "completed"]);
 
 const CLASSIFY_INPUT_FIELDS = Object.freeze([

@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Held-out evaluation core (R-ET-4 / 0174).
 //
 // An eval-set is the content measured by an eval definition, not the
@@ -16,15 +18,20 @@ const { artifactGraphNodeId } = require("../core/artifact-graph-projection");
 const { readRunEvents } = require("./event-ledger");
 const { readPage } = require("../core/context-store");
 const { loadoutsDir } = require("../core/context-loadout");
+const { defineVerdictSurface } = require("../core/verdict-surface");
+
+// ADR-0106: a leak check that scanned nothing (no loadout, or a page it could
+// not read) is `not-run`, never `pass` — the distinction `cb7bb8a1` and
+// `88632c52` were repaired to make, declared here instead of re-derived.
+const LEAK_CHECK = defineVerdictSurface({
+	name: "held-out leak check",
+	notRun: "status",
+	outcomes: ["pass", "fail"],
+	notRunValue: "not-run",
+});
 
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 const CODE_ARTIFACT_NOT_FOUND = "AMBER_E_ARTIFACT_NOT_FOUND";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 function resolveHeldOutBinding(targetRoot, pin) {
 	if (!pin || typeof pin !== "object" || Array.isArray(pin)) {
@@ -163,12 +170,16 @@ function leakCheck(targetRoot, { runId, needles } = {}) {
 		orderedFindings.length > 0
 			? "fail"
 			: runScopedLoadouts === 0 || unreadablePages > 0
-				? "not-run"
+				? LEAK_CHECK.notRunValue
 				: "pass";
 	return {
 		status,
 		reason:
-			status === "not-run" ? (runScopedLoadouts === 0 ? "no-loadout" : "unreadable-page") : null,
+			status === LEAK_CHECK.notRunValue
+				? runScopedLoadouts === 0
+					? "no-loadout"
+					: "unreadable-page"
+				: null,
 		findings: orderedFindings,
 		scanned: { events: events.length, pages: scannedPages },
 	};

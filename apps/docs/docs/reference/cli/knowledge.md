@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber knowledge
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,16 +39,16 @@ amber knowledge --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>admit</code> | Subcommand action for <code>knowledge</code> |
-| <code>context-manifest</code> | Subcommand action for <code>knowledge</code> |
-| <code>context-review-sample</code> | Subcommand action for <code>knowledge</code> |
-| <code>context-sync</code> | Subcommand action for <code>knowledge</code> |
-| <code>graph</code> | Subcommand action for <code>knowledge</code> |
-| <code>list</code> | Subcommand action for <code>knowledge</code> |
-| <code>query</code> | Subcommand action for <code>knowledge</code> |
-| <code>retire</code> | Subcommand action for <code>knowledge</code> |
-| <code>search</code> | Subcommand action for <code>knowledge</code> |
-| <code>status</code> | Subcommand action for <code>knowledge</code> |
+| <code>admit</code> | Admit a Knowledge Record from a canonical Context Page. |
+| <code>context-manifest</code> | Render the context-page manifest and validate it against the committed census. |
+| <code>context-review-sample</code> | Emit a bounded ADR/wiki/architecture sample with source hashes, page ids, verification verdicts, and excerpts for the mandatory HITL checkpoint. |
+| <code>context-sync</code> | Idempotently drive context request/ingest/verify for the manifest and rebuild the knowledge-base projection. Existing unmanaged pages are never overwritten. |
+| <code>graph</code> | Emit the deterministic knowledge graph (F059; F060 code layer): three layers (decision: adr/artifact; knowledge: wiki/memory/architecture; implementation: feature/ code), six verbs (supersedes, builds-on, references, describes, imports, anchors), dead-anchor drift findings. Read-only, schema-validated (knowledge-graph.schema.json), byte-identical on recompute over an unchanged tree. |
+| <code>list</code> | List all Knowledge Records. |
+| <code>query</code> | Exact-scope query; unknown scope denied. |
+| <code>retire</code> | Retire a record explicitly. |
+| <code>search</code> | Read-time document index (0009): three planes — content NUL-byte detection), path (every file path/name is a key, curing file-name-invisibility R07/R08), and lexicon (CONTEXT.md terms mechanically derived; _Avoid_ tokens findable but never suggestion outputs). Boolean-hit + deterministic byte order; zero weights, zero model confidence; fail-closed on empty query. |
+| <code>status</code> | Report record freshness (fresh/stale). |
 
 ## Command Details
 

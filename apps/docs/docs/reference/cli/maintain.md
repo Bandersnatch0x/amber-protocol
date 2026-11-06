@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber maintain
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -48,15 +48,15 @@ amber maintain <register-detector|detect|propose|triage|complete|rollup|detector
 
 | Subcommand | Description |
 | --- | --- |
-| <code>complete</code> | Subcommand action for <code>maintain</code> |
-| <code>detect</code> | Subcommand action for <code>maintain</code> |
-| <code>detectors</code> | Subcommand action for <code>maintain</code> |
-| <code>findings</code> | Subcommand action for <code>maintain</code> |
-| <code>proposals</code> | Subcommand action for <code>maintain</code> |
-| <code>propose</code> | Subcommand action for <code>maintain</code> |
-| <code>register-detector</code> | Subcommand action for <code>maintain</code> |
-| <code>rollup</code> | Subcommand action for <code>maintain</code> |
-| <code>triage</code> | Subcommand action for <code>maintain</code> |
+| <code>complete</code> | `--fingerprint <sha256:...> --intent <identity>@<rev> --eval <identity>@<rev> --eval-result <identity>@<rev>` |
+| <code>detect</code> | `--id <detector-id> --detector-version <v> --subject <subject> --window-from <iso> --window-to <iso> --value <number> --observation-hash <sha256:...>` |
+| <code>detectors</code> | — |
+| <code>findings</code> | `[--id <detector-id>] [--fingerprint <sha256:...>]` |
+| <code>proposals</code> | `[--fingerprint <sha256:...>]` |
+| <code>propose</code> | `--finding-index <n>` |
+| <code>register-detector</code> | `--id <detector-id> --detector-version <v> --metric <name> --source <origin> --baseline <number> --rule <tier>:<ge\|gt\|le\|lt>:<threshold> [--rule ...] --window-ms <n> --scope <scope> --cooldown-ms <n> --max-observations <n> --decision-identity <identity> --revision <n>` |
+| <code>rollup</code> | `--limit <n>` |
+| <code>triage</code> | `--fingerprint <sha256:...> --outcome <fix\|schedule\|dismiss> [--reason <text>] --decision-identity <identity> --revision <n>` |
 
 ## Command Details
 

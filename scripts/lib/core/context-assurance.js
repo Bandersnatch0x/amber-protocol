@@ -6,6 +6,13 @@ const { canonicalJson, sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
 const { pagePath, readEvents } = require("./context-store");
 const { statePathForCreate } = require("../state-dir-resolver");
+const {
+	summarizeFreshnessActivity,
+	revisionInstantFor,
+	revisionIndexFor,
+	feedbackForPage,
+	effectiveConfidence,
+} = require("./context-freshness");
 
 const EVIDENCE_SCHEMA_VERSION = "1.0.0";
 
@@ -59,7 +66,7 @@ function writeVerificationEvidence(targetRoot, pageId, details = {}) {
 	return evidence;
 }
 
-function readAcceptedEvidence(targetRoot, pageId) {
+function readAcceptedEvidence(targetRoot, pageId, events = null) {
 	const file = evidencePath(targetRoot, pageId);
 	if (!fs.existsSync(file)) return null;
 	let evidence;
@@ -68,7 +75,7 @@ function readAcceptedEvidence(targetRoot, pageId) {
 	} catch {
 		return null;
 	}
-	const matchingEvent = readEvents(targetRoot).find(
+	const matchingEvent = (events || readEvents(targetRoot)).find(
 		(event) =>
 			event.kind === "ingest" &&
 			event.pageId === pageId &&
@@ -93,12 +100,25 @@ function readAcceptedEvidence(targetRoot, pageId) {
 	return evidence;
 }
 
-function deriveAssurance(targetRoot, page) {
-	const evidence = readAcceptedEvidence(targetRoot, page.pageId);
+function deriveAssurance(targetRoot, page, events = null, activity = null) {
+	const log = events || readEvents(targetRoot);
+	const evidence = readAcceptedEvidence(targetRoot, page.pageId, log);
+	// The caller folds the event log once per verify pass; deriving it again
+	// here would make the fold O(pages x events). The revision instant comes
+	// from the shared policy helper so the ttl base and the feedback window
+	// cannot drift apart.
+	const folded = activity || summarizeFreshnessActivity(log);
+	const revisionAt = revisionInstantFor(page, folded);
+	const feedback = feedbackForPage(log, page.pageId, revisionAt, revisionIndexFor(page, folded));
+	const storedConfidence = page.assurance?.confidence || null;
 	return {
-		confidence: page.assurance?.confidence || null,
+		// Effective confidence is derived, never written back: each recorded
+		// contradiction since the current revision drops one level.
+		confidence: effectiveConfidence(storedConfidence, feedback.contradicted),
+		storedConfidence,
 		maturity: page.assurance?.maturity || null,
 		verifiedAt: evidence ? evidence.verifiedAt : null,
+		feedback,
 	};
 }
 

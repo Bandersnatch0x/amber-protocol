@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber handoff
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>core</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -41,8 +41,8 @@ amber handoff --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>bundle</code> | Subcommand action for <code>handoff</code> |
-| <code>validate</code> | Subcommand action for <code>handoff</code> |
+| <code>bundle</code> | Write README, summary, evidence, next-actions, risks, recovery commands, and manifest. |
+| <code>validate</code> | Validate a handoff bundle directory. |
 
 ## Command Details
 

@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber feature
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,12 +39,12 @@ amber feature --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>add</code> | Subcommand action for <code>feature</code> |
-| <code>evidence</code> | Subcommand action for <code>feature</code> |
-| <code>list</code> | Subcommand action for <code>feature</code> |
-| <code>paths</code> | Subcommand action for <code>feature</code> |
-| <code>remove</code> | Subcommand action for <code>feature</code> |
-| <code>verify</code> | Subcommand action for <code>feature</code> |
+| <code>add</code> | Register a new feature in feature_list.json. To be doctor-valid, pass --area, --behavior, and at least one --verify. |
+| <code>evidence</code> | List all recorded evidence for a feature. |
+| <code>list</code> | List all registered features with status. |
+| <code>paths</code> | Book paths onto a feature (append-only, comma-splits each value, skips duplicates). Without --path it inspects the feature's current paths read-only. |
+| <code>remove</code> | Remove a feature from feature_list.json. |
+| <code>verify</code> | Record verification evidence for a feature. |
 
 ## Command Details
 

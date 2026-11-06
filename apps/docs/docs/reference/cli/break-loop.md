@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber break-loop
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,7 +39,7 @@ amber break-loop --target <repo> --issue <n> --title "<title>" --recurrence <n> 
 
 | Subcommand | Description |
 | --- | --- |
-| <code>validate</code> | Subcommand action for <code>break-loop</code> |
+| <code>validate</code> | Check every section is filled: ids chosen, write-back surface + test anchor + runnable verification command present. |
 
 ## Command Details
 

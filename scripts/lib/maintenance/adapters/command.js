@@ -46,8 +46,9 @@ function handleScaffoldDrift(args) {
 
 function handleDistill(args) {
 	const targetRoot = resolveTarget(args.target);
-	const outputPath =
-		args.output || path.join(targetRoot, "docs", "quality", "distill-proposals.md");
+	// Target-relative by construction; writeDistillProposal confines whatever the
+	// flag supplies against the same root.
+	const outputPath = args.output || path.join("docs", "quality", "distill-proposals.md");
 	const proposal = writeDistillProposal(targetRoot, outputPath, args);
 	return {
 		target: targetRoot,

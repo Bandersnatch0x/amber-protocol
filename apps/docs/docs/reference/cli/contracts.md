@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber contracts
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,7 +39,7 @@ amber contracts validate [--target <amber-checkout>] [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>validate</code> | Subcommand action for <code>contracts</code> |
+| <code>validate</code> | Check schema conformance, entry self-consistency, the compatibility matrix, and that every pointer resolves. Optional: --target &lt;amber-checkout&gt;. |
 
 ## Command Details
 

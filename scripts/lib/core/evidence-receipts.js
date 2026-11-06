@@ -31,6 +31,7 @@ const {
 	isPlainObject,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
+const { defineVerdictSurface } = require("./verdict-surface");
 const { resolveActivePrincipal } = require("./principal-registry");
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_EVIDENCE_REGISTRY_CORRUPT";
@@ -60,15 +61,26 @@ const ASSURANCE_LEVELS = Object.freeze([
 	"attested",
 ]);
 
+// ADR-0106: a receipt must be able to say "the check failed" AND "the
+// observation is unavailable" — two axes, not three values. `status` stays
+// two-valued; the absence lives on the assurance axis.
+const EVIDENCE_RECEIPT = defineVerdictSurface({
+	name: "evidence receipt",
+	notRun: "assurance",
+	outcomes: ["pass", "fail"],
+	notRunValue: "unavailable",
+	assurance: ["unavailable", "observed", "replayable"],
+});
+
 /**
  * The levels a receipt may be RECORDED with. `verified` is not recordable:
  * only an independent verification event promotes effective assurance past
  * the producer's own claim (F050 AC3/AC4).
  */
-const RECORDABLE_ASSURANCE = Object.freeze(["unavailable", "observed", "replayable"]);
+const RECORDABLE_ASSURANCE = EVIDENCE_RECEIPT.assurance;
 
 /** The closed set of run statuses a receipt may carry. */
-const EVIDENCE_STATUSES = Object.freeze(["pass", "fail"]);
+const EVIDENCE_STATUSES = EVIDENCE_RECEIPT.outcomes;
 
 /**
  * Ledger size ceiling in bytes (default 1 MiB; deliberate overrides via

@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber principal
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>core</code>
 </div>
@@ -42,10 +42,10 @@ amber principal register --target <repo> --id <id> --kind <human|service> [--rol
 
 | Subcommand | Description |
 | --- | --- |
-| <code>list</code> | Subcommand action for <code>principal</code> |
-| <code>register</code> | Subcommand action for <code>principal</code> |
-| <code>revoke</code> | Subcommand action for <code>principal</code> |
-| <code>show</code> | Subcommand action for <code>principal</code> |
+| <code>list</code> | List every registered Principal with its status, in first-registration order. |
+| <code>register</code> | Register a Principal. --role, --membership, --capability, half-open [from, to)) are optional qualifications; the window is evaluated against the admission-time clock when a Decision binds the Principal. |
+| <code>revoke</code> | Revoke a Principal terminally. A revoked Principal can no longer bind new Decisions; already-committed Decisions keep their recorded Principal snapshots. |
+| <code>show</code> | Show one Principal's record and current status: active \| revoked \| expired \| not-yet-valid. |
 
 ## Command Details
 

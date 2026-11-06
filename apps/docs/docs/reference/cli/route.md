@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber route
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Governed Command</code>
   Stability: <code>core</code>
 </div>
@@ -39,12 +39,12 @@ amber route <list|inspect|validate|test|approve|verify-ledger> <route-id> [--tar
 
 | Subcommand | Description |
 | --- | --- |
-| <code>approve</code> | Subcommand action for <code>route</code> |
-| <code>inspect</code> | Subcommand action for <code>route</code> |
-| <code>list</code> | Subcommand action for <code>route</code> |
-| <code>test</code> | Subcommand action for <code>route</code> |
-| <code>validate</code> | Subcommand action for <code>route</code> |
-| <code>verify-ledger</code> | Subcommand action for <code>route</code> |
+| <code>approve</code> | — |
+| <code>inspect</code> | Print a route's stage tree and full JSON. |
+| <code>list</code> | List all routes (id, version, stage count). |
+| <code>test</code> | Print the ordered stage sequence and gate points. |
+| <code>validate</code> | Validate a route file; non-zero exit on invalid. |
+| <code>verify-ledger</code> | — |
 
 ## Command Details
 

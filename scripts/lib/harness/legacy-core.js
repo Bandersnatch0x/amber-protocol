@@ -1,5 +1,7 @@
 "use strict";
 
+const { typedError } = require("../core/error-catalog");
+
 // Harness Legacy-surface dispositions (F075; proposal §52 Rules 4–7,
 // ADR-0101 decision 4).
 //
@@ -21,16 +23,21 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { statePath } = require("../state-dir-resolver");
+const { defineVerdictSurface } = require("../core/verdict-surface");
+
+// ADR-0106: the legacy projection discloses each §7 axis as `not-run` because
+// the pre-H1 surface never recorded one. It declares that itself rather than
+// borrowing validation-core's word — this is a projection, not the receipt.
+const LEGACY_RECEIPT_AXIS = defineVerdictSurface({
+	name: "legacy receipt axis",
+	notRun: "status",
+	outcomes: ["pass", "fail"],
+	notRunValue: "not-run",
+});
 
 const CODE_NOT_FOUND = "AMBER_E_HARNESS_LEGACY_NOT_FOUND";
 const CODE_CORRUPT = "AMBER_E_HARNESS_LEGACY_CORRUPT";
 const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
-
-function typedError(code, message) {
-	const err = new Error(message);
-	err.amberCode = code;
-	return err;
-}
 
 // The closed nearest-neighbor table: the legacy ledger's status vocabulary
 // mapped to the run state vocabulary. Unmapped statuses refuse the
@@ -139,11 +146,11 @@ function legacyTaskView(targetRoot, { taskId } = {}) {
 			chatHistoryRequired: !replayable,
 			receiptAxes: {
 				evidence: replayable ? "pass" : "fail",
-				policy: "not-run",
-				execution: "not-run",
-				tools: "not-run",
-				context: "not-run",
-				attempts: "not-run",
+				policy: LEGACY_RECEIPT_AXIS.notRunValue,
+				execution: LEGACY_RECEIPT_AXIS.notRunValue,
+				tools: LEGACY_RECEIPT_AXIS.notRunValue,
+				context: LEGACY_RECEIPT_AXIS.notRunValue,
+				attempts: LEGACY_RECEIPT_AXIS.notRunValue,
 			},
 		},
 		mapping: {

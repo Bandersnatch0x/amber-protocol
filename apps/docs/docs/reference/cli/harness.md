@@ -12,7 +12,7 @@ import CommandBlock from '@site/src/components/command-block';
 # amber harness
 
 <div className="amber-generated-banner">
-  <strong>Reference generated from Amber Protocol v2.0.2</strong><br />
+  <strong>Reference generated from Amber Protocol v2.0.4</strong><br />
   Tier: <code>expert</code> • Classification: <code>Standard Command</code>
   Stability: <code>EXPERIMENTAL</code>
 </div>
@@ -77,29 +77,29 @@ amber harness admit --file <contract.json> --target <repo> [--json]
 
 | Subcommand | Description |
 | --- | --- |
-| <code>admit</code> | Subcommand action for <code>harness</code> |
-| <code>advance</code> | Subcommand action for <code>harness</code> |
-| <code>attempt</code> | Subcommand action for <code>harness</code> |
-| <code>bind</code> | Subcommand action for <code>harness</code> |
-| <code>capabilities</code> | Subcommand action for <code>harness</code> |
-| <code>checkpoint</code> | Subcommand action for <code>harness</code> |
-| <code>context</code> | Subcommand action for <code>harness</code> |
-| <code>diff</code> | Subcommand action for <code>harness</code> |
-| <code>eval</code> | Subcommand action for <code>harness</code> |
-| <code>events</code> | Subcommand action for <code>harness</code> |
-| <code>execution</code> | Subcommand action for <code>harness</code> |
-| <code>inspect</code> | Subcommand action for <code>harness</code> |
-| <code>legacy</code> | Subcommand action for <code>harness</code> |
-| <code>lifecycle</code> | Subcommand action for <code>harness</code> |
-| <code>policy</code> | Subcommand action for <code>harness</code> |
-| <code>propose-regression</code> | Subcommand action for <code>harness</code> |
-| <code>replay</code> | Subcommand action for <code>harness</code> |
-| <code>runtime</code> | Subcommand action for <code>harness</code> |
-| <code>start</code> | Subcommand action for <code>harness</code> |
-| <code>status</code> | Subcommand action for <code>harness</code> |
-| <code>tool</code> | Subcommand action for <code>harness</code> |
-| <code>trace</code> | Subcommand action for <code>harness</code> |
-| <code>validate</code> | Subcommand action for <code>harness</code> |
+| <code>admit</code> | Validate and admit a contract document. Immutable after admission; only byte-identical re-admission is idempotent. Required: --file &lt;contract.json&gt;. |
+| <code>advance</code> | Move a Run along its closed ten-state machine. Advancing to admitted requires the complete six-check AdmissionReceipt: context, execution, approval — each pointer citing the existing governed artifact it witnessed. Required: --run &lt;id&gt; --to &lt;state&gt;. Optional: --reason. |
+| <code>attempt</code> | Run-scoped attempt records (F072 H4): every governed attempt is a first-class record (running → completed/failed/refused; terminal records immutable); list reports the no-progress derivation (reported, never enforced). Subcommands: list (--run), inspect |
+| <code>bind</code> | Bind one real loop outcome (the loop ledger's latest executed record) to an admitted/running run: emits execution.* and policy.evaluated events and moves the run to completed/failed. Required: --run &lt;id&gt; |
+| <code>capabilities</code> | The capability snapshot (F074 H6): the admitted tools with their resolved pins (tombstones for corrupt records) and the registry's snapshot hash. Read-only; admission stays `harness tool admit`. |
+| <code>checkpoint</code> | Run-scoped checkpoints (F072 H4): capture a snapshot citing the run/execution record digests and the attempt count (non-final runs only; idempotent per content), list a run's checkpoints, or verify — recovery reads + verifies the run still stands where the checkpoint captured it; a drifted run refuses (fail closed). Checkpoints are snapshots, never ledger events. Subcommands: capture (--run), list (--run), verify |
+| <code>context</code> | Context grants (F069, report-first firewall): admit a grant binding one subject to resource prefixes for one purpose inside a half-open TTL under a classification ceiling; revoke terminally (records stay listable); check — deterministic, label-only — whether subject S may see resource R for purpose P now. Denials land on the trail as context.denied events. Subcommands: admit (--file), list, inspect (--grant &lt;id&gt;), check |
+| <code>diff</code> | The cross-run comparison (F076, §20): `harness diff --from &lt;runId&gt; --to &lt;runId&gt;` compares two runs over the SAME six replay axes — per-axis same \| differs \| only-a \| only-b, verdict equivalent-world \| world-drift \| incomparable. The outcome states are reported, never compared into the verdict; response-only (a diff of two immutable records is reproducible by re-running); unrelated declared tasks refuse. |
+| <code>eval</code> | A governed ALIAS over the F058 eval surface (F074 H6, §26: eval does not mean authority): without --run, the same instruction-surface suite `amber eval run` produces through the same dispatch path (report-only, never a model call); with --run &lt;id&gt;, the run's eval artifact pointers on record. `eval admit` is NOT aliased — it stays on its own explicitly gated surface. |
+| <code>events</code> | The verified harness event stream (F074 H6): one run's trail with --run &lt;id&gt;, or the whole ledger |
+| <code>execution</code> | Execution boundaries (F068/F070, declared/effective/ observed comparable): admit an ExecutionContract, prepare the workspace per its declared type (the git-worktree adapter composes the existing worktree seam; local prepares a bounded scratch root — the main checkout is never the default cwd), run ONE governed named command inside the prepared workspace deterministic mutation observation and the fold recomputes over the full trail), evaluate — folding observed entries into an ok/violation/unevaluated verdict (observed outside declared BLOCKs, never silently continues) — and release the workspace as a recorded step. Subcommands: admit (--file), list, inspect (--contract \| --run), prepare (--contract run (--run --command-id [--ledger] [--budget-minutes] terminate is an explicit F078 REFUSAL: 'terminate' conflates Run cancellation, request settlement, and workspace deletion, so it stays refused (and writes nothing) while pointing at the precise surfaces: cancel (F081, a live owned governed execution with its own Decision), handles (observed pid/lease/fence view), advance --to cancelled, runner execution abort, and execution release. A cancellation reports what it OBSERVED (terminated \| already-exited \| unknown), retains the workspace, and never rewrites the run's terminal result. |
+| <code>inspect</code> | Show one admitted contract with its Snapshot Hash, or list every admitted contract with --all. Required: --contract &lt;id&gt;, or --all. |
+| <code>legacy</code> | The §52 disposition table (F075): one read-only row per deprecated surface (task prepare / result inspect / profile inspect) naming its mapping onto the harness spine — or its declared absence (profile is a deletion candidate pending an explicit user decision). `harness legacy task --task &lt;id&gt;` projects one legacy task's frozen artifacts (a view with legacy: true, never a Run record); `harness legacy profile` shows that disposition. |
+| <code>lifecycle</code> | The unified lifecycle view (F072 H4): one read-only mapping of run state/history, loop/session/task provenance (cited from the run's admission pointers), the execution verdict, attempts, and checkpoints, plus the release manifest the run's latest receipt froze (R-ET-5: the versions validated, beside whether they still hold — staleness, never integrity). Writes nothing; corrupt records fail closed. Optional: --run &lt;id&gt; (one run) or omit for every run plus the surface mapping. |
+| <code>policy</code> | The control-plane policy POSTURE (F074 H6): `harness policy check --run &lt;id&gt;` surfaces the trail's policy verdicts and the run's frozen policy ref — report-only visibility; enforcement stays inside the governed runner, unchanged. |
+| <code>propose-regression</code> | Derive a regression proposal from RECORDED FACTS only drift replay; a clean passing run refuses (proposals are data for human review — eval can never change governance). Required: --run &lt;id&gt;. |
+| <code>replay</code> | Replay as verification, not re-execution (F073 H5, §7/§43): re-derives the six frozen axes (contract/ tools/execution/context/policy/attempts) from the run's own records — no chat history, no conversation state — and compares. Per-axis equivalent \| drift \| unevaluated with the closed §7 drift kinds; a released workspace is the recorded fact, not drift. Subcommands: (--run &lt;id&gt;), list (--run &lt;id&gt;). |
+| <code>runtime</code> | EXPERIMENTAL. Bounded H7 maintenance runtime (F080, ADR-0103): a repository-local scheduler for a CLOSED registry of deterministic Amber-internal proposal jobs. Jobs may read the repository and append proposal/evidence/runtime records under .amber/harness/runtime/ only; they never run a target command, dispatch an agent, execute a workflow, or write an external system. The authority tuple is executesAnything=false, schedulesJobs=true, dispatchesAgents=false, writesExternalSystems=false. Schedules bind one committed human Decision, expire, and stay revocable; every wake/skip/result/stop is a typed event on the existing Harness ledger. The local daemon is lease/fence-guarded and self-signals only. Subcommands: jobs; schedule admit (--file) \| list \| show (--schedule) \| revoke (--schedule --decision |
+| <code>start</code> | Create a Run bound to an admitted contract. Optional: Required: --contract &lt;id&gt;. With --from-loop &lt;loopContractId&gt; (F066): admit the run from the loop's unconsumed approval in its ledger — the six receipt checks point at the real gate artifacts. Optional then: --file &lt;workflow-pack.json&gt;. |
+| <code>status</code> | Show one Run with --run &lt;id&gt;, or list runs. |
+| <code>tool</code> | Tool declarations (F067, connector ≠ permission): admit a tool whose capability pin resolves through the existing F052/F056 registries (admission grants zero authority), list/inspect admitted tools (Snapshot Hash, tombstones for corrupt records), or check — report-only — which verdict the existing policy surface would give a tool. Subcommands: admit check (--tool &lt;id&gt;). |
+| <code>trace</code> | The run's causal line in one view (F074 H6, §35): the run record, its state history, the admission pointers, and the ordered event trail — the same citations inspect --run composes, factored for reading. Required: --run &lt;id&gt;. |
+| <code>validate</code> | The ValidationReceipt (F073 H5, §16/§51C): a closed deterministic check set (policy/execution/tools/ context/evidence/attempts) over the run's own frozen records — pass \| fail \| not-run, with every not-run disclosing its reason. Optional F077 binding: committed eval-result and adds the eval pass\|fail leg plus eval-prefixed pointers to validation.completed. eval-set and runs the held-out leak check. Without the flag the F073 receipt stays byte-identical; validation never touches the run's state machine. Every receipt also freezes a release manifest (R-ET-5): the code/task/evaluator/provider/model versions it validated, with its sha256, re-derived on read. Subcommands: (--run &lt;id&gt; [--eval-result &lt;id&gt;@&lt;rev&gt;] list (--run &lt;id&gt;). |
 
 ## Command Details
 

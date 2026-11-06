@@ -3153,6 +3153,174 @@
 				"docs/adr/0101-run-unit-of-auditable-execution.md"
 			],
 			"updated": "2026-10-21"
+		},
+		{
+			"id": "F084",
+			"priority": 84,
+			"area": "governance",
+			"title": "Declared plan slices and a deterministic context freshness loop",
+			"user_visible_behavior": "Plan slices declare paths (<=5, <=2 subsystems), earlier-only dependencies, and a verify command, and the gate rejects an undeclared plan. Context pages report their derived ttl expiry at verify, generate ttl-expired refresh requests, and accept append-only knowledge feedback that decays effective confidence one level per contradiction.",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/planning.test.js tests/unit/context-freshness.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "4220 pass / 0 fail (full suite)",
+					"date": "2026-11-05",
+					"notes": "P1 plan slice contract + P2 context freshness loop; focused suites planning 69/69 and context-freshness 21/21; fix-then-revert proved both directions"
+				},
+				{
+					"command": "npm test",
+					"result": "4235/4236 pass; 1 unrelated retention-ledger lock flake, green on 3 consecutive solo runs",
+					"date": "2026-11-05",
+					"notes": "Second-round review fixes: slice-gate fail-open closed, status qualifier bypass closed, verify --loadout reads TTL, instant-based feedback window, shared revision instant, index states it reports source health only"
+				},
+				{
+					"command": "npm test",
+					"result": "4251 pass / 0 fail / 0 skipped (full suite, exit 0, 932.6s)",
+					"date": "2026-11-06",
+					"notes": "Third-round review fixes: bare Slice N: headers and Windows drive-relative paths rejected; prototype-safe page-id activity maps; append-order same-instant feedback window; refresh requests persist expiredAt on both triggers; Loadout pages carry derived assurance at every tier. Each fix proved by a failing assertion before implementation and a fix-then-revert red run; related suites 243/243; CLI smoke on a disposable target passed"
+				},
+				{
+					"command": "npm test",
+					"result": "4257 pass / 0 fail / 0 skipped (full suite, exit 0, 466.2s)",
+					"date": "2026-11-06",
+					"notes": "Stage-7 review round 2: drive designators preserved until path validation, misplaced slice metadata refused instead of terminal-exempt, equivalent relative path spellings normalized for subsystem classification, depends-on aliases removed. planning 88/88; reviewer spec probe 3 previous failures to 0; standards probe and real amber gate refuse paths: C:. Context behaviour unchanged"
+				},
+				{
+					"command": "npm test",
+					"result": "4258 pass / 0 fail / 0 skipped (full suite, exit 0, 503.3s)",
+					"date": "2026-11-06",
+					"notes": "Spec closure round-2 gap: separator-only depends-on values now parse to an empty token list and are refused; separator regressions added and fix-then-revert proved. planning 89/89; the reviewer 8-group closure probe is 8 PASS / 0 fail with real CLI refusals. Context behaviour untouched"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/planning.js",
+				"scripts/lib/core/context-freshness.js",
+				"scripts/lib/core/context-verify.js",
+				"scripts/lib/core/context-refresh.js",
+				"scripts/lib/core/context-loadout.js",
+				"scripts/lib/core/context-assurance.js",
+				"scripts/lib/core/context-stats.js",
+				"scripts/lib/context/action-registry.js",
+				"scripts/lib/context/index.js",
+				"scripts/lib/context/adapters/command.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/core/classification.js",
+				"tests/unit/planning.test.js",
+				"tests/unit/context-freshness.test.js",
+				"tests/unit/context-adapter.test.js",
+				"tests/unit/context-classification.test.js",
+				"docs/specs/plan-slice-contract.md",
+				"docs/specs/context-freshness-loop.md",
+				"docs/plans/F084-declared-slices-and-context-freshness.md",
+				"docs/adr/0109-declarations-carry-gates.md",
+				"docs/CLI_REFERENCE.md"
+			],
+			"updated": "2026-11-06",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-06",
+				"surfaces": ["docs/specs/plan-slice-contract.md", "docs/specs/context-freshness-loop.md"],
+				"owner": "script"
+			}
+		},
+		{
+			"id": "F085",
+			"priority": 85,
+			"area": "context",
+			"title": "Plan-declared required context enforced at loadout",
+			"user_visible_behavior": "A plan can declare required Context Pages per implement/review role with an explicit freshness floor. A loadout built for that plan and role either places every requirement in the required tier or fails closed with a stable code when a requirement is missing, unhealthy, superseded, time-expired, or older than the declared floor.",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/planning.test.js tests/unit/context-loadout.test.js tests/unit/context-freshness.test.js",
+				"node --test tests/unit/context-requirements.test.js tests/unit/context-dispatch.test.js",
+				"node --test tests/unit/command-registry-parity.test.js tests/unit/context-verify-refresh-stats.test.js",
+				"node --test tests/amber-cli.test.js",
+				"npm test",
+				"node scripts/verify-public-docs.js"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/planning.test.js tests/unit/context-loadout.test.js tests/unit/context-freshness.test.js",
+					"result": "193 pass / 0 fail",
+					"date": "2026-11-06",
+					"notes": "Slice 1-3: per-role freshness floor parsing (malformed or orphaned floors refuse, terminal plans exempt), strict loadout-boundary floor validation (empty or non-ISO declarations refuse as AMBER_E_INVALID_ARG), the pure required-context resolver unioned into the loadout required tier, and plan-declared pages kept through --since."
+				},
+				{
+					"command": "node --test tests/unit/context-requirements.test.js tests/unit/context-dispatch.test.js",
+					"result": "24 pass / 0 fail",
+					"date": "2026-11-06",
+					"notes": "Slice 2-4: all six refusal reasons, coverage normalization, --plan/--role usage errors, and --page pins still unioning. The resolver receives the floor as a validated instant; the shared parser owns the ISO-8601 grammar."
+				},
+				{
+					"command": "node --test tests/unit/command-registry-parity.test.js tests/unit/context-verify-refresh-stats.test.js",
+					"result": "28 pass / 0 fail",
+					"date": "2026-11-06",
+					"notes": "Slice 5: help text and the generated CLI reference stay in parity."
+				},
+				{
+					"command": "node --test tests/amber-cli.test.js",
+					"result": "31 pass / 0 fail",
+					"date": "2026-11-06",
+					"notes": "Real-CLI regression on a disposable target: `context load --plan --role --since --confirm` writes a loadout whose required tier still holds the declared page, and an invalid freshness floor exits AMBER_E_INVALID_ARG without writing a loadout."
+				},
+				{
+					"command": "npm test",
+					"result": "4299 tests, 0 failed, 0 skipped, exit 0",
+					"date": "2026-11-06",
+					"notes": "Full suite green on the revised fix-round tree, run serially after the public docs build; complete stdout parsed from start to end."
+				},
+				{
+					"command": "amber context load --plan docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md --role implement --confirm (disposable target)",
+					"result": "An uncovered surface exits AMBER_E_CONTEXT_LOADOUT_REQUIRED with reason missing and writes no loadout; a covering page lands in the required tier; a half-declared --plan/--role pair is AMBER_E_INVALID_ARG; --plan with --since keeps the declared page; a malformed floor refuses as AMBER_E_INVALID_ARG with no file.",
+					"date": "2026-11-06",
+					"notes": "Real CLI probes, not a unit shortcut. The rerun lives under .scratch/pstack-f085-closeout/fix-round1/probes/."
+				}
+			],
+			"notes": [
+				"A refused build writes no loadout file; remediation (re-ingest, refresh, retire) stays an explicit operator action.",
+				"An authority-layer denial of a declared page (classification ceiling, hard expiry, firewall) refuses as AMBER_E_CONTEXT_LOADOUT_REQUIRED with reason unhealthy and the actual denial fact in the detail; the page's stored health status is not mutated.",
+				"Plan-declared required pages stay in the required tier under --since; ordinary --page pins and other pages keep the delta behavior.",
+				"This repository's corpus has no pages for docs/specs surfaces, so this plan's own loadout refuses with reason missing until those specs are distilled into pages."
+			],
+			"paths": [
+				"scripts/lib/core/planning.js",
+				"scripts/lib/core/context-requirements.js",
+				"scripts/lib/core/context-loadout.js",
+				"scripts/lib/core/context-freshness.js",
+				"scripts/lib/core/error-catalog.js",
+				"scripts/lib/context/adapters/command.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/planning.test.js",
+				"tests/unit/context-requirements.test.js",
+				"tests/unit/context-loadout.test.js",
+				"tests/unit/context-dispatch.test.js",
+				"tests/unit/context-freshness.test.js",
+				"tests/unit/command-registry-parity.test.js",
+				"tests/amber-cli.test.js",
+				"docs/specs/plan-required-context.md",
+				"docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md",
+				"docs/adr/0110-required-context-is-loadout-enforced.md",
+				"docs/adr/0010-context-loadout.md",
+				"docs/CLI_REFERENCE.md",
+				"apps/docs/docs-manifest.json",
+				"apps/docs/docs/reference/cli/context.md",
+				"docs/knowledge-corpus/knowledge-base.output.json",
+				"docs/knowledge-corpus/knowledge-context-manifest.json"
+			],
+			"updated": "2026-11-06",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-06",
+				"surfaces": [],
+				"owner": "standard"
+			}
 		}
 	]
 }

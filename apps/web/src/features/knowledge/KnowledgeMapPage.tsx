@@ -20,27 +20,25 @@ import * as d3 from 'd3-force';
 import '@xyflow/react/dist/style.css';
 import type {
   GraphLayer,
-  KnowledgeAskResultDTO,
   KnowledgeEdgeDTO,
   KnowledgeGraphDTO,
   KnowledgeNode,
   RecentChangeItem,
   SemanticResultDTO,
-  NodeSummaryDTO,
   LLMStatusDTO,
 } from './types';
-import { MAX_CONTEXT_NODES, isDocumentNode } from '@/lib/knowledge-dto';
-import { LAYER_ORDER, buildKnowledgeAnalytics, type KnowledgeAnalytics } from './map-analytics';
+import { LAYER_ORDER } from './map-analytics';
 import {
-  FOUNDATION_NODE_ID,
-  anomalyKey,
-  buildRenderGraph,
-  codeNeighbourhoodOf,
-  owningFeaturesOf,
-  searchKnowledgeNodes,
-  type RenderGraph,
-  type RenderNode,
-} from './map-render-graph';
+  FoundationDetailPanel,
+  KnowledgeAnalyticsPanel,
+  KnowledgeAskPanel,
+} from './KnowledgeRailPanels';
+import { type RenderGraph, type RenderNode } from './map-render-graph';
+import {
+  buildKnowledgeBase,
+  buildKnowledgeInteraction,
+  buildKnowledgeRender,
+} from './knowledge-view';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { MarkdownMessage } from '@/components/code/MarkdownMessage';
@@ -888,403 +886,6 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
   );
 }
 
-function KnowledgeAskForm({
-  question,
-  onQuestionChange,
-  onSubmit,
-  focusNode,
-  isFetching,
-  nodeCount,
-}: {
-  question: string;
-  onQuestionChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  focusNode: KnowledgeNode | null;
-  isFetching: boolean;
-  nodeCount: number;
-}) {
-  const { t } = useI18n();
-  const overCap = !focusNode && nodeCount > MAX_CONTEXT_NODES;
-  return (
-    <form className="mt-3 space-y-3" onSubmit={onSubmit}>
-      <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-200">
-        {t('knowledge.ask.questionLabel')}
-        <textarea
-          value={question}
-          onChange={(event) => onQuestionChange(event.target.value)}
-          placeholder={t('knowledge.ask.placeholder')}
-          maxLength={2_000}
-          rows={4}
-          className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-obsidian-border dark:bg-obsidian-surface dark:text-slate-200"
-        />
-      </label>
-      <div className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-[10px] text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
-        {t('knowledge.ask.disclosure')}
-      </div>
-      <div
-        className={
-          overCap
-            ? 'text-[10px] text-amber-700 dark:text-amber-300'
-            : 'text-[10px] text-slate-500 dark:text-slate-400'
-        }
-      >
-        {overCap
-          ? t('knowledge.ask.overCap', { nodes: nodeCount, cap: MAX_CONTEXT_NODES })
-          : focusNode
-            ? t('knowledge.ask.focus', { id: focusNode.id })
-            : t('knowledge.ask.noFocus')}
-      </div>
-      <button
-        type="submit"
-        disabled={isFetching || question.trim().length === 0}
-        className="btn-secondary w-full text-xs disabled:opacity-50"
-      >
-        {isFetching ? t('knowledge.ask.loading') : t('knowledge.ask.submit')}
-      </button>
-    </form>
-  );
-}
-
-function KnowledgeAskStatus({
-  result,
-  errorCode,
-}: {
-  result: KnowledgeAskResultDTO | undefined;
-  errorCode: string | null;
-}) {
-  const { t } = useI18n();
-  const errorMessage = errorCode?.includes('context-overflow')
-    ? t('knowledge.ask.overflow')
-    : errorCode?.includes('uncitable-answer')
-      ? t('knowledge.ask.uncitable')
-      : errorCode?.includes('invalid-focus-node')
-        ? t('knowledge.ask.invalidFocus')
-        : errorCode
-          ? t('knowledge.ask.error')
-          : null;
-  if (result?.status === 'unavailable') {
-    return (
-      <div role="status" className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-        {result.reason === 'invalid-config'
-          ? t('knowledge.ask.invalidConfig')
-          : t('knowledge.ask.unavailable')}
-      </div>
-    );
-  }
-  return errorMessage ? (
-    <div role="alert" className="mt-3 text-xs text-red-700 dark:text-red-300">
-      {errorMessage}
-    </div>
-  ) : null;
-}
-
-function KnowledgeCitation({
-  citation,
-  supersederIds,
-  nodeById,
-  onSelect,
-}: {
-  citation: string;
-  supersederIds: string[];
-  nodeById: Map<string, KnowledgeNode>;
-  onSelect: (id: string) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <button
-        type="button"
-        onClick={() => onSelect(citation)}
-        data-testid={`knowledge-citation-${citation}`}
-        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-        title={nodeById.get(citation)?.title}
-      >
-        {citation}
-      </button>
-      {supersederIds.length > 0 && (
-        <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {t('knowledge.ask.superseded')}
-        </span>
-      )}
-      {supersederIds.map((supersederId) => (
-        <button
-          key={supersederId}
-          type="button"
-          onClick={() => onSelect(supersederId)}
-          className="text-[9px] text-blue-700 underline hover:text-blue-800 dark:text-blue-300"
-        >
-          {t('knowledge.ask.supersededBy', { id: supersederId })}
-        </button>
-      ))}
-    </span>
-  );
-}
-
-function KnowledgeAskAnswer({
-  result,
-  nodeById,
-  onSelect,
-}: {
-  result: Extract<KnowledgeAskResultDTO, { status: 'ok' }>;
-  nodeById: Map<string, KnowledgeNode>;
-  onSelect: (id: string) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="mt-4 space-y-3" data-testid="knowledge-ask-answer">
-      <div className="text-[10px] uppercase tracking-wide text-slate-400">
-        {t('knowledge.ask.result')}
-      </div>
-      <div className="rounded-md bg-slate-50 px-2.5 py-2 text-[10px] text-slate-600 dark:bg-obsidian-surface dark:text-slate-300">
-        <div data-testid="knowledge-ask-submitted-question">
-          {t('knowledge.ask.submittedQuestion', { question: result.request.question })}
-        </div>
-        <div data-testid="knowledge-ask-submitted-focus">
-          {result.request.focusNodeId
-            ? t('knowledge.ask.submittedFocus', { id: result.request.focusNodeId })
-            : t('knowledge.ask.submittedNoFocus')}
-        </div>
-      </div>
-      {result.answer.segments.map((segment, index) => (
-        <div
-          key={`${index}:${segment.text}`}
-          className="rounded-md border border-slate-200 p-2.5 dark:border-obsidian-border"
-        >
-          <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200">
-            {segment.text}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5" aria-label={t('knowledge.ask.citations')}>
-            {segment.citations.map((citation) => (
-              <KnowledgeCitation
-                key={citation}
-                citation={citation}
-                supersederIds={result.supersededBy[citation] ?? []}
-                nodeById={nodeById}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-      {result.omittedCount > 0 && (
-        <div role="status" className="text-[10px] text-amber-700 dark:text-amber-300">
-          {t('knowledge.ask.omitted', { count: result.omittedCount })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function KnowledgeAskPanel({
-  question,
-  onQuestionChange,
-  onSubmit,
-  focusNode,
-  result,
-  isFetching,
-  errorCode,
-  nodeById,
-  onSelect,
-  nodeCount,
-}: {
-  question: string;
-  onQuestionChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  focusNode: KnowledgeNode | null;
-  result: KnowledgeAskResultDTO | undefined;
-  isFetching: boolean;
-  errorCode: string | null;
-  nodeById: Map<string, KnowledgeNode>;
-  onSelect: (id: string) => void;
-  nodeCount: number;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="card p-4 max-h-[70vh] overflow-y-auto" data-testid="knowledge-ask-panel">
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-        {t('knowledge.ask.title')}
-      </h2>
-      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-        {t('knowledge.ask.description')}
-      </p>
-      <KnowledgeAskForm
-        question={question}
-        onQuestionChange={onQuestionChange}
-        onSubmit={onSubmit}
-        focusNode={focusNode}
-        isFetching={isFetching}
-        nodeCount={nodeCount}
-      />
-      <KnowledgeAskStatus result={result} errorCode={errorCode} />
-      {result?.status === 'ok' && (
-        <KnowledgeAskAnswer result={result} nodeById={nodeById} onSelect={onSelect} />
-      )}
-    </div>
-  );
-}
-
-function KnowledgeAnalyticsPanel({
-  analytics,
-  nodeById,
-  onSelect,
-}: {
-  analytics: KnowledgeAnalytics;
-  nodeById: Map<string, KnowledgeNode>;
-  onSelect: (id: string) => void;
-}) {
-  const { t } = useI18n();
-  const percent = (value: number) => Math.round(value * 1000) / 10;
-  return (
-    <div className="card p-4 max-h-[70vh] overflow-y-auto" data-testid="knowledge-analytics-report">
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-        {t('knowledge.analytics.title')}
-      </h2>
-      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-        {t('knowledge.analytics.description')}
-      </p>
-      <p className="mt-2 text-[11px] font-mono text-slate-600 dark:text-slate-300">
-        {t('knowledge.analytics.metrics', {
-          nodes: analytics.metrics.nodeCount,
-          edges: analytics.metrics.edgeCount,
-          communities: analytics.metrics.communityCount,
-          largest: percent(analytics.metrics.largestCommunityShare),
-          singleton: percent(analytics.metrics.weightedSingletonShare),
-        })}
-      </p>
-
-      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
-          {t('knowledge.analytics.godNodes')}
-        </div>
-        {analytics.godNodes.map((board) => (
-          <div key={board.layer} className="mb-2">
-            <div className="text-[10px] font-mono text-slate-400">
-              {board.layer} · p99 = {board.threshold}
-            </div>
-            <ul className="mt-1 space-y-1">
-              {board.entries.map((entry) => (
-                <li key={entry.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(entry.id)}
-                    className="w-full text-left rounded border border-slate-200 dark:border-obsidian-border px-2 py-1 hover:border-fuchsia-300 dark:hover:border-fuchsia-800 transition-colors"
-                  >
-                    <span className="font-mono text-[10px] text-slate-700 dark:text-slate-200 break-all">
-                      {entry.id}
-                    </span>
-                    <span className="ml-1.5 text-[10px] text-fuchsia-700 dark:text-fuchsia-300">
-                      {t('knowledge.analytics.godNodeRow', {
-                        degree: entry.degree,
-                        inDegree: entry.inDegree,
-                        outDegree: entry.outDegree,
-                      })}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
-          {t('knowledge.analytics.communities')}
-        </div>
-        <ul className="space-y-1">
-          {analytics.communities.slice(0, 8).map((community) => (
-            <li
-              key={community.id}
-              className="text-[10px] font-mono text-slate-600 dark:text-slate-300"
-            >
-              {t('knowledge.analytics.communityRow', {
-                id: community.id,
-                size: community.size,
-                sample: nodeById.get(community.members[0])?.title ?? community.members[0],
-              })}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
-          {t('knowledge.analytics.anomalies')}
-        </div>
-        <p className="text-[10px] text-slate-400 mb-1.5">{t('knowledge.analytics.neutral')}</p>
-        {analytics.anomalies.length === 0 ? (
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {t('knowledge.analytics.anomaliesEmpty')}
-          </div>
-        ) : (
-          <ul className="space-y-1">
-            {analytics.anomalies.map((mark) => (
-              <li key={`${mark.src}:${mark.verb}:${mark.dst}:${mark.reason}`}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(mark.src)}
-                  className="w-full text-left rounded border border-violet-200 dark:border-violet-900/60 px-2 py-1 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors"
-                >
-                  <div className="font-mono text-[10px] text-slate-700 dark:text-slate-200 break-all">
-                    {mark.src} -[{mark.verb}]→ {mark.dst}
-                  </div>
-                  <div className="text-[9px] text-violet-700 dark:text-violet-300">
-                    {t(`knowledge.analytics.reason.${mark.reason}` as I18nKey)} · {mark.detail}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function FoundationDetailPanel({
-  memberIds,
-  nodeById,
-  inDegreeP99,
-  onSelect,
-}: {
-  memberIds: string[];
-  nodeById: Map<string, KnowledgeNode>;
-  inDegreeP99: number;
-  onSelect: (id: string) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className="card p-4 max-h-[70vh] overflow-y-auto" data-testid="foundation-detail-panel">
-      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200">
-        <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-        {t('knowledge.kind.foundation')}
-      </span>
-      <h2 className="mt-2 text-sm font-semibold text-slate-900 dark:text-white leading-snug">
-        {t('knowledge.foundation.members', { count: memberIds.length })}
-      </h2>
-      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-        {t('knowledge.foundation.description')} (p99 = {inDegreeP99})
-      </p>
-      <ul className="mt-3 space-y-1">
-        {memberIds.map((memberId) => (
-          <li key={memberId}>
-            <button
-              type="button"
-              data-testid={`foundation-member-${memberId}`}
-              onClick={() => onSelect(memberId)}
-              className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-violet-300 dark:hover:border-violet-800 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors"
-            >
-              <span className="font-mono text-[10px] text-slate-700 dark:text-slate-200 break-all">
-                {nodeById.get(memberId)?.sourcePath ?? memberId}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 export function KnowledgeMapPage() {
   const [semanticRequested, setSemanticRequested] = useState(false);
   const {
@@ -1449,69 +1050,50 @@ function KnowledgeMapGraph({
   }, []);
   const collapseAll = useCallback(() => setExpandedFeatures(new Set()), []);
 
-  // Merge inferred edges from the semantic layer (client-side only; never feeds back into DTO)
-  const mergedDto = useMemo((): KnowledgeGraphDTO => {
-    if (!semanticResult?.available || !semanticResult.inferredEdges.length) return dto;
-    return { ...dto, edges: [...dto.edges, ...semanticResult.inferredEdges] };
-  }, [dto, semanticResult]);
-
-  // Read-time analytics over the deterministic graph (F060) — never persisted.
-  const analytics: KnowledgeAnalytics = useMemo(
-    () => buildKnowledgeAnalytics({ nodes: dto.nodes, edges: dto.edges }),
-    [dto],
-  );
-  const anomalousKeys = useMemo(
-    () => new Set(analytics.anomalies.map((mark) => anomalyKey(mark))),
-    [analytics],
-  );
-  const godNodeIds = useMemo(
-    () => new Set(analytics.godNodes.flatMap((board) => board.entries.map((entry) => entry.id))),
-    [analytics],
-  );
+  // Every derived value below comes from knowledge-view.ts: one pure input
+  // shape in, one view model out. Three stages, so a node click does not
+  // rebuild the analytics or the folded render graph.
+  const base = useMemo(() => buildKnowledgeBase(dto, semanticResult), [dto, semanticResult]);
+  const {
+    mergedDto,
+    analytics,
+    godNodeIds,
+    nodeById,
+    anchorsCountByFeature,
+    summaryByNodeId,
+    documentNodeCount,
+    kindLayer,
+    driftNodeIds,
+  } = base;
 
   // Folded-by-default render graph (ticket #264): document scale plus the
-  // expanded code neighbourhoods; shared-foundation aggregation lives here in
-  // the renderer only.
-  const renderGraph = useMemo(
-    () =>
-      buildRenderGraph(mergedDto, {
-        expandedFeatures,
-        aggregateFoundation,
-        foundationMembers: analytics.codeAggregation.memberIds,
-        anomalousKeys,
-      }),
-    [mergedDto, expandedFeatures, aggregateFoundation, analytics, anomalousKeys],
+  // expanded code neighbourhoods; shared-foundation aggregation lives in the
+  // renderer only.
+  const { renderGraph, kindCounts } = useMemo(
+    () => buildKnowledgeRender(base, { expandedFeatures, aggregateFoundation }),
+    [base, expandedFeatures, aggregateFoundation],
   );
 
   const layout = useMemo(() => computeLayout(renderGraph, layoutMode), [renderGraph, layoutMode]);
 
-  const nodeById = useMemo(() => new Map(mergedDto.nodes.map((n) => [n.id, n])), [mergedDto.nodes]);
-
-  const anchorsCountByFeature = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const edge of mergedDto.edges) {
-      if (edge.verb !== 'anchors') continue;
-      counts.set(edge.src, (counts.get(edge.src) ?? 0) + 1);
-    }
-    return counts;
-  }, [mergedDto.edges]);
-
-  const summaryByNodeId = useMemo((): Map<string, NodeSummaryDTO> => {
-    if (!semanticResult?.nodeSummaries.length) return new Map();
-    return new Map(semanticResult.nodeSummaries.map((s) => [s.nodeId, s]));
-  }, [semanticResult]);
-
-  const selected = useMemo(
-    () => (selectedId ? (nodeById.get(selectedId) ?? null) : null),
-    [nodeById, selectedId],
-  );
-  const selectedFoundation = selectedId === FOUNDATION_NODE_ID;
-
-  // The QA/semantic ceiling is document-scale: Code Nodes never enter the
-  // LLM layer, so the pre-emptive hint counts documents only.
-  const documentNodeCount = useMemo(
-    () => mergedDto.nodes.filter(isDocumentNode).length,
-    [mergedDto.nodes],
+  const {
+    selected,
+    selectedFoundation,
+    searchHits,
+    foldedSearchHits,
+    visibleIds,
+    visibleCount,
+    selectedDegree,
+    featureCodeSummary,
+  } = useMemo(
+    () =>
+      buildKnowledgeInteraction(base, renderGraph, {
+        selectedId,
+        search,
+        kindFilter,
+        showDriftOnly,
+      }),
+    [base, renderGraph, selectedId, search, kindFilter, showDriftOnly],
   );
 
   const submitQuestion = (event: FormEvent<HTMLFormElement>) => {
@@ -1533,26 +1115,6 @@ function KnowledgeMapGraph({
     setAskInput(nextInput);
   };
 
-  // Search pierces the fold (ticket #265): the domain includes folded code
-  // nodes by path and exported symbol name.
-  const searchHits = useMemo(() => {
-    const q = search.trim();
-    if (!q) return null;
-    return searchKnowledgeNodes(mergedDto.nodes, q);
-  }, [mergedDto.nodes, search]);
-
-  // Folded code hits surface as a pierce list; selecting one auto-expands
-  // the owning feature neighbourhood and selects the node.
-  const foldedSearchHits = useMemo(() => {
-    if (searchHits === null) return [];
-    const rendered = new Set(renderGraph.nodes.map((n) => n.id));
-    return [...searchHits]
-      .filter((id) => id.startsWith('code:') && !rendered.has(id))
-      .sort()
-      .slice(0, 8)
-      .map((id) => ({ id, owners: owningFeaturesOf(mergedDto, id) }));
-  }, [searchHits, renderGraph.nodes, mergedDto]);
-
   const pierceTo = useCallback(
     (codeId: string, owners: string[]) => {
       if (owners.length > 0) {
@@ -1567,41 +1129,6 @@ function KnowledgeMapGraph({
     [setSelectedId],
   );
 
-  const kindCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const n of renderGraph.nodes) {
-      if (n.kind === 'foundation') continue;
-      counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1);
-    }
-    return counts;
-  }, [renderGraph.nodes]);
-
-  const driftNodeIds = useMemo(
-    () => new Set(mergedDto.drift.map((d) => d.nodeId)),
-    [mergedDto.drift],
-  );
-
-  const visibleIds = useMemo(() => {
-    if (kindFilter.size === 0 && searchHits === null && !showDriftOnly) return null;
-    const ids = new Set<string>();
-    for (const n of renderGraph.nodes) {
-      const effectiveKind = n.kind === 'foundation' ? 'code' : n.kind;
-      if (kindFilter.size > 0 && !kindFilter.has(effectiveKind)) continue;
-      if (searchHits !== null && !searchHits.has(n.id)) continue;
-      if (showDriftOnly && n.kind !== 'foundation' && !driftNodeIds.has(n.id)) continue;
-      ids.add(n.id);
-    }
-    return ids;
-  }, [renderGraph.nodes, kindFilter, searchHits, showDriftOnly, driftNodeIds]);
-
-  const visibleCount = visibleIds === null ? renderGraph.nodes.length : visibleIds.size;
-
-  const kindLayer = useMemo(() => {
-    const map = new Map<string, GraphLayer>();
-    for (const n of mergedDto.nodes) if (!map.has(n.kind)) map.set(n.kind, n.layer);
-    return map;
-  }, [mergedDto.nodes]);
-
   const relatedOf = useCallback(
     (id: string) => ({
       outgoing: mergedDto.edges.filter((e) => e.src === id),
@@ -1609,35 +1136,6 @@ function KnowledgeMapGraph({
     }),
     [mergedDto.edges],
   );
-
-  // Feature detail annotation: where its anchored code sits (communities and
-  // high fan-in members) — analytics stay visible while folded.
-  const featureCodeSummary = useMemo(() => {
-    if (!selected || selected.kind !== 'feature') return null;
-    const neighbourhood = codeNeighbourhoodOf(mergedDto, selected.id);
-    if (neighbourhood.size === 0) return null;
-    const communities = [
-      ...new Set(
-        [...neighbourhood]
-          .map((id) => analytics.communityOf[id])
-          .filter((id): id is string => id !== undefined),
-      ),
-    ].sort();
-    const hubs = analytics.codeAggregation.memberIds.filter((id) => neighbourhood.has(id)).length;
-    return { communities, hubs, size: neighbourhood.size };
-  }, [selected, mergedDto, analytics]);
-
-  const selectedDegree = useMemo(() => {
-    if (!selected) return null;
-    let inDegree = 0;
-    let outDegree = 0;
-    for (const edge of mergedDto.edges) {
-      if (edge.origin !== 'deterministic') continue;
-      if (edge.src === selected.id) outDegree += 1;
-      if (edge.dst === selected.id) inDegree += 1;
-    }
-    return { inDegree, outDegree };
-  }, [selected, mergedDto.edges]);
 
   const semanticBanner = useMemo(() => {
     if (semanticStatusError) {
