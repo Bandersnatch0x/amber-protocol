@@ -5,9 +5,10 @@
 // question per surface — "which accepted page covers it, and may that page be
 // loaded?" — and refuses with one of six closed reasons otherwise.
 //
-// Pure: no disk access, no clock reads. The caller passes the page entries it
-// already collected and the instant the build runs at, so the resolution is
-// testable and the loadout build owns every side effect.
+// Pure: no disk access. The caller passes the page entries it already
+// collected and the instant the build runs at (the default clock is read only
+// when `now` is omitted), so the resolution is testable and the loadout build
+// owns every side effect.
 
 const { stripRange } = require("./context-sources");
 
@@ -24,7 +25,8 @@ const REQUIRED_CONTEXT_REASONS = Object.freeze([
 // Coverage is a source-path match (ADR-0110): exact after normalization, no
 // globs, no prefixes, no fuzzy matching. Normalization folds the spellings a
 // plan and a page legitimately disagree on — `./`, backslashes, quoting, and
-// case — and nothing else.
+// case — and strips a source citation's line range through the shared
+// source-path helper, so a span-cited page covers its whole surface.
 function normalizeSurfacePath(value) {
 	let text = stripRange(String(value == null ? "" : value)).trim();
 	text = text.replace(/^["'`]|["'`]$/g, "");
@@ -61,7 +63,9 @@ function describe(pageIds) {
  * @param {Array} input.pageEntries  Entries from the loadout's page collection.
  * @param {string[]} input.requiredPaths Declared knowledge surfaces.
  * @param {string} [input.role] Role the surfaces belong to (implement|review).
- * @param {string|null} [input.freshnessFloor] Absolute ISO-8601 floor or null.
+ * @param {number|null} [input.freshnessFloor] Validated floor instant (epoch ms)
+ *   or null. The loadout parses the plan's declaration with the shared
+ *   parseFreshnessFloor owner and never passes an unvalidated string.
  * @param {Date|string} [input.now]
  * @returns {{ pageIds: string[], findings: Array }}
  */
@@ -75,10 +79,8 @@ function resolveRequiredContext({
 	const entries = Array.isArray(pageEntries) ? pageEntries : [];
 	const paths = Array.isArray(requiredPaths) ? requiredPaths : [];
 	const instant = now instanceof Date ? now.getTime() : Date.parse(now);
-	const floorInstant =
-		typeof freshnessFloor === "string" && freshnessFloor.trim() !== ""
-			? Date.parse(freshnessFloor)
-			: null;
+	const floorInstant = freshnessFloor;
+	const floorLabel = floorInstant === null ? null : new Date(floorInstant).toISOString();
 	const pageIds = [];
 	const surfacesByPageId = new Map();
 	const findings = [];
@@ -159,7 +161,7 @@ function resolveRequiredContext({
 			);
 			continue;
 		}
-		if (floorInstant !== null && Number.isFinite(floorInstant)) {
+		if (floorInstant !== null) {
 			const revision = page.revisionAt ? Date.parse(page.revisionAt) : NaN;
 			// A page with no revision instant cannot prove it meets an absolute
 			// floor, and "cannot prove" fails closed like every other requirement.
@@ -169,7 +171,7 @@ function resolveRequiredContext({
 						"stale-floor",
 						surface,
 						role,
-						`page ${page.pageId} covering required surface ${surface} has revision ${page.revisionAt || "unknown"}, older than the ${role || "role"} freshness floor ${freshnessFloor}`,
+						`page ${page.pageId} covering required surface ${surface} has revision ${page.revisionAt || "unknown"}, older than the ${role || "role"} freshness floor ${floorLabel}`,
 					),
 				);
 				continue;

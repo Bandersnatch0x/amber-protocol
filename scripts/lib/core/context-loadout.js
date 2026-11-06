@@ -63,16 +63,18 @@ const {
 	readKnowledgeGraph,
 } = require("./context-knowledge");
 const { compileSchema } = require("./schema-contract");
-// F085: plan-declared required context. The resolver is pure; the plan
-// reader and the floor parser are the only plan-side coupling.
+// F085: plan-declared required context. The resolver is pure; the plan reader
+// and the shared floor parser are the only plan-side coupling.
 const { resolveRequiredContext } = require("./context-requirements");
-const { readRoleContextRequirements } = require("./planning");
+const {
+	CONTEXT_MANIFEST_ROLES,
+	readRoleContextRequirements,
+	parseFreshnessFloor,
+} = require("./planning");
 // F071 H3b: the ONE firewall verdict — the build never re-implements it.
 const { checkContextAccess } = require("../harness/context-core");
 
 const SCHEMA_VERSION = "1.0.0";
-// The two roles a plan's Context manifests section declares.
-const PLAN_ROLES = Object.freeze(["implement", "review"]);
 const ROUTE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/; // kebab-case, matching pageId
 const FEATURE_RE = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -243,12 +245,12 @@ function loadBuildConfig(targetRoot, opts) {
 			],
 		};
 	}
-	if (roleDeclared && !PLAN_ROLES.includes(opts.role)) {
+	if (roleDeclared && !CONTEXT_MANIFEST_ROLES.includes(opts.role)) {
 		return {
 			errors: [
 				{
 					code: "AMBER_E_INVALID_ARG",
-					detail: `--role must be one of ${PLAN_ROLES.join("|")} (got ${JSON.stringify(opts.role)})`,
+					detail: `--role must be one of ${CONTEXT_MANIFEST_ROLES.join("|")} (got ${JSON.stringify(opts.role)})`,
 				},
 			],
 		};
@@ -309,6 +311,7 @@ function loadBuildConfig(targetRoot, opts) {
 	// path that escapes the target is refused here for the same reason every
 	// other target-relative read is.
 	let planRequirements = null;
+	let freshnessFloor = null;
 	if (planDeclared) {
 		let planPath;
 		try {
@@ -338,6 +341,23 @@ function loadBuildConfig(targetRoot, opts) {
 			surfaces: [],
 			freshnessFloor: null,
 		};
+		// F085: a present-but-malformed or empty floor is a declaration error, not
+		// "no floor". The shared parser owns the ISO-8601 grammar; the loadout
+		// never re-interprets the raw string.
+		const rawFloor = planRequirements.freshnessFloor;
+		if (rawFloor !== null) {
+			freshnessFloor = parseFreshnessFloor(rawFloor);
+			if (freshnessFloor === null) {
+				return {
+					errors: [
+						{
+							code: "AMBER_E_INVALID_ARG",
+							detail: `plan ${opts.plan} declares a freshness floor for role ${opts.role} that is not an ISO-8601 date or instant: ${rawFloor === "" ? "(empty)" : rawFloor}`,
+						},
+					],
+				};
+			}
+		}
 	}
 	const requiredArtifacts = collectRequiredArtifacts(targetRoot, route);
 	if (requiredArtifacts.errors.length > 0) return { errors: requiredArtifacts.errors };
@@ -417,7 +437,7 @@ function loadBuildConfig(targetRoot, opts) {
 		// resolver needs the collected entries). Null means the build is unbound.
 		planRole: roleDeclared ? opts.role : null,
 		planSurfaces: planRequirements ? planRequirements.surfaces : [],
-		freshnessFloor: planRequirements ? planRequirements.freshnessFloor : null,
+		freshnessFloor,
 		knowledgeKinds: [...new Set(knowledgeKinds)].sort(),
 		requiredArtifacts,
 		maxClassification,
@@ -792,14 +812,20 @@ function selectPageTiers(pageEntries, config, now = new Date()) {
 	return state;
 }
 
-function applyDeltaSelection(selection, latestAtByPage, since) {
+// D6 delta filter, with the F085 exception: a page the plan declared as
+// required is never omitted by --since, because the required tier is the
+// feature's guarantee. Ordinary --page pins and priority/optional pages keep
+// plain delta semantics.
+function applyDeltaSelection(selection, latestAtByPage, since, declaredPageIds = null) {
 	let required = selection.requiredPageIds;
 	let priority = selection.priorityPageIds;
 	let optional = selection.optionalPageIds;
 	let pages = selection.pagesMap;
 	if (since) {
 		const inDelta = (pageId) => Boolean(latestAtByPage[pageId] && latestAtByPage[pageId] >= since);
-		required = required.filter(inDelta);
+		const keepRequired = (pageId) =>
+			inDelta(pageId) || Boolean(declaredPageIds && declaredPageIds.has(pageId));
+		required = required.filter(keepRequired);
 		priority = priority.filter(inDelta);
 		optional = optional.filter(inDelta);
 		pages = {};
@@ -959,7 +985,7 @@ function previewLoadout(targetRoot, opts = {}) {
 	// (classification ceiling, hard expiry, firewall) can still drop a page the
 	// plan declared. A requirement the loadout omits is the failure this feature
 	// exists to prevent, so re-check every resolved page against the required
-	// tier and refuse on the first one that did not survive.
+	// tier and report each one that did not survive.
 	// Only plan-declared pages are re-checked: `--page` pins keep their existing
 	// drop-on-denial semantics (a deliberate, tested authority behavior).
 	const missingRequired = [...declaredSurfaces.keys()].filter(
@@ -984,7 +1010,13 @@ function previewLoadout(targetRoot, opts = {}) {
 	}
 
 	// 9. Delta-since semantics (D6): emit only pages added/re-hashed after `since`.
-	const delta = applyDeltaSelection(selection, pageState.latestAtByPage, config.since);
+	//    Plan-declared required pages are the F085 exception and always stay.
+	const delta = applyDeltaSelection(
+		selection,
+		pageState.latestAtByPage,
+		config.since,
+		declaredSurfaces,
+	);
 	const loadout = assembleLoadout(config, pageState, selection, delta);
 	const shapeErrors = validateLoadoutShape(loadout);
 	if (shapeErrors.length > 0) {

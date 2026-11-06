@@ -9,6 +9,9 @@ const {
 	normalizeSurfacePath,
 	resolveRequiredContext,
 } = require("../../scripts/lib/core/context-requirements");
+const { parseFreshnessFloor } = require("../../scripts/lib/core/planning");
+
+const FLOOR = parseFreshnessFloor("2026-10-01");
 
 // Minimal page entry shape: only the fields resolution reads.
 function entry(pageId, refs, extra = {}) {
@@ -156,7 +159,7 @@ describe("resolveRequiredContext — the six closed reasons", () => {
 		const result = resolve(
 			[entry("page-a", ["docs/a.md"], { revisionAt: "2026-09-30T23:59:59.000Z" })],
 			["docs/a.md"],
-			{ role: "review", freshnessFloor: "2026-10-01" },
+			{ role: "review", freshnessFloor: FLOOR },
 		);
 		assert.deepEqual(result.pageIds, []);
 		assert.equal(result.findings[0].reason, "stale-floor");
@@ -167,7 +170,7 @@ describe("resolveRequiredContext — the six closed reasons", () => {
 		const result = resolve(
 			[entry("page-a", ["docs/a.md"], { revisionAt: "2026-10-01T00:00:00.000Z" })],
 			["docs/a.md"],
-			{ freshnessFloor: "2026-10-01" },
+			{ freshnessFloor: FLOOR },
 		);
 		assert.deepEqual(result.findings, []);
 		assert.deepEqual(result.pageIds, ["page-a"]);

@@ -96,6 +96,9 @@ embedded hashes ARE the accounting set). The host agent compares against what it
 context and skips re-loading. Optional `--since <timestamp>` emits only pages added or re-hashed
 after that point — the warm-continuation delta. This is the mechanical analog of Anthropic's
 context-editing eviction: Amber records what should be skipped rather than deciding it itself.
+[ADR-0110](0110-required-context-is-loadout-enforced.md) decision 6 adds one narrow exception: a
+plan-declared required page stays in the required tier under `--since`, because a required tier
+never omits a declared surface. Ordinary pages and `--page` pins keep the delta behavior above.
 
 ### D7 — Validation timing: hybrid (T7)
 

@@ -2743,9 +2743,10 @@ node scripts/amber.js context load --target . --route feature-standard --feature
 node scripts/amber.js context load --target . --route feature-standard --subject worker --purpose review
 # Plan-bound load (F085): every knowledge surface the plan's `## Context manifests` declares for
 # the role is required — exactly one current, healthy page must cover it, at or after the role's
-# optional `freshness:` floor. Any failure exits AMBER_E_CONTEXT_LOADOUT_REQUIRED (surface, role,
-# and reason) and writes no file.
-node scripts/amber.js context load --target . --route feature-standard --plan docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md --role implement
+# optional `freshness:` floor. A page that fails exits AMBER_E_CONTEXT_LOADOUT_REQUIRED (surface,
+# role, and reason) and writes no file; a malformed or empty floor is AMBER_E_INVALID_ARG, and
+# exceeding the word budget keeps AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW.
+node scripts/amber.js context load --target . --route feature-standard --plan docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md --role implement --confirm
 node scripts/amber.js context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
 
 # Rebuildable projections and deterministic quality checks

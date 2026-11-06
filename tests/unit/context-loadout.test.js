@@ -1451,7 +1451,8 @@ describe("buildLoadout — plan-declared required context (F085)", () => {
 		const lines = ["# Plan", "", "## Context manifests", ""];
 		if (implement !== undefined) {
 			lines.push(`- implement: ${implement}`);
-			if (implementFloor) lines.push(`  - freshness: ${implementFloor}`);
+			// `!== undefined` so an explicitly empty floor stays expressible.
+			if (implementFloor !== undefined) lines.push(`  - freshness: ${implementFloor}`);
 		}
 		if (review !== undefined) lines.push(`- review: ${review}`);
 		lines.push("");
@@ -1695,6 +1696,129 @@ describe("buildLoadout — plan-declared required context (F085)", () => {
 			assert.match(result.errors[0].detail, /classification restricted exceeds/);
 		} finally {
 			cleanup(root);
+		}
+	});
+
+	it("keeps plan-declared required pages through --since and leaves ordinary pins in the delta", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { at: "2026-10-15T00:00:00.000Z" });
+			writeMutable(root, "src/old.js", "old\n");
+			writePage(root, freshPage(root, { pageId: "old-page", ref: "src/old.js" }));
+			writeMutable(root, "src/new.js", "new\n");
+			writePage(root, freshPage(root, { pageId: "new-page", ref: "src/new.js" }));
+			regenerateIndex(root);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "surface-page", at: "2026-10-15T00:00:00.000Z" },
+				{ kind: "page-written", pageId: "old-page", at: "2026-08-01T00:00:00.000Z" },
+				{ kind: "page-written", pageId: "new-page", at: "2026-11-02T00:00:00.000Z" },
+			]);
+			writePlan(root, { implement: SURFACE });
+			const since = "2026-11-01T00:00:00.000Z";
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+				// The surface page is also pinned here: a plan-declared page must
+				// survive even when it is requested through --page, while the
+				// ordinary pin predates --since and keeps plain delta semantics.
+				required: ["surface-page", "old-page"],
+				since,
+			});
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.equal(result.loadout.deltaSince, since);
+			assert.deepEqual(result.loadout.tiers.required, ["surface-page"]);
+			assert.deepEqual(result.loadout.tiers.priority, ["new-page"]);
+			assert.deepEqual(result.loadout.tiers.optional, []);
+			assert.deepEqual(
+				result.loadout.references.map((reference) => reference.pageId),
+				["new-page", "surface-page"],
+			);
+			assert.equal(result.loadout.pages["old-page"], undefined);
+			const check = verifyLoadoutFile(root, path.relative(root, result.loadoutPath));
+			assert.equal(check.ok, true, JSON.stringify(check.findings));
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses a present-but-invalid freshness floor before writing", () => {
+		for (const floor of ["", "   ", "next week", "2026/10/01"]) {
+			const root = makeTarget();
+			try {
+				seedSurfacePage(root, { at: "2026-01-01T00:00:00.000Z" });
+				writePlan(root, { implement: SURFACE, implementFloor: floor });
+				const result = buildLoadout(root, {
+					route: "bugfix-quick",
+					plan: PLAN_PATH,
+					role: "implement",
+				});
+				const label = JSON.stringify(floor);
+				assert.equal(result.loadout, null, label);
+				assert.equal(result.loadoutPath, null, label);
+				assert.equal(result.errors[0].code, "AMBER_E_INVALID_ARG", label);
+				assert.match(result.errors[0].detail, /implement/, label);
+				assert.match(result.errors[0].detail, /docs\/plans\/F085\.md/, label);
+				assert.match(result.errors[0].detail, /freshness/i, label);
+				assert.equal(
+					!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0,
+					true,
+					`no loadout file may be written for ${label}`,
+				);
+			} finally {
+				cleanup(root);
+			}
+		}
+	});
+
+	it("refuses an invalid floor on a terminal plan too", () => {
+		const root = makeTarget();
+		try {
+			seedSurfacePage(root, { at: "2026-01-01T00:00:00.000Z" });
+			writeMutable(
+				root,
+				PLAN_PATH,
+				[
+					"# Plan",
+					"",
+					"Status: accepted",
+					"",
+					"## Context manifests",
+					"",
+					`- implement: ${SURFACE}`,
+					"  - freshness: next week",
+					"",
+				].join("\n"),
+			);
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				plan: PLAN_PATH,
+				role: "implement",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_INVALID_ARG");
+			assert.match(result.errors[0].detail, /freshness/i);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("accepts a valid ISO date and an offset-instant floor", () => {
+		for (const floor of ["2026-10-01", "2026-10-01T08:00:00+08:00"]) {
+			const root = makeTarget();
+			try {
+				seedSurfacePage(root, { at: "2026-10-15T00:00:00.000Z" });
+				writePlan(root, { implement: SURFACE, implementFloor: floor });
+				const result = buildLoadout(root, {
+					route: "bugfix-quick",
+					plan: PLAN_PATH,
+					role: "implement",
+				});
+				assert.equal(result.errors.length, 0, `${floor}: ${JSON.stringify(result.errors)}`);
+				assert.deepEqual(result.loadout.tiers.required, ["surface-page"]);
+			} finally {
+				cleanup(root);
+			}
 		}
 	});
 });

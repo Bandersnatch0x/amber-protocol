@@ -20,6 +20,7 @@ const {
 	sliceSubsystemOf,
 	sliceContractApplies,
 	parseContextManifests,
+	readRoleContextRequirements,
 } = require("../../scripts/lib/core/planning");
 
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
@@ -495,7 +496,12 @@ test("parseContextManifests exposes an optional freshness floor per role", () =>
 });
 
 test("validatePlanContent accepts an ISO-8601 freshness floor on a gated plan", () => {
-	for (const floor of ["2026-10-01", "2026-10-01T00:00:00Z", "2026-10-01T08:00:00+08:00"]) {
+	for (const floor of [
+		"2026-10-01",
+		"2026-10-01T00:00:00Z",
+		"2026-10-01T08:00:00+08:00",
+		"2028-02-29",
+	]) {
 		const result = validatePlanContent({
 			content: validPlanContent({
 				contextManifests: `- implement: docs/specs/contract.md\n  - freshness: ${floor}\n- review: docs/adr/0001.md`,
@@ -507,7 +513,7 @@ test("validatePlanContent accepts an ISO-8601 freshness floor on a gated plan", 
 });
 
 test("validatePlanContent rejects a malformed freshness floor and names the role", () => {
-	for (const floor of ["2026-13-01", "next week", "30d", ""]) {
+	for (const floor of ["2026-13-01", "2026-02-30", "2026-04-31", "next week", "30d", ""]) {
 		const result = validatePlanContent({
 			content: validPlanContent({
 				contextManifests: `- implement: docs/specs/contract.md\n  - freshness: ${floor}\n- review: docs/adr/0001.md`,
@@ -548,6 +554,29 @@ test("terminal plans keep malformed or orphaned freshness declarations readable"
 	}).replace("Feature:", "Status: accepted\n\nFeature:");
 	const result = validatePlanContent({ content, resolveFeature: foundResolver });
 	assert.deepEqual(result.errors, []);
+});
+
+test("readRoleContextRequirements preserves absence, emptiness, and malformed floors", () => {
+	const read = (contextManifests) =>
+		readRoleContextRequirements(validPlanContent({ contextManifests }), "implement");
+	const flat = read("- implement: docs/specs/contract.md\n- review: docs/adr/0001.md");
+	assert.equal(flat.freshnessFloor, null);
+	assert.deepEqual(flat.surfaces, ["docs/specs/contract.md"]);
+
+	const empty = read(
+		"- implement: docs/specs/contract.md\n  - freshness:\n- review: docs/adr/0001.md",
+	);
+	assert.equal(empty.freshnessFloor, "");
+
+	const malformed = read(
+		"- implement: docs/specs/contract.md\n  - freshness: next week\n- review: docs/adr/0001.md",
+	);
+	assert.equal(malformed.freshnessFloor, "next week");
+
+	const valid = read(
+		"- implement: docs/specs/contract.md\n  - freshness: 2026-10-01\n- review: docs/adr/0001.md",
+	);
+	assert.equal(valid.freshnessFloor, "2026-10-01");
 });
 
 // ---- buildReviewResult: pure review assembly ----

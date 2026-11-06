@@ -34,13 +34,21 @@ since changed.
 2. **A role may state a freshness floor.** `freshness: <date|instant>` is the oldest acceptable
    revision instant for the role's required pages. It is an absolute instant so the same
    declaration reads the same forever. A malformed floor is a gate failure, never "no floor".
+   The loadout validates the declaration at its own boundary with the same ISO-8601 parser the
+   gate uses. A present but empty or unparseable value refuses with `AMBER_E_INVALID_ARG` naming
+   the plan, the role, and the value, before anything is written. That applies to a terminal plan
+   too: the gate's terminal-plan exemption covers the gate, not an unvalidated load.
 
 3. **Every requirement resolves to exactly one current, healthy page covering its path.** Absent
    coverage refuses as `missing`; more than one current page refuses as `ambiguous`; a stale,
    tampered, obsolete, or orphaned page refuses as `unhealthy`; a superseded page refuses as
    `superseded`; a page past its TTL refuses as `time-expired`; a page older than the declared
    floor refuses as `stale-floor`. Every refusal carries the closed code
-   `AMBER_E_CONTEXT_LOADOUT_REQUIRED` and names the surface and role.
+   `AMBER_E_CONTEXT_LOADOUT_REQUIRED` and names the surface and role. After tier selection the
+   build re-checks each resolved page against the required tier, so the authority layers
+   (classification ceiling, hard expiry, firewall) cannot silently drop a declared page. An
+   authority denial is reported as `unhealthy` with the actual denial fact in the detail; the
+   page's stored health status is not mutated and the closed reason set is unchanged.
 
 4. **A refused build writes no loadout file.** Partial required tiers are the failure mode this
    feature exists to remove, so the build refuses before persisting rather than writing a file
@@ -48,6 +56,13 @@ since changed.
 
 5. **The build repairs nothing.** It does not re-ingest, refresh, retire, or silently demote a
    requirement. Remediation stays an explicit operator action.
+
+6. **`--since` does not remove a plan-declared required page.** This is the narrow F085 exception
+   to ADR-0010 D6. The delta filter keeps its meaning for ordinary pages and `--page` pins, but a
+   plan-declared required page stays in the required tier even when its revision predates
+   `--since`, because decision 4 forbids a required tier with a hole. Coverage matching strips a
+   source citation's line range through the shared source-path helper, so a span-cited page covers
+   its whole surface.
 
 ## Consequences
 

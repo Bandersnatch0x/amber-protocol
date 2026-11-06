@@ -684,11 +684,11 @@ const CATALOG = {
 		related: ["AMBER_E_CONTEXT_LOADOUT_ROUTE", "AMBER_E_INVALID_ARG"],
 	},
 	AMBER_E_CONTEXT_LOADOUT_REQUIRED: {
-		title: "Context loadout required artifact is invalid",
+		title: "Context loadout required input is invalid or unavailable",
 		cause:
-			"the target-local Operating Manual, selected Route manifest, or Loadout Definition is missing, outside the target, or no longer matches its recorded hash.",
+			"An inherited Required Artifact (Operating Manual, Route manifest, or Loadout Definition) is missing, outside the target, or no longer matches its recorded hash; or an F085 plan-declared surface has no loadable page: uncovered (missing), ambiguous, superseded, unhealthy, time-expired, older than the role's freshness floor, or dropped by an authority layer (classification ceiling, hard expiry, firewall).",
 		remedy:
-			"Run `amber init` to install the required artifacts, restore any missing file, then regenerate and verify the Loadout.",
+			"For an inherited artifact, run `amber init` or restore the file. For an uncovered or unloadable declared surface, distill the page, run `amber context refresh` and re-ingest, or correct the plan declaration. For an authority denial, obtain a qualifying grant or adjust the classification ceiling. Then regenerate and verify the Loadout.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW", "AMBER_E_CONTEXT_LOADOUT_MISSING"],
 	},

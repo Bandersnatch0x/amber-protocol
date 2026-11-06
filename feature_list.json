@@ -3236,26 +3236,27 @@
 			"area": "context",
 			"title": "Plan-declared required context enforced at loadout",
 			"user_visible_behavior": "A plan can declare required Context Pages per implement/review role with an explicit freshness floor. A loadout built for that plan and role either places every requirement in the required tier or fails closed with a stable code when a requirement is missing, unhealthy, superseded, time-expired, or older than the declared floor.",
-			"status": "accepted",
+			"status": "passing",
 			"verification": [
 				"node --test tests/unit/planning.test.js tests/unit/context-loadout.test.js tests/unit/context-freshness.test.js",
 				"node --test tests/unit/context-requirements.test.js tests/unit/context-dispatch.test.js",
 				"node --test tests/unit/command-registry-parity.test.js tests/unit/context-verify-refresh-stats.test.js",
+				"node --test tests/amber-cli.test.js",
 				"npm test",
 				"node scripts/verify-public-docs.js"
 			],
 			"evidence": [
 				{
 					"command": "node --test tests/unit/planning.test.js tests/unit/context-loadout.test.js tests/unit/context-freshness.test.js",
-					"result": "186 pass / 0 fail",
+					"result": "193 pass / 0 fail",
 					"date": "2026-11-06",
-					"notes": "Slice 1-3: per-role freshness floor parsing (malformed or orphaned floors refuse, terminal plans exempt) and the pure required-context resolver unioned into the loadout required tier."
+					"notes": "Slice 1-3: per-role freshness floor parsing (malformed or orphaned floors refuse, terminal plans exempt), strict loadout-boundary floor validation (empty or non-ISO declarations refuse as AMBER_E_INVALID_ARG), the pure required-context resolver unioned into the loadout required tier, and plan-declared pages kept through --since."
 				},
 				{
 					"command": "node --test tests/unit/context-requirements.test.js tests/unit/context-dispatch.test.js",
 					"result": "24 pass / 0 fail",
 					"date": "2026-11-06",
-					"notes": "Slice 2-4: all six refusal reasons, coverage normalization, --plan/--role usage errors, and --page pins still unioning."
+					"notes": "Slice 2-4: all six refusal reasons, coverage normalization, --plan/--role usage errors, and --page pins still unioning. The resolver receives the floor as a validated instant; the shared parser owns the ISO-8601 grammar."
 				},
 				{
 					"command": "node --test tests/unit/command-registry-parity.test.js tests/unit/context-verify-refresh-stats.test.js",
@@ -3264,20 +3265,28 @@
 					"notes": "Slice 5: help text and the generated CLI reference stay in parity."
 				},
 				{
-					"command": "npm test",
-					"result": "4293 tests, 0 failed, 0 skipped, exit 0",
+					"command": "node --test tests/amber-cli.test.js",
+					"result": "31 pass / 0 fail",
 					"date": "2026-11-06",
-					"notes": "Full suite green after `npm run docs:gen` refreshed the generated CLI reference and the tree was committed."
+					"notes": "Real-CLI regression on a disposable target: `context load --plan --role --since --confirm` writes a loadout whose required tier still holds the declared page, and an invalid freshness floor exits AMBER_E_INVALID_ARG without writing a loadout."
+				},
+				{
+					"command": "npm test",
+					"result": "4299 tests, 0 failed, 0 skipped, exit 0",
+					"date": "2026-11-06",
+					"notes": "Full suite green on the revised fix-round tree, run serially after the public docs build; complete stdout parsed from start to end."
 				},
 				{
 					"command": "amber context load --plan docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md --role implement --confirm (disposable target)",
-					"result": "An uncovered surface exits AMBER_E_CONTEXT_LOADOUT_REQUIRED with reason missing and writes no loadout; a covering page lands in the required tier; a half-declared --plan/--role pair is AMBER_E_INVALID_ARG.",
+					"result": "An uncovered surface exits AMBER_E_CONTEXT_LOADOUT_REQUIRED with reason missing and writes no loadout; a covering page lands in the required tier; a half-declared --plan/--role pair is AMBER_E_INVALID_ARG; --plan with --since keeps the declared page; a malformed floor refuses as AMBER_E_INVALID_ARG with no file.",
 					"date": "2026-11-06",
-					"notes": "Real CLI probe, not a unit shortcut."
+					"notes": "Real CLI probes, not a unit shortcut. The rerun lives under .scratch/pstack-f085-closeout/fix-round1/probes/."
 				}
 			],
 			"notes": [
 				"A refused build writes no loadout file; remediation (re-ingest, refresh, retire) stays an explicit operator action.",
+				"An authority-layer denial of a declared page (classification ceiling, hard expiry, firewall) refuses as AMBER_E_CONTEXT_LOADOUT_REQUIRED with reason unhealthy and the actual denial fact in the detail; the page's stored health status is not mutated.",
+				"Plan-declared required pages stay in the required tier under --since; ordinary --page pins and other pages keep the delta behavior.",
 				"This repository's corpus has no pages for docs/specs surfaces, so this plan's own loadout refuses with reason missing until those specs are distilled into pages."
 			],
 			"paths": [
@@ -3285,6 +3294,7 @@
 				"scripts/lib/core/context-requirements.js",
 				"scripts/lib/core/context-loadout.js",
 				"scripts/lib/core/context-freshness.js",
+				"scripts/lib/core/error-catalog.js",
 				"scripts/lib/context/adapters/command.js",
 				"scripts/lib/command-registry.js",
 				"tests/unit/planning.test.js",
@@ -3293,10 +3303,16 @@
 				"tests/unit/context-dispatch.test.js",
 				"tests/unit/context-freshness.test.js",
 				"tests/unit/command-registry-parity.test.js",
+				"tests/amber-cli.test.js",
 				"docs/specs/plan-required-context.md",
 				"docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md",
 				"docs/adr/0110-required-context-is-loadout-enforced.md",
-				"docs/CLI_REFERENCE.md"
+				"docs/adr/0010-context-loadout.md",
+				"docs/CLI_REFERENCE.md",
+				"apps/docs/docs-manifest.json",
+				"apps/docs/docs/reference/cli/context.md",
+				"docs/knowledge-corpus/knowledge-base.output.json",
+				"docs/knowledge-corpus/knowledge-context-manifest.json"
 			]
 		}
 	]

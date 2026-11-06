@@ -47,6 +47,7 @@ const CONTEXT_MANIFEST_ROLES = ["implement", "review"];
 const CONTEXT_FRESHNESS_BULLET_RE = /^\s*[-*+]\s*freshness\s*:\s*(.*)$/i;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/i;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 // The one rule line the scaffold renders under `## Context manifests`.
 const CONTEXT_MANIFEST_RULE_LINE =
@@ -105,6 +106,19 @@ function parseContextManifests(content) {
 	return { ...roles, freshness, orphanedFreshness };
 }
 
+// `Date.parse` rolls a day that does not exist forward (`2026-02-30` becomes
+// March 2), which would silently move a declared floor instead of refusing it,
+// so the calendar fields are checked before the value is accepted.
+function isRealCalendarDate(text) {
+	const year = Number(text.slice(0, 4));
+	const month = Number(text.slice(5, 7));
+	const day = Number(text.slice(8, 10));
+	if (month < 1 || month > 12) return false;
+	const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+	const lastDayOfMonth = month === 2 && isLeapYear ? 29 : DAYS_IN_MONTH[month - 1];
+	return day >= 1 && day <= lastDayOfMonth;
+}
+
 // Parse a declared freshness floor into an instant (epoch milliseconds).
 // Returns null for an absent or malformed value; the gate distinguishes the
 // two by checking the raw value, and malformed is always a gate failure there.
@@ -113,6 +127,7 @@ function parseFreshnessFloor(value) {
 	const text = value.trim();
 	if (text === "") return null;
 	if (!ISO_DATE_RE.test(text) && !ISO_INSTANT_RE.test(text)) return null;
+	if (!isRealCalendarDate(text)) return null;
 	const instant = Date.parse(text);
 	return Number.isFinite(instant) ? instant : null;
 }
@@ -169,10 +184,12 @@ function extractContextManifests(content) {
 }
 
 // F085: one role's declaration as the loadout consumes it — the bare surfaces
-// it requires plus the optional absolute freshness floor (raw string; the
-// loadout parses it, the gate already rejected a malformed one). Returns null
-// when the plan has no Context manifests section at all, which keeps a plan
-// that never declares anything byte-identical to the pre-F085 build.
+// it requires plus the optional absolute freshness floor. The floor is returned
+// exactly as declared (null when absent, "" when the bullet is present but
+// empty); the loadout validates it with parseFreshnessFloor at its own boundary,
+// so a malformed declaration never degrades to "no floor". Returns null when the
+// plan has no Context manifests section at all, which keeps a plan that never
+// declares anything byte-identical to the pre-F085 build.
 function readRoleContextRequirements(content, role) {
 	const parsed = parseContextManifests(content);
 	if (!parsed) return null;
@@ -180,7 +197,7 @@ function readRoleContextRequirements(content, role) {
 	const rawFloor = parsed.freshness ? parsed.freshness[role] : null;
 	return {
 		surfaces: raw === null || isUncuratedManifestValue(raw) ? [] : splitManifestEntries(raw),
-		freshnessFloor: typeof rawFloor === "string" && rawFloor.trim() !== "" ? rawFloor.trim() : null,
+		freshnessFloor: rawFloor,
 	};
 }
 

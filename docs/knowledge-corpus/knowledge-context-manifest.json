@@ -124,8 +124,8 @@
       "sourcePath": "docs/adr/0010-context-loadout.md",
       "title": "Context Loadout — Amber Governs the Agent's Context Window",
       "source": {
-        "rawHash": "sha256:87a96e9649c41da7ea6df5579aecf1b149c10988d67619633db318ca6116fc03",
-        "normHash": "sha256:df9b1e1122734f96de004ad9da407073228a0fb5ffaf7635ffdb79ca6a55381e"
+        "rawHash": "sha256:22f75e0b173fa3053f1130944783ba805322fe6b87523dfcb2bedfb33fbda4f0",
+        "normHash": "sha256:8cd5feabd263d69a21c56e9aea0fe02da46e1919c2b253aa8fa1c874c7ee0b17"
       }
     },
     {
@@ -496,8 +496,8 @@
       "sourcePath": "docs/adr/0110-required-context-is-loadout-enforced.md",
       "title": "Required Context Is Enforced Where It Is Loaded",
       "source": {
-        "rawHash": "sha256:3c11eb41ca77ac41e6bb572e31487b51add435a3bec78aed7b56621d9053581d",
-        "normHash": "sha256:adfa6a535d417d5259153aea3887fc06c00cc7a27915ffddf0f8fbdafef2ee3b"
+        "rawHash": "sha256:ff8a3f6f08ed392c152da0c2197033d0db9dc618dd2a2f2c5ece62ce94a91620",
+        "normHash": "sha256:70e31575616f90918f9b5e1b5a9b5c3667ce23f27695c2b23316defab5e72a47"
       }
     },
     {
@@ -717,5 +717,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:4649a75f32751bea7403e110a8af19fdfc51e5a2694710a5e4a2e372120231d5"
+  "manifestHash": "sha256:33a0af8b24d5292cd4f98c01b677b6a29e1cb0bcf57ee2526d9b8f7ef4bd9182"
 }
