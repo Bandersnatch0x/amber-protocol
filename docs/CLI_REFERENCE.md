@@ -2741,6 +2741,11 @@ node scripts/amber.js context load --target . --route feature-standard --feature
 # cite the covering grant, denied pages are excluded (reason firewall, closed deny reason,
 # context.denied on the trail); without --subject the build is byte-identical.
 node scripts/amber.js context load --target . --route feature-standard --subject worker --purpose review
+# Plan-bound load (F085): every knowledge surface the plan's `## Context manifests` declares for
+# the role is required — exactly one current, healthy page must cover it, at or after the role's
+# optional `freshness:` floor. Any failure exits AMBER_E_CONTEXT_LOADOUT_REQUIRED (surface, role,
+# and reason) and writes no file.
+node scripts/amber.js context load --target . --route feature-standard --plan docs/plans/F085-Plan-declared-required-context-enforced-at-loadout.md --role implement
 node scripts/amber.js context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
 
 # Rebuildable projections and deterministic quality checks

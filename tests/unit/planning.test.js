@@ -19,6 +19,7 @@ const {
 	validateVerticalSlices,
 	sliceSubsystemOf,
 	sliceContractApplies,
+	parseContextManifests,
 } = require("../../scripts/lib/core/planning");
 
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
@@ -466,6 +467,87 @@ test("validatePlanContent parses comma- and space-separated manifest entries", (
 	assert.deepEqual(result.errors, [
 		"Context manifest entry docs/b.md (implement) does not exist in the target repository (or escapes its root). → fix: point the entry at a knowledge surface inside the repository.",
 	]);
+});
+
+// ---- context manifest freshness floors (F085) ----
+
+test("parseContextManifests exposes an optional freshness floor per role", () => {
+	const content = validPlanContent({
+		contextManifests: [
+			"- implement: docs/specs/contract.md, docs/adr/0001.md",
+			"  - freshness: 2026-10-01",
+			"- review: docs/adr/0001.md",
+		].join("\n"),
+	});
+	const parsed = parseContextManifests(content);
+	assert.equal(parsed.implement, "docs/specs/contract.md, docs/adr/0001.md");
+	assert.equal(parsed.review, "docs/adr/0001.md");
+	assert.deepEqual(parsed.freshness, { implement: "2026-10-01", review: null });
+	assert.deepEqual(parsed.orphanedFreshness, []);
+	// The flat form stays valid and declares no floor.
+	const flat = parseContextManifests(
+		validPlanContent({
+			contextManifests: "- implement: docs/specs/contract.md\n- review: docs/adr/0001.md",
+		}),
+	);
+	assert.deepEqual(flat.freshness, { implement: null, review: null });
+	assert.deepEqual(flat.orphanedFreshness, []);
+});
+
+test("validatePlanContent accepts an ISO-8601 freshness floor on a gated plan", () => {
+	for (const floor of ["2026-10-01", "2026-10-01T00:00:00Z", "2026-10-01T08:00:00+08:00"]) {
+		const result = validatePlanContent({
+			content: validPlanContent({
+				contextManifests: `- implement: docs/specs/contract.md\n  - freshness: ${floor}\n- review: docs/adr/0001.md`,
+			}),
+			resolveFeature: foundResolver,
+		});
+		assert.deepEqual(result.errors, [], `${floor} must be accepted`);
+	}
+});
+
+test("validatePlanContent rejects a malformed freshness floor and names the role", () => {
+	for (const floor of ["2026-13-01", "next week", "30d", ""]) {
+		const result = validatePlanContent({
+			content: validPlanContent({
+				contextManifests: `- implement: docs/specs/contract.md\n  - freshness: ${floor}\n- review: docs/adr/0001.md`,
+			}),
+			resolveFeature: foundResolver,
+		});
+		assert.equal(result.errors.length, 1, `${JSON.stringify(floor)} must fail the gate`);
+		assert.match(result.errors[0], /Context manifests freshness floor for role implement/);
+		assert.match(result.errors[0], /ISO-8601 date or instant/);
+		assert.match(result.errors[0], /→ fix:/);
+	}
+});
+
+test("validatePlanContent rejects a freshness bullet that sits outside a role block", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests: [
+				"- freshness: 2026-10-01",
+				"- implement: docs/specs/contract.md",
+				"- review: docs/adr/0001.md",
+			].join("\n"),
+		}),
+		resolveFeature: foundResolver,
+	});
+	assert.equal(result.errors.length, 1);
+	assert.match(result.errors[0], /freshness bullet .* not indented under a role bullet/);
+	assert.match(result.errors[0], /→ fix:/);
+});
+
+test("terminal plans keep malformed or orphaned freshness declarations readable", () => {
+	const content = validPlanContent({
+		contextManifests: [
+			"- freshness: never",
+			"- implement: docs/specs/contract.md",
+			"  - freshness: next week",
+			"- review: docs/adr/0001.md",
+		].join("\n"),
+	}).replace("Feature:", "Status: accepted\n\nFeature:");
+	const result = validatePlanContent({ content, resolveFeature: foundResolver });
+	assert.deepEqual(result.errors, []);
 });
 
 // ---- buildReviewResult: pure review assembly ----

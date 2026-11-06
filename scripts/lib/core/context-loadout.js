@@ -51,17 +51,28 @@ const {
 	effectiveClassificationOf,
 	admittedUnderCeiling,
 } = require("./classification");
-const { summarizeFreshnessActivity, pageExpiresAt, isTimeExpired } = require("./context-freshness");
+const {
+	summarizeFreshnessActivity,
+	pageExpiresAt,
+	isTimeExpired,
+	revisionInstantFor,
+} = require("./context-freshness");
 const {
 	KNOWLEDGE_KINDS,
 	normalizeKnowledgeKind,
 	readKnowledgeGraph,
 } = require("./context-knowledge");
 const { compileSchema } = require("./schema-contract");
+// F085: plan-declared required context. The resolver is pure; the plan
+// reader and the floor parser are the only plan-side coupling.
+const { resolveRequiredContext } = require("./context-requirements");
+const { readRoleContextRequirements } = require("./planning");
 // F071 H3b: the ONE firewall verdict — the build never re-implements it.
 const { checkContextAccess } = require("../harness/context-core");
 
 const SCHEMA_VERSION = "1.0.0";
+// The two roles a plan's Context manifests section declares.
+const PLAN_ROLES = Object.freeze(["implement", "review"]);
 const ROUTE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/; // kebab-case, matching pageId
 const FEATURE_RE = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -217,6 +228,31 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 
 function loadBuildConfig(targetRoot, opts) {
 	const runIdDeclared = opts.runId !== undefined && opts.runId !== null;
+	// F085: --plan/--role are a pair. Declaring one without the other is a
+	// usage error, never "no requirements" — a caller that meant to bind the
+	// plan and mistyped the flag must not get an unbound loadout.
+	const planDeclared = opts.plan !== undefined && opts.plan !== null;
+	const roleDeclared = opts.role !== undefined && opts.role !== null;
+	if (planDeclared !== roleDeclared) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_INVALID_ARG",
+					detail: `--plan and --role must be given together (got plan=${JSON.stringify(opts.plan)}, role=${JSON.stringify(opts.role)})`,
+				},
+			],
+		};
+	}
+	if (roleDeclared && !PLAN_ROLES.includes(opts.role)) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_INVALID_ARG",
+					detail: `--role must be one of ${PLAN_ROLES.join("|")} (got ${JSON.stringify(opts.role)})`,
+				},
+			],
+		};
+	}
 	if (runIdDeclared && (typeof opts.runId !== "string" || !RUN_ID_RE.test(opts.runId))) {
 		return {
 			errors: [
@@ -267,6 +303,40 @@ function loadBuildConfig(targetRoot, opts) {
 					detail: `feature must be a safe identifier (got ${JSON.stringify(feature)})`,
 				},
 			],
+		};
+	}
+	// F085: read the plan's declared surfaces for the requested role. A plan
+	// path that escapes the target is refused here for the same reason every
+	// other target-relative read is.
+	let planRequirements = null;
+	if (planDeclared) {
+		let planPath;
+		try {
+			planPath = resolvePathWithin(targetRoot, opts.plan, {
+				label: "Plan path",
+				canonicalExisting: true,
+			});
+		} catch (error) {
+			return { errors: [{ code: "AMBER_E_INVALID_ARG", detail: error.message }] };
+		}
+		let planContent;
+		try {
+			planContent = fs.readFileSync(planPath, "utf8");
+		} catch (error) {
+			return {
+				errors: [
+					{
+						code: "AMBER_E_INVALID_ARG",
+						detail: `plan ${opts.plan} is not a readable file (${error.message})`,
+					},
+				],
+			};
+		}
+		// A plan with no Context manifests section declares nothing; the build
+		// stays byte-identical to the pre-F085 shape.
+		planRequirements = readRoleContextRequirements(planContent, opts.role) || {
+			surfaces: [],
+			freshnessFloor: null,
 		};
 	}
 	const requiredArtifacts = collectRequiredArtifacts(targetRoot, route);
@@ -343,6 +413,11 @@ function loadBuildConfig(targetRoot, opts) {
 		budget: Number.isInteger(opts.budget) && opts.budget > 0 ? opts.budget : 4000,
 		since: opts.since || null,
 		requiredPins: Array.isArray(opts.required) ? opts.required.slice() : [],
+		// F085: the plan's role declaration, resolved against pages later (the
+		// resolver needs the collected entries). Null means the build is unbound.
+		planRole: roleDeclared ? opts.role : null,
+		planSurfaces: planRequirements ? planRequirements.surfaces : [],
+		freshnessFloor: planRequirements ? planRequirements.freshnessFloor : null,
 		knowledgeKinds: [...new Set(knowledgeKinds)].sort(),
 		requiredArtifacts,
 		maxClassification,
@@ -422,6 +497,9 @@ function collectPageEntries(targetRoot, route, feature) {
 			classificationSource: effective.classificationSource,
 			purpose: typeof page.purpose === "string" ? page.purpose : null,
 			expiresAt: pageExpiresAt(page, activity),
+			// F085: the declared freshness floor compares against the same
+			// revision instant the TTL base uses — one clock, one answer.
+			revisionAt: revisionInstantFor(page, activity),
 			// Derived at read time and never written back onto the page: a
 			// contradicted page still loads, with visibly lower confidence.
 			assurance: derived
@@ -657,11 +735,10 @@ function applyFirewallExclusions(pageEntries, state, config, now) {
 	return { grants: [...covering.values()], deniedCount, checkedAt: at };
 }
 
-function selectPageTiers(pageEntries, config) {
+function selectPageTiers(pageEntries, config, now = new Date()) {
 	const state = { excluded: [], pagesMap: {}, seen: new Set(), requiredPageIds: [] };
 	// One build, one instant: expiry, ceiling, and the firewall verdict all
 	// read the same clock (TTL is a half-open window with no skew tolerance).
-	const now = new Date();
 	// §3.3 authority exclusions run FIRST: classification-denied and expired
 	// pages never enter any tier, required pins included.
 	applyAuthorityExclusions(pageEntries, state, config, now);
@@ -833,6 +910,9 @@ function previewLoadout(targetRoot, opts = {}) {
 		return { loadout: null, loadoutPath: null, errors: config.errors, warnings };
 	}
 	const errors = [];
+	// One build, one instant: the plan-requirement resolution and the later
+	// tier selection must not straddle a clock tick.
+	const now = new Date();
 
 	const pageState = collectPageEntries(targetRoot, config.route, config.feature);
 	if (pageState.error) {
@@ -840,9 +920,34 @@ function previewLoadout(targetRoot, opts = {}) {
 		return { loadout: null, loadoutPath: null, errors, warnings };
 	}
 
+	// F085: the plan's role declaration resolves against the collected pages
+	// first. Any refusal fails the whole build before a tier is chosen — a
+	// partial required tier is the failure this feature exists to prevent.
+	if (config.planRole) {
+		const resolution = resolveRequiredContext({
+			pageEntries: pageState.pageEntries,
+			requiredPaths: config.planSurfaces,
+			role: config.planRole,
+			freshnessFloor: config.freshnessFloor,
+			now,
+		});
+		if (resolution.findings.length > 0) {
+			return {
+				loadout: null,
+				loadoutPath: null,
+				errors: resolution.findings.map((finding) => ({
+					code: finding.code,
+					detail: `${finding.detail} (role ${finding.role}, reason ${finding.reason})`,
+				})),
+				warnings,
+			};
+		}
+		config.requiredPins = [...new Set([...config.requiredPins, ...resolution.pageIds])].sort();
+	}
+
 	// 4. Required tier (pinned). D4: tampered/obsolete excluded; stale included
 	//    with status "stale"; ok included with status "ok".
-	const selection = selectPageTiers(pageState.pageEntries, config);
+	const selection = selectPageTiers(pageState.pageEntries, config, now);
 	if (selection.error) {
 		errors.push(selection.error);
 		return { loadout: null, loadoutPath: null, errors, warnings };

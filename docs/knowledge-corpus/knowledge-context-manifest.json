@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 40,
+    "adr": 41,
     "wiki": 9,
     "architecture": 9,
-    "total": 58
+    "total": 59
   },
   "rows": [
     {
@@ -489,6 +489,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0110",
+      "category": "adr",
+      "sourceNodeId": "adr:0110",
+      "pageId": "knowledge-adr-0110",
+      "sourcePath": "docs/adr/0110-required-context-is-loadout-enforced.md",
+      "title": "Required Context Is Enforced Where It Is Loaded",
+      "source": {
+        "rawHash": "sha256:3c11eb41ca77ac41e6bb572e31487b51add435a3bec78aed7b56621d9053581d",
+        "normHash": "sha256:adfa6a535d417d5259153aea3887fc06c00cc7a27915ffddf0f8fbdafef2ee3b"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -705,5 +717,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:4df77f130bf710befaa63236fd40975520b1a37d05e17b8398b63668e204ad92"
+  "manifestHash": "sha256:4649a75f32751bea7403e110a8af19fdfc51e5a2694710a5e4a2e372120231d5"
 }

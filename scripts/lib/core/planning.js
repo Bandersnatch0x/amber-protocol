@@ -41,23 +41,80 @@ const { MESSAGES } = require("./terminology");
 
 const CONTEXT_MANIFEST_ROLES = ["implement", "review"];
 
+// F085: an optional sibling bullet under a role block. `freshness:` is the
+// oldest acceptable revision instant for every page covering that role's
+// declared surfaces; absent means no floor.
+const CONTEXT_FRESHNESS_BULLET_RE = /^\s*[-*+]\s*freshness\s*:\s*(.*)$/i;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/i;
+
 // The one rule line the scaffold renders under `## Context manifests`.
 const CONTEXT_MANIFEST_RULE_LINE =
 	"Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.";
 
 // Parse the `## Context manifests` section. Returns null when the section is
-// absent; otherwise { implement: string|null, review: string|null } with each
-// role bullet's raw text (null when that role bullet is missing). Prose lines
-// around the bullets are ignored.
+// absent; otherwise the role bullets' raw text (null when that role bullet is
+// missing), each role's optional freshness floor (null when absent), and any
+// freshness bullets that sit outside a role block. Prose lines around the
+// bullets are ignored.
 function parseContextManifests(content) {
 	const body = getSectionBody(content, "Context manifests");
 	if (body === null) return null;
 	const roles = {};
-	for (const role of CONTEXT_MANIFEST_ROLES) {
-		const match = body.match(new RegExp(`^\\s*-\\s*${role}\\s*:\\s*(.*)$`, "im"));
-		roles[role] = match ? match[1].trim() : null;
+	const freshness = {};
+	const orphanedFreshness = [];
+	let currentRole = null;
+	let roleIndent = null;
+	for (const rawLine of body.split(/\r?\n/)) {
+		const line = rawLine.replace(/\r$/, "");
+		if (line.trim() === "") continue;
+		const indent = line.match(/^(\s*)/)[1].length;
+		const roleMatch = line.match(/^\s*-\s*(implement|review)\s*:\s*(.*)$/i);
+		if (roleMatch) {
+			const role = roleMatch[1].toLowerCase();
+			if (!Object.prototype.hasOwnProperty.call(roles, role)) {
+				roles[role] = roleMatch[2].trim();
+			}
+			currentRole = role;
+			roleIndent = indent;
+			continue;
+		}
+		const floorMatch = line.match(CONTEXT_FRESHNESS_BULLET_RE);
+		if (floorMatch) {
+			const value = floorMatch[1].trim();
+			// A floor binds to the role bullet it is nested under; anything else
+			// is an orphaned hint, never a global floor.
+			if (currentRole !== null && indent > roleIndent) {
+				if (!Object.prototype.hasOwnProperty.call(freshness, currentRole)) {
+					freshness[currentRole] = value;
+				}
+			} else {
+				orphanedFreshness.push(value);
+			}
+			continue;
+		}
+		if (currentRole !== null && indent <= roleIndent) {
+			currentRole = null;
+			roleIndent = null;
+		}
 	}
-	return roles;
+	for (const role of CONTEXT_MANIFEST_ROLES) {
+		if (!Object.prototype.hasOwnProperty.call(roles, role)) roles[role] = null;
+		if (!Object.prototype.hasOwnProperty.call(freshness, role)) freshness[role] = null;
+	}
+	return { ...roles, freshness, orphanedFreshness };
+}
+
+// Parse a declared freshness floor into an instant (epoch milliseconds).
+// Returns null for an absent or malformed value; the gate distinguishes the
+// two by checking the raw value, and malformed is always a gate failure there.
+function parseFreshnessFloor(value) {
+	if (typeof value !== "string") return null;
+	const text = value.trim();
+	if (text === "") return null;
+	if (!ISO_DATE_RE.test(text) && !ISO_INSTANT_RE.test(text)) return null;
+	const instant = Date.parse(text);
+	return Number.isFinite(instant) ? instant : null;
 }
 
 // A role bullet still carrying scaffold placeholder text (`<fill: ...>`) is
@@ -109,6 +166,22 @@ function extractContextManifests(content) {
 				: splitManifestEntries(parsed[role]);
 	}
 	return block;
+}
+
+// F085: one role's declaration as the loadout consumes it — the bare surfaces
+// it requires plus the optional absolute freshness floor (raw string; the
+// loadout parses it, the gate already rejected a malformed one). Returns null
+// when the plan has no Context manifests section at all, which keeps a plan
+// that never declares anything byte-identical to the pre-F085 build.
+function readRoleContextRequirements(content, role) {
+	const parsed = parseContextManifests(content);
+	if (!parsed) return null;
+	const raw = parsed[role];
+	const rawFloor = parsed.freshness ? parsed.freshness[role] : null;
+	return {
+		surfaces: raw === null || isUncuratedManifestValue(raw) ? [] : splitManifestEntries(raw),
+		freshnessFloor: typeof rawFloor === "string" && rawFloor.trim() !== "" ? rawFloor.trim() : null,
+	};
 }
 
 // ── Vertical-slice contract (F084) ──────────────────────────────────────────
@@ -701,6 +774,23 @@ function validatePlanContent({ content, resolveFeature, resolveExists }) {
 						`Context manifest entry ${entry} (${role}) does not exist in the target repository (or escapes its root). → fix: point the entry at a knowledge surface inside the repository.`,
 					);
 				}
+			}
+		}
+
+		// F085: freshness floors follow the slice contract's boundary — a
+		// terminal plan is frozen history, so its floors are not re-judged.
+		if (sliceContractApplies(content)) {
+			for (const role of CONTEXT_MANIFEST_ROLES) {
+				const floor = manifests.freshness[role];
+				if (floor === null || parseFreshnessFloor(floor) !== null) continue;
+				errors.push(
+					`Context manifests freshness floor for role ${role} is not an ISO-8601 date or instant: ${floor === "" ? "(empty)" : floor}. → fix: use an absolute ISO-8601 date (2026-10-01) or instant (2026-10-01T00:00:00Z).`,
+				);
+			}
+			for (const value of manifests.orphanedFreshness) {
+				errors.push(
+					`Context manifests freshness bullet ${value === "" ? "(empty)" : value} is not indented under a role bullet. → fix: indent the freshness: bullet under the implement or review role it applies to.`,
+				);
 			}
 		}
 	}
@@ -1351,6 +1441,8 @@ module.exports = {
 	CONTEXT_MANIFEST_RULE_LINE,
 	parseContextManifests,
 	extractContextManifests,
+	readRoleContextRequirements,
+	parseFreshnessFloor,
 	isKnowledgeSurfacePath,
 	parseVerticalSlices,
 	parseVerticalSlicesDetailed,
