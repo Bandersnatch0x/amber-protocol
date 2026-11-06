@@ -9,12 +9,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const {
-	memoryDispatch,
-	GAMMA_QUOTA,
-	ALPHA_MAX_ENTRIES,
-	ALPHA_MAX_BYTES,
-} = require("../../scripts/lib/memory-commands");
+const { memoryDispatch, GAMMA_QUOTA } = require("../../scripts/lib/memory-commands");
 
 function tmpRoot(label) {
 	const dir = trackTempDir(
@@ -54,18 +49,9 @@ test("status envelope: projection payload, defaulted errors/warnings, exit 0, by
 				windowStart: envelope.result.gamma.windowStart,
 				windowEnd: envelope.result.gamma.windowEnd,
 			},
-			alpha: {
+			surface: {
 				entries: 0,
-				maxEntries: ALPHA_MAX_ENTRIES,
 				bytes: Buffer.byteLength(MEMORY_MD_FIXTURE, "utf8"),
-				maxBytes: ALPHA_MAX_BYTES,
-				utilizationPct:
-					Math.round(
-						Math.max(
-							0 / ALPHA_MAX_ENTRIES,
-							Buffer.byteLength(MEMORY_MD_FIXTURE, "utf8") / ALPHA_MAX_BYTES,
-						) * 1000,
-					) / 10,
 			},
 			text: envelope.result.text,
 			errors: [],

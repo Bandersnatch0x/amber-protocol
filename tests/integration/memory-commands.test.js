@@ -127,8 +127,13 @@ test("T1 chain replays request → ingest → approve → book → status with �
 	);
 	assert.equal(status.result.gamma.windowAdmitted, 1);
 	assert.equal(status.result.gamma.quotaRemaining, 4);
-	assert.equal(status.result.alpha.maxEntries, 50);
-	assert.equal(status.result.alpha.maxBytes, 8192);
+	assert.equal(status.result.alpha, undefined, "F086 retired the alpha budget projection");
+	assert.ok(Number.isInteger(status.result.surface.bytes));
+	assert.equal(
+		status.result.surface.entries,
+		0,
+		"surface reflects the physical file: booking registers a hash and never writes MEMORY.md",
+	);
 
 	const kinds = events(target).map((e) => e.kind);
 	assert.deepEqual(kinds, [
@@ -211,9 +216,9 @@ test("conversion channels require a closed-set signal id at ingest", () => {
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
-// ── §6.3/§6.5 α and γ gates ─────────────────────────────────────────────────
+// ── §6.5 γ gate and the retired α budget ────────────────────────────────────
 
-test("ingest projects α admission arithmetic and refuses over-budget batches", () => {
+test("ingest admits a batch that would have exceeded the retired alpha budget", () => {
 	const target = mkTarget();
 	const big = "B".repeat(2000);
 	const payload = writePayload(
@@ -229,13 +234,9 @@ test("ingest projects α admission arithmetic and refuses over-budget batches", 
 	);
 	assert.equal(run(target, "request", { payload }).exitCode, 0);
 	const ingest = run(target, "ingest", { request: "mreq-alpha-1" });
-	assert.equal(ingest.exitCode, 1);
-	assert.equal(ingest.result.code, "AMBER_E_MEMORY_BUDGET_EXCEEDED");
-	assert.match(
-		ingest.result.errors[0],
-		/remedy|supersede|α budget/i,
-		"budget refusal carries the β remedy",
-	);
+	assert.equal(ingest.exitCode, 0);
+	assert.equal(ingest.result.code, undefined);
+	assert.equal(ingest.result.entryIds.length, 5);
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
@@ -505,7 +506,7 @@ test("doctor rules 2+4: drift moves active → needs-re-review; re-book resets t
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
-test("doctor rule 5: over-quota γ ledger and physical α over-limit are fail-closed", () => {
+test("doctor rule 5: an over-quota γ ledger is fail-closed and surface size is not judged", () => {
 	const target = mkTarget();
 	memoryStore.appendMemoryEvent(target, {
 		kind: "memory-ingest",
@@ -523,10 +524,11 @@ test("doctor rule 5: over-quota γ ledger and physical α over-limit are fail-cl
 	const fat = ["# Memory", "", "## Entries", ""];
 	for (let i = 0; i < 51; i += 1) fat.push(`### filler entry ${i}`);
 	fs.writeFileSync(path.join(target, "MEMORY.md"), fat.join("\n") + "\n");
-	const alpha = doctorMemoryRules(target);
-	assert.ok(
-		alpha.errors.some((e) => e.includes("α budget physically exceeded")),
-		alpha.errors.join("\n"),
+	const oversized = doctorMemoryRules(target);
+	assert.equal(
+		oversized.errors.some((e) => e.includes("α budget")),
+		false,
+		`F086 retired the alpha ceiling: ${oversized.errors.join("\n")}`,
 	);
 	fs.rmSync(target, { recursive: true, force: true });
 });
@@ -632,14 +634,15 @@ test("doctor rules 3/6/10/11: pointers, forced review, git detection, abandoned 
 		result.warnings.join("\n"),
 	);
 
-	// Rule 6: ≥ 50% α utilisation forces the review warning (25 entries).
+	// Retired rule 6: a half-full alpha budget no longer forces a review.
 	const fat = ["# Memory", "", "## Entries", ""];
 	for (let i = 0; i < 25; i += 1) fat.push(`### forced-review entry ${i}`);
 	fs.writeFileSync(path.join(target, "MEMORY.md"), fat.join("\n") + "\n");
 	result = doctorMemoryRules(target);
-	assert.ok(
+	assert.equal(
 		result.warnings.some((w) => w.includes("forced review")),
-		result.warnings.join("\n"),
+		false,
+		`F086 retired the 50% review trigger: ${result.warnings.join("\n")}`,
 	);
 
 	// Rule 10: booked surface outside a git working tree (non-blocking).
@@ -727,7 +730,7 @@ test("ratification track: book --ratify --claim creates an active entry directly
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
-test("α arithmetic nets out β pairs: an exhausted budget still admits one-in-one-out", () => {
+test("surface size no longer gates admission, and supersession still pairs atomically", () => {
 	const target = mkTarget();
 	// Book one active entry first (the pair target).
 	const first = writePayload(
@@ -740,12 +743,12 @@ test("α arithmetic nets out β pairs: an exhausted budget still admits one-in-o
 	run(target, "approve", { entryId: oldId, decision: "approve" });
 	run(target, "book", { entryId: oldId });
 
-	// Exhaust the entry dimension physically (50 entries on the surface).
+	// Fill the surface past the retired entry ceiling (50 entries physically).
 	const fat = ["# Memory", "", "## Entries", ""];
 	for (let i = 0; i < 50; i += 1) fat.push(`### filler ${i}`);
 	fs.writeFileSync(path.join(target, "MEMORY.md"), fat.join("\n") + "\n");
 
-	// A bare new entry is refused (projected 51 > 50)…
+	// A bare new entry is admitted: the ceiling is retired.
 	const bare = writePayload(
 		target,
 		"pair-b",
@@ -753,11 +756,11 @@ test("α arithmetic nets out β pairs: an exhausted budget still admits one-in-o
 	);
 	run(target, "request", { payload: bare });
 	const bareIngest = run(target, "ingest", { request: "mreq-pair-b" });
-	assert.equal(bareIngest.exitCode, 1);
-	assert.equal(bareIngest.result.code, "AMBER_E_MEMORY_BUDGET_EXCEEDED");
-	assert.match(bareIngest.result.errors[0], /supersede/, "§6.3: α refusal carries the β remedy");
+	assert.equal(bareIngest.exitCode, 0, JSON.stringify(bareIngest.result));
+	assert.equal(bareIngest.result.code, undefined);
 
-	// …but the same slot admits a one-in-one-out pair (net 50 ≤ 50).
+	// A superseding entry is admitted and keeps its proposal state, so the
+	// replacement pair is still available without any budget arithmetic.
 	const pair = writePayload(
 		target,
 		"pair-c",
@@ -1107,7 +1110,8 @@ test("amber memory status --json round-trips through the real CLI", () => {
 	assert.equal(result.status, 0, result.stderr);
 	const parsed = JSON.parse(result.stdout);
 	assert.equal(parsed.entries.active, 0);
-	assert.equal(parsed.alpha.maxEntries, 50);
+	assert.equal(parsed.alpha, undefined, "F086 retired the alpha projection");
+	assert.ok(Number.isInteger(parsed.surface.bytes));
 	assert.equal(parsed.gamma.quotaRemaining, 5);
 	fs.rmSync(target, { recursive: true, force: true });
 });

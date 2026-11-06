@@ -84,15 +84,7 @@ function generateCommandDoc(commandName, pkgMeta) {
 	// the genuinely read-only verbs; everything else writes but without an
 	// approval gate, i.e. `idempotent-write` (issues/0063 R1). Prose substrings
 	// like "inspect"/"read-only" are no longer consulted.
-	const READ_ONLY_COMMANDS = new Set([
-		"audit",
-		"doctor",
-		"next",
-		"route",
-		"status",
-		"explain",
-		"drift",
-	]);
+	const READ_ONLY_COMMANDS = new Set(["audit", "next", "route", "status", "explain", "drift"]);
 	const nature = READ_ONLY_COMMANDS.has(commandName)
 		? "read-only"
 		: isGoverned

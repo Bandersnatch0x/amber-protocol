@@ -2,7 +2,7 @@
 	"actionTypeId": "amber.memory.status",
 	"version": 1,
 	"title": "Memory status",
-	"goal": "Read the three-section memory projection (entries, gamma, alpha) without mutating anything. Observation only — doctor is the sole judgment authority; status only projects counts, window, and utilization.",
+	"goal": "Read the three-section memory projection (entries, gamma, surface) without mutating anything. Observation only — doctor is the sole judgment authority; status projects registry counts, the gamma window, and the physical MEMORY.md surface, with no budget ceiling or utilisation.",
 	"mode": "dry-run",
 	"parameters": {},
 	"submissionCriteria": [],

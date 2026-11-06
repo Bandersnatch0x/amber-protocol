@@ -2016,6 +2016,9 @@ Reports:
 - Missing files
 - Configuration issues
 - Compatibility warnings
+- Memory findings: source drift, ledger inconsistencies, surface drift. When an active entry's
+  source or booked surface has drifted, `doctor` marks that entry `needs-re-review` in the
+  registry; it never writes `MEMORY.md`.
 
 Failing checks carry an actionable `→ fix:` remedy (e.g. missing harness files → `amber init`).
 
@@ -2850,10 +2853,12 @@ See `scripts/lib/core/knowledge-projection.js` and `docs/specs/F059-knowledge-de
 MEMORY.md nominations. **Amber never writes MEMORY.md** — humans curate the surface; Amber admits,
 approves, registers, and audits. `request` nominates entries (T1/T2 write-back triggers or the human
 escape hatch); `ingest` is the mechanical all-or-nothing admission gate (schema → source binding →
-signal → α budget → γ rate limit); `approve` is the single human, entry-level gate; `book` registers
-the MEMORY.md surface hash and promotes entries to active; `abandon` is the explicit terminal
-marker; `status` is a read-only three-section projection (entries / gamma / alpha). Doctor owns the
-judgment rules (ledger consistency, source health, surface drift, budget compliance).
+signal → γ rate limit); `approve` is the single human, entry-level gate; `book` registers the
+MEMORY.md surface hash and promotes entries to active; `abandon` is the explicit terminal marker;
+`status` is a read-only three-section projection (entries / gamma / surface). The retired α budget
+(F086) leaves no ceiling or utilisation figure; `surface` reports the physical entry count and
+normalized byte size as observation. Doctor owns the judgment rules (ledger consistency, source
+health, surface drift, gamma compliance) and now runs them for product repositories too.
 
 `request`/`ingest`/`book` inline the identity gate (non-TTY without `--yes` is refused);
 `approve`/`abandon` are typed-seam mutations and require `--yes`/`--confirm`.

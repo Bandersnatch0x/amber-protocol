@@ -10,14 +10,15 @@
 //
 // Verb surface (§8.1):
 //   request  → produce a nomination request artifact (+ memory-request-created)
-//   ingest   → mechanical admission: ajv → α budget → γ rate-limit → K1/K2/K3
+//   ingest   → mechanical admission: ajv → γ rate-limit → K1/K2/K3
 //              ranking → write proposals (+ memory-ingest)
-//   approve  → the single human gate; proposal→(approved) or reject→draft; β
+//   approve  → the single human gate; proposal→(approved) or reject→draft; a
+//              supersedeTarget pointer completes the replacement pair
 //              pair supersession atomic (+ memory-approval)
 //   book     → surface hash registration; proposal/needs-re-review→active;
 //              origin governed-promotion|human-direct-ratification (+ memory-book)
 //   abandon  → explicit F1(ii) entry/request terminal marker (+ memory-abandon)
-//   status   → three-section read-only projection (entries/gamma/alpha)
+//   status   → three-section read-only projection (entries/gamma/surface)
 //
 // Envelope, routing, and exit codes are owned by defineCommand (F039): the
 // verb handlers return bodies; failure bodies carry bypassPrint: false so the
@@ -33,8 +34,6 @@ const triggers = require("./core/memory-trigger");
 const { sha256, hashFile } = require("./core/context-hash");
 const {
 	SCHEMA_VERSION,
-	ALPHA_MAX_ENTRIES,
-	ALPHA_MAX_BYTES,
 	GAMMA_QUOTA,
 	GAMMA_WINDOW_MS,
 	AUTO_ABANDON_THRESHOLD,
@@ -43,9 +42,8 @@ const {
 	SIGNAL_CLOSED_SET,
 	nowIso,
 	readMemoryMd,
-	alphaState,
+	surfaceUsage,
 	gammaWindow,
-	bookText,
 	computeEntryIdFor,
 	withEntryId,
 	rankEntries,
@@ -516,12 +514,7 @@ function handleIngest(args, targetRoot) {
 		};
 	}
 
-	// Stage 4: α budget for MEMORY.md-targeted entries (§6.3 admission
-	// arithmetic, β-freed slots netted out — see alphaBudgetRefusal).
-	const alphaRefusal = alphaBudgetRefusal(targetRoot, request, channel, entryIds, effective);
-	if (alphaRefusal) return alphaRefusal;
-
-	// Stage 5: γ rate-limit over the mixed pool — see rankForGammaAdmission.
+	// Stage 4: γ rate-limit over the mixed pool — see rankForGammaAdmission.
 	const gammaOutcome = rankForGammaAdmission(
 		targetRoot,
 		request,
@@ -533,7 +526,7 @@ function handleIngest(args, targetRoot) {
 	if (gammaOutcome.errors) return gammaOutcome;
 	const rankedPool = gammaOutcome.rankedPool;
 
-	// Stage 6: admit (draft→proposal), ranking留痕 over the mixed pool (§6.5).
+	// Stage 5: admit (draft→proposal), ranking留痕 over the mixed pool (§6.5).
 	const now = nowIso();
 	for (const { entry } of rankedPool.filter((r) => !r.queued)) {
 		store.writeEntry(targetRoot, {
@@ -575,47 +568,7 @@ function handleIngest(args, targetRoot) {
 	};
 }
 
-// Stage 4: α budget projection for MEMORY.md-targeted entries (§6.3 admission
-// arithmetic). β pairs free the pointed-to entry's slot and bytes — the
-// projection nets them out, so an exhausted budget still admits a
-// one-in-one-out pair (§6.4) while refusing bare growth.
-function alphaBudgetRefusal(targetRoot, request, channel, entryIds, effective) {
-	const memMd = effective.filter((e) => e.targetSurface === MEMORY_MD);
-	if (memMd.length === 0) return null;
-	const alpha = alphaState(targetRoot);
-	const freedIds = new Set();
-	let freedBytes = 0;
-	for (const entry of memMd) {
-		if (!entry.supersedeTarget) continue;
-		const prior = store.readEntry(targetRoot, entry.supersedeTarget);
-		if (
-			prior &&
-			["active", "needs-re-review"].includes(prior.status) &&
-			!freedIds.has(prior.entryId)
-		) {
-			freedIds.add(prior.entryId);
-			freedBytes += Buffer.byteLength(bookText(prior), "utf8");
-		}
-	}
-	const projectedEntries = alpha.entries + memMd.length - freedIds.size;
-	const projectedBytes =
-		alpha.bytes +
-		memMd.reduce((s, e) => s + Buffer.byteLength(bookText(e), "utf8"), 0) -
-		freedBytes;
-	if (projectedEntries > ALPHA_MAX_ENTRIES || projectedBytes > ALPHA_MAX_BYTES) {
-		return rejectIngest(
-			targetRoot,
-			request,
-			channel,
-			"AMBER_E_MEMORY_BUDGET_EXCEEDED",
-			`α budget: entries ${projectedEntries}/${ALPHA_MAX_ENTRIES}, bytes ${projectedBytes}/${ALPHA_MAX_BYTES} (net of ${freedIds.size} β-freed) — split the batch or supersede an existing entry`,
-			entryIds,
-		);
-	}
-	return null;
-}
-
-// Stage 5: γ rate-limit over the full admission mixed pool (§6.5 C4×M14):
+// Stage 4: γ rate-limit over the full admission mixed pool (§6.5 C4×M14):
 // current candidates + queued un-admitted candidates from other open
 // requests, ranked K1/K2/K3, truncated to the window's remaining quota —
 // the whole current batch must land inside the admitted slice. Returns the
@@ -702,7 +655,7 @@ function approveReject(args, targetRoot, entry, entryId, requestId) {
 	};
 }
 
-// C3 β pair: approving an entry that carries supersedeTarget completes the
+// C3 replacement pair: approving an entry that carries supersedeTarget completes the
 // pair atomically — the pointed active/needs-re-review entry → superseded.
 function approveSupersedePair(targetRoot, entry, entryId, requestId) {
 	const supersedeTarget = entry.supersedeTarget;
@@ -746,7 +699,7 @@ function approveSupersedePair(targetRoot, entry, entryId, requestId) {
 	return {
 		errors: [],
 		warnings: [],
-		text: `${CREED_HINT}\n\napproved ${entryId}; superseded ${supersedeTarget} (β pair). Write to MEMORY.md, then \`amber memory book\`.`,
+		text: `${CREED_HINT}\n\napproved ${entryId}; superseded ${supersedeTarget}. Write to MEMORY.md, then \`amber memory book\`.`,
 		decision: "approve",
 		entryId,
 		supersededEntryId: supersedeTarget,
@@ -1059,10 +1012,7 @@ function buildProjection(targetRoot) {
 		.readRequests(targetRoot)
 		.filter((r) => r.status !== "resolved").length;
 	const gamma = gammaWindow(targetRoot);
-	const alpha = alphaState(targetRoot);
-	const utilizationPct =
-		Math.round(Math.max(alpha.entries / ALPHA_MAX_ENTRIES, alpha.bytes / ALPHA_MAX_BYTES) * 1000) /
-		10;
+	const surface = surfaceUsage(targetRoot);
 	return {
 		entries: { ...counts, pendingRequests },
 		gamma: {
@@ -1071,13 +1021,7 @@ function buildProjection(targetRoot) {
 			windowStart: gamma.windowStart,
 			windowEnd: gamma.windowEnd,
 		},
-		alpha: {
-			entries: alpha.entries,
-			maxEntries: ALPHA_MAX_ENTRIES,
-			bytes: alpha.bytes,
-			maxBytes: ALPHA_MAX_BYTES,
-			utilizationPct,
-		},
+		surface,
 	};
 }
 
@@ -1087,7 +1031,7 @@ function renderStatus(p) {
 		"Memory status (registry + events.jsonl; observation only — doctor is the judgment authority):",
 		`  entries: draft ${e.draft}, proposal ${e.proposal}, active ${e.active}, superseded ${e.superseded}, needs-re-review ${e.needsReReview}, abandoned ${e.abandoned}, pending requests ${e.pendingRequests}`,
 		`  gamma:   ${p.gamma.windowAdmitted}/${GAMMA_QUOTA} admitted in 168h (remaining ${p.gamma.quotaRemaining})`,
-		`  alpha:   ${p.alpha.entries}/${p.alpha.maxEntries} entries, ${p.alpha.bytes}/${p.alpha.maxBytes} bytes (${p.alpha.utilizationPct}% utilization)`,
+		`  surface: ${p.surface.entries} entries, ${p.surface.bytes} bytes in ${MEMORY_MD}`,
 	].join("\n");
 }
 
@@ -1144,11 +1088,9 @@ module.exports = {
 	handleStatus,
 	buildProjection,
 	// exported for tests / doctor reuse
-	alphaState,
+	surfaceUsage,
 	gammaWindow,
 	computeEntryIdFor,
-	ALPHA_MAX_ENTRIES,
-	ALPHA_MAX_BYTES,
 	GAMMA_QUOTA,
 	GAMMA_WINDOW_MS,
 	AUTO_ABANDON_THRESHOLD,

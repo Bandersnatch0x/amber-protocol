@@ -33,13 +33,7 @@ const { remedyFor } = require("./lifecycle");
 
 const memoryStore = require("./memory-store");
 const { hashFile } = require("./context-hash");
-const {
-	alphaState,
-	gammaWindow,
-	GAMMA_QUOTA,
-	ALPHA_MAX_ENTRIES,
-	ALPHA_MAX_BYTES,
-} = require("./memory-policy");
+const { gammaWindow, GAMMA_QUOTA } = require("./memory-policy");
 const { sha256, canonicalJson } = require("./context-hash");
 
 const { CLI_VERSION } = require("./constants");
@@ -114,6 +108,23 @@ function doctorProductRepo(targetRoot, classification) {
 		warnings: profileResult.warnings.length,
 	});
 
+	// Memory layer: a product repo can carry MEMORY.md and a registry, so the
+	// same checks a governed target runs apply here. Skipping them hid real
+	// source drift behind a green doctor (F086).
+	if (
+		pathExists(statePath(targetRoot, "memory")) ||
+		pathExists(path.join(targetRoot, "MEMORY.md"))
+	) {
+		const memoryResult = doctorMemoryRules(targetRoot);
+		errors.push(...memoryResult.errors);
+		warnings.push(...memoryResult.warnings);
+		productChecks.push({
+			name: "memory-layer",
+			errors: memoryResult.errors.length,
+			warnings: memoryResult.warnings.length,
+		});
+	}
+
 	return {
 		target: targetRoot,
 		classification,
@@ -129,8 +140,6 @@ function doctorProductRepo(targetRoot, classification) {
 // function owns the six read-only increments over the registry + the memory-*
 // event subset. One-shot load; never spawns a subprocess (executesAnything:
 // false) — git "tracking" is inferred from filesystem markers only.
-const ALPHA_REVIEW_ENTRIES = 25; // 50% of the §6.3 entry budget (rule 6)
-const ALPHA_REVIEW_BYTES = 4096; // 50% of the §6.3 byte budget (rule 6)
 const MEMORY_TRIPLET_KEYS = ["approvalPolicy", "loopLedger", "workspaceIsolation"];
 
 // Rule 9 anchor: normHash of the three governance blocks that must be verbatim
@@ -292,26 +301,13 @@ function doctorMemoryRules(targetRoot) {
 		);
 	}
 
-	// Rule 5 — 预算与限速合规: recompute α level and γ consumption from the
-	// physical surface and the ledger; physical over-limit or an over-quota
-	// ledger is an error (tamper / drift between the two counting surfaces).
-	const alpha = alphaState(targetRoot);
-	if (alpha.entries > ALPHA_MAX_ENTRIES || alpha.bytes > ALPHA_MAX_BYTES) {
-		errors.push(
-			`Memory α budget physically exceeded: ${alpha.entries}/${ALPHA_MAX_ENTRIES} entries, ${alpha.bytes}/${ALPHA_MAX_BYTES} bytes on MEMORY.md — prune or supersede before any further admission.`,
-		);
-	}
+	// Rule 5 — 限速合规: recompute γ consumption from the ledger; an over-quota
+	// ledger is an error (tamper / drift between ledger and quota). F086 retired
+	// the α total cap, so physical surface size is reported elsewhere, not judged.
 	const gamma = gammaWindow(targetRoot);
 	if (gamma.windowAdmitted > GAMMA_QUOTA) {
 		errors.push(
 			`Memory γ ledger admits ${gamma.windowAdmitted} entries in the 168h window but the quota is ${GAMMA_QUOTA} — ledger and budget disagree (fail-closed).`,
-		);
-	}
-
-	// Rule 6 — α 50% 强制复审 (#173-Q5): either dimension crossing 50% utilisation.
-	if (surface.entries >= ALPHA_REVIEW_ENTRIES || surface.bytes >= ALPHA_REVIEW_BYTES) {
-		warnings.push(
-			`Memory α budget ≥ 50% utilised (${surface.entries}/${ALPHA_MAX_ENTRIES} entries, ${surface.bytes}/${ALPHA_MAX_BYTES} bytes) — forced review: prune or supersede before it exhausts.`,
 		);
 	}
 

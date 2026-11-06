@@ -69,7 +69,8 @@ const COMMAND_HELP = {
 		"  amber handoff bundle --target path/to/repo --replay-scope run-<sessionId>-<attemptId>",
 		"  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
 	],
-	doctor: "Run Amber guardrail checks and target classification.",
+	doctor:
+		"Run Amber guardrail checks and target classification. Conditional write: when an active memory entry's provenance or booked surface has drifted, doctor marks that entry needs-re-review (registry only; MEMORY.md is never written).",
 	drift:
 		"CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail.",
 	plan: [
@@ -621,7 +622,7 @@ const COMMAND_HELP = {
 		"  book       Register a MEMORY.md surface hash and promote booked entries to active.",
 		"             --ratify --claim <text> ratifies a human direct edit directly (γ-free).",
 		"  abandon    Explicit human abandon of a request or entry (terminal ledger marker).",
-		"  status     Read-only three-section projection (entries / gamma / alpha).",
+		"  status     Read-only three-section projection (entries / gamma / surface).",
 		"",
 		"Boundary: Amber detects, admits, and registers; humans curate MEMORY.md and approve.",
 		"",

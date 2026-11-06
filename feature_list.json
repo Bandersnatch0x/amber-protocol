@@ -3321,6 +3321,78 @@
 				"surfaces": [],
 				"owner": "standard"
 			}
+		},
+		{
+			"id": "F086",
+			"priority": 86,
+			"area": "memory",
+			"title": "Retire the memory alpha budget and keep surface usage observable",
+			"user_visible_behavior": "amber memory status reports physical MEMORY.md usage as entries and bytes with no budget ceiling or utilisation percentage, ingest no longer refuses an entry because the surface is large, supersession keeps working as ordinary knowledge replacement, and amber doctor checks the memory layer for product repositories instead of skipping it.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/memory-dispatch.test.js tests/integration/memory-commands.test.js",
+				"node --test tests/unit/doctor-remedy.test.js tests/integration/amber-mcp.test.js",
+				"node scripts/verify-public-docs.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/memory-dispatch.test.js tests/integration/memory-commands.test.js",
+					"result": "39 pass / 0 fail",
+					"date": "2026-11-06",
+					"notes": "Slices 1-2: the status envelope projects surface instead of alpha, an oversized batch is admitted, the retired ceiling and 50% review no longer fire, and supersession still pairs."
+				},
+				{
+					"command": "node --test tests/unit/doctor-remedy.test.js tests/phase-v1-5.test.js tests/integration/amber-mcp.test.js",
+					"result": "49 pass / 0 fail",
+					"date": "2026-11-06",
+					"notes": "Slices 5-6: a hermetic product-repo fixture now has source drift reported by doctor() and listed in productChecks, and the MCP status payload exposes surface with no alpha."
+				},
+				{
+					"command": "npm run docs:gen:check; node scripts/verify-public-docs.js",
+					"result": "both exit 0",
+					"date": "2026-11-06",
+					"notes": "Slices 7-9: the generated CLI reference and the knowledge corpus were rebuilt from the amended source, and the public documentation seam passes."
+				},
+				{
+					"command": "npm test",
+					"result": "4300 tests, 4296 pass, 4 skipped (sh unavailable), 0 fail, exit 0",
+					"date": "2026-11-06",
+					"notes": "Slice 11: whole-suite run on the committed implementation tree."
+				}
+			],
+			"notes": [
+				"Retiring the alpha budget is an explicit replacement of spec sections 6.3 and 6.4, which the spec itself pins to a #173-level adjudication rather than a threshold tweak.",
+				"The gate measured a claim's first line plus a provenance stub, so a 20,009-byte claim projected as 50 bytes; a hard cap that cannot measure what it caps is a false guarantee.",
+				"Supersession survives as an independent capability; only its exhaustion-triggered obligation disappears.",
+				"Losing a total cap is the accepted cost: growth becomes a curation duty under the MEMORY.md creed, and gamma still rate-limits intake."
+			],
+			"paths": [
+				"scripts/lib/core/memory-policy.js",
+				"scripts/lib/memory-commands.js",
+				"scripts/lib/core/memory-store.js",
+				"scripts/lib/core/doctor.js",
+				"scripts/lib/core/error-catalog.js",
+				"scripts/lib/command-registry.js",
+				"action-types/memory-status.json",
+				"docs/specs/2026-08-21-governed-memory-layer.md",
+				"docs/adr/0018-governed-memory-layer.md",
+				"docs/CLI_REFERENCE.md",
+				"docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md",
+				"templates/MEMORY.md",
+				"MEMORY.md",
+				"apps/docs/docs/reference/cli/memory.md",
+				"apps/docs/docs-manifest.json",
+				"docs/knowledge-corpus/knowledge-base.output.json",
+				"docs/knowledge-corpus/knowledge-context-manifest.json",
+				"tests/unit/memory-dispatch.test.js",
+				"tests/integration/memory-commands.test.js",
+				"tests/unit/doctor-remedy.test.js",
+				"tests/integration/amber-mcp.test.js",
+				"tests/phase-v1-5.test.js",
+				"CHANGELOG.md"
+			],
+			"updated": "2026-11-06"
 		}
 	]
 }

@@ -10,13 +10,13 @@ tags: [memory, governance, promotion, dreaming, registry, mcp]
 
 # Governed Memory Layer 实现 Spec
 
-> 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、α/β/γ 预算闸门、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
+> 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、γ 限速与物理用量观测（α/β 预算已于 F086 退役）、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
 
 **Date:** 2026-08-21 ｜ **Status:** accepted（与 ADR-0018 Accepted、F033/F034 accepted 对齐；批次 A + T1/T2 已落地）｜ **ADR:** [ADR-0018 Governed Memory Layer](../adr/0018-governed-memory-layer.md)
 
 **Tracker:** map [#169](https://github.com/Bandersnatch0x/amber-protocol/issues/169) · #171 业界调研 · [#170](https://github.com/Bandersnatch0x/amber-protocol/issues/170) 对象模型 · [#172](https://github.com/Bandersnatch0x/amber-protocol/issues/172) 写回闸门 · [#173](https://github.com/Bandersnatch0x/amber-protocol/issues/173) 晋升规则 · [#174](https://github.com/Bandersnatch0x/amber-protocol/issues/174) dreaming loop · [#175](https://github.com/Bandersnatch0x/amber-protocol/issues/175) 动词表面
 
-**Implementation status (2026-09):** Batch A (F033) and T1/T2 write-back mounting (F034) are **accepted**. Core verb surface (`request`/`ingest`/`approve`/`book`/`abandon`/`status`), registry, doctor rules, and MEMORY.md `## Entries` + `###` α-count shape are in tree. **Deferred (no code in this change):** dreaming loop enable (`memory-maintenance-dreaming` trigger remains `enabled: false`); maintenance verb surface (`collect`/`inspect` and product persistence path — §15.1 / #174-M6).
+**Implementation status (2026-09):** Batch A (F033) and T1/T2 write-back mounting (F034) are **accepted**. Core verb surface (`request`/`ingest`/`approve`/`book`/`abandon`/`status`), registry, doctor rules, and MEMORY.md `## Entries` + `###` surface-count shape are in tree (the alpha budget those counts once fed was retired by F086). **Deferred (no code in this change):** dreaming loop enable (`memory-maintenance-dreaming` trigger remains `enabled: false`); maintenance verb surface (`collect`/`inspect` and product persistence path — §15.1 / #174-M6).
 
 ---
 
@@ -107,7 +107,7 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 | draft→proposal | ingest 验收准入 | `memory-ingest` |
 | proposal→active | approve 之后人写入 MEMORY.md，`book` 登记 surface 哈希 | `memory-approval` + `memory-book` |
 | proposal→draft | `approve --decision reject`（reason 强制非空） | `memory-approval`（reject）+ 条目 `lastRejection` |
-| active→superseded | β pair：approve 批准带 supersedeTarget 指针的条目，同调用原子完成 | 同调用两条 `memory-approval` 事件 |
+| active→superseded | supersession pair：approve 批准带 supersedeTarget 指针的条目，同调用完成 | 同调用两条 `memory-approval` 事件 |
 | active→needs-re-review | surface normHash 漂移 / 源漂移检出（doctor） | 状态字段迁移 + doctor 发现 |
 | needs-re-review→active | 重新 `book` 登记当前 surface 哈希（**Spec-defined 复位通道**：五动词闭集下唯一在系统内的复位路径，复用 book "登记 surface 与哈希"的已裁语义） | `memory-book` |
 | needs-re-review→superseded / abandoned | β 指针 / 人显式 abandon | 同上对应事件 |
@@ -150,7 +150,7 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 
 ### 5.3 ingest（机械验收，全有或全无）
 
-五段验收逐元素执行：ajv → `checkRequestBinding` 逐源哈希比对 → provenance 哈希校验 → α 预算（§6.3）→ γ 限速（§6.5）；通过后逐条目写入 registry，各自独立成为 proposal。
+四段验收逐元素执行：ajv → `checkRequestBinding` 逐源哈希比对 → provenance 哈希校验 → γ 限速（§6.5）；通过后逐条目写入 registry，各自独立成为 proposal。容量不再参与准入（§6.3 退役）。
 
 - **C4（γ 接口）**：单次提交全有或全无——`entries[]` 超当期剩余 γ 配额即整体拒绝（`AMBER_E_MEMORY_RATE_LIMITED`），request 保留，缩减后重交；无"部分入账部分挂起"半状态。
 - **signal 校验落点**（#174-M13）：request 的 `provenance.signal` 取值 = §6.1 闭集信号 id 之一；转换类与 dreaming 通道缺失或不属闭集即 ingest 拒绝（`AMBER_E_MEMORY_SIGNAL_INVALID`）；T1/T2 与逃生舱通道按吸收规则/豁免条款免于强制（§6.2；**Spec-defined 通道清单**）。
@@ -162,7 +162,7 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 - **A1 粒度**：每次调用处理**恰好一个 entryId**（复用 `validateBookingOwner` "强制恰好一个"范式）；批量提案以脚本化循环逐条审批表达，人的审查粒度永不从"条目"退化到"批"。
 - **A2 留痕**：审批记录只写两处——(i) `events.jsonl` 的 `memory-approval` 事件 `{entryId, requestId, decision, reason?, decidedBy:"human", at}`；(ii) registry 条目状态字段。不产生 `decision.json`、不写 loop ledger、不动 session timeline（18 种事件深锁）。
 - **A4 拒绝驱动迁移**：`--decision reject` 时 `--reason` 强制非空（handler 校验），proposal→draft，拒绝理由记录于事件与条目 `lastRejection`。
-- **C3 β pair 原子性**：批准带 `supersedeTarget` 指针的条目时，同一调用原子完成 pair——新条目获准 + 被指条目 active→superseded，两条事件同调用写入；部分批准天然成立（未决条目停留 proposal 直至终态处置）。
+- **C3 supersession 配对**：批准带 `supersedeTarget` 指针的条目时，同一调用完成 pair——新条目获准 + 被指条目 active→superseded，两条事件同调用写入；部分批准天然成立（未决条目停留 proposal 直至终态处置）。这是"同一调用内完成"，不是崩溃可恢复事务：两次 registry 写入之间失败仍可能留下半对，恢复属人工。F086 明确不升级该保证。
 - **A3 身份门**：非 TTY 无 `--yes` 即拒绝；templates 指示 agent 永不传 `--yes`；`COMMAND_CAPABILITIES` 注册 `approver:"human"`；MCP F018 下 mutating Action approval-required。
 - **spec 约束**（#173-Q1）：approve 命令输出须展示 creed（`templates/MEMORY.md` 准入/排除全文）提示，使语义标准在决策点机械在场；机械信号不是 creed 的语义代理，前瞻语义判断的法定执行点是 approve 时的人。
 
@@ -171,9 +171,9 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 - **主轨（governed-promotion）**：approve 之后，人（或人明确指令下的宿主 agent）将条目文本写入 MEMORY.md，`book` 只读登记 MEMORY.md 当前 normHash 入 registry（不写文件、不解析条目行）、条目 proposal→active；后续哈希漂移使条目进入 needs-re-review（#170 surface 哈希登记条款）。
 - **批量**：book 可批量登记同一 MEMORY.md 哈希下的多条目 → active（#172-系统性二）。
 - **origin 双值**（#173 追认强化 1）：book 必须记录来源类别 `origin ∈ {governed-promotion, human-direct-ratification}`。
-- **追认轨（human-direct-ratification）**：人直编 MEMORY.md 后经 book 追认并入治理账本。**Spec-defined 机械形态**：追认 book 直接在 registry 创建 active 条目（无前置 request/ingest/approve），provenance 指向编辑事实本身（surface 路径 + 时间 + normHash），knowledgeKind 由人选择（7 枚举含 `unspecified`），targetSurface=MEMORY.md；追认非 ingest 准入，故不耗 γ；α 经 MEMORY.md 物理计数天然覆盖（内容已在文件中）。
+- **追认轨（human-direct-ratification）**：人直编 MEMORY.md 后经 book 追认并入治理账本。**Spec-defined 机械形态**：追认 book 直接在 registry 创建 active 条目（无前置 request/ingest/approve），provenance 指向编辑事实本身（surface 路径 + 时间 + normHash），knowledgeKind 由人选择（7 枚举含 `unspecified`），targetSurface=MEMORY.md；追认非 ingest 准入，故不耗 γ；物理用量由 status 的 surface 观测，不受任何硬预算约束。
 - **无前置 approve 事件的 book 触发 doctor 告警**（ratification-class 提示，#173 追认强化 2，见 §11）。
-- **β 前提**（#173 追认强化 4）：supersedeTarget 只能指向 registry 内条目——直编内容欲被 supersede，先 book 追认。
+- **supersession 前提**（#173 追认强化 4）：supersedeTarget 只能指向 registry 内条目——直编内容欲被 supersede，先 book 追认。
 - **book 时 git 检测**（#173-Q6）：登记时检测目标 surface 不在 git 追踪范围 → 输出非阻塞 warning。
 - **needs-re-review 复位**：对 needs-re-review 条目重新 book 登记当前 surface 哈希 → active（§4.1）。
 - **权威转移条款**（#170-Q3）：晋升批准即权威转移至 consumer-owned 条目，源 notes 片段降为历史残留；反向指针是 best-effort provenance metadata 非承重结构，目标消失不得使条目失效（对照 `AMBER_E_CONTEXT_SOURCE_MISSING` 对 immutable source 仅 informational 的判例）。
@@ -186,7 +186,7 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 - **F4 消费面过滤**：loadout/governance/web 读取一律过滤 abandoned；doctor 只报统计 warning。
 - **ceremony 上限**（#172-系统性二）：一次触发 → 1 request（1..N 条目）→ 1 ingest（全有或全无）→ N 次条目级 approve → 1 book；稳态人工 ceremony 上限 = γ = 5 审批 + 1 book / 周期，机器 ceremony O(1)/触发。
 
-## 6. 晋升资格与预算（α/β/γ）
+## 6. 晋升资格与约束（γ 限速；α/β 预算已退役）
 
 ### 6.1 信号闭集（机械地板 + 人治天花板，#173-Q1）
 
@@ -210,18 +210,16 @@ spec 约束：dreaming proposal 必须引用闭集信号之一，**禁止单次�
 - **合法对象约束**：转换仅限候选中的**决策知识成分**（"为何/应当如何决策"）；行为性修正（regression test、standard diff）留在原管道落行为面；approve 时审批人以 creed 排除项第 4 条（仓库已自记的机械事实）为拒绝依据，A4 reason 留痕。
 - **双权威规则**：同一候选同时走行为面晋升与记忆转换时，目标物不同不构成权威重复；若记忆条目与已落面 standard 表述同一事实，适用 β supersede 逻辑（提名人声明 supersedeTarget 或 approve 时说明分工）；转换 request 的 provenance 反向指针使两条管道关联可被 doctor 审计。
 
-### 6.3 α 预算闸门（#173-Q5 钉死）
+### 6.3 表面用量观测（F086 退役 α 预算）
 
-- **计数对象**：MEMORY.md 的 **surface 物理量**（不计 registry 条目数）——条目数 = MEMORY.md 中条目分隔结构（§10.3）的确定性解析计数；字节数 = 文件归一化后字节数。两者零语义判断、可机械扫描。
-- **初始值**：**条目数 ≤ 50 ∧ 字节数 ≤ 8 KB**（明文标注：先验值，非实证值）。
-- **闸门语义**：预算耗尽时晋升准入被机械拒绝（新 proposal 排队而非旧条目被删），fail-closed 零删除；α 拒绝输出必须携带 remedy 指引（拆分为多条、或经 β 指认 supersedeTarget 腾出预算），**禁止裸拒绝**。
-- **准入算术（Spec-defined）**：预算耗尽状态 = 当前条目数 ≥ 50 或当前字节数 ≥ 8192；该状态下 ingest 拒绝 targetSurface=MEMORY.md 的新准入（`AMBER_E_MEMORY_BUDGET_EXCEEDED` + remedy）；未耗尽时准入检查 = 当前条目数 + 本批拟准入 MEMORY.md 条目数（β pair 被指条目计入腾出）≤ 50 **且** 当前字节数 + Σ 该批 bookText（§10.3）字节数 ≤ 8192。
-- **50% 强制复审**：任一维度首次达到 50% 利用率（25 条或 4 KB）时 doctor 输出强制复审提示（§11）。
-- **调整程序**：调整须走与 #173 同级裁决议题；批准调整时若存量超限，迁移计划随裁决一并钉死，禁止"先调数后处置"。
+- **退役记录**：α 硬预算（条目数 ≤ 50 ∧ 字节数 ≤ 8 KB）与 §6.4 的强制 β 一进一出于 F086 退役，取代原 #173-Q5 裁决。退役依据是实测缺陷，不是阈值偏好：准入估算 `bookText` 只渲染 claim 首行加溯源桩（20,009 字节的 claim 计为 50 字节）；β 的额度抵扣只减 registry 条目，不校验被指条目是否绑定到对应 Markdown 区块；准入不为待落盘 proposal 预留空间、`book` 也不复核；§6.3 的"耗尽即拒绝"与 §6.4 的"耗尽可一进一出"互相矛盾；"拆分为多条"的 remedy 无法减少内容字节。裁决正文见 `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`。
+- **保留的观测**：`amber memory status` 仍投影 MEMORY.md 的物理条目数（`## Entries` 区内 `^### ` 行数）与归一化字节数（CRLF→LF、去 BOM、去行尾空白），但不给上限、利用率，也不产生拒绝。
+- **保留的增长约束**：γ 限速（§6.5）与人工审批（§5.4）继续生效。γ 压的是准入速率，不是总量，不能当作 α 的替代物。
+- **接受的代价**：不再有自动总量封顶。MEMORY.md 的增长由 creed、逐条审批与人工整理承担。
 
-### 6.4 β one-in-one-out（#170 条款 β + #172-C3）
+### 6.4 supersession（原 β 一进一出退役）
 
-预算耗尽状态下，提案获准的**必要条件**是提名人指明被 supersede 的既有条目（`supersedeTarget` 一对一指针）且该 supersession 同批获人批准——"进一条必须出一条"，膨胀数学上封顶为预算值。指针只能指向 registry 内条目（直编内容先 book 追认）；approve 批准带指针条目时同调用原子完成 pair（§5.4）。
+supersession 保留为独立能力，不再与预算绑定：条目可携带 `supersedeTarget` 指向既有 registry 条目（直编内容先 book 追认），approve 批准带指针条目时同调用完成 pair（§5.4；不是崩溃可恢复事务），`needs-re-review` 亦为合法来源状态。它不再是"预算耗尽时的必要条件"，也不计算腾出额度；空 surface 的第一条条目无需配对即可准入。
 
 ### 6.5 γ 提案限速与 K1/K2/K3 排序（#174-M7/M14/M16）
 
@@ -297,7 +295,7 @@ spec 约束：dreaming proposal 必须引用闭集信号之一，**禁止单次�
 | 动词 | CLI | MCP | 形态 |
 | --- | --- | --- | --- |
 | `amber memory request` | ✓ | ✗（白名单） | 产 request（触发/转换/逃生舱/追认前提名） |
-| `amber memory ingest` | ✓ | ✗（白名单） | 机械验收准入（γ/α/排序在此生效） |
+| `amber memory ingest` | ✓ | ✗（白名单） | 机械验收准入（γ/排序在此生效） |
 | `amber memory approve` | ✓ | ✓ `amber.memory.approve`（mutating，approval-required） | 条目级人工审批（A1/A3/A4） |
 | `amber memory book` | ✓ | ✗（白名单） | surface 登记 + 双轨 origin（§5.5） |
 | `amber memory abandon` | ✓ | ✓ `amber.memory.abandon`（mutating，approval-required） | F1(ii) 人显式入口（F1(i) 自动路径不经 MCP，#175-M2/M4） |
@@ -315,12 +313,11 @@ M1：CLI 子命令面与 MCP 工具名 `amber.memory.<同名动词>` 一一对�
                "needsReReview": 0, "abandoned": 0, "pendingRequests": 0 },
   "gamma": { "windowAdmitted": 0, "quotaRemaining": 5,
              "windowStart": "<T-168h>", "windowEnd": "<T>" },
-  "alpha": { "entries": 0, "maxEntries": 50, "bytes": 0, "maxBytes": 8192,
-             "utilizationPct": 0.0 }
+  "surface": { "entries": 0, "bytes": 0 }
 }
 ```
 
-M8 权威归属：α 50% 强制复审**告警**职责唯一归 doctor；γ 超限**拒绝**职责唯一归 ingest；status 只投影数值不做判定——doctor 是判定权威、status 是观测投影，二者读取同一数据源（registry + events.jsonl），无第二权威。M9 同批次纪律：status 的机械注册项（schema enum、capability、action-type JSON、四表）必须与 handler 实现及数据基底（registry 读取器 + events.jsonl 聚合器）在同一实施批次（同一 PR）落地，批次测试必须含 `memory status --json` CLI 实调断言与 MCP tools/call 断言——测试是"注册了且实现了"的机械证明，填补 validateWhitelist 不校验 handler 的已知空洞。
+M8 权威归属：γ 超限**拒绝**职责唯一归 ingest；status 只投影数值不做判定——doctor 是判定权威、status 是观测投影，二者读取同一数据源（registry + events.jsonl），无第二权威。`surface` 只报物理条目数与归一化字节数，不含上限与利用率（§6.3 退役）。M9 同批次纪律：status 的机械注册项（schema enum、capability、action-type JSON、四表）必须与 handler 实现及数据基底（registry 读取器 + events.jsonl 聚合器）在同一实施批次（同一 PR）落地，批次测试必须含 `memory status --json` CLI 实调断言与 MCP tools/call 断言——测试是"注册了且实现了"的机械证明，填补 validateWhitelist 不校验 handler 的已知空洞。
 
 ### 8.3 注册轨道：单轨 + 白名单分流（系统性一"第四出路"）
 
@@ -387,24 +384,24 @@ M8 权威归属：α 50% 强制复审**告警**职责唯一归 doctor；γ 超�
 | --- | --- | --- | --- |
 | `schemaVersion` | string | ✓ | enum `["1.0.0"]` |
 | `entryId` | string | ✓ | `^sha256:[0-9a-f]{64}$`；**定义** = 规范化 JSON（键字典序、无填充空白、UTF-8）of `{claim, knowledgeKind, targetSurface, sources, supersedeTarget?}` 的 sha256——修订内容即新 entryId |
-| `claim` | string | ✓ | minLength 1（不设 maxLength——体量由 α 字节预算治理，最小增量） |
+| `claim` | string | ✓ | minLength 1（不设 maxLength——MEMORY.md 的物理用量由 status 观测，不受硬预算约束） |
 | `knowledgeKind` | string | ✓ | 7 枚举（§2.2） |
 | `targetSurface` | string | ✓ | 4 值闭集（#173-Q4；枚举扩列须裁决程序） |
 | `provenance.sources[]` | array | ✓ | minItems 1；元素同 context-request source descriptor（kind/ref/rawHash/mutable/normHash 或 excerpt+excerptHash）+ `backref?`（反向指针，best-effort 非承重，#170-Q3） |
-| `supersedeTarget` | string | ✗ | 一对一 entryId 指针（#172-C3）；预算耗尽时为获准必要条件（β） |
+| `supersedeTarget` | string | ✗ | 一对一 entryId 指针（#172-C3）；任何水位均可选的 supersession 指针，不再与预算绑定 |
 | `related[]` | array | ✗ | `[entryId]`；best-effort 提示非结构，断链仅 doctor warning（#172-Q4 处置） |
 
 registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：draft/proposal/active/superseded/needs-re-review/abandoned）、`origin?`（2 值）、`approvedAt?`、`lastRejection?{reason, at}`、`rejectionCount?`（血统链累计）、`bookedSurface?{path, normHash, bookedAt}`、`createdAt`、`updatedAt`。条目 schema 不设超过状态机所需的元数据字段（#170 攻击 3 约束）。
 
-### 10.3 MEMORY.md 条目分隔结构与 α 计数（α 计数的机械前提）
+### 10.3 MEMORY.md 条目分隔结构与物理用量观测
 
-现状缺口：`templates/MEMORY.md` 仅 21 行 creed，未定义条目格式——#173-Q5 的 α 计数依赖本节定义（**Spec-defined**）：
+现状缺口：`templates/MEMORY.md` 仅 21 行 creed，未定义条目格式——status 的 surface 计数依赖本节定义（**Spec-defined**）：
 
 - **条目区**：二级标题 `## Entries`（既有 creed 小节保留不动）。
 - **条目分隔**：条目区内每个 `^### `（三级标题行）起始一个条目，至下一个 `^### ` 行或文件末尾。
-- **条目计数**（α 条目维度）= 条目区内 `^### ` 行数（确定性正则可解析，零语义判断）。
-- **字节数**（α 字节维度）= 归一化后 UTF-8 字节数；归一化 = CRLF→LF、去 BOM、去行尾空白。
-- **bookText**（α 准入预估与 book 登记锚，Spec-defined 最简形态）：条目渲染 = `### <claim 首行>` 一行 + 溯源行 `> provenance: <surface 路径>@<normHash 前 12 位>`；人写入 MEMORY.md 时以此为准（不禁止人类增补叙述，α 字节以落盘后实测为准）。
+- **条目计数** = 条目区内 `^### ` 行数（确定性正则可解析，零语义判断），由 status 的 `surface.entries` 投影。
+- **字节数** = 归一化后 UTF-8 字节数；归一化 = CRLF→LF、去 BOM、去行尾空白，由 status 的 `surface.bytes` 投影。
+- **条目渲染**（人写入 MEMORY.md 时的建议形态）：`### <claim 首行>` 一行 + 溯源行 `> provenance: <surface 路径>@<normHash 前 12 位>`；允许人类增补叙述，物理用量以落盘后实测为准。F086 删除了在此之上做准入预估的 `bookText`。
 - **模板修订建议**（供实施批次采纳，本 spec 不改模板）：`templates/MEMORY.md` 增加 `## Entries` 区与一条示例条目；增加追认义务提示行（"直接编辑后请运行 `amber memory book` 追认"，#173-Q2）；init scaffold 的 `.gitignore` 模板增加 `!/MEMORY.md` re-include **建议**（advisory 带注释，复制 `!/feature_list.json` 惯例；注明 "governed shared memory — tracked by git by default"，从 "Local working files" 并列语义中显式区隔，#173-Q6）。
 
 ### 10.4 其余机械定义（Spec-defined）
@@ -421,8 +418,8 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 | 2 | 源健康：provenance 源可解析且哈希相符；源失效/哈希漂移 → 条目机械进入 needs-re-review（`AMBER_E_MEMORY_SOURCE_STALE`，复用 D4/D5 mutable-source refresh 机制） | error→状态迁移 |
 | 3 | 反向指针与 related 指针：best-effort，目标消失只报 warning，**永不使条目失效** | warning |
 | 4 | surface 漂移：MEMORY.md 登记 normHash 漂移 → 关联条目 active→needs-re-review；漂移检出且**无关联 registry 条目**时必须给出二选一 remedy 文案（book 一条 human-direct-ratification 条目，provenance 指 surface 路径+时间+normHash；或人工回退），**禁止只报"哈希变了"**（#173 追认强化 3） | 状态迁移 + remedy |
-| 5 | 预算与限速合规：重算当期 γ 消耗与 α 水位，账本-registry 计数不符即 error | error |
-| 6 | α 50% 强制复审：任一维度首次达到 25 条或 4 KB → 强制复审提示（#173-Q5） | 提示 |
+| 5 | 限速合规：重算当期 γ 消耗，账本-registry 计数不符即 error。物理 surface 用量只作观测，不参与判定（F086 退役 α 预算） | error |
+| 6 | 已退役：原 α 50% 强制复审随 §6.3 一并撤销；不替代以新的阈值提示 | 退役 |
 | 7 | ratification-class 告警：无前置 approve 事件的 book（#173 追认强化 2），与 needs-re-review 并列 | warning |
 | 8 | acknowledged divergence：目标仓库 .gitignore 忽略 MEMORY.md = 知情分歧类别而非缺陷——报一次、附 remedy 文案（re-include 或接受 L2 降级），不作持续告警（#173-Q6） | 一次性告知 |
 | 9 | pack 三件套一致性（Spec-defined，#174 开放点）：memory-maintenance 与 safe-amber-bootstrap 的 approvalPolicy/loopLedger/workspaceIsolation 三块声明逐字一致（normHash 比对），不一致 = error，remedy = 同 PR 联动修订 | error |
@@ -440,7 +437,6 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 | `AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID` | 载荷未过 memory-request schema / 字段缺失或类型错误 / 修正后重交（request 保留） | Spec-defined |
 | `AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID` | 条目未过 memory-entry schema（含 signal 闭集/枚举违例在 `AMBER_E_MEMORY_SIGNAL_INVALID` 单列） / 同上 | Spec-defined |
 | `AMBER_E_MEMORY_BINDING_MISMATCH` | checkRequestBinding 逐源哈希比对失败 / 源文件与 request 登记哈希不符 / 重新生成 request | Spec-defined |
-| `AMBER_E_MEMORY_BUDGET_EXCEEDED` | α 预算耗尽状态拒绝新准入 / MEMORY.md 物理条目数或字节数达上限 / remedy 指引：拆分为多条、或经 β 指认 supersedeTarget 腾出预算（禁止裸拒绝） | #170-α、#173-Q5 |
 | `AMBER_E_MEMORY_SIGNAL_INVALID` | provenance.signal 缺失或不属 6 闭集（转换/dreaming 通道） / 引用 #173 闭集信号 id 之一 | #174-M13 |
 | `AMBER_E_MEMORY_APPROVAL_REQUIRED` | 非 TTY 调用人判定动词且无 `--yes` / 非交互环境 / 由人在 TTY 执行或显式 `--yes`（agent 永不传） | #172-A3、#175-M12 |
 | `AMBER_E_MEMORY_ENTRY_NOT_FOUND` | entryId 不在 registry / 指针指向不存在条目 / 核对 `amber memory status` 与 entryId | Spec-defined |
@@ -473,8 +469,8 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 2. **闭集逐字一致**：§2.2 五个闭集与五份裁决逐字一致；实现中任一闭集扩列均构成偏差。
 3. **批次 A 单 PR**：§13 步骤 1–11 同一 PR；步骤 9 全部测试断言绿（含 tools/list 恰 3 新工具、approve/abandon approvalRequired:true 且 executed:false、status executed:true、CLI 实调、seam 白名单放行与无 `--yes` exit 1）。
 4. **gen:agents:check 通过**（动词名进 skills 文本后）。
-5. **dogfood 冒烟可重放**：测试环境重放一次 T1 触发 → request（channel=t1-writeback）→ ingest（proposal）→ approve → book（active, origin=governed-promotion）→ status（entries/gamma/alpha 三段数值断言）全链，断言各事件 kind、状态迁移与 §9 载荷字段在场（本仓 `.amber/context/` 现为空态，冒烟在测试 fixture 环境执行，不依赖真实数据管道）。
-6. **状态机覆盖**：§4.1 全部迁移边有测试（含 needs-re-review 复位、β pair 原子性、F1(i) 血统 3 次自动 abandoned、F3 重建排除 abandoned）。
+5. **dogfood 冒烟可重放**：测试环境重放一次 T1 触发 → request（channel=t1-writeback）→ ingest（proposal）→ approve → book（active, origin=governed-promotion）→ status（entries/gamma/surface 三段数值断言）全链，断言各事件 kind、状态迁移与 §9 载荷字段在场（本仓 `.amber/context/` 现为空态，冒烟在测试 fixture 环境执行，不依赖真实数据管道）。
+6. **状态机覆盖**：§4.1 全部迁移边有测试（含 needs-re-review 复位、supersession 同调用配对、F1(i) 血统 3 次自动 abandoned、F3 重建排除 abandoned）。
 7. **doctor 覆盖**：§11 规则 1–11 各有正/反测试（一致性 fail-closed、二选一 remedy 文案在场）。
 8. **偏差表为空**：实现与本 spec 及五份裁决零冲突；任何偏离先记偏差表并回到裁决程序。
 
@@ -494,7 +490,7 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 
 ### 15.2 Spec-defined 落地项汇总（评审聚焦清单）
 
-§4.1 needs-re-review 复位通道（重新 book）｜§5.1 T2 挂载点定位｜§5.3 signal 强制通道清单｜§5.5 追认 book 机械形态（直接创建 active、不耗 γ）｜§6.1 信号 id 映射｜§6.3 α 准入算术（耗尽判定 + bookText 预估）｜§6.5 K1 的 T1/T2 工件锚定、C4×M14 合成语义｜§7.2-M12 batchId 格式、pack steps 不声明｜§8.2 status 字段名｜§9 事件载荷字段｜§10.1–§10.4 两 schema 字段/schemaVersion "1.0.0"/MEMORY.md 分隔结构/bookText/request 存储/entryId 规范化/身份门细节｜§11 规则 9 pack 三件套检查｜§12 十条新增错误码｜§14 验收标准。
+§4.1 needs-re-review 复位通道（重新 book）｜§5.1 T2 挂载点定位｜§5.3 signal 强制通道清单｜§5.5 追认 book 机械形态（直接创建 active、不耗 γ）｜§6.1 信号 id 映射｜§6.3 表面用量观测（F086 退役 α 预算与 β 义务）｜§6.5 K1 的 T1/T2 工件锚定、C4×M14 合成语义｜§7.2-M12 batchId 格式、pack steps 不声明｜§8.2 status 字段名（entries/gamma/surface）｜§9 事件载荷字段｜§10.1–§10.4 两 schema 字段/schemaVersion "1.0.0"/MEMORY.md 分隔结构与物理用量/request 存储/entryId 规范化/身份门细节｜§11 规则 9 pack 三件套检查｜§12 十条新增错误码（预算码已退役）｜§14 验收标准。
 
 ### 15.3 待裁决问题
 

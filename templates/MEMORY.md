@@ -30,10 +30,11 @@ booked from and the first 12 hex characters of that surface's normalized hash:
 > provenance: MEMORY.md@<normHash first 12>
 ```
 
-An entry runs from one `### ` line to the next `### ` line (or end of file). The
-α budget counts the `### ` lines **inside `## Entries` only**, plus the whole
-file's normalized byte size (CRLF→LF, no BOM, no trailing whitespace). This
-reference example lives outside `## Entries`, so it is never counted.
+An entry runs from one `### ` line to the next `### ` line (or end of file).
+`amber memory status` reports the `### ` lines **inside `## Entries`** and the
+whole file's normalized byte size (CRLF→LF, no BOM, no trailing whitespace) as
+observation only. Nothing caps those numbers: this creed and the approval gate
+curate growth, and gamma still limits admission to five entries per 168 hours.
 
 After editing entries by hand, run `amber memory book` to ratify the change so
 the registered surface hash matches the file again — unratified edits surface as
@@ -42,5 +43,5 @@ a doctor ratification-class warning.
 ## Entries
 
 <!-- Booked entries live here as `### ` blocks, one per entry. Empty until the
-     first entry is booked; the α entry count is the number of `### ` lines in
-     this region. -->
+     first entry is booked; the reported entry count is the number of `### `
+     lines in this region. -->
