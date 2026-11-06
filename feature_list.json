@@ -3236,7 +3236,7 @@
 			"area": "context",
 			"title": "Plan-declared required context enforced at loadout",
 			"user_visible_behavior": "A plan can declare required Context Pages per implement/review role with an explicit freshness floor. A loadout built for that plan and role either places every requirement in the required tier or fails closed with a stable code when a requirement is missing, unhealthy, superseded, time-expired, or older than the declared floor.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/planning.test.js tests/unit/context-loadout.test.js tests/unit/context-freshness.test.js",
 				"node --test tests/unit/context-requirements.test.js tests/unit/context-dispatch.test.js",
@@ -3313,7 +3313,14 @@
 				"apps/docs/docs/reference/cli/context.md",
 				"docs/knowledge-corpus/knowledge-base.output.json",
 				"docs/knowledge-corpus/knowledge-context-manifest.json"
-			]
+			],
+			"updated": "2026-11-06",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-06",
+				"surfaces": [],
+				"owner": "standard"
+			}
 		}
 	]
 }
