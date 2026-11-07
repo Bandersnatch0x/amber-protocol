@@ -19,8 +19,9 @@ defines what a memory entry is, and both add ceremony the owner no longer wants.
    and ignored, so existing scripts do not break.
 2. `ingest` admits every eligible candidate in the request. There is no quota, truncation, pool
    ordering, provenance exemption, charged/exempt partition or `AMBER_E_MEMORY_RATE_LIMITED`.
-3. New `memory-ingest` events carry `entryIds`, `skippedAbandoned` and `batchId` only. Older events
-   that carry γ fields stay readable and are ignored.
+3. Admitted `memory-ingest` events carry no γ or ranking fields; they keep `kind`, `requestId`,
+   `channel`, `outcome`, `entryIds`, `skippedAbandoned` and `batchId`. Rejected events keep their
+   existing `code`. Older events that carry γ fields stay readable and are ignored.
 4. `memory status` projects `entries` and `surface`. It exposes no `gamma` object and no
    corrupt-partition error.
 5. `doctor` no longer judges γ or partition consistency. Its other memory rules are unchanged.

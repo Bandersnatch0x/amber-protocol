@@ -230,9 +230,9 @@ test("conversion channels require a closed-set signal id at ingest", () => {
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
-// ── §6.5 γ gate and the retired α budget ────────────────────────────────────
+// ── retired budgets: the α surface cap and the γ admission limit ────────────
 
-test("ingest admits a batch that would have exceeded the retired alpha budget", () => {
+test("ingest admits six entries in one batch (retired alpha and gamma limits)", () => {
 	const target = mkTarget();
 	const big = "B".repeat(2000);
 	const payload = writePayload(
@@ -244,13 +244,14 @@ test("ingest admits a batch that would have exceeded the retired alpha budget", 
 			entryFor(target, `${big} 3`),
 			entryFor(target, `${big} 4`),
 			entryFor(target, `${big} 5`),
+			entryFor(target, `${big} 6`),
 		]),
 	);
 	assert.equal(run(target, "request", { payload }).exitCode, 0);
 	const ingest = run(target, "ingest", { request: "mreq-alpha-1" });
 	assert.equal(ingest.exitCode, 0);
 	assert.equal(ingest.result.code, undefined);
-	assert.equal(ingest.result.entryIds.length, 5);
+	assert.equal(ingest.result.entryIds.length, 6, "no five-entry window may reappear");
 	fs.rmSync(target, { recursive: true, force: true });
 });
 

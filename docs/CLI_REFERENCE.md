@@ -2866,7 +2866,8 @@ quota, pool ordering, exemption or charged/exempt ledger partition, and `status`
 object. Intake is bounded only by the entry-level human `approve` step.
 
 F089 also retired the non-TTY identity gate on `request`/`ingest`/`book`, so agents may run them
-without `--yes`. `approve`/`abandon` are typed-seam mutations and still require `--yes`/`--confirm`.
+without `--yes`. `approve` and `abandon` still take their explicit `--decision` and `--entry`
+arguments; no `--yes` gate remains anywhere in the memory family.
 
 ```bash
 # Nominate + admit + approve + register (the governed chain)
