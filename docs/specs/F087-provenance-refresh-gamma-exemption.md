@@ -37,14 +37,21 @@ An entry `E` is a **provenance-only refresh** of its predecessor `T` if and only
 4. `E.claim === T.claim`, `E.knowledgeKind === T.knowledgeKind`, and
    `E.targetSurface === T.targetSurface` — **exact, byte-for-byte string equality** (no trimming,
    no case folding, no normalization);
-5. `E` is a distinct identity from `T` (`E.entryId !== T.entryId`), which follows from a changed
-   `sources` binding and is checked explicitly so a byte-identical resubmission can never be
-   mistaken for a refresh.
+5. **the source binding actually changed**: the ordered, de-duplicated multiset of
+   `(kind, ref, rawHash, normHash, excerptHash)` tuples over `E.provenance.sources` differs from
+   `T`'s. Identical bindings (ignoring order) are a **no-op resubmission**, not maintenance, and
+   stay charged;
+6. `E` is a distinct identity from `T` (`E.entryId !== T.entryId`), checked explicitly.
+
+> **Identity is not evidence.** `entryId` hashes `supersedeTarget` as well as the core fields
+> (§10.2), so adding the pointer changes the id even when the sources are untouched. A predicate
+> that inferred "refresh" from `E.entryId !== T.entryId` would let an unchanged resubmission
+> consume zero quota. Condition 5 is therefore explicit and independent.
 
 Everything else is **not** a refresh and stays charged: a changed claim, a changed knowledge kind,
-a changed target surface, a missing predecessor, a predecessor in any other status (draft,
-proposal, superseded, abandoned), a self-referential pointer, and any entry without
-`supersedeTarget`.
+a changed target surface, an unchanged source binding, a missing predecessor, a predecessor in
+any other status (draft, proposal, superseded, abandoned), a self-referential pointer, and any
+entry without `supersedeTarget`.
 
 **Authority.** The predicate is derived only from registry-backed content plus the entry's own
 core text. No payload flag, provenance field, caller identity or `needs-re-review` label can
@@ -93,18 +100,32 @@ that produced it. `gammaChargedEntryIds.length + gammaExemptEntryIds.length === 
 for every event this version writes; legacy events have neither field and keep legacy accounting.
 Rejected and no-change events carry no partition (they admit nothing).
 
+**Partition contract (single validator: `gammaPartitionProblem`).** The charged and exempt
+identities are **disjoint sets** — one identity is either charged or exempt, never both. No
+global de-duplication rule is added: duplicate inputs keep their existing meaning and may repeat
+**within** a side, but the two sides merged must reproduce `entryIds` as an **exact multiset**
+(per-id occurrence counts). Presence is decided by property ownership: only an event with
+**neither** property is legacy; an event carrying **one** property is incomplete. Any of the
+following is a **corrupt ledger**, never silently re-read as legacy or empty: a field of the
+wrong type (string, `null`, mixed array), a missing counterpart, a non-array or non-string
+`entryIds`, an empty-string identity, or an identity on both sides.
+
 ### 3.4 Status projection ([`amber memory status`](2026-08-21-governed-memory-layer.md))
 
-`gamma` gains `windowExempt` (count of exempt admissions in the window) and keeps
-`windowAdmitted` meaning **charged** admissions, so
-`quotaRemaining === max(0, 5 − windowAdmitted)`. The section shape stays three-part
-(entries / gamma / surface); this is an additive field, not a new section.
+`gamma` gains `windowExempt` (count of exempt admissions in the window) and `problems` (corrupt
+partition records in the window, empty when healthy), and keeps `windowAdmitted` meaning
+**charged** admissions, so `quotaRemaining === max(0, 5 − windowAdmitted)`. Corrupt records are
+excluded from both counts. The section shape stays three-part (entries / gamma / surface); these
+are additive fields, not a new section. A non-empty `problems` makes `status` report the same
+errors doctor does and exit non-zero — the projection stays read-only, but it never reports a
+corrupt ledger as healthy. Admission refuses to compute a quota from the same window
+(`AMBER_E_MEMORY_STATE_INVALID`).
 
 ### 3.5 Doctor rule 5
 
 Rule 5 judges the **charged** count (`windowAdmitted > 5` → error) and additionally refuses a
-partition that does not reconstruct (`charged + exempt !== entryIds.length`, or a duplicate
-identity across the two sets) as a fail-closed ledger error. Legacy events are exempt from the
+partition that violates §3.3 (malformed or incomplete fields, non-array identities, or an
+identity on both sides) with a fail-closed ledger error. Legacy events are exempt from the
 partition check and keep prior accounting.
 
 ## 4. Non-goals
@@ -128,8 +149,12 @@ partition check and keep prior accounting.
 ## 6. Verification obligations
 
 Focused tests must cover: zero-quota refresh admitted; zero-quota changed-claim supersession
-refused; mixed batch charging only its non-exempt subset; queued refreshes neither displacing
-charged candidates nor blocked by exhausted quota; repeat admission after the predecessor is
-already superseded (charged, not exempt); invalid/missing predecessor (charged); legacy events
-keeping prior accounting; doctor and status agreeing with the ledger; and the partition
-consistency check. The runner ACK atomic write carries its own deterministic overlap regression.
+refused; **an identical source binding with a `supersedeTarget` pointer charged, not exempt**;
+mixed batch charging only its non-exempt subset; queued refreshes neither displacing charged
+candidates nor blocked by exhausted quota; repeat admission after the predecessor is already
+superseded (charged, not exempt); invalid/missing predecessor (charged); legacy events keeping
+prior accounting; doctor and status agreeing with the ledger; the partition consistency check
+(malformed field types, one-field-only records, non-string identities, cross-side duplicates
+rejected; same-side duplicates legal with an exact multiset); and the **real CLI writer** against
+the Web reader under a deterministic partial-write overlap (the Web-helper-only regression is
+insufficient — production publishes through `scripts/lib/runner-ack.js`).

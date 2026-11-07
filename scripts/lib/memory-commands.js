@@ -592,7 +592,18 @@ function handleIngest(args, targetRoot) {
 // neither displace a charged candidate nor be blocked by an exhausted quota),
 // and is still written as a proposal that needs the human approve/book steps.
 function rankForGammaAdmission(targetRoot, request, channel, entryIds, effective, effectiveIds) {
-	const quota = gammaWindow(targetRoot).quotaRemaining;
+	// F087 §3.5 / Standards P2: a ledger whose partition is present but
+	// malformed cannot be counted. Refuse to admit rather than compute a quota
+	// from a corrupt window (doctor reports the same condition).
+	const window = gammaWindow(targetRoot);
+	if (window.problems.length > 0) {
+		const first = window.problems[0];
+		return failure(
+			"AMBER_E_MEMORY_STATE_INVALID",
+			`γ ledger partition is corrupt (${first.requestId || "unknown request"}: ${first.problem}); refusing to admit until the ledger is repaired`,
+		);
+	}
+	const quota = window.quotaRemaining;
 	const exemptTargets = new Map(); // entryId -> predecessor id
 	const classify = (entry) => {
 		const target = gammaExemptTarget(targetRoot, entry);
@@ -1064,6 +1075,7 @@ function buildProjection(targetRoot) {
 			quotaRemaining: gamma.quotaRemaining,
 			windowStart: gamma.windowStart,
 			windowEnd: gamma.windowEnd,
+			problems: gamma.problems,
 		},
 		surface,
 	};
@@ -1071,12 +1083,28 @@ function buildProjection(targetRoot) {
 
 function renderStatus(p) {
 	const e = p.entries;
-	return [
+	const lines = [
 		"Memory status (registry + events.jsonl; observation only — doctor is the judgment authority):",
 		`  entries: draft ${e.draft}, proposal ${e.proposal}, active ${e.active}, superseded ${e.superseded}, needs-re-review ${e.needsReReview}, abandoned ${e.abandoned}, pending requests ${e.pendingRequests}`,
 		`  gamma:   ${p.gamma.windowAdmitted}/${GAMMA_QUOTA} charged in 168h (${p.gamma.windowExempt} provenance refresh exempt; remaining ${p.gamma.quotaRemaining})`,
-		`  surface: ${p.surface.entries} entries, ${p.surface.bytes} bytes in ${MEMORY_MD}`,
-	].join("\n");
+	];
+	if (p.gamma.problems.length > 0) {
+		lines.push(
+			`  gamma ledger: ${p.gamma.problems.length} corrupt partition event(s) — quarantine the ledger before admitting (see errors)`,
+		);
+	}
+	lines.push(`  surface: ${p.surface.entries} entries, ${p.surface.bytes} bytes in ${MEMORY_MD}`);
+	return lines.join("\n");
+}
+
+// F087 §3.5: a corrupt partition is a ledger error, not a silent zero. Status
+// keeps its read-only contract but fails closed the same way doctor does, and
+// admission refuses to compute a quota from the same window.
+function gammaPartitionErrors(projection) {
+	return projection.gamma.problems.map(
+		(problem) =>
+			`γ ledger partition is corrupt (${problem.requestId || "unknown request"}): ${problem.problem} — repair or quarantine the ledger; doctor rule 5 reports the same condition.`,
+	);
 }
 
 function handleStatus(args, targetRoot) {
@@ -1084,7 +1112,7 @@ function handleStatus(args, targetRoot) {
 	return {
 		...projection,
 		text: renderStatus(projection),
-		errors: [],
+		errors: gammaPartitionErrors(projection),
 		warnings: [],
 	};
 }

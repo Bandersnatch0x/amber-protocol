@@ -617,6 +617,178 @@ test("F087: legacy events keep prior accounting and a tampered partition fails c
 	fs.rmSync(tampered, { recursive: true, force: true });
 });
 
+// ── F087 follow-up: identity, partition shape and disjointness ─────────────
+// `entryId` hashes supersedeTarget too, so adding the pointer changes the id
+// even when the sources are untouched. Identity difference is therefore not a
+// refresh signal: the binding itself must have changed.
+
+test("F087: an identical source binding with a pointer is charged, not exempt", () => {
+	const target = mkTarget();
+	const predecessor = fillWindow(target)[0];
+	// Same claim, kind, surface AND the same MEMORY.md binding as the
+	// predecessor; only the supersedeTarget makes the entryId new.
+	const unchanged = entryFor(target, "f087 filler 1", { supersedeTarget: predecessor });
+	const payload = writePayload(target, "f087-noop", requestFor("mreq-f087-noop", [unchanged]));
+	const ingest = run(target, "ingest", { payload });
+	assert.equal(ingest.exitCode, 1, JSON.stringify(ingest.result));
+	assert.equal(ingest.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.equal(
+		ingest.result.ranking[0].exempt,
+		false,
+		"an unchanged binding is a no-op resubmission, not a refresh",
+	);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("F087: a malformed or incomplete partition fails closed in doctor, status and admission", () => {
+	const malformed = [
+		{
+			label: "string charged + array exempt",
+			event: { entryIds: ["a"], gammaChargedEntryIds: "broken", gammaExemptEntryIds: ["a"] },
+		},
+		{
+			label: "both fields strings",
+			event: { entryIds: ["a"], gammaChargedEntryIds: "a", gammaExemptEntryIds: "b" },
+		},
+		{
+			label: "missing exempt",
+			event: { entryIds: ["a"], gammaChargedEntryIds: ["a"] },
+		},
+		{
+			label: "missing charged",
+			event: { entryIds: ["a"], gammaExemptEntryIds: ["a"] },
+		},
+		{
+			label: "non-string identity",
+			event: { entryIds: [1], gammaChargedEntryIds: [1], gammaExemptEntryIds: [] },
+		},
+		{
+			label: "null partition field",
+			event: { entryIds: ["a"], gammaChargedEntryIds: null, gammaExemptEntryIds: [] },
+		},
+	];
+	for (const { label, event } of malformed) {
+		const target = mkTarget();
+		memoryStore.appendMemoryEvent(target, {
+			kind: "memory-ingest",
+			requestId: `malformed-${label.replace(/\s+/g, "-")}`,
+			channel: "t1-writeback",
+			outcome: "admitted",
+			...event,
+		});
+		const doctor = doctorMemoryRules(target);
+		assert.ok(
+			doctor.errors.some((e) => e.includes("does not reconstruct")),
+			`${label}: ${doctor.errors.join("\n")}`,
+		);
+		const status = run(target, "status");
+		assert.equal(status.exitCode, 1, label);
+		assert.ok(
+			status.result.errors.some((e) => e.includes("corrupt")),
+			`${label}: ${JSON.stringify(status.result.errors)}`,
+		);
+		const ingest = run(target, "ingest", {
+			payload: writePayload(
+				target,
+				`malformed-ingest-${label.replace(/\s+/g, "-")}`,
+				requestFor(`mreq-malformed-${label.replace(/\s+/g, "-")}`, [
+					entryFor(target, `blocked by corrupt partition ${label}`),
+				]),
+			),
+		});
+		assert.equal(ingest.exitCode, 1, label);
+		assert.equal(ingest.result.code, "AMBER_E_MEMORY_STATE_INVALID", label);
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+
+	// Legacy events (neither property present) keep prior accounting and stay
+	// admissible — the strictness above never reinterprets them.
+	const legacy = mkTarget();
+	memoryStore.appendMemoryEvent(legacy, {
+		kind: "memory-ingest",
+		requestId: "legacy-control",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["a"],
+	});
+	assert.equal(run(legacy, "status").exitCode, 0);
+	const admitted = run(legacy, "ingest", {
+		payload: writePayload(
+			legacy,
+			"legacy-ingest",
+			requestFor("mreq-legacy-control", [entryFor(legacy, "legacy control entry")]),
+		),
+	});
+	assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.result));
+	fs.rmSync(legacy, { recursive: true, force: true });
+});
+
+test("F087: the charged and exempt sides are disjoint, same-side duplicates stay legal", () => {
+	// Cross-side duplicate: one identity on both sides is a corrupt partition.
+	const crossed = mkTarget();
+	memoryStore.appendMemoryEvent(crossed, {
+		kind: "memory-ingest",
+		requestId: "crossed",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["a", "b"],
+		gammaChargedEntryIds: ["a", "b"],
+		gammaExemptEntryIds: ["a"],
+	});
+	const crossedReport = doctorMemoryRules(crossed);
+	assert.ok(
+		crossedReport.errors.some((e) => e.includes("both sides")),
+		crossedReport.errors.join("\n"),
+	);
+	assert.equal(run(crossed, "status").exitCode, 1);
+
+	// Cross-side duplicate that still reconstructs the multiset exactly: only
+	// the disjointness rule can reject it, so the multiset check cannot stand
+	// in for the set rule.
+	const crossedExact = mkTarget();
+	memoryStore.appendMemoryEvent(crossedExact, {
+		kind: "memory-ingest",
+		requestId: "crossed-exact",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["a", "a"],
+		gammaChargedEntryIds: ["a"],
+		gammaExemptEntryIds: ["a"],
+	});
+	const crossedExactReport = doctorMemoryRules(crossedExact);
+	assert.ok(
+		crossedExactReport.errors.some((e) => e.includes("both sides")),
+		crossedExactReport.errors.join("\n"),
+	);
+	assert.equal(run(crossedExact, "status").exitCode, 1);
+	fs.rmSync(crossedExact, { recursive: true, force: true });
+
+	// Same-side duplicates are legal as long as the multiset reconstructs the
+	// admitted identities (existing duplicate-input semantics are preserved).
+	const sameSide = mkTarget();
+	memoryStore.appendMemoryEvent(sameSide, {
+		kind: "memory-ingest",
+		requestId: "same-side",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["a", "a", "b"],
+		gammaChargedEntryIds: ["a", "a"],
+		gammaExemptEntryIds: ["b"],
+	});
+	const sameSideReport = doctorMemoryRules(sameSide);
+	assert.equal(
+		sameSideReport.errors.some((e) => e.includes("γ ledger")),
+		false,
+		sameSideReport.errors.join("\n"),
+	);
+	assert.equal(run(sameSide, "status").exitCode, 0);
+	assert.equal(gammaOf(sameSide).windowAdmitted, 2);
+	assert.equal(gammaOf(sameSide).windowExempt, 1);
+
+	fs.rmSync(crossed, { recursive: true, force: true });
+	fs.rmSync(sameSide, { recursive: true, force: true });
+});
+
 // ── §4.1 state machine edges ────────────────────────────────────────────────
 
 test("approve --decision reject requires a reason and drives proposal → draft", () => {

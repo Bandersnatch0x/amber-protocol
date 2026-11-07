@@ -224,7 +224,7 @@ supersession 保留为独立能力，不再与预算绑定：条目可携带 `su
 ### 6.5 γ 提案限速与 K1/K2/K3 排序（#174-M7/M14/M16；F087 修订计数域）
 
 - **分母 = 168h 滚动窗口**（#174-M7）：γ 的"周期"不是 cadence 声明、不是自然周、不是 lastRunAt 间隔——任一准入时刻 T，γ 消耗 = `events.jsonl` 中 `[T−168h, T]` 窗口内 `memory-ingest` 准入事件的**计费**条目数；≥5 即 `AMBER_E_MEMORY_RATE_LIMITED` 全有或全无拒绝（#172-C4 口径不变）。零状态文件，兼容任何触发形态；cadence 数值仅表达维护意图频率，不承载机械语义。
-- **计费域 = 新知识；纯来源刷新豁免（F087）**：一个条目是**纯来源刷新**当且仅当它携带 `supersedeTarget`、该目标在 registry 中真实存在且状态 ∈ {active, needs-re-review}、且新条目的 `claim`/`knowledgeKind`/`targetSurface` 与目标**逐字节完全相同**（只有 provenance.sources 变化），并且是不同身份（`entryId ≠ target.entryId`）。满足者不消耗 γ、不进入截断池、也不能挤掉计费候选；但它仍须走完全部其它闸门（schema、逐源哈希绑定、signal 闭集、人工 approve、book）。改 claim / 改 kind / 改 surface、目标缺失或已 superseded/abandoned、自指指针、以及任何未携带 `supersedeTarget` 的条目**一律计费**。豁免只认 registry 内容，不认载荷中的任何自述标记；`needs-re-review` 本身不构成豁免理由。
+- **计费域 = 新知识；纯来源刷新豁免（F087）**：一个条目是**纯来源刷新**当且仅当同时满足：(1) 携带 `supersedeTarget`，该目标在 registry 中真实存在且状态 ∈ {active, needs-re-review}；(2) 新条目的 `claim`/`knowledgeKind`/`targetSurface` 与目标**逐字节完全相同**；(3) **来源绑定确实发生变化**——按 `(kind, ref, rawHash, normHash, excerptHash)` 多重集比较，与目标不同（仅新增 `supersedeTarget` 指针不算）；(4) 是不同身份（`entryId ≠ target.entryId`）。满足者不消耗 γ、不进入截断池、也不能挤掉计费候选；但它仍须走完全部其它闸门（schema、逐源哈希绑定、signal 闭集、人工 approve、book）。改 claim / 改 kind / 改 surface、来源绑定不变、目标缺失或已 superseded/abandoned、自指指针、以及任何未携带 `supersedeTarget` 的条目**一律计费**。豁免只认 registry 内容，不认载荷中的任何自述标记；`needs-re-review` 本身不构成豁免理由。**身份变化不是刷新证据**：`entryId` 哈希包含 `supersedeTarget`，因此仅加指针就会改变 id，而来源可以完全没变——判定必须显式比较来源绑定，不能以「id 变了」代替。
 - **计数域 = 排序域 = 计费准入混合池**（#174-系统性三/M16，F087 后为计费子集）：dreaming + 三流转换 + T1/T2 写回的全部 ingest 准入中，只有计费条目参与配额竞争；dreaming 无专属配额，通道差异只经 channel 归因统计，不作配额分区。排队中的纯来源刷新既不占用名额，也不因窗口耗尽被拒。
 - **K1（staleness，降序）**：候选针对既有条目 → 该条目最近一次 memory-* 事件距准入时刻天数；新增候选 → provenance 引用的闭集信号产物/触发工件（distill 提案文件、maintenance 提案、evolution finding、session/feature 触发工件）的最新落盘时间距今天数（**Spec-defined 补全**：T1/T2 通道候选取触发工件时间戳）。
 - **K2（β 压力，降序）**：候选条目被其他条目 `supersedeTarget` 指向的计数；零指向即 0，自然退化。
@@ -358,7 +358,12 @@ M8 权威归属：γ 超限**拒绝**职责唯一归 ingest；status 只投影�
 
 载荷字段变动时 status 输出契约同步修订属 spec 义务，不需重开裁决（#175-系统性四第 3 项：投影语义锚定"计数/窗口/利用率"层面，不锚定字段名——与 #174-M14"键定义锚事件语义不锚字段名"同范式）。
 
-**F087 分区语义**：`admitted` 事件的 `entryIds[]` 保持完整（列出全部获批身份），`gammaChargedEntryIds[]` / `gammaExemptEntryIds[]` 是同一多重集合的一个划分（按 `entryIds` 顺序；两者长度之和 = `entryIds` 长度，重复身份按出现次数计）。**历史事件没有这两个字段，按 `entryIds.length` 计费（F087 之前的记账口径），永不重写**；只要能读到 `gammaChargedEntryIds` 就只按它计费。rejected / no-change 事件不携带分区（它们没有获批身份）。
+**F087 分区语义**：`admitted` 事件的 `entryIds[]` 保持完整（列出全部获批身份），`gammaChargedEntryIds[]` / `gammaExemptEntryIds[]` 是同一多重集合的一个划分。**契约（唯一校验器 = `gammaPartitionProblem`）**：
+
+1. **两侧互斥**：计费集合与豁免集合是**不相交的集合**——同一 entryId 不得同时出现在两侧。为保留既有重复输入语义，**不新增全局去重规则**：同一侧允许重复，但两侧合并后的多重集合必须与 `entryIds` **精确相等**（逐 id 出现次数一致）。
+2. **存在性按属性判定，而非按形状**：只有两个属性都**不存在**才是历史（legacy）事件，按 `entryIds.length` 计费、永不重写；**只要出现其中一个属性**，就必须两个属性都存在，且各自是「非空 entry-id 字符串数组」（允许空数组，元素不得为空串/非字符串）。
+3. **畸形即损坏，不得静默重释**：字段存在但类型错误、缺一个字段、`entryIds` 非数组或含非字符串、越界 id、两侧交集非空——一律按**账本损坏**处理：doctor 规则 5 报 error；`amber memory status` 报相同错误并以非零退出（投影仍只读）；`ingest` 拒绝计算配额（`AMBER_E_MEMORY_STATE_INVALID`），直到账本被修复或隔离。
+4. rejected / no-change 事件不携带分区（它们没有获批身份）。
 
 ## 10. schema 落地（Spec-defined——裁决留白，本节给出最简可执行定义）
 
@@ -423,7 +428,7 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 | 2 | 源健康：provenance 源可解析且哈希相符；源失效/哈希漂移 → 条目机械进入 needs-re-review（`AMBER_E_MEMORY_SOURCE_STALE`，复用 D4/D5 mutable-source refresh 机制） | error→状态迁移 |
 | 3 | 反向指针与 related 指针：best-effort，目标消失只报 warning，**永不使条目失效** | warning |
 | 4 | surface 漂移：MEMORY.md 登记 normHash 漂移 → 关联条目 active→needs-re-review；漂移检出且**无关联 registry 条目**时必须给出二选一 remedy 文案（book 一条 human-direct-ratification 条目，provenance 指 surface 路径+时间+normHash；或人工回退），**禁止只报"哈希变了"**（#173 追认强化 3） | 状态迁移 + remedy |
-| 5 | 限速合规：重算当期 γ **计费**消耗，账本-registry 计数不符即 error；带分区的准入事件必须能由 `gammaChargedEntryIds + gammaExemptEntryIds` 重建其 `entryIds`（多重集合相等），否则 fail-closed；历史事件按旧口径计费。物理 surface 用量只作观测，不参与判定（F086 退役 α 预算；F087 修订） | error |
+| 5 | 限速合规：重算当期 γ **计费**消耗，账本-registry 计数不符即 error；带分区的准入事件必须通过 §9 的分区契约（两侧互斥、属性成对存在且为 entry-id 数组、多重集合与 `entryIds` 精确相等），任何畸形/不完整分区 fail-closed 且不得被当作 legacy；历史事件按旧口径计费。物理 surface 用量只作观测，不参与判定（F086 退役 α 预算；F087 修订） | error |
 | 6 | 已退役：原 α 50% 强制复审随 §6.3 一并撤销；不替代以新的阈值提示 | 退役 |
 | 7 | ratification-class 告警：无前置 approve 事件的 book（#173 追认强化 2），与 needs-re-review 并列 | warning |
 | 8 | acknowledged divergence：目标仓库 .gitignore 忽略 MEMORY.md = 知情分歧类别而非缺陷——报一次、附 remedy 文案（re-include 或接受 L2 降级），不作持续告警（#173-Q6） | 一次性告知 |

@@ -2,7 +2,7 @@
 
 Feature: F087
 Status: accepted — implementation complete, pending mandatory two-axis review and coordinator acceptance
-User Confirmation: scope explicitly delegated by the repository owner (2026-11-07); the confirmation gate itself is not self-issued
+User Confirmation: confirmed
 
 ## Goal
 
@@ -60,24 +60,32 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
   - verify: node --test --test-name-pattern="gamma" tests/integration/memory-commands.test.js
 - [ ] Slice 2: charge only non-exempt candidates at admission, keep mixed batches all-or-nothing, record the partition in the ledger and the status projection.
   - paths: scripts/lib/memory-commands.js
-  - depends-on: Slice 1
+  - depends-on: 1
   - verify: node --test tests/integration/memory-commands.test.js tests/unit/memory-dispatch.test.js
 - [ ] Slice 3: make doctor §11-5 judge charged admissions and refuse an inconsistent ledger partition.
   - paths: scripts/lib/core/doctor.js
-  - depends-on: Slice 1
+  - depends-on: 1
   - verify: node --test --test-name-pattern="rule 5" tests/integration/memory-commands.test.js
-- [ ] Slice 4: synchronize the governed spec, ADR amendment, CLI/help/action-type text and the delta spec; regenerate docs and the knowledge corpus.
-  - paths: docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, docs/CLI_REFERENCE.md, action-types/memory-status.json, scripts/lib/command-registry.js
-  - depends-on: Slices 1–3
-  - verify: npm run docs:gen:check && npm run docs:verify && npm run gen:agents:check
-- [ ] Slice 5: publish runner ACK files atomically and pin it with a deterministic overlap regression.
+- [ ] Slice 4: synchronize the governed spec, the ADR amendment, the CLI reference and the delta spec; regenerate the knowledge corpus.
+  - paths: docs/specs/2026-08-21-governed-memory-layer.md, docs/adr/0018-governed-memory-layer.md, docs/CLI_REFERENCE.md, docs/specs/F087-provenance-refresh-gamma-exemption.md
+  - depends-on: 1, 2, 3
+  - verify: node scripts/amber.js knowledge context-sync --target . && npm run docs:verify
+- [ ] Slice 5: align the memory help text and the status action-type goal with the charged/exempt projection; regenerate the CLI pages.
+  - paths: scripts/lib/command-registry.js, action-types/memory-status.json
+  - depends-on: 4
+  - verify: npm run docs:gen:check && npm run gen:agents:check
+- [ ] Slice 6: publish runner ACK files atomically and pin it with a deterministic overlap regression.
   - paths: apps/web/server/lib/runner-ack.ts, apps/web/tests/server/runner-ack.test.ts
   - depends-on: none
   - verify: npm --prefix apps/web run test -- tests/server/runner-ack.test.ts
-- [ ] Slice 6: drop the duplicated `Error: ` prefixes in the session command family and correct F033's obsolete alpha description.
-  - paths: scripts/lib/session-commands.js, feature_list.json
+- [ ] Slice 7: drop the duplicated `Error: ` prefixes in the session command family.
+  - paths: scripts/lib/session-commands.js, scripts/lib/command-dispatcher.js
   - depends-on: none
-  - verify: node scripts/amber.js session abort --target . ; npm run manifests
+  - verify: node --test tests/integration/session-commands.test.js
+- [ ] Slice 8: correct F033's obsolete alpha description in the feature list.
+  - paths: feature_list.json
+  - depends-on: none
+  - verify: npm run manifests
 
 ## Resume Checkpoint
 

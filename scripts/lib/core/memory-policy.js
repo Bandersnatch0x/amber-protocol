@@ -70,23 +70,44 @@ function surfaceUsage(targetRoot) {
 	return { entries, bytes };
 }
 
+// F087 §3.3: the two fields that partition an admitted batch. Presence is
+// decided by property ownership, not by shape: a record that carries either
+// field must carry both, as entry-id arrays, or it is a corrupt ledger record
+// and is never reinterpreted as legacy.
+const GAMMA_PARTITION_FIELDS = Object.freeze(["gammaChargedEntryIds", "gammaExemptEntryIds"]);
+
+function hasPartitionField(event, key) {
+	return Object.prototype.hasOwnProperty.call(event, key);
+}
+
+function isEntryIdArray(value) {
+	return Array.isArray(value) && value.every((id) => typeof id === "string" && id.length > 0);
+}
+
 // §6.5 γ 168h rolling window: count CHARGED admitted entries in [T-168h, T].
 // F087 §3.1: an event that carries a partition is counted by its charged side;
 // an event without one is legacy and keeps the pre-F087 accounting
-// (entryIds.length), so historical windows are never reinterpreted.
+// (entryIds.length), so historical windows are never reinterpreted. A record
+// whose partition is present but malformed is excluded from both counts and
+// reported in `problems` — corrupt state is never silently re-read as legacy.
 function gammaWindow(targetRoot) {
 	const now = Date.now();
 	const since = now - GAMMA_WINDOW_MS;
 	let charged = 0;
 	let exempt = 0;
+	const problems = [];
 	for (const event of store.readMemoryEvents(targetRoot, since)) {
 		if (event.kind !== "memory-ingest" || event.outcome !== "admitted") continue;
-		const admitted = Array.isArray(event.entryIds) ? event.entryIds : [];
-		if (Array.isArray(event.gammaChargedEntryIds)) {
+		const problem = gammaPartitionProblem(event);
+		if (problem) {
+			problems.push({ requestId: event.requestId || null, problem });
+			continue;
+		}
+		if (hasPartitionField(event, "gammaChargedEntryIds")) {
 			charged += event.gammaChargedEntryIds.length;
-			exempt += Array.isArray(event.gammaExemptEntryIds) ? event.gammaExemptEntryIds.length : 0;
+			exempt += event.gammaExemptEntryIds.length;
 		} else {
-			charged += admitted.length;
+			charged += Array.isArray(event.entryIds) ? event.entryIds.length : 0;
 		}
 	}
 	return {
@@ -95,6 +116,7 @@ function gammaWindow(targetRoot) {
 		quotaRemaining: Math.max(0, GAMMA_QUOTA - charged),
 		windowStart: new Date(since).toISOString(),
 		windowEnd: new Date(now).toISOString(),
+		problems,
 	};
 }
 
@@ -102,10 +124,44 @@ function gammaWindow(targetRoot) {
 // predecessor entryId when the entry is a genuine refresh, otherwise null.
 //
 // The decision is registry-backed: it reads the predecessor from the entry
-// registry and compares the three core text fields byte-for-byte. A caller can
-// pick supersedeTarget, but cannot assert exemption — a changed claim, a
-// missing/retired predecessor, a self-pointer or a byte-identical resubmission
+// registry, compares the three core text fields byte-for-byte, and requires the
+// source binding to have actually changed. A caller can pick supersedeTarget,
+// but cannot assert exemption — a changed claim, a missing/retired predecessor,
+// a self-pointer, an identical source binding or a byte-identical resubmission
 // all fall through as ordinary (charged) admissions.
+//
+// Identity difference is NOT evidence of a refresh: `entryId` hashes
+// `supersedeTarget` too, so adding the pointer changes the id even when the
+// sources are untouched. That is why the binding comparison below is explicit.
+const SOURCE_SIGNATURE_FIELDS = Object.freeze([
+	"kind",
+	"ref",
+	"rawHash",
+	"normHash",
+	"excerptHash",
+]);
+
+function sourceBindingSignatures(entry) {
+	const sources =
+		entry && entry.provenance && Array.isArray(entry.provenance.sources)
+			? entry.provenance.sources
+			: [];
+	return sources
+		.map((source) => {
+			const signature = {};
+			for (const field of SOURCE_SIGNATURE_FIELDS)
+				signature[field] = source ? source[field] : undefined;
+			return JSON.stringify(signature);
+		})
+		.sort();
+}
+
+function sourceBindingsEqual(left, right) {
+	const a = sourceBindingSignatures(left);
+	const b = sourceBindingSignatures(right);
+	return a.length === b.length && a.every((signature, index) => signature === b[index]);
+}
+
 function gammaExemptTarget(targetRoot, entry) {
 	if (!entry || typeof entry !== "object") return null;
 	const targetId = entry.supersedeTarget;
@@ -117,6 +173,9 @@ function gammaExemptTarget(targetRoot, entry) {
 	if (entry.claim !== prior.claim) return null;
 	if (entry.knowledgeKind !== prior.knowledgeKind) return null;
 	if (entry.targetSurface !== prior.targetSurface) return null;
+	// A refresh must carry new provenance; an identical binding is a no-op
+	// resubmission, not maintenance, and stays charged.
+	if (sourceBindingsEqual(entry, prior)) return null;
 	return targetId;
 }
 
@@ -135,15 +194,38 @@ function partitionGammaAdmission(entryIds, exemptTargetsByEntryId) {
 
 // F087 §3.5: validate a recorded partition against the identities the same
 // event admitted. Returns a short problem description, or null when the event
-// is consistent (or is a legacy event that predates the partition fields).
+// is consistent. Legacy events (neither partition property present) are
+// consistent by definition; a record that carries ONE of the two properties is
+// incomplete, and a property of the wrong type (string, null, mixed array) is
+// corrupt — both are reported rather than silently treated as empty or legacy.
 function gammaPartitionProblem(event) {
 	if (!event || event.kind !== "memory-ingest" || event.outcome !== "admitted") return null;
-	const hasPartition =
-		Array.isArray(event.gammaChargedEntryIds) || Array.isArray(event.gammaExemptEntryIds);
-	if (!hasPartition) return null;
-	const admitted = Array.isArray(event.entryIds) ? event.entryIds : [];
-	const charged = Array.isArray(event.gammaChargedEntryIds) ? event.gammaChargedEntryIds : [];
-	const exempt = Array.isArray(event.gammaExemptEntryIds) ? event.gammaExemptEntryIds : [];
+	const present = GAMMA_PARTITION_FIELDS.filter((key) => hasPartitionField(event, key));
+	if (present.length === 0) return null;
+	if (present.length !== GAMMA_PARTITION_FIELDS.length) {
+		const missing = GAMMA_PARTITION_FIELDS.filter((key) => !present.includes(key));
+		return `${present.join(", ")} present without ${missing.join(", ")}; a partitioned event carries both arrays`;
+	}
+	for (const key of GAMMA_PARTITION_FIELDS) {
+		if (!isEntryIdArray(event[key])) {
+			return `${key} must be an array of non-empty entry ids (got ${JSON.stringify(event[key])})`;
+		}
+	}
+	const admitted = event.entryIds;
+	if (!isEntryIdArray(admitted)) {
+		return `entryIds must be an array of non-empty entry ids (got ${JSON.stringify(admitted)})`;
+	}
+	const charged = event.gammaChargedEntryIds;
+	const exempt = event.gammaExemptEntryIds;
+	// The two sides are disjoint sets: one identity is either charged or
+	// exempt, never both. Duplicates WITHIN a side stay legal (the admitted
+	// batch may repeat an input; no global de-duplication rule is added), and
+	// the multiset below must still reconstruct entryIds exactly.
+	const chargedSet = new Set(charged);
+	const shared = [...new Set(exempt)].filter((id) => chargedSet.has(id));
+	if (shared.length > 0) {
+		return `entry ids appear on both sides (${shared.slice(0, 3).join(", ")}); the charged and exempt sets must be disjoint`;
+	}
 	const counts = (ids) => {
 		const map = new Map();
 		for (const id of ids) map.set(id, (map.get(id) || 0) + 1);

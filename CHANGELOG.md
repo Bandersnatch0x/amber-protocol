@@ -14,12 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MEMORY.md` is large, and `AMBER_E_MEMORY_BUDGET_EXCEEDED` is retired — a breaking change to the
   status JSON and to hosts that watch that code
 - exempt provenance-only memory refreshes from the γ admission limit (F087): a replacement that names
-  a real `active`/`needs-re-review` predecessor and preserves its claim, knowledge kind and target
-  surface exactly is admitted without consuming one of the five 168-hour slots. Changed claims,
-  missing or retired predecessors and repeat admissions stay charged, and every other admission gate
-  is unchanged. The `memory-ingest` event gains `gammaChargedEntryIds` / `gammaExemptEntryIds` (with
-  `ranking[].exempt`), and `amber memory status` gains the additive `gamma.windowExempt` count;
-  legacy events keep their prior accounting and are never rewritten.
+  a real `active`/`needs-re-review` predecessor, preserves its claim, knowledge kind and target
+  surface exactly, and actually changes its source binding is admitted without consuming one of the
+  five 168-hour slots. Changed claims, unchanged bindings, missing or retired predecessors and repeat
+  admissions stay charged, and every other admission gate is unchanged. The `memory-ingest` event
+  gains `gammaChargedEntryIds` / `gammaExemptEntryIds` (with `ranking[].exempt`), and `amber memory
+status` gains the additive `gamma.windowExempt` count and `gamma.problems`; legacy events keep
+  their prior accounting and are never rewritten.
 
 ### Fixed
 
@@ -27,9 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before them, so source drift and ledger inconsistencies are visible. The command is no longer
   purely read-only: when an active entry's provenance or booked surface has drifted, it marks that
   entry `needs-re-review` in the registry and never writes `MEMORY.md`.
-- publish runner ACK files atomically (write a sibling temp file, then rename) so a reader polling
-  the ACK path never observes a truncated file and reports a spurious `rejected` control outcome;
-  a genuinely unparseable committed ACK file is still rejected terminally
+- publish runner ACK files atomically from the **real CLI writer** (`scripts/lib/runner-ack.js`,
+  the path `amber session …` uses) — temp file plus rename — so a reader polling the ACK path never
+  observes a truncated file and reports a spurious `rejected` control outcome; a genuinely
+  unparseable committed ACK file is still rejected terminally
+- reject malformed γ partitions instead of reinterpreting them (F087): presence is decided by
+  property ownership, both partition fields must be entry-id arrays, the charged and exempt sets
+  must be disjoint, and the merged multiset must reconstruct `entryIds` exactly. Doctor, `memory
+status` (non-zero exit, `gamma.problems`) and admission (`AMBER_E_MEMORY_STATE_INVALID`) share
+  the same fail-closed semantics; legacy events are unaffected
 - stop doubling the error label on failing session verbs (`ERROR: Error: …` → `ERROR: …`); exit
   codes are unchanged
 
