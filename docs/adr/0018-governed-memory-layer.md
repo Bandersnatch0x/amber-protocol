@@ -76,6 +76,26 @@ the **γ** admission rate limit of 5 entries per 168-hour rolling window with K1
 capability; it is no longer a budget duty. The accepted cost is that there is no automatic total
 ceiling. → spec §6, `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`
 
+*Amended by F087 (2026-11-07).* **γ's counting domain, not its number, was wrong.** Entry identity
+hashes the core content *including* `supersedeTarget` (spec §10.2), so refreshing the provenance of
+an existing claim is necessarily a new entry plus a supersession — but the identity change proves
+nothing by itself: an untouched resubmission carrying the pointer is also "new". It consumed the same
+five slots as new knowledge, while doctor designates supersede/abandon as the only durable exits for
+source drift. A refresh that names a real `active`/`needs-re-review` predecessor, preserves `claim`,
+`knowledgeKind` and `targetSurface` byte-for-byte, **and actually changes its source binding** (the set of unique
+signatures over `(kind, ref, rawHash, normHash, excerptHash)` must differ — order and duplicate
+sources do not count; this is a provenance-set rule, not the entry-accounting multiset in §9) now
+consumes no quota; it still passes
+every other gate and still needs a human `approve`. A changed claim, an unchanged binding, a missing
+or retired predecessor and a repeat admission stay charged; the exemption is derived from registry
+content, never asserted by a payload. The ledger partition records the split under one contract
+(single validator `gammaPartitionProblem`): charged and exempt identities are **disjoint sets**,
+same-side duplicates stay legal, and the merged multiset must reconstruct `entryIds` exactly;
+presence is decided by property ownership, and a present-but-malformed partition is a **corrupt
+ledger** — doctor errors, status errors, admission is refused — never silently re-read as legacy. The
+5-per-168h limit and its atomic all-or-nothing enforcement are unchanged. → spec §5.3, §6.3, §6.5,
+§8.2, §9, §11-5, `docs/plans/F087-Provenance-only-memory-refresh-exemption.md`
+
 ### D4 — One event ledger: the `memory-*` closed set
 
 All memory-domain events (request creation, ingest acceptance and rejection, approval and rejection,
@@ -119,7 +139,8 @@ enters the MCP surface if and only if its legal invocation does not depend on lo
 local ceremony. Registration is single-track (session-style): `memory` joins the typed command family
 with exactly three capabilities and three action-type JSONs; the three CLI-only verbs ride the existing
 `KNOWN_UNTYPED_SUBCOMMANDS` whitelist with inline identity gates as the price. Approval ceremony is
-bounded (γ = 5 approvals + 1 book per window) but non-zero. Evidence kinds reuse the existing
+bounded for new knowledge (γ = 5 approvals + 1 book per window; F087 exempts provenance-only
+refreshes, which still require an `approve` each) but non-zero. Evidence kinds reuse the existing
 `approval-record` / `ingest-record` vocabulary; side effects reuse `ledger-append`. → spec §8, §13
 
 ## Considered and rejected

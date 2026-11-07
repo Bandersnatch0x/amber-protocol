@@ -69,8 +69,16 @@ function writeRunnerAck(projectRoot, sessionId, ack) {
 		...(ack.message ? { message: ack.message } : {}),
 	};
 
+	// F-01: publish atomically. A direct writeFileSync exposes a truncate→write
+	// window; the Web reader (apps/web/server/lib/runner-ack.ts) treats an
+	// unparseable file as a TERMINAL rejection, so a reader polling while the
+	// CLI publishes would report a spurious `rejected` ACK. Write a sibling
+	// temp file, then rename it into place: the ACK path is either absent or
+	// complete. Same pattern as apps/web/server/lib/session-writer.ts.
 	fs.mkdirSync(path.dirname(ackPath), { recursive: true });
-	fs.writeFileSync(ackPath, JSON.stringify(payload, null, 2));
+	const tempPath = `${ackPath}.${process.pid}.${Date.now()}.tmp`;
+	fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2));
+	fs.renameSync(tempPath, ackPath);
 	return payload;
 }
 

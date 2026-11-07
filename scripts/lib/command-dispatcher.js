@@ -124,6 +124,8 @@ const sessionTarget = (args) => require("./command-helpers").resolveTarget(args)
 // `session-commands` returns `{ text, exitCode, sessionId? }`. The command
 // envelope additionally mirrors the text into errors on failure and forwards
 // sessionId — the shape this handler built by hand before the table existed.
+// F-02: the envelope owns the "ERROR: " label, so handler messages must not
+// carry their own "Error: " prefix (that rendered as "ERROR: Error: …").
 function sessionBody(sessionResult) {
 	return {
 		text: sessionResult.text,
@@ -140,7 +142,7 @@ function sessionBody(sessionResult) {
 function sessionRunSettleGuard(action) {
 	return {
 		text:
-			`Error: session ${action} takes no --stage or --command. ` +
+			`session ${action} takes no --stage or --command. ` +
 			"Stage selection, capability, and adapter come from the session's own state (F062 closed seam).",
 		exitCode: 1,
 	};
@@ -156,7 +158,7 @@ const sessionDispatch = defineCliCommand({
 				parsedBudget = parseInt(args.budget, 10);
 				if (isNaN(parsedBudget) || parsedBudget <= 0) {
 					return sessionBody({
-						text: "Error: --budget must be a positive integer",
+						text: "--budget must be a positive integer",
 						exitCode: 1,
 					});
 				}
@@ -286,7 +288,7 @@ const sessionDispatch = defineCliCommand({
 				try {
 					parsedResult = JSON.parse(args.result);
 				} catch (error) {
-					parseError = `Error: --result must be a JSON object: ${error.message}`;
+					parseError = `--result must be a JSON object: ${error.message}`;
 				}
 			} else {
 				parsedResult = args.result;

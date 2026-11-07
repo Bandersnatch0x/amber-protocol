@@ -2860,6 +2860,17 @@ MEMORY.md surface hash and promotes entries to active; `abandon` is the explicit
 normalized byte size as observation. Doctor owns the judgment rules (ledger consistency, source
 health, surface drift, gamma compliance) and now runs them for product repositories too.
 
+γ charges **new knowledge**: five entries per rolling 168 hours. A **provenance-only refresh** is
+exempt (F087): the entry must name a real `active`/`needs-re-review` `supersedeTarget` and preserve
+that predecessor's `claim`, `knowledgeKind` and `targetSurface` byte-for-byte, changing only its
+source bindings. Refresh admission is still schema-checked, hash-verified, human-approved and booked;
+it simply does not consume a slot. A changed claim, a missing or retired predecessor, a repeat
+admission and any entry without a pointer stay charged — the exemption is derived from the registry,
+never asserted in a payload. `status` reports `gamma.windowAdmitted` (charged), `gamma.windowExempt`
+(exempt refreshes in the same window) and `gamma.quotaRemaining`; doctor rule 5 judges the charged
+count and fails closed when an event's charged/exempt partition does not reconstruct its admitted
+identities.
+
 `request`/`ingest`/`book` inline the identity gate (non-TTY without `--yes` is refused);
 `approve`/`abandon` are typed-seam mutations and require `--yes`/`--confirm`.
 

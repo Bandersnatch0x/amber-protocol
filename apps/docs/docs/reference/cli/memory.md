@@ -44,11 +44,11 @@ amber memory <request|ingest|approve|book|abandon|status> [--target <repo>] [--j
 | <code>book</code> | Register a MEMORY.md surface hash and promote booked entries to active. |
 | <code>conversion</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
 | <code>escape-hatch</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
-| <code>gamma</code> | Read-only three-section projection (entries / gamma / surface). |
-| <code>ingest</code> | Mechanically admit request entries into the registry as proposals (all-or-nothing). |
+| <code>gamma</code> | Read-only three-section projection (entries / gamma / surface); gamma reports charged admissions, exempt refreshes, remaining quota, and corrupt-partition problems (non-zero exit until the ledger is repaired). |
+| <code>ingest</code> | Mechanically admit request entries into the registry as proposals (all-or-nothing). Gamma admits five charged entries per rolling 168h. A provenance-only refresh — same claim, knowledge kind and target surface as its real active/needs-re-review supersedeTarget, with a source binding that actually changed — consumes no quota; a changed claim or an unchanged binding stays charged. |
 | <code>ratification</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
 | <code>request</code> | Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination). |
-| <code>status</code> | Read-only three-section projection (entries / gamma / surface). |
+| <code>status</code> | Read-only three-section projection (entries / gamma / surface); gamma reports charged admissions, exempt refreshes, remaining quota, and corrupt-partition problems (non-zero exit until the ledger is repaired). |
 
 ## Command Details
 
@@ -62,11 +62,18 @@ Subcommands:
              --trigger <id> cites an open nomination and closes it as answered;
              --skip-trigger <id> records that no entry is warranted (closes it as skipped).
   ingest     Mechanically admit request entries into the registry as proposals (all-or-nothing).
+             Gamma admits five charged entries per rolling 168h. A provenance-only
+             refresh — same claim, knowledge kind and target surface as its real
+             active/needs-re-review supersedeTarget, with a source binding that
+             actually changed — consumes no quota; a changed claim or an unchanged
+             binding stays charged.
   approve    Human, entry-level approval gate (--entry-id, --decision approve|reject, --reason).
   book       Register a MEMORY.md surface hash and promote booked entries to active.
              --ratify --claim <text> ratifies a human direct edit directly (γ-free).
   abandon    Explicit human abandon of a request or entry (terminal ledger marker).
-  status     Read-only three-section projection (entries / gamma / surface).
+  status     Read-only three-section projection (entries / gamma / surface); gamma
+             reports charged admissions, exempt refreshes, remaining quota, and
+             corrupt-partition problems (non-zero exit until the ledger is repaired).
 
 Boundary: Amber detects, admits, and registers; humans curate MEMORY.md and approve.
 

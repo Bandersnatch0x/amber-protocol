@@ -10,7 +10,7 @@ tags: [memory, governance, promotion, dreaming, registry, mcp]
 
 # Governed Memory Layer 实现 Spec
 
-> 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、γ 限速与物理用量观测（α/β 预算已于 F086 退役）、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
+> 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、γ 限速与物理用量观测（α/β 预算已于 F086 退役；F087 起 γ 只计费新知识，既有条目的纯来源刷新不占配额）、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
 
 **Date:** 2026-08-21 ｜ **Status:** accepted（与 ADR-0018 Accepted、F033/F034 accepted 对齐；批次 A + T1/T2 已落地）｜ **ADR:** [ADR-0018 Governed Memory Layer](../adr/0018-governed-memory-layer.md)
 
@@ -150,9 +150,9 @@ needs-re-review ──β 指针 supersede / 人显式 abandon──▶ supersede
 
 ### 5.3 ingest（机械验收，全有或全无）
 
-四段验收逐元素执行：ajv → `checkRequestBinding` 逐源哈希比对 → provenance 哈希校验 → γ 限速（§6.5）；通过后逐条目写入 registry，各自独立成为 proposal。容量不再参与准入（§6.3 退役）。
+四段验收逐元素执行：ajv → `checkRequestBinding` 逐源哈希比对 → provenance 哈希校验 → γ 限速（§6.5，仅计费条目）；通过后逐条目写入 registry，各自独立成为 proposal。容量不再参与准入（§6.3 退役）。
 
-- **C4（γ 接口）**：单次提交全有或全无——`entries[]` 超当期剩余 γ 配额即整体拒绝（`AMBER_E_MEMORY_RATE_LIMITED`），request 保留，缩减后重交；无"部分入账部分挂起"半状态。
+- **C4（γ 接口；F087 修订）**：单次提交全有或全无——**计费**条目超当期剩余 γ 配额即整体拒绝（`AMBER_E_MEMORY_RATE_LIMITED`），request 保留，缩减后重交；无"部分入账部分挂起"半状态。纯来源刷新条目（§6.5）不占配额，但同批次被拒时也不单独获准。
 - **signal 校验落点**（#174-M13）：request 的 `provenance.signal` 取值 = §6.1 闭集信号 id 之一；转换类与 dreaming 通道缺失或不属闭集即 ingest 拒绝（`AMBER_E_MEMORY_SIGNAL_INVALID`）；T1/T2 与逃生舱通道按吸收规则/豁免条款免于强制（§6.2；**Spec-defined 通道清单**）。
 - **排序留痕**：准入时点按 K1/K2/K3 对混合池排序，结果随 `memory-ingest` 事件载荷留痕（§6.5、§9）。
 - `outcome:"no-change"` 合法（M3）；ingest 拒绝 = 不入 registry、事件记账（`outcome:"rejected", code`）、request 保留重交（逐字沿用 `context-ingest.js` 判例，#172-F1）。
@@ -214,21 +214,22 @@ spec 约束：dreaming proposal 必须引用闭集信号之一，**禁止单次�
 
 - **退役记录**：α 硬预算（条目数 ≤ 50 ∧ 字节数 ≤ 8 KB）与 §6.4 的强制 β 一进一出于 F086 退役，取代原 #173-Q5 裁决。退役依据是实测缺陷，不是阈值偏好：准入估算 `bookText` 只渲染 claim 首行加溯源桩（20,009 字节的 claim 计为 50 字节）；β 的额度抵扣只减 registry 条目，不校验被指条目是否绑定到对应 Markdown 区块；准入不为待落盘 proposal 预留空间、`book` 也不复核；§6.3 的"耗尽即拒绝"与 §6.4 的"耗尽可一进一出"互相矛盾；"拆分为多条"的 remedy 无法减少内容字节。裁决正文见 `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`。
 - **保留的观测**：`amber memory status` 仍投影 MEMORY.md 的物理条目数（`## Entries` 区内 `^### ` 行数）与归一化字节数（CRLF→LF、去 BOM、去行尾空白），但不给上限、利用率，也不产生拒绝。
-- **保留的增长约束**：γ 限速（§6.5）与人工审批（§5.4）继续生效。γ 压的是准入速率，不是总量，不能当作 α 的替代物。
+- **保留的增长约束**：γ 限速（§6.5）与人工审批（§5.4）继续生效。γ 压的是准入速率，不是总量，不能当作 α 的替代物。F087 进一步把 γ 的计费域限定为新知识：既有条目的纯来源刷新不占配额，因为它的 claim / knowledgeKind / targetSurface 与前任逐字节相同，不引入新的知识文本。
 - **接受的代价**：不再有自动总量封顶。MEMORY.md 的增长由 creed、逐条审批与人工整理承担。
 
 ### 6.4 supersession（原 β 一进一出退役）
 
 supersession 保留为独立能力，不再与预算绑定：条目可携带 `supersedeTarget` 指向既有 registry 条目（直编内容先 book 追认），approve 批准带指针条目时同调用完成 pair（§5.4；不是崩溃可恢复事务），`needs-re-review` 亦为合法来源状态。它不再是"预算耗尽时的必要条件"，也不计算腾出额度；空 surface 的第一条条目无需配对即可准入。
 
-### 6.5 γ 提案限速与 K1/K2/K3 排序（#174-M7/M14/M16）
+### 6.5 γ 提案限速与 K1/K2/K3 排序（#174-M7/M14/M16；F087 修订计数域）
 
-- **分母 = 168h 滚动窗口**（#174-M7）：γ 的"周期"不是 cadence 声明、不是自然周、不是 lastRunAt 间隔——任一准入时刻 T，γ 消耗 = `events.jsonl` 中 `[T−168h, T]` 窗口内 `memory-ingest` 准入事件条目数；≥5 即 `AMBER_E_MEMORY_RATE_LIMITED` 全有或全无拒绝（#172-C4 口径不变）。零状态文件，兼容任何触发形态；cadence 数值仅表达维护意图频率，不承载机械语义。
-- **计数域 = 排序域 = 全准入混合池**（#174-系统性三/M16）：dreaming + 三流转换 + T1/T2 写回的全部 ingest 准入；dreaming 无专属配额，通道差异只经 channel 归因统计，不作配额分区。
+- **分母 = 168h 滚动窗口**（#174-M7）：γ 的"周期"不是 cadence 声明、不是自然周、不是 lastRunAt 间隔——任一准入时刻 T，γ 消耗 = `events.jsonl` 中 `[T−168h, T]` 窗口内 `memory-ingest` 准入事件的**计费**条目数；≥5 即 `AMBER_E_MEMORY_RATE_LIMITED` 全有或全无拒绝（#172-C4 口径不变）。零状态文件，兼容任何触发形态；cadence 数值仅表达维护意图频率，不承载机械语义。
+- **计费域 = 新知识；纯来源刷新豁免（F087）**：一个条目是**纯来源刷新**当且仅当同时满足：(1) 携带 `supersedeTarget`，该目标在 registry 中真实存在且状态 ∈ {active, needs-re-review}；(2) 新条目的 `claim`/`knowledgeKind`/`targetSurface` 与目标**逐字节完全相同**；(3) **来源绑定确实发生变化**——按 `(kind, ref, rawHash, normHash, excerptHash)` 的**去重签名集合**比较：顺序不计、重复同一来源也不计，只有集合内容不同才算变化（仅新增 `supersedeTarget` 指针或重复既有来源都不算）；这是**来源集合**语义，不要与 §9 入账 `entryIds` 允许同侧重复的多重集规则混淆；(4) 是不同身份（`entryId ≠ target.entryId`）。满足者不消耗 γ、不进入截断池、也不能挤掉计费候选；但它仍须走完全部其它闸门（schema、逐源哈希绑定、signal 闭集、人工 approve、book）。改 claim / 改 kind / 改 surface、来源绑定不变、目标缺失或已 superseded/abandoned、自指指针、以及任何未携带 `supersedeTarget` 的条目**一律计费**。豁免只认 registry 内容，不认载荷中的任何自述标记；`needs-re-review` 本身不构成豁免理由。**身份变化不是刷新证据**：`entryId` 哈希包含 `supersedeTarget`，因此仅加指针就会改变 id，而来源可以完全没变——判定必须显式比较来源绑定，不能以「id 变了」代替。
+- **计数域 = 排序域 = 计费准入混合池**（#174-系统性三/M16，F087 后为计费子集）：dreaming + 三流转换 + T1/T2 写回的全部 ingest 准入中，只有计费条目参与配额竞争；dreaming 无专属配额，通道差异只经 channel 归因统计，不作配额分区。排队中的纯来源刷新既不占用名额，也不因窗口耗尽被拒。
 - **K1（staleness，降序）**：候选针对既有条目 → 该条目最近一次 memory-* 事件距准入时刻天数；新增候选 → provenance 引用的闭集信号产物/触发工件（distill 提案文件、maintenance 提案、evolution finding、session/feature 触发工件）的最新落盘时间距今天数（**Spec-defined 补全**：T1/T2 通道候选取触发工件时间戳）。
 - **K2（β 压力，降序）**：候选条目被其他条目 `supersedeTarget` 指向的计数；零指向即 0，自然退化。
 - **K3（tiebreak，升序）**：entryId 内容哈希字节字典序——拒绝 FIFO（到达顺序是外部状态，跨批次/重建后不可复现；确定性优先于先到先得）。排序结果随当次 `memory-ingest` 事件载荷留痕（候选序列 + 各键值），使截断可审计。
-- **C4 × M14 合成语义（Spec-defined）**：准入时将当次提交候选 + 排队中未准入候选（保留待重交 request 的条目）合并排序、截断至窗口剩余配额；**当次提交的全部候选均落入获准集 → 整体准入，否则整体拒绝**（RATE_LIMITED + ranking 留痕）——既保 #172-C4 全有或全无原子性，又使 #174-M14 混合池截断在跨请求竞争时点生效。
+- **C4 × M14 合成语义（Spec-defined；F087 修订）**：准入时将当次提交候选 + 排队中未准入候选合并排序、截断至窗口剩余配额——但只有**计费**候选参与排序截断（§6.5 纯来源刷新豁免）；**当次提交的全部计费候选均落入获准集 → 整体准入，否则整体拒绝**（RATE_LIMITED + ranking 留痕，ranking 行携带 `exempt` 标记）——既保 #172-C4 全有或全无原子性，又使 #174-M14 混合池截断在跨请求竞争时点生效。豁免候选不参与截断，也不会因同批次计费候选不合格而单独获准（批次原子性同样适用于它）。
 
 ## 7. dreaming 维护 loop（#174）
 
@@ -311,11 +312,13 @@ M1：CLI 子命令面与 MCP 工具名 `amber.memory.<同名动词>` 一一对�
 {
   "entries": { "draft": 0, "proposal": 0, "active": 0, "superseded": 0,
                "needsReReview": 0, "abandoned": 0, "pendingRequests": 0 },
-  "gamma": { "windowAdmitted": 0, "quotaRemaining": 5,
+  "gamma": { "windowAdmitted": 0, "windowExempt": 0, "quotaRemaining": 5,
              "windowStart": "<T-168h>", "windowEnd": "<T>" },
   "surface": { "entries": 0, "bytes": 0 }
 }
 ```
+
+F087 语义：`windowAdmitted` = 窗口内**计费**准入数（`quotaRemaining = max(0, 5 − windowAdmitted)`）；`windowExempt` = 同一窗口内被豁免的纯来源刷新数。二者都是观测值，判定仍只归 doctor。
 
 M8 权威归属：γ 超限**拒绝**职责唯一归 ingest；status 只投影数值不做判定——doctor 是判定权威、status 是观测投影，二者读取同一数据源（registry + events.jsonl），无第二权威。`surface` 只报物理条目数与归一化字节数，不含上限与利用率（§6.3 退役）。M9 同批次纪律：status 的机械注册项（schema enum、capability、action-type JSON、四表）必须与 handler 实现及数据基底（registry 读取器 + events.jsonl 聚合器）在同一实施批次（同一 PR）落地，批次测试必须含 `memory status --json` CLI 实调断言与 MCP tools/call 断言——测试是"注册了且实现了"的机械证明，填补 validateWhitelist 不校验 handler 的已知空洞。
 
@@ -348,12 +351,19 @@ M8 权威归属：γ 超限**拒绝**职责唯一归 ingest；status 只投影�
 | kind | 载荷字段（除 appendEvent 公共时间戳外） |
 | --- | --- |
 | `memory-request-created` | `requestId`, `channel`, `signal?`, `triggerRef.ref`, `entryIds[]`, `batchId?`, `derivedFrom?` |
-| `memory-ingest` | `requestId`, `channel`, `outcome`(admitted/rejected/no-change), `entryIds[]`, `ranking?`(`[{entryId, k1, k2, queued?}]` 按名次排序，K3=entryId 本身隐含；`queued` 标记混合池排队候选，#175-系统性四字段演进), `skippedAbandoned?`(F3 重建排除留痕), `code?`, `batchId?` |
+| `memory-ingest` | `requestId`, `channel`, `outcome`(admitted/rejected/no-change), `entryIds[]`, `gammaChargedEntryIds[]?`, `gammaExemptEntryIds[]?`, `ranking?`(`[{entryId, k1, k2, queued?, exempt?}]` 按名次排序，K3=entryId 本身隐含；`queued` 标记混合池排队候选、`exempt` 标记纯来源刷新，#175-系统性四字段演进 + F087), `skippedAbandoned?`(F3 重建排除留痕), `code?`, `batchId?` |
 | `memory-approval` | `entryId`, `requestId`, `decision`(approve/reject), `reason?`, `decidedBy:"human"`, 另含 β pair 第二事件时 `supersededEntryId` |
 | `memory-book` | `entryIds[]`, `origin`(governed-promotion/human-direct-ratification), `surfacePath`, `normHash`; 追认轨无 `requestId` |
 | `memory-abandon` | `scope`(request/entry), `targetId`, `triggerSource`(auto-threshold/explicit), `requestId?`, `entryId?` |
 
 载荷字段变动时 status 输出契约同步修订属 spec 义务，不需重开裁决（#175-系统性四第 3 项：投影语义锚定"计数/窗口/利用率"层面，不锚定字段名——与 #174-M14"键定义锚事件语义不锚字段名"同范式）。
+
+**F087 分区语义**：`admitted` 事件的 `entryIds[]` 保持完整（列出全部获批身份），`gammaChargedEntryIds[]` / `gammaExemptEntryIds[]` 是同一多重集合的一个划分。**契约（唯一校验器 = `gammaPartitionProblem`）**：
+
+1. **两侧互斥**：计费集合与豁免集合是**不相交的集合**——同一 entryId 不得同时出现在两侧。为保留既有重复输入语义，**不新增全局去重规则**：同一侧允许重复，但两侧合并后的多重集合必须与 `entryIds` **精确相等**（逐 id 出现次数一致）。
+2. **存在性按属性判定，而非按形状**：只有两个属性都**不存在**才是历史（legacy）事件，按 `entryIds.length` 计费、永不重写；**只要出现其中一个属性**，就必须两个属性都存在，且各自是「非空 entry-id 字符串数组」（允许空数组，元素不得为空串/非字符串）。
+3. **畸形即损坏，不得静默重释**：字段存在但类型错误、缺一个字段、`entryIds` 非数组或含非字符串、越界 id、两侧交集非空——一律按**账本损坏**处理：doctor 规则 5 报 error；`amber memory status` 报相同错误并以非零退出（投影仍只读）；`ingest` 拒绝计算配额（`AMBER_E_MEMORY_STATE_INVALID`），直到账本被修复或隔离。
+4. rejected / no-change 事件不携带分区（它们没有获批身份）。
 
 ## 10. schema 落地（Spec-defined——裁决留白，本节给出最简可执行定义）
 
@@ -418,7 +428,7 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 | 2 | 源健康：provenance 源可解析且哈希相符；源失效/哈希漂移 → 条目机械进入 needs-re-review（`AMBER_E_MEMORY_SOURCE_STALE`，复用 D4/D5 mutable-source refresh 机制） | error→状态迁移 |
 | 3 | 反向指针与 related 指针：best-effort，目标消失只报 warning，**永不使条目失效** | warning |
 | 4 | surface 漂移：MEMORY.md 登记 normHash 漂移 → 关联条目 active→needs-re-review；漂移检出且**无关联 registry 条目**时必须给出二选一 remedy 文案（book 一条 human-direct-ratification 条目，provenance 指 surface 路径+时间+normHash；或人工回退），**禁止只报"哈希变了"**（#173 追认强化 3） | 状态迁移 + remedy |
-| 5 | 限速合规：重算当期 γ 消耗，账本-registry 计数不符即 error。物理 surface 用量只作观测，不参与判定（F086 退役 α 预算） | error |
+| 5 | 限速合规：重算当期 γ **计费**消耗，账本-registry 计数不符即 error；带分区的准入事件必须通过 §9 的分区契约（两侧互斥、属性成对存在且为 entry-id 数组、多重集合与 `entryIds` 精确相等），任何畸形/不完整分区 fail-closed 且不得被当作 legacy；历史事件按旧口径计费。物理 surface 用量只作观测，不参与判定（F086 退役 α 预算；F087 修订） | error |
 | 6 | 已退役：原 α 50% 强制复审随 §6.3 一并撤销；不替代以新的阈值提示 | 退役 |
 | 7 | ratification-class 告警：无前置 approve 事件的 book（#173 追认强化 2），与 needs-re-review 并列 | warning |
 | 8 | acknowledged divergence：目标仓库 .gitignore 忽略 MEMORY.md = 知情分歧类别而非缺陷——报一次、附 remedy 文案（re-include 或接受 L2 降级），不作持续告警（#173-Q6） | 一次性告知 |
@@ -432,7 +442,7 @@ registry 扩展字段（仅 registry 对象携带）：`status`（6 值枚举：
 
 | code | title / cause / remedy 概要 | 依据 |
 | --- | --- | --- |
-| `AMBER_E_MEMORY_RATE_LIMITED` | 168h 窗口内 memory-ingest 准入已达 5 条上限，提交整体拒绝 / entries[] 超剩余配额 / 缩减后重交，或待窗口滚动 | #172-C4、#174-M7（裁定） |
+| `AMBER_E_MEMORY_RATE_LIMITED` | 168h 窗口内 memory-ingest **计费**准入已达 5 条上限，提交（计费部分）整体拒绝 / 计费 entries[] 超剩余配额 / 缩减后重交，或待窗口滚动；纯来源刷新不占配额也不触发本码（F087） | #172-C4、#174-M7（裁定）、F087 |
 | `AMBER_E_MEMORY_SOURCE_STALE` | 条目 provenance 源 normHash 漂移或源失效 / 源被修改或清除 / 复审条目：修正后重验或 supersede | #172-系统性三-2（裁定） |
 | `AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID` | 载荷未过 memory-request schema / 字段缺失或类型错误 / 修正后重交（request 保留） | Spec-defined |
 | `AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID` | 条目未过 memory-entry schema（含 signal 闭集/枚举违例在 `AMBER_E_MEMORY_SIGNAL_INVALID` 单列） / 同上 | Spec-defined |
