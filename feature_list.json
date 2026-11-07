@@ -3495,6 +3495,38 @@
 				"surfaces": ["docs/specs/F088-knowledge-first-load.md"],
 				"owner": "standard"
 			}
+		},
+		{
+			"id": "F089",
+			"priority": 89,
+			"area": "memory",
+			"title": "Remove the memory identity gate and the gamma admission limit",
+			"user_visible_behavior": "Agents can run amber memory request, ingest and book without a terminal or --yes, and ingest admits every eligible candidate with no gamma quota, pool ordering, provenance exemption or charged/exempt ledger partition. The human approve gate and all non-gamma admission checks are unchanged.",
+			"status": "passing",
+			"verification": [
+				"Non-TTY request, ingest, approve and book complete without --yes",
+				"A request with more than five candidates is admitted in one ingest",
+				"memory status exposes no gamma projection and doctor judges no gamma rule"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/integration/memory-commands.test.js tests/integration/memory-triggers.test.js tests/unit/memory-dispatch.test.js",
+					"result": "44 tests passed, 0 failed",
+					"date": "2026-11-07",
+					"notes": "Focused memory suites after the gate and gamma code paths were deleted."
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/memory-policy.js",
+				"scripts/lib/memory-commands.js",
+				"scripts/lib/core/doctor.js",
+				"scripts/lib/core/error-catalog.js",
+				"docs/specs/F089-memory-ungated-admission.md",
+				"docs/plans/F089-Remove-the-memory-identity-gate-and-gamma-limit.md",
+				"CHANGELOG.md"
+			],
+			"updated": "2026-11-07"
 		}
 	]
 }

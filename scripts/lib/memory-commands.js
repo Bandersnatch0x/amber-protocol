@@ -10,15 +10,15 @@
 //
 // Verb surface (§8.1):
 //   request  → produce a nomination request artifact (+ memory-request-created)
-//   ingest   → mechanical admission: ajv → γ rate-limit → K1/K2/K3
-//              ranking → write proposals (+ memory-ingest)
+//   ingest   → mechanical admission: ajv → binding/signal gates
+//              → write proposals (+ memory-ingest)
 //   approve  → the single human gate; proposal→(approved) or reject→draft; a
 //              supersedeTarget pointer completes the replacement pair
 //              pair supersession atomic (+ memory-approval)
 //   book     → surface hash registration; proposal/needs-re-review→active;
 //              origin governed-promotion|human-direct-ratification (+ memory-book)
 //   abandon  → explicit F1(ii) entry/request terminal marker (+ memory-abandon)
-//   status   → three-section read-only projection (entries/gamma/surface)
+//   status   → two-section read-only projection (entries/surface)
 //
 // Envelope, routing, and exit codes are owned by defineCommand (F039): the
 // verb handlers return bodies; failure bodies carry bypassPrint: false so the
@@ -34,8 +34,6 @@ const triggers = require("./core/memory-trigger");
 const { sha256, hashFile } = require("./core/context-hash");
 const {
 	SCHEMA_VERSION,
-	GAMMA_QUOTA,
-	GAMMA_WINDOW_MS,
 	AUTO_ABANDON_THRESHOLD,
 	MEMORY_MD,
 	SIGNAL_REQUIRED_CHANNELS,
@@ -43,12 +41,8 @@ const {
 	nowIso,
 	readMemoryMd,
 	surfaceUsage,
-	gammaWindow,
-	gammaExemptTarget,
-	partitionGammaAdmission,
 	computeEntryIdFor,
 	withEntryId,
-	rankEntries,
 	maybeResolveRequests,
 } = require("./core/memory-policy");
 const { codedError } = require("./core/error-catalog");
@@ -111,14 +105,6 @@ function failure(code, message) {
 	};
 }
 
-// Non-TTY without an explicit --yes is refused fail-closed.
-function identityGate(args) {
-	if (!process.stdout.isTTY && !args.yes) {
-		return failure("AMBER_E_MEMORY_APPROVAL_REQUIRED", "non-interactive invocation without --yes");
-	}
-	return null;
-}
-
 function surfaceNormHash(targetRoot) {
 	return sha256(store.normalizeMemoryMd(readMemoryMd(targetRoot)));
 }
@@ -159,9 +145,6 @@ function loadPayloadJson(targetRoot, ref) {
 
 // ── request (§5.1/§5.2) ───────────────────────────────────────────────────────
 function handleRequest(args, targetRoot) {
-	const gate = identityGate(args);
-	if (gate) return gate;
-
 	// `--skip-trigger <id>` records the nomination's documented no-change
 	// outcome (§5.1-M3): the human ruled no memory entry is warranted. Without
 	// it a trigger stayed `open` forever, so the count only ever grew.
@@ -276,8 +259,8 @@ function handleRequest(args, targetRoot) {
 	};
 }
 
-// ── ingest (§5.3 five-stage acceptance, all-or-nothing) ───────────────────────
-function rejectIngest(targetRoot, request, channel, code, message, entryIds, ranking) {
+// ── ingest (§5.3 acceptance gates, all-or-nothing) ────────────────────────────
+function rejectIngest(targetRoot, request, channel, code, message, entryIds) {
 	const warnings = [];
 	let abandoned = false;
 	if (request) {
@@ -297,7 +280,6 @@ function rejectIngest(targetRoot, request, channel, code, message, entryIds, ran
 		outcome: "rejected",
 		entryIds,
 		code,
-		ranking,
 		batchId: request && request.provenance && request.provenance.batchId,
 	});
 	if (abandoned) {
@@ -328,7 +310,6 @@ function rejectIngest(targetRoot, request, channel, code, message, entryIds, ran
 		code,
 		outcome: "rejected",
 		entryIds,
-		ranking,
 		bypassPrint: false,
 	};
 }
@@ -429,9 +410,6 @@ function resolveIngestSource(args, targetRoot) {
 }
 
 function handleIngest(args, targetRoot) {
-	const gate = identityGate(args);
-	if (gate) return gate;
-
 	const source = resolveIngestSource(args, targetRoot);
 	if (source.errors) return source;
 	const { request, requestId, payloadBody, channel } = source;
@@ -516,21 +494,10 @@ function handleIngest(args, targetRoot) {
 		};
 	}
 
-	// Stage 4: γ rate-limit over the mixed pool — see rankForGammaAdmission.
-	const gammaOutcome = rankForGammaAdmission(
-		targetRoot,
-		request,
-		channel,
-		entryIds,
-		effective,
-		effectiveIds,
-	);
-	if (gammaOutcome.errors) return gammaOutcome;
-	const { rankedPool, exemptTargets } = gammaOutcome;
-
-	// Stage 5: admit (draft→proposal), ranking留痕 over the mixed pool (§6.5).
+	// Stage 4: admit (draft→proposal). F089 retired the γ rate limit, so every
+	// eligible candidate in the request is admitted.
 	const now = nowIso();
-	for (const { entry } of rankedPool.filter((r) => !r.queued)) {
+	for (const entry of effective) {
 		store.writeEntry(targetRoot, {
 			...entry,
 			status: "proposal",
@@ -539,28 +506,13 @@ function handleIngest(args, targetRoot) {
 			updatedAt: now,
 		});
 	}
-	const ranking = rankedPool.map((r) => ({
-		entryId: r.entryId,
-		k1: r.k1,
-		k2: r.k2,
-		queued: r.queued,
-		exempt: r.exempt,
-	}));
-	// F087 §3.3: entryIds stays complete (every admitted identity); the
-	// partition makes the charged/exempt split reconstructable. `exemptTargets`
-	// is keyed by identity, so a duplicated candidate lands on the same side
-	// as its twin.
-	const partition = partitionGammaAdmission(effectiveIds, exemptTargets);
 	store.appendMemoryEvent(targetRoot, {
 		kind: "memory-ingest",
 		requestId,
 		channel,
 		outcome: "admitted",
 		entryIds: effectiveIds,
-		gammaChargedEntryIds: partition.chargedEntryIds,
-		gammaExemptEntryIds: partition.exemptEntryIds,
 		skippedAbandoned: skipped,
-		ranking,
 		batchId: request && request.provenance && request.provenance.batchId,
 	});
 	const warnings = skipped.length
@@ -569,114 +521,13 @@ function handleIngest(args, targetRoot) {
 			]
 		: [];
 	return {
-		text: `ingest admitted ${effectiveIds.length} proposal(s) (${partition.chargedEntryIds.length} charged, ${partition.exemptEntryIds.length} provenance refresh).`,
+		text: `ingest admitted ${effectiveIds.length} proposal(s).`,
 		errors: [],
 		warnings,
 		outcome: "admitted",
 		entryIds: effectiveIds,
-		gammaChargedEntryIds: partition.chargedEntryIds,
-		gammaExemptEntryIds: partition.exemptEntryIds,
-		ranking,
 	};
 }
-
-// Stage 4: γ rate-limit over the full admission mixed pool (§6.5 C4×M14):
-// current candidates + queued un-admitted candidates from other open
-// requests, ranked K1/K2/K3, truncated to the window's remaining quota —
-// the whole current batch must land inside the admitted slice. Returns the
-// refusal, or the ranked pool stage 6 admits from.
-//
-// F087 §3.2: the quota applies to CHARGED candidates only. A candidate that
-// `gammaExemptTarget` proves to be a provenance-only refresh is admitted
-// without consuming a slot, is excluded from the truncation pool (so it can
-// neither displace a charged candidate nor be blocked by an exhausted quota),
-// and is still written as a proposal that needs the human approve/book steps.
-function rankForGammaAdmission(targetRoot, request, channel, entryIds, effective, effectiveIds) {
-	// F087 §3.5 / Standards P2: a ledger whose partition is present but
-	// malformed cannot be counted. Refuse to admit rather than compute a quota
-	// from a corrupt window (doctor reports the same condition).
-	const window = gammaWindow(targetRoot);
-	if (window.problems.length > 0) {
-		const first = window.problems[0];
-		return failure(
-			"AMBER_E_MEMORY_STATE_INVALID",
-			`γ ledger partition is corrupt (${first.requestId || "unknown request"}: ${first.problem}); refusing to admit until the ledger is repaired`,
-		);
-	}
-	const quota = window.quotaRemaining;
-	const exemptTargets = new Map(); // entryId -> predecessor id
-	const classify = (entry) => {
-		const target = gammaExemptTarget(targetRoot, entry);
-		if (target) exemptTargets.set(entry.entryId, target);
-		return Boolean(target);
-	};
-	const currentCandidates = effective.map((entry) => ({
-		entry,
-		createdAt: request ? request.createdAt : undefined,
-		queued: false,
-		exempt: classify(entry),
-	}));
-	const queued = [];
-	const queuedSeen = new Set(effectiveIds);
-	for (const other of store.readRequests(targetRoot)) {
-		if (other.status === "resolved") continue;
-		if (request && other.requestId === request.requestId) continue;
-		for (const e of other.entries || []) {
-			const prior = store.readEntry(targetRoot, e.entryId);
-			if (
-				prior &&
-				["proposal", "active", "superseded", "needs-re-review", "abandoned"].includes(prior.status)
-			)
-				continue;
-			if (queuedSeen.has(e.entryId)) continue;
-			queuedSeen.add(e.entryId);
-			const queuedEntry = withEntryId(e);
-			queued.push({
-				entry: queuedEntry,
-				createdAt: other.createdAt,
-				queued: true,
-				exempt: classify(queuedEntry),
-			});
-		}
-	}
-	const pool = currentCandidates.concat(queued);
-	const rankedPool = rankEntries(
-		targetRoot,
-		pool.map(({ entry, createdAt, queued: isQueued }) => ({
-			entry,
-			createdAt,
-			queued: isQueued,
-		})),
-	);
-	for (const row of rankedPool) row.exempt = exemptTargets.has(row.entryId);
-	const chargedPool = rankedPool.filter((row) => !row.exempt);
-	if (chargedPool.length > quota) {
-		const admittedSlice = new Set(chargedPool.slice(0, quota).map((r) => r.entryId));
-		const chargedCurrent = chargedPool.filter((row) => !row.queued);
-		const currentFits = chargedCurrent.every((row) => admittedSlice.has(row.entryId));
-		if (!currentFits) {
-			const exemptCurrent = effectiveIds.length - chargedCurrent.length;
-			const ranking = rankedPool.map((r) => ({
-				entryId: r.entryId,
-				k1: r.k1,
-				k2: r.k2,
-				queued: r.queued,
-				exempt: r.exempt,
-			}));
-			return rejectIngest(
-				targetRoot,
-				request,
-				channel,
-				"AMBER_E_MEMORY_RATE_LIMITED",
-				`γ remaining ${quota} in 168h window cannot admit the whole charged batch of ${chargedCurrent.length} (${exemptCurrent} provenance-only refresh(es) excluded from the quota; ranked charged pool ${chargedPool.length})`,
-				entryIds,
-				ranking,
-			);
-		}
-	}
-	return { rankedPool, exemptTargets };
-}
-
 // ── approve (§5.4 the single human gate; typed seam already gated --yes) ──────
 
 // A4 reject path: proposal→draft with a mandatory non-empty reason.
@@ -874,9 +725,6 @@ function bookRatified(targetRoot, args, surfacePath, normHash, now, warnings) {
 }
 
 function handleBook(args, targetRoot) {
-	const gate = identityGate(args);
-	if (gate) return gate;
-
 	const surfacePath = MEMORY_MD;
 	const normHash = surfaceNormHash(targetRoot);
 	const now = nowIso();
@@ -888,9 +736,9 @@ function handleBook(args, targetRoot) {
 		);
 	}
 
-	// §5.5 ratification track (human-direct-ratification): a human edit already
-	// on MEMORY.md enters the ledger directly — no prior request/ingest/approve,
-	// no γ. Provenance points at the edit fact itself (surface path + time +
+	// §5.5 ratification track (human-direct-ratification): a direct edit already
+	// on MEMORY.md enters the ledger without a prior request/ingest/approve.
+	// Provenance points at the edit fact itself (surface path + time +
 	// normHash); knowledgeKind is the human's choice (unspecified allowed).
 	const entryId = args.entryId || args.entry;
 	if (args.ratify && entryId) {
@@ -1028,7 +876,7 @@ function handleAbandon(args, targetRoot) {
 	};
 }
 
-// ── status (§8.2 three-section read-only projection) ──────────────────────────
+// ── status (§8.2 two-section read-only projection) ────────────────────────────
 function buildProjection(targetRoot) {
 	const counts = {
 		draft: 0,
@@ -1065,18 +913,9 @@ function buildProjection(targetRoot) {
 	const pendingRequests = store
 		.readRequests(targetRoot)
 		.filter((r) => r.status !== "resolved").length;
-	const gamma = gammaWindow(targetRoot);
 	const surface = surfaceUsage(targetRoot);
 	return {
 		entries: { ...counts, pendingRequests },
-		gamma: {
-			windowAdmitted: gamma.windowAdmitted,
-			windowExempt: gamma.windowExempt,
-			quotaRemaining: gamma.quotaRemaining,
-			windowStart: gamma.windowStart,
-			windowEnd: gamma.windowEnd,
-			problems: gamma.problems,
-		},
 		surface,
 	};
 }
@@ -1086,25 +925,9 @@ function renderStatus(p) {
 	const lines = [
 		"Memory status (registry + events.jsonl; observation only — doctor is the judgment authority):",
 		`  entries: draft ${e.draft}, proposal ${e.proposal}, active ${e.active}, superseded ${e.superseded}, needs-re-review ${e.needsReReview}, abandoned ${e.abandoned}, pending requests ${e.pendingRequests}`,
-		`  gamma:   ${p.gamma.windowAdmitted}/${GAMMA_QUOTA} charged in 168h (${p.gamma.windowExempt} provenance refresh exempt; remaining ${p.gamma.quotaRemaining})`,
 	];
-	if (p.gamma.problems.length > 0) {
-		lines.push(
-			`  gamma ledger: ${p.gamma.problems.length} corrupt partition event(s) — quarantine the ledger before admitting (see errors)`,
-		);
-	}
 	lines.push(`  surface: ${p.surface.entries} entries, ${p.surface.bytes} bytes in ${MEMORY_MD}`);
 	return lines.join("\n");
-}
-
-// F087 §3.5: a corrupt partition is a ledger error, not a silent zero. Status
-// keeps its read-only contract but fails closed the same way doctor does, and
-// admission refuses to compute a quota from the same window.
-function gammaPartitionErrors(projection) {
-	return projection.gamma.problems.map(
-		(problem) =>
-			`γ ledger partition is corrupt (${problem.requestId || "unknown request"}): ${problem.problem} — repair or quarantine the ledger; doctor rule 5 reports the same condition.`,
-	);
 }
 
 function handleStatus(args, targetRoot) {
@@ -1112,7 +935,7 @@ function handleStatus(args, targetRoot) {
 	return {
 		...projection,
 		text: renderStatus(projection),
-		errors: gammaPartitionErrors(projection),
+		errors: [],
 		warnings: [],
 	};
 }
@@ -1161,9 +984,6 @@ module.exports = {
 	buildProjection,
 	// exported for tests / doctor reuse
 	surfaceUsage,
-	gammaWindow,
 	computeEntryIdFor,
-	GAMMA_QUOTA,
-	GAMMA_WINDOW_MS,
 	AUTO_ABANDON_THRESHOLD,
 };

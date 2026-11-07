@@ -24,7 +24,6 @@ const {
 const { dispatch } = require("../../scripts/lib/command-dispatcher");
 const memoryStore = require("../../scripts/lib/core/memory-store");
 const { triggerWriteBackRequest, listTriggers } = require("../../scripts/lib/core/memory-trigger");
-const { buildProjection } = require("../../scripts/lib/memory-commands");
 
 function mkTarget({ handoff = true } = {}) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-triggers-"));
@@ -46,10 +45,6 @@ function mkTarget({ handoff = true } = {}) {
 
 function memoryEvents(target) {
 	return memoryStore.readMemoryEvents(target, 0);
-}
-
-function gammaAdmitted(target) {
-	return buildProjection(target).gamma.windowAdmitted;
 }
 
 // ── trigger module semantics ────────────────────────────────────────────────
@@ -74,8 +69,6 @@ test("triggerWriteBackRequest writes a nomination contract + event, exclusively"
 	assert.equal(events[0].triggerRef.ref, "sess-1");
 	assert.deepEqual(events[0].entryIds, [], "a trigger is a contract, never an admission");
 
-	// γ counts admitted proposals only — a trigger consumes nothing (M3).
-	assert.equal(gammaAdmitted(target), 0);
 	// MEMORY.md is never touched by a trigger.
 	assert.equal(fs.existsSync(path.join(target, "MEMORY.md")), false);
 
@@ -139,7 +132,6 @@ test("T1 fires exactly once on strict completion with handoff evidence", async (
 	assert.equal(created.length, 1);
 	assert.equal(created[0].channel, "t1-writeback");
 	assert.deepEqual(created[0].entryIds, []);
-	assert.equal(gammaAdmitted(target), 0, "M3: a nomination contract consumes no γ");
 	assert.equal(
 		fs.readFileSync(path.join(target, "MEMORY.md"), "utf8"),
 		memoryMdBefore,
@@ -290,7 +282,6 @@ test("T2 fires at feature accept when a write-back path category hits", () => {
 	);
 	assert.equal(created[0].triggerRef.ref, "F001", "§9 payload: triggerRef.ref linkage");
 	assert.deepEqual(created[0].entryIds, [], "a trigger is a contract, never an admission");
-	assert.equal(gammaAdmitted(dir), 0);
 	assert.equal(fs.existsSync(path.join(dir, "MEMORY.md")), false);
 
 	// Re-accept is idempotent — exclusivity holds the nomination at one.

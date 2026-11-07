@@ -1,6 +1,6 @@
 # F087 — Provenance-only refresh exemption from the γ admission limit
 
-Status: proposed
+Status: superseded (retired by F089)
 Date: 2026-11-07
 Amends: `docs/specs/2026-08-21-governed-memory-layer.md` §5.3, §6.3, §6.5, §8.2, §9, §11-5, §12
 Related: ADR-0018 (D3/D7 amendments), `docs/plans/F087-Provenance-only-memory-refresh-exemption.md`

@@ -2853,43 +2853,37 @@ See `scripts/lib/core/knowledge-projection.js` and `docs/specs/F059-knowledge-de
 MEMORY.md nominations. **Amber never writes MEMORY.md** — humans curate the surface; Amber admits,
 approves, registers, and audits. `request` nominates entries (T1/T2 write-back triggers or the human
 escape hatch); `ingest` is the mechanical all-or-nothing admission gate (schema → source binding →
-signal → γ rate limit); `approve` is the single human, entry-level gate; `book` registers the
+signal); `approve` is the single human, entry-level gate; `book` registers the
 MEMORY.md surface hash and promotes entries to active; `abandon` is the explicit terminal marker;
-`status` is a read-only three-section projection (entries / gamma / surface). The retired α budget
+`status` is a read-only two-section projection (entries / surface). The retired α budget
 (F086) leaves no ceiling or utilisation figure; `surface` reports the physical entry count and
 normalized byte size as observation. Doctor owns the judgment rules (ledger consistency, source
-health, surface drift, gamma compliance) and now runs them for product repositories too.
+health, surface drift) and now runs them for product repositories too.
 
-γ charges **new knowledge**: five entries per rolling 168 hours. A **provenance-only refresh** is
-exempt (F087): the entry must name a real `active`/`needs-re-review` `supersedeTarget` and preserve
-that predecessor's `claim`, `knowledgeKind` and `targetSurface` byte-for-byte, changing only its
-source bindings. Refresh admission is still schema-checked, hash-verified, human-approved and booked;
-it simply does not consume a slot. A changed claim, a missing or retired predecessor, a repeat
-admission and any entry without a pointer stay charged — the exemption is derived from the registry,
-never asserted in a payload. `status` reports `gamma.windowAdmitted` (charged), `gamma.windowExempt`
-(exempt refreshes in the same window) and `gamma.quotaRemaining`; doctor rule 5 judges the charged
-count and fails closed when an event's charged/exempt partition does not reconstruct its admitted
-identities.
+F089 retired the γ admission limit (five entries per rolling 168 hours) and the provenance-only
+exemption built to escape it. `ingest` admits every eligible candidate in a request; there is no
+quota, pool ordering, exemption or charged/exempt ledger partition, and `status` exposes no `gamma`
+object. Intake is bounded only by the entry-level human `approve` step.
 
-`request`/`ingest`/`book` inline the identity gate (non-TTY without `--yes` is refused);
-`approve`/`abandon` are typed-seam mutations and require `--yes`/`--confirm`.
+F089 also retired the non-TTY identity gate on `request`/`ingest`/`book`, so agents may run them
+without `--yes`. `approve`/`abandon` are typed-seam mutations and still require `--yes`/`--confirm`.
 
 ```bash
 # Nominate + admit + approve + register (the governed chain)
-node scripts/amber.js memory request --target . --payload mem-request.json --yes
+node scripts/amber.js memory request --target . --payload mem-request.json
 
 # Answer or skip an open T1/T2 nomination (closes it; one-way)
-node scripts/amber.js memory request --target . --payload mem-request.json --trigger trig-... --yes
-node scripts/amber.js memory request --target . --skip-trigger trig-... --yes
-node scripts/amber.js memory ingest  --target . --request mreq-... --yes
+node scripts/amber.js memory request --target . --payload mem-request.json --trigger trig-...
+node scripts/amber.js memory request --target . --skip-trigger trig-...
+node scripts/amber.js memory ingest  --target . --request mreq-...
 node scripts/amber.js memory approve --target . --entry-id sha256:... --decision approve --yes
-node scripts/amber.js memory book    --target . --entry-id sha256:... --yes
+node scripts/amber.js memory book    --target . --entry-id sha256:...
 
 # Human escape hatch + explicit terminal marker
 node scripts/amber.js memory abandon --target . --entry sha256:... --yes
 
-# Ratify a human direct edit of MEMORY.md (no request/ingest/approve, γ-free)
-node scripts/amber.js memory book --target . --ratify --claim "<entry heading>" --yes
+# Ratify a human direct edit of MEMORY.md (no request/ingest/approve)
+node scripts/amber.js memory book --target . --ratify --claim "<entry heading>"
 
 # Read-only projection (also exposed as the amber.memory.status MCP tool)
 node scripts/amber.js memory status --target . --json
