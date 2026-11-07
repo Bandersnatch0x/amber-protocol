@@ -3453,6 +3453,35 @@
 				"surfaces": ["docs/specs/F087-provenance-refresh-gamma-exemption.md"],
 				"owner": "standard"
 			}
+		},
+		{
+			"id": "F088",
+			"priority": 88,
+			"area": "knowledge",
+			"title": "Render knowledge map before recent changes",
+			"user_visible_behavior": "The knowledge map renders from its graph response before the initial recent-change feed is requested; a slow recent feed cannot hold the initial graph batch.",
+			"status": "passing",
+			"verification": [
+				"Knowledge page renders while the recent feed is deliberately held",
+				"Recent feed still loads and refreshes after graph data arrives"
+			],
+			"evidence": [
+				{
+					"command": "Playwright knowledge blocked-feed, graph counts, recent feed and no-provider checks",
+					"result": "5 passed; removing the query readiness condition makes the blocked-feed case fail",
+					"date": "2026-11-07",
+					"notes": "Complete traces and fix-then-revert logs under .scratch/knowledge-timeout/implementation/runs; default timeouts unchanged."
+				}
+			],
+			"notes": [],
+			"paths": [
+				"apps/web/src/features/knowledge/KnowledgeMapPage.tsx",
+				"apps/web/tests/client/KnowledgeMapPage.test.tsx",
+				"apps/web/tests/e2e/knowledge.spec.ts",
+				"docs/specs/F088-knowledge-first-load.md",
+				"docs/plans/F088-Render-knowledge-map-before-recent-changes.md",
+				"CHANGELOG.md"
+			]
 		}
 	]
 }
