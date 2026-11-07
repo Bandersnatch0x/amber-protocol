@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { spawn } from 'node:child_process';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import {
   createRunnerControlRequest,
   waitForRunnerAck,
@@ -243,6 +245,98 @@ describe('runner-ack', () => {
       releaseHalfWrite();
       spy.mockRestore();
     }
+  });
+
+  it('publishes atomically from the real CLI writer (cross-boundary)', async () => {
+    // The production ACK writer is scripts/lib/runner-ack.js, called by
+    // `amber session ...`; the Web reader polls the same path. Drive the real
+    // CLI writer in a child process that holds the write open after half the
+    // bytes, so the reader can only succeed if the publication is atomic.
+    const sessionId = '00000000-0000-0000-0000-000000000018';
+    fs.mkdirSync(sessionDir(sessionId), { recursive: true });
+    const request = createRunnerControlRequest({
+      sessionId,
+      action: 'resume',
+      requestedStatus: 'executing',
+      requestId: 'resume-request-cli',
+    });
+    const cliWriterPath = fileURLToPath(
+      new URL('../../../../scripts/lib/runner-ack.js', import.meta.url),
+    );
+    const helperPath = path.join(testRoot, 'slow-cli-writer.cjs');
+    fs.writeFileSync(
+      helperPath,
+      [
+        '"use strict";',
+        "const fs = require('node:fs');",
+        'const [root, sessionId, requestId, cliPath] = process.argv.slice(2);',
+        'const realWriteFileSync = fs.writeFileSync.bind(fs);',
+        'let first = true;',
+        'fs.writeFileSync = (file, data, ...rest) => {',
+        "  if (first && String(file).includes('runner-acks')) {",
+        '    first = false;',
+        '    const text = String(data);',
+        '    realWriteFileSync(file, text.slice(0, Math.floor(text.length / 2)));',
+        "    process.stdout.write('HALF\\n');",
+        '    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 800);',
+        '    realWriteFileSync(file, text);',
+        '    return;',
+        '  }',
+        '  return realWriteFileSync(file, data, ...rest);',
+        '};',
+        'const { writeRunnerAck } = require(cliPath);',
+        'writeRunnerAck(root, sessionId, {',
+        '  requestId,',
+        "  action: 'resume',",
+        "  status: 'acked',",
+        "  requestedStatus: 'executing',",
+        "  source: 'cli-runner',",
+        '});',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const child = spawn(
+      process.execPath,
+      [helperPath, testRoot, sessionId, request.requestId, cliWriterPath],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    );
+    // Attach the exit listener before anything can await, so a quick child is
+    // never missed (a listener added after exit never fires).
+    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error('CLI helper never reported its partial write')),
+        10_000,
+      );
+      let buffer = '';
+      child.stdout?.on('data', (chunk) => {
+        buffer += chunk.toString();
+        if (buffer.includes('HALF')) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      child.once('exit', (code) => {
+        if (code !== 0) {
+          clearTimeout(timer);
+          reject(new Error(`CLI helper exited with ${code}`));
+        }
+      });
+    });
+
+    const pendingAck = waitForRunnerAck(request, { pollMs: 5, timeoutMs: 5_000 });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const ack = await pendingAck;
+    await exited;
+
+    expect(ack).toMatchObject({
+      requestId: 'resume-request-cli',
+      action: 'resume',
+      status: 'acked',
+      requestedStatus: 'executing',
+      source: 'cli-runner',
+    });
   });
 
   it('does not let request ids escape the runner ACK directory', async () => {
