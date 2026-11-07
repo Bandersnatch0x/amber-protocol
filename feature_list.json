@@ -3476,7 +3476,7 @@
 					"command": "npm test; Web vitest; Vite build; Playwright complete suite plus semantic cases",
 					"result": "Root 4312 tests, 4308 pass, 4 skipped, 0 failures; Web 812 passed; browser 73 passed and 3 semantic-only skipped; separate semantic 3 passed; production build exit 0",
 					"date": "2026-11-07",
-					"notes": "Complete logs parsed in .scratch/knowledge-timeout/complete-gate-evidence.json; all five jobs exit0. Current implementation5ec5bf38. Default assertion/test timeouts unchanged; see retained cold-five cleanup failure and evidence-review qualification."
+					"notes": "Complete logs parsed in .scratch/knowledge-timeout/complete-gate-evidence.json; all five jobs exit0. Current implementation 5ec5bf38. Default assertion/test timeouts unchanged; see retained cold-five cleanup failure and evidence-review qualification."
 				}
 			],
 			"notes": [],
