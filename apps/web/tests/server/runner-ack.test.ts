@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
+import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import {
@@ -168,6 +169,80 @@ describe('runner-ack', () => {
       source: 'runner-ack-file',
       message: 'Runner ACK file could not be parsed.',
     });
+  });
+
+  it('publishes ACK files atomically so a reader never observes a partial write', async () => {
+    const sessionId = '00000000-0000-0000-0000-000000000017';
+    fs.mkdirSync(sessionDir(sessionId), { recursive: true });
+    const request = createRunnerControlRequest({
+      sessionId,
+      action: 'resume',
+      requestedStatus: 'executing',
+      requestId: 'resume-request-atomic',
+    });
+
+    // Deterministically hold the FIRST writeFile open after half of the bytes
+    // have landed — exactly the truncate→write window a direct write exposes.
+    // With an atomic publish the destination path does not exist until the
+    // rename, so the waiter keeps polling and observes the complete ACK. With
+    // a direct write the waiter reads the half file, and readRunnerAck treats
+    // an unparseable file as a TERMINAL rejection, so the assertion below goes
+    // red. No timing luck is involved: the partial state is held until the
+    // test releases it.
+    const realWriteFile = fsp.writeFile.bind(fsp);
+    let markHalfLanded: () => void = () => {};
+    const halfLanded = new Promise<void>((resolve) => {
+      markHalfLanded = resolve;
+    });
+    let releaseHalfWrite: () => void = () => {};
+    const halfWriteHeld = new Promise<void>((resolve) => {
+      releaseHalfWrite = resolve;
+    });
+    let writeCalls = 0;
+    const spy = vi.spyOn(fsp, 'writeFile');
+    spy.mockImplementation((async (
+      file: Parameters<typeof fsp.writeFile>[0],
+      data: Parameters<typeof fsp.writeFile>[1],
+    ) => {
+      writeCalls += 1;
+      if (writeCalls > 1) return realWriteFile(file, data);
+      const text = String(data);
+      await realWriteFile(file, text.slice(0, Math.floor(text.length / 2)));
+      markHalfLanded();
+      await halfWriteHeld;
+      await realWriteFile(file, text);
+    }) as unknown as typeof fsp.writeFile);
+
+    try {
+      const write = writeRunnerAck(sessionId, {
+        requestId: 'resume-request-atomic',
+        action: 'resume',
+        status: 'acked',
+        requestedStatus: 'executing',
+        source: 'atomic-runner',
+      });
+      await Promise.race([
+        halfLanded,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('writeFile spy did not intercept')), 2_000),
+        ),
+      ]);
+      const pendingAck = waitForRunnerAck(request, { pollMs: 5, timeoutMs: 5_000 });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      releaseHalfWrite();
+      await write;
+      const ack = await pendingAck;
+      expect(ack).toMatchObject({
+        requestId: 'resume-request-atomic',
+        action: 'resume',
+        status: 'acked',
+        requestedStatus: 'executing',
+        source: 'atomic-runner',
+      });
+    } finally {
+      releaseHalfWrite();
+      spy.mockRestore();
+    }
   });
 
   it('does not let request ids escape the runner ACK directory', async () => {

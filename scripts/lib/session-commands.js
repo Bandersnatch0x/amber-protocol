@@ -201,7 +201,7 @@ async function startSession(projectRoot, options) {
 	}
 
 	if (!goal) {
-		return result("Error: --goal is required", 1);
+		return result("--goal is required", 1);
 	}
 
 	// Autonomous mode removed in 1.3.0 (ADR-0005): refuse at start, not just at
@@ -209,7 +209,7 @@ async function startSession(projectRoot, options) {
 	// still guards legacy manifests created before this gate.)
 	if (mode === "autonomous") {
 		return result(
-			"Error: Autonomous execution is not available. " +
+			"Autonomous execution is not available. " +
 				"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
 			1,
 		);
@@ -453,7 +453,7 @@ async function abortSession(projectRoot, options) {
 	const { sessionId } = options;
 
 	if (!sessionId) {
-		return result("Error: --session-id is required", 1);
+		return result("--session-id is required", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -510,7 +510,7 @@ async function completeSession(projectRoot, options) {
 	const { sessionId } = options;
 
 	if (!sessionId) {
-		return result("Error: session complete requires --session <id>.", 1);
+		return result("session complete requires --session <id>.", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -641,7 +641,7 @@ async function continueSession(projectRoot, options) {
 				projectRoot,
 				sessionId,
 				options,
-				"Error: Autonomous execution is not available. " +
+				"Autonomous execution is not available. " +
 					"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
 			);
 		}
@@ -741,7 +741,7 @@ async function verifySession(projectRoot, options) {
 	const { sessionId, stage: stageName } = options;
 
 	if (!sessionId) {
-		return result("Error: session verify requires --session <id>.", 1);
+		return result("session verify requires --session <id>.", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -925,7 +925,7 @@ async function approveSession(projectRoot, options) {
 	const { sessionId, gate: gateId } = options;
 
 	if (!sessionId) {
-		return result("Error: session approve requires --session <id>.", 1);
+		return result("session approve requires --session <id>.", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -1079,7 +1079,7 @@ async function runSession(projectRoot, options) {
 	const { sessionId, execute, ownerId, tokenHash, leaseFence } = options;
 
 	if (!sessionId) {
-		return result("Error: session run requires --session <id>.", 1);
+		return result("session run requires --session <id>.", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -1147,7 +1147,7 @@ async function settleSession(projectRoot, options) {
 	} = options;
 
 	if (!sessionId) {
-		return result("Error: session settle requires --session <id>.", 1);
+		return result("session settle requires --session <id>.", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -1156,11 +1156,11 @@ async function settleSession(projectRoot, options) {
 	}
 
 	if (!requestId) {
-		return result("Error: session settle requires --request-id <id>.", 1);
+		return result("session settle requires --request-id <id>.", 1);
 	}
 
 	if (!settlementResult) {
-		return result("Error: session settle requires --result <json>.", 1);
+		return result("session settle requires --result <json>.", 1);
 	}
 
 	// Session existence, terminal-state, and lease refusals are all owned by the
@@ -1209,7 +1209,7 @@ async function leaseSession(projectRoot, options) {
 	const { sessionId, ownerId, tokenHash } = options;
 
 	if (!sessionId) {
-		return result("Error: session lease requires --session <id>.", 1);
+		return result("session lease requires --session <id>.", 1);
 	}
 
 	const validation = validateSessionIdForLookup(sessionId);
@@ -1219,7 +1219,7 @@ async function leaseSession(projectRoot, options) {
 
 	if (!ownerId || !tokenHash) {
 		return result(
-			"Error: session lease requires --owner-id <agent> and --token-hash <sha256 of the current lease token>.",
+			"session lease requires --owner-id <agent> and --token-hash <sha256 of the current lease token>.",
 			1,
 		);
 	}

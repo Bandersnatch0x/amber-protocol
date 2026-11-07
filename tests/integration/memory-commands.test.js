@@ -262,6 +262,361 @@ test("γ rate limit rejects batches beyond the 168h remaining quota (all-or-noth
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
+// ── F087 provenance-only refresh exemption ─────────────────────────────────
+// A refresh is a NEW entry that names a real active/needs-re-review
+// predecessor and preserves claim / knowledgeKind / targetSurface exactly,
+// changing only its source binding. It is admitted without consuming γ; a
+// changed claim, a missing/retired predecessor and a repeat admission are
+// ordinary (charged) entries again.
+
+function gammaOf(target) {
+	return run(target, "status").result.gamma;
+}
+
+function sourcedEntry(target, claim, ref, overrides = {}) {
+	const hashed = hashFile(path.join(target, ref));
+	return {
+		schemaVersion: "1.0.0",
+		claim,
+		knowledgeKind: "pattern",
+		targetSurface: "MEMORY.md",
+		provenance: {
+			sources: [
+				{
+					kind: "file",
+					ref,
+					rawHash: hashed.rawHash,
+					normHash: hashed.normHash,
+					mutable: true,
+				},
+			],
+		},
+		...overrides,
+	};
+}
+
+// Full governed chain for one entry; returns its entryId.
+function promote(target, requestId, entry) {
+	const payload = writePayload(target, requestId, requestFor(requestId, [entry]));
+	run(target, "request", { payload });
+	const ingested = run(target, "ingest", { request: requestId });
+	assert.equal(ingested.exitCode, 0, JSON.stringify(ingested.result));
+	const entryId = ingested.result.entryIds[0];
+	assert.equal(run(target, "approve", { entryId, decision: "approve" }).exitCode, 0);
+	assert.equal(run(target, "book", { entryId }).exitCode, 0);
+	return entryId;
+}
+
+// Fill the whole γ window with ordinary admissions (5 charged entries).
+function fillWindow(target) {
+	const ids = [];
+	for (let i = 1; i <= 5; i += 1) {
+		ids.push(promote(target, `mreq-f087-fill-${i}`, entryFor(target, `f087 filler ${i}`)));
+	}
+	return ids;
+}
+
+function refreshSource(target, name) {
+	const ref = `src-${name}.js`;
+	fs.writeFileSync(
+		path.join(target, ref),
+		`// provenance for ${name}\nexport const V = "${name}";\n`,
+	);
+	return ref;
+}
+
+test("F087: a provenance-only refresh is admitted at zero quota and consumes no γ", () => {
+	const target = mkTarget();
+	const predecessor = fillWindow(target)[0];
+	assert.equal(gammaOf(target).quotaRemaining, 0);
+	assert.equal(gammaOf(target).windowAdmitted, 5);
+
+	const ref = refreshSource(target, "refresh-a");
+	const refreshed = sourcedEntry(target, "f087 filler 1", ref, { supersedeTarget: predecessor });
+	const ingest = run(target, "ingest", {
+		payload: writePayload(target, "f087-refresh-a", requestFor("mreq-f087-a", [refreshed])),
+	});
+	assert.equal(ingest.exitCode, 0, JSON.stringify(ingest.result));
+	assert.equal(ingest.result.outcome, "admitted");
+	assert.deepEqual(ingest.result.gammaChargedEntryIds, [], "a pure refresh charges nothing");
+	assert.equal(ingest.result.gammaExemptEntryIds.length, 1);
+	assert.equal(memoryStore.readEntry(target, ingest.result.entryIds[0]).status, "proposal");
+
+	const gamma = gammaOf(target);
+	assert.equal(gamma.windowAdmitted, 5, "the quota is untouched");
+	assert.equal(gamma.windowExempt, 1, "status exposes the exempt side");
+	assert.equal(gamma.quotaRemaining, 0);
+
+	const admittedEvent = events(target)
+		.filter((e) => e.kind === "memory-ingest" && e.outcome === "admitted")
+		.at(-1);
+	assert.deepEqual(
+		admittedEvent.entryIds,
+		ingest.result.entryIds,
+		"every admitted identity is kept",
+	);
+	assert.deepEqual(admittedEvent.gammaChargedEntryIds, []);
+	assert.deepEqual(admittedEvent.gammaExemptEntryIds, ingest.result.entryIds);
+	assert.equal(admittedEvent.ranking[0].exempt, true);
+
+	// The refresh still needs the human gate and the booking ceremony.
+	const refreshedId = ingest.result.entryIds[0];
+	assert.equal(run(target, "approve", { entryId: refreshedId, decision: "approve" }).exitCode, 0);
+	assert.equal(run(target, "book", { entryId: refreshedId }).exitCode, 0);
+	assert.equal(memoryStore.readEntry(target, predecessor).status, "superseded");
+	assert.equal(memoryStore.readEntry(target, refreshedId).status, "active");
+
+	// Doctor agrees with status: only charged admissions are judged.
+	const doctor = doctorMemoryRules(target);
+	assert.equal(
+		doctor.errors.some((e) => e.includes("γ ledger")),
+		false,
+		doctor.errors.join("\n"),
+	);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("F087: a changed claim is not a refresh and is refused at zero quota", () => {
+	const target = mkTarget();
+	const predecessor = fillWindow(target)[0];
+	const ref = refreshSource(target, "refresh-b");
+	const changed = sourcedEntry(target, "f087 filler 1 — materially reworded", ref, {
+		supersedeTarget: predecessor,
+	});
+	const payload = writePayload(target, "f087-changed", requestFor("mreq-f087-b", [changed]));
+	run(target, "request", { payload });
+	const ingest = run(target, "ingest", { request: "mreq-f087-b" });
+	assert.equal(ingest.exitCode, 1);
+	assert.equal(ingest.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.equal(ingest.result.ranking[0].exempt, false);
+	assert.equal(
+		fs
+			.readdirSync(path.join(target, ".amber", "memory", "registry"))
+			.filter((f) => f.endsWith(".json")).length,
+		5,
+		"nothing was written by the refused batch",
+	);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("F087: a mixed batch charges only its ordinary entries and stays all-or-nothing", () => {
+	const target = mkTarget();
+	const predecessors = fillWindow(target);
+	// Free exactly one slot by rewinding the clock beyond one admission.
+	const eventsFile = path.join(target, ".amber", "context", "events.jsonl");
+	const lines = fs.readFileSync(eventsFile, "utf8").trim().split("\n");
+	const admitted = lines
+		.map((line, index) => ({ line, index, event: JSON.parse(line) }))
+		.filter(({ event }) => event.kind === "memory-ingest" && event.outcome === "admitted");
+	const oldest = admitted[0];
+	oldest.event.at = new Date(Date.now() - 200 * 3600 * 1000).toISOString();
+	lines[oldest.index] = JSON.stringify(oldest.event);
+	fs.writeFileSync(eventsFile, lines.join("\n") + "\n");
+	assert.equal(gammaOf(target).quotaRemaining, 1);
+
+	const ref = refreshSource(target, "refresh-c");
+	const mixed = [
+		sourcedEntry(target, "f087 filler 3", ref, { supersedeTarget: predecessors[2] }),
+		entryFor(target, "f087 ordinary mixed"),
+	];
+	const ingest = run(target, "ingest", {
+		payload: writePayload(target, "f087-mixed", requestFor("mreq-f087-c", mixed)),
+	});
+	assert.equal(ingest.exitCode, 0, JSON.stringify(ingest.result));
+	assert.equal(ingest.result.gammaExemptEntryIds.length, 1);
+	assert.equal(ingest.result.gammaChargedEntryIds.length, 1);
+	assert.equal(gammaOf(target).windowAdmitted, 5);
+	assert.equal(gammaOf(target).windowExempt, 1);
+	assert.equal(gammaOf(target).quotaRemaining, 0);
+
+	// With no quota left, a batch whose ordinary part does not fit is refused
+	// whole — the refresh inside it is not smuggled in either.
+	const ref2 = refreshSource(target, "refresh-d");
+	const tooMuch = [
+		sourcedEntry(target, "f087 filler 4", ref2, { supersedeTarget: predecessors[3] }),
+		entryFor(target, "f087 ordinary 1"),
+		entryFor(target, "f087 ordinary 2"),
+	];
+	const refused = run(target, "ingest", {
+		payload: writePayload(target, "f087-mixed-2", requestFor("mreq-f087-d", tooMuch)),
+	});
+	assert.equal(refused.exitCode, 1);
+	assert.equal(refused.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.equal(refused.result.ranking.filter((r) => r.exempt).length, 1);
+	assert.equal(
+		fs
+			.readdirSync(path.join(target, ".amber", "memory", "registry"))
+			.filter((f) => f.endsWith(".json")).length,
+		7,
+		"the refused mixed batch wrote nothing (5 fillers + 2 admitted mixed entries)",
+	);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("F087: a queued refresh neither takes a slot nor is blocked by an exhausted window", () => {
+	const target = mkTarget();
+	const predecessors = fillWindow(target);
+	const ref = refreshSource(target, "refresh-e");
+	// Queue (never ingest) a refresh request.
+	const queued = writePayload(
+		target,
+		"f087-queued",
+		requestFor("mreq-f087-e", [
+			sourcedEntry(target, "f087 filler 2", ref, { supersedeTarget: predecessors[1] }),
+		]),
+	);
+	assert.equal(run(target, "request", { payload: queued }).exitCode, 0);
+
+	// A separate ordinary batch is still refused: the queued refresh did not
+	// consume or free a slot, and it did not displace the ordinary candidate.
+	const ordinary = run(target, "ingest", {
+		payload: writePayload(
+			target,
+			"f087-ordinary-queued",
+			requestFor("mreq-f087-e2", [entryFor(target, "f087 ordinary queued")]),
+		),
+	});
+	assert.equal(ordinary.exitCode, 1);
+	assert.equal(ordinary.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.ok(
+		ordinary.result.ranking.some((r) => r.exempt === true && r.queued === true),
+		"the queued refresh is classified in the recorded pool",
+	);
+
+	// Its own ingest still succeeds at zero quota.
+	const own = run(target, "ingest", { request: "mreq-f087-e" });
+	assert.equal(own.exitCode, 0, JSON.stringify(own.result));
+	assert.equal(own.result.gammaChargedEntryIds.length, 0);
+	assert.equal(gammaOf(target).windowAdmitted, 5);
+	assert.equal(gammaOf(target).windowExempt, 1);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("F087: repeat and invalid-target admissions stay charged", () => {
+	const target = mkTarget();
+	const predecessors = fillWindow(target);
+
+	// Repeat: the first refresh supersedes its predecessor, so resubmitting the
+	// same payload no longer names an eligible predecessor.
+	const ref = refreshSource(target, "refresh-f");
+	const first = run(target, "ingest", {
+		payload: writePayload(
+			target,
+			"f087-repeat-1",
+			requestFor("mreq-f087-f1", [
+				sourcedEntry(target, "f087 filler 1", ref, { supersedeTarget: predecessors[0] }),
+			]),
+		),
+	});
+	assert.equal(first.exitCode, 0);
+	const refreshedId = first.result.entryIds[0];
+	run(target, "approve", { entryId: refreshedId, decision: "approve" });
+	run(target, "book", { entryId: refreshedId });
+
+	const repeat = run(target, "ingest", {
+		payload: writePayload(
+			target,
+			"f087-repeat-2",
+			requestFor("mreq-f087-f2", [
+				sourcedEntry(target, "f087 filler 1", ref, { supersedeTarget: predecessors[0] }),
+			]),
+		),
+	});
+	assert.equal(repeat.exitCode, 1);
+	assert.equal(repeat.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.equal(repeat.result.ranking[0].exempt, false, "a superseded predecessor is not eligible");
+
+	// Missing and malformed pointers are ordinary admissions, never exemptions.
+	// A malformed pointer is refused one stage earlier by the entry schema
+	// (supersedeTarget must be a sha256 id), so it never reaches the quota.
+	for (const [label, pointer, expectedCode] of [
+		["missing", "sha256:" + "0".repeat(64), "AMBER_E_MEMORY_RATE_LIMITED"],
+		["malformed", "not-an-entry-id", "AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID"],
+	]) {
+		const ref2 = refreshSource(target, `refresh-${label}`);
+		const ingest = run(target, "ingest", {
+			payload: writePayload(
+				target,
+				`f087-${label}`,
+				requestFor(`mreq-f087-${label}`, [
+					sourcedEntry(target, "f087 filler 5", ref2, { supersedeTarget: pointer }),
+				]),
+			),
+		});
+		assert.equal(ingest.exitCode, 1, label);
+		assert.equal(ingest.result.code, expectedCode, label);
+		assert.notEqual(ingest.result.outcome, "admitted", label);
+	}
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("F087: legacy events keep prior accounting and a tampered partition fails closed", () => {
+	const target = mkTarget();
+	// Legacy admitted event: no partition fields, counted exactly as before.
+	memoryStore.appendMemoryEvent(target, {
+		kind: "memory-ingest",
+		requestId: "legacy-a",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["a", "b", "c"],
+	});
+	assert.equal(gammaOf(target).windowAdmitted, 3);
+	assert.equal(gammaOf(target).windowExempt, 0);
+	assert.equal(
+		doctorMemoryRules(target).errors.some((e) => e.includes("γ ledger")),
+		false,
+		"three legacy admissions are inside the quota",
+	);
+
+	// A partitioned event contributes only its charged side.
+	memoryStore.appendMemoryEvent(target, {
+		kind: "memory-ingest",
+		requestId: "partitioned-a",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["d", "e", "f", "g", "h"],
+		gammaChargedEntryIds: ["d", "e"],
+		gammaExemptEntryIds: ["f", "g", "h"],
+	});
+	assert.equal(gammaOf(target).windowAdmitted, 5);
+	assert.equal(gammaOf(target).windowExempt, 3);
+
+	// One more charged identity breaks the quota — legacy + partitioned mix is
+	// judged on the charged total only.
+	memoryStore.appendMemoryEvent(target, {
+		kind: "memory-ingest",
+		requestId: "legacy-b",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["i"],
+	});
+	const overQuota = doctorMemoryRules(target);
+	assert.ok(
+		overQuota.errors.some((e) => e.includes("γ ledger") && e.includes("charges 6")),
+		overQuota.errors.join("\n"),
+	);
+
+	// A partition that does not reconstruct its admitted identities is
+	// fail-closed rather than silently changing the quota.
+	const tampered = mkTarget();
+	memoryStore.appendMemoryEvent(tampered, {
+		kind: "memory-ingest",
+		requestId: "tampered",
+		channel: "t1-writeback",
+		outcome: "admitted",
+		entryIds: ["a", "b"],
+		gammaChargedEntryIds: ["a"],
+		gammaExemptEntryIds: [],
+	});
+	const tamperReport = doctorMemoryRules(tampered);
+	assert.ok(
+		tamperReport.errors.some((e) => e.includes("does not reconstruct")),
+		tamperReport.errors.join("\n"),
+	);
+	fs.rmSync(target, { recursive: true, force: true });
+	fs.rmSync(tampered, { recursive: true, force: true });
+});
+
 // ── §4.1 state machine edges ────────────────────────────────────────────────
 
 test("approve --decision reject requires a reason and drives proposal → draft", () => {

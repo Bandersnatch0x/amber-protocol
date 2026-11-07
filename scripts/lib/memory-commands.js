@@ -44,6 +44,8 @@ const {
 	readMemoryMd,
 	surfaceUsage,
 	gammaWindow,
+	gammaExemptTarget,
+	partitionGammaAdmission,
 	computeEntryIdFor,
 	withEntryId,
 	rankEntries,
@@ -524,7 +526,7 @@ function handleIngest(args, targetRoot) {
 		effectiveIds,
 	);
 	if (gammaOutcome.errors) return gammaOutcome;
-	const rankedPool = gammaOutcome.rankedPool;
+	const { rankedPool, exemptTargets } = gammaOutcome;
 
 	// Stage 5: admit (draft→proposal), ranking留痕 over the mixed pool (§6.5).
 	const now = nowIso();
@@ -542,13 +544,21 @@ function handleIngest(args, targetRoot) {
 		k1: r.k1,
 		k2: r.k2,
 		queued: r.queued,
+		exempt: r.exempt,
 	}));
+	// F087 §3.3: entryIds stays complete (every admitted identity); the
+	// partition makes the charged/exempt split reconstructable. `exemptTargets`
+	// is keyed by identity, so a duplicated candidate lands on the same side
+	// as its twin.
+	const partition = partitionGammaAdmission(effectiveIds, exemptTargets);
 	store.appendMemoryEvent(targetRoot, {
 		kind: "memory-ingest",
 		requestId,
 		channel,
 		outcome: "admitted",
 		entryIds: effectiveIds,
+		gammaChargedEntryIds: partition.chargedEntryIds,
+		gammaExemptEntryIds: partition.exemptEntryIds,
 		skippedAbandoned: skipped,
 		ranking,
 		batchId: request && request.provenance && request.provenance.batchId,
@@ -559,11 +569,13 @@ function handleIngest(args, targetRoot) {
 			]
 		: [];
 	return {
-		text: `ingest admitted ${effectiveIds.length} proposal(s).`,
+		text: `ingest admitted ${effectiveIds.length} proposal(s) (${partition.chargedEntryIds.length} charged, ${partition.exemptEntryIds.length} provenance refresh).`,
 		errors: [],
 		warnings,
 		outcome: "admitted",
 		entryIds: effectiveIds,
+		gammaChargedEntryIds: partition.chargedEntryIds,
+		gammaExemptEntryIds: partition.exemptEntryIds,
 		ranking,
 	};
 }
@@ -573,12 +585,25 @@ function handleIngest(args, targetRoot) {
 // requests, ranked K1/K2/K3, truncated to the window's remaining quota —
 // the whole current batch must land inside the admitted slice. Returns the
 // refusal, or the ranked pool stage 6 admits from.
+//
+// F087 §3.2: the quota applies to CHARGED candidates only. A candidate that
+// `gammaExemptTarget` proves to be a provenance-only refresh is admitted
+// without consuming a slot, is excluded from the truncation pool (so it can
+// neither displace a charged candidate nor be blocked by an exhausted quota),
+// and is still written as a proposal that needs the human approve/book steps.
 function rankForGammaAdmission(targetRoot, request, channel, entryIds, effective, effectiveIds) {
 	const quota = gammaWindow(targetRoot).quotaRemaining;
+	const exemptTargets = new Map(); // entryId -> predecessor id
+	const classify = (entry) => {
+		const target = gammaExemptTarget(targetRoot, entry);
+		if (target) exemptTargets.set(entry.entryId, target);
+		return Boolean(target);
+	};
 	const currentCandidates = effective.map((entry) => ({
 		entry,
 		createdAt: request ? request.createdAt : undefined,
 		queued: false,
+		exempt: classify(entry),
 	}));
 	const queued = [];
 	const queuedSeen = new Set(effectiveIds);
@@ -594,33 +619,51 @@ function rankForGammaAdmission(targetRoot, request, channel, entryIds, effective
 				continue;
 			if (queuedSeen.has(e.entryId)) continue;
 			queuedSeen.add(e.entryId);
-			queued.push({ entry: withEntryId(e), createdAt: other.createdAt, queued: true });
+			const queuedEntry = withEntryId(e);
+			queued.push({
+				entry: queuedEntry,
+				createdAt: other.createdAt,
+				queued: true,
+				exempt: classify(queuedEntry),
+			});
 		}
 	}
 	const pool = currentCandidates.concat(queued);
-	const rankedPool = rankEntries(targetRoot, pool);
-	if (effectiveIds.length > quota || pool.length > quota) {
-		const admittedSlice = new Set(rankedPool.slice(0, quota).map((r) => r.entryId));
-		const currentFits = effectiveIds.every((id) => admittedSlice.has(id));
+	const rankedPool = rankEntries(
+		targetRoot,
+		pool.map(({ entry, createdAt, queued: isQueued }) => ({
+			entry,
+			createdAt,
+			queued: isQueued,
+		})),
+	);
+	for (const row of rankedPool) row.exempt = exemptTargets.has(row.entryId);
+	const chargedPool = rankedPool.filter((row) => !row.exempt);
+	if (chargedPool.length > quota) {
+		const admittedSlice = new Set(chargedPool.slice(0, quota).map((r) => r.entryId));
+		const chargedCurrent = chargedPool.filter((row) => !row.queued);
+		const currentFits = chargedCurrent.every((row) => admittedSlice.has(row.entryId));
 		if (!currentFits) {
+			const exemptCurrent = effectiveIds.length - chargedCurrent.length;
 			const ranking = rankedPool.map((r) => ({
 				entryId: r.entryId,
 				k1: r.k1,
 				k2: r.k2,
 				queued: r.queued,
+				exempt: r.exempt,
 			}));
 			return rejectIngest(
 				targetRoot,
 				request,
 				channel,
 				"AMBER_E_MEMORY_RATE_LIMITED",
-				`γ remaining ${quota} in 168h window cannot admit the whole batch of ${effectiveIds.length} (mixed pool ${pool.length}, ranked)`,
+				`γ remaining ${quota} in 168h window cannot admit the whole charged batch of ${chargedCurrent.length} (${exemptCurrent} provenance-only refresh(es) excluded from the quota; ranked charged pool ${chargedPool.length})`,
 				entryIds,
 				ranking,
 			);
 		}
 	}
-	return { rankedPool };
+	return { rankedPool, exemptTargets };
 }
 
 // ── approve (§5.4 the single human gate; typed seam already gated --yes) ──────
@@ -1017,6 +1060,7 @@ function buildProjection(targetRoot) {
 		entries: { ...counts, pendingRequests },
 		gamma: {
 			windowAdmitted: gamma.windowAdmitted,
+			windowExempt: gamma.windowExempt,
 			quotaRemaining: gamma.quotaRemaining,
 			windowStart: gamma.windowStart,
 			windowEnd: gamma.windowEnd,
@@ -1030,7 +1074,7 @@ function renderStatus(p) {
 	return [
 		"Memory status (registry + events.jsonl; observation only — doctor is the judgment authority):",
 		`  entries: draft ${e.draft}, proposal ${e.proposal}, active ${e.active}, superseded ${e.superseded}, needs-re-review ${e.needsReReview}, abandoned ${e.abandoned}, pending requests ${e.pendingRequests}`,
-		`  gamma:   ${p.gamma.windowAdmitted}/${GAMMA_QUOTA} admitted in 168h (remaining ${p.gamma.quotaRemaining})`,
+		`  gamma:   ${p.gamma.windowAdmitted}/${GAMMA_QUOTA} charged in 168h (${p.gamma.windowExempt} provenance refresh exempt; remaining ${p.gamma.quotaRemaining})`,
 		`  surface: ${p.surface.entries} entries, ${p.surface.bytes} bytes in ${MEMORY_MD}`,
 	].join("\n");
 }

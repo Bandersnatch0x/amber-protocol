@@ -191,8 +191,15 @@ export async function writeRunnerAck(
 ): Promise<void> {
   const ackPath = getRunnerAckPath(sessionId, ack.requestId);
   await fsp.mkdir(path.dirname(ackPath), { recursive: true });
+  // Atomic publish: write a sibling temp file, then rename it into place, so a
+  // reader polling the ACK path either sees nothing or the complete object.
+  // A direct writeFile exposes a truncate→write window, and readRunnerAck treats
+  // an unparseable file as a TERMINAL rejection ("could not be parsed"), which
+  // turned a 5 ms reader/writer overlap into a spurious `rejected` ACK. Same
+  // pattern as session-writer.ts / gate-reader.ts in this package.
+  const tempPath = `${ackPath}.${process.pid}.${Date.now()}.tmp`;
   await fsp.writeFile(
-    ackPath,
+    tempPath,
     JSON.stringify(
       {
         ...ack,
@@ -204,4 +211,5 @@ export async function writeRunnerAck(
     ),
     'utf8',
   );
+  await fsp.rename(tempPath, ackPath);
 }

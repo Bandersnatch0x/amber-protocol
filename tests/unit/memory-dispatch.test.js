@@ -45,6 +45,7 @@ test("status envelope: projection payload, defaulted errors/warnings, exit 0, by
 			},
 			gamma: {
 				windowAdmitted: 0,
+				windowExempt: 0,
 				quotaRemaining: GAMMA_QUOTA,
 				windowStart: envelope.result.gamma.windowStart,
 				windowEnd: envelope.result.gamma.windowEnd,

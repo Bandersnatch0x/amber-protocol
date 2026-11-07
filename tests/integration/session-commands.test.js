@@ -187,3 +187,25 @@ test("session start with goal matching bugfix-quick route auto-selects route", (
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, /bugfix-quick/);
 });
+
+// F-02 (audit follow-up): the command envelope owns the "ERROR: " label, so a
+// handler message must not carry its own "Error: " prefix — the user saw
+// "ERROR: Error: …" on every failing session verb.
+test("session failure messages carry the error label exactly once", () => {
+	const cases = [
+		{ args: ["session", "abort"], expected: "--session-id is required" },
+		{ args: ["session", "verify", "--yes"], expected: "session verify requires --session <id>." },
+		{
+			args: ["session", "start", "--goal", "budget probe", "--budget", "0", "--confirm"],
+			expected: "--budget must be a positive integer",
+		},
+	];
+	for (const { args, expected } of cases) {
+		const result = runHarness(args);
+		assert.equal(result.status, 1, args.join(" "));
+		const combined = `${result.stdout}${result.stderr}`;
+		assert.match(combined, new RegExp(`ERROR: ${expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+		assert.doesNotMatch(combined, /ERROR: Error:/, args.join(" "));
+		assert.doesNotMatch(combined, /Error: Error:/, args.join(" "));
+	}
+});

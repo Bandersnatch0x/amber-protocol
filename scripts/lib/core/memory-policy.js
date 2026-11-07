@@ -9,6 +9,11 @@
  * request resolution, and entry identity. The command
  * module (memory-commands.js) is a thin adapter over the pipeline
  * request → ingest → approve → book (unchanged, ADR-0018).
+ *
+ * F087: gamma counts *charged* admissions only. A provenance-only refresh of
+ * an existing entry (same claim / knowledge kind / target surface, new source
+ * bindings, real eligible predecessor) is admitted without consuming quota.
+ * The predicate below is the single definition every consumer imports.
  */
 
 const fs = require("node:fs");
@@ -22,6 +27,13 @@ const GAMMA_QUOTA = 5; // §6.5 168h 滚动窗口配额
 const GAMMA_WINDOW_MS = 168 * 3600 * 1000; // §6.5 168h
 const AUTO_ABANDON_THRESHOLD = 3; // §5.6-F1(i) ingest 拒绝累计 3 次
 const MEMORY_MD = "MEMORY.md";
+
+// F087 §2: a refresh may only replace a predecessor the approval pipeline
+// could itself supersede (§5.4 approveSupersedePair accepts these two states).
+const REFRESH_ELIGIBLE_STATUSES = new Set(["active", "needs-re-review"]);
+// The registry rejects a malformed id by throwing; the predicate must answer
+// "not exempt" instead, because supersedeTarget is caller-supplied text.
+const ENTRY_ID_RE = /^sha256:[0-9a-f]{64}$/;
 
 // §5.3 signal-required channels: conversion + dreaming carry a closed-set
 // signal id; T1/T2 and escape-hatch are exempt (absorption / sovereignty).
@@ -58,20 +70,98 @@ function surfaceUsage(targetRoot) {
 	return { entries, bytes };
 }
 
-// §6.5 γ 168h rolling window: count admitted memory-ingest entryIds in [T-168h, T].
+// §6.5 γ 168h rolling window: count CHARGED admitted entries in [T-168h, T].
+// F087 §3.1: an event that carries a partition is counted by its charged side;
+// an event without one is legacy and keeps the pre-F087 accounting
+// (entryIds.length), so historical windows are never reinterpreted.
 function gammaWindow(targetRoot) {
 	const now = Date.now();
 	const since = now - GAMMA_WINDOW_MS;
-	const windowAdmitted = store
-		.readMemoryEvents(targetRoot, since)
-		.filter((e) => e.kind === "memory-ingest" && e.outcome === "admitted")
-		.reduce((sum, e) => sum + (Array.isArray(e.entryIds) ? e.entryIds.length : 0), 0);
+	let charged = 0;
+	let exempt = 0;
+	for (const event of store.readMemoryEvents(targetRoot, since)) {
+		if (event.kind !== "memory-ingest" || event.outcome !== "admitted") continue;
+		const admitted = Array.isArray(event.entryIds) ? event.entryIds : [];
+		if (Array.isArray(event.gammaChargedEntryIds)) {
+			charged += event.gammaChargedEntryIds.length;
+			exempt += Array.isArray(event.gammaExemptEntryIds) ? event.gammaExemptEntryIds.length : 0;
+		} else {
+			charged += admitted.length;
+		}
+	}
 	return {
-		windowAdmitted,
-		quotaRemaining: Math.max(0, GAMMA_QUOTA - windowAdmitted),
+		windowAdmitted: charged,
+		windowExempt: exempt,
+		quotaRemaining: Math.max(0, GAMMA_QUOTA - charged),
 		windowStart: new Date(since).toISOString(),
 		windowEnd: new Date(now).toISOString(),
 	};
+}
+
+// F087 §2: the single provenance-only-refresh predicate. Returns the
+// predecessor entryId when the entry is a genuine refresh, otherwise null.
+//
+// The decision is registry-backed: it reads the predecessor from the entry
+// registry and compares the three core text fields byte-for-byte. A caller can
+// pick supersedeTarget, but cannot assert exemption — a changed claim, a
+// missing/retired predecessor, a self-pointer or a byte-identical resubmission
+// all fall through as ordinary (charged) admissions.
+function gammaExemptTarget(targetRoot, entry) {
+	if (!entry || typeof entry !== "object") return null;
+	const targetId = entry.supersedeTarget;
+	if (typeof targetId !== "string" || !ENTRY_ID_RE.test(targetId)) return null;
+	if (entry.entryId === targetId) return null;
+	const prior = store.readEntry(targetRoot, targetId);
+	if (!prior) return null;
+	if (!REFRESH_ELIGIBLE_STATUSES.has(prior.status)) return null;
+	if (entry.claim !== prior.claim) return null;
+	if (entry.knowledgeKind !== prior.knowledgeKind) return null;
+	if (entry.targetSurface !== prior.targetSurface) return null;
+	return targetId;
+}
+
+// F087 §3.3: split admitted identities into the charged and exempt sides in
+// entryIds order. The partition is total and multiset-faithful: concatenating
+// both sides restores entryIds exactly (duplicates included).
+function partitionGammaAdmission(entryIds, exemptTargetsByEntryId) {
+	const chargedEntryIds = [];
+	const exemptEntryIds = [];
+	for (const id of entryIds) {
+		if (exemptTargetsByEntryId.has(id)) exemptEntryIds.push(id);
+		else chargedEntryIds.push(id);
+	}
+	return { chargedEntryIds, exemptEntryIds };
+}
+
+// F087 §3.5: validate a recorded partition against the identities the same
+// event admitted. Returns a short problem description, or null when the event
+// is consistent (or is a legacy event that predates the partition fields).
+function gammaPartitionProblem(event) {
+	if (!event || event.kind !== "memory-ingest" || event.outcome !== "admitted") return null;
+	const hasPartition =
+		Array.isArray(event.gammaChargedEntryIds) || Array.isArray(event.gammaExemptEntryIds);
+	if (!hasPartition) return null;
+	const admitted = Array.isArray(event.entryIds) ? event.entryIds : [];
+	const charged = Array.isArray(event.gammaChargedEntryIds) ? event.gammaChargedEntryIds : [];
+	const exempt = Array.isArray(event.gammaExemptEntryIds) ? event.gammaExemptEntryIds : [];
+	const counts = (ids) => {
+		const map = new Map();
+		for (const id of ids) map.set(id, (map.get(id) || 0) + 1);
+		return map;
+	};
+	const expected = counts(admitted);
+	const actual = counts([...charged, ...exempt]);
+	let consistent = expected.size === actual.size;
+	if (consistent) {
+		for (const [id, count] of expected) {
+			if (actual.get(id) !== count) {
+				consistent = false;
+				break;
+			}
+		}
+	}
+	if (consistent) return null;
+	return `entryIds ${admitted.length} vs charged ${charged.length} + exempt ${exempt.length} (identities do not reconstruct)`;
 }
 
 // §10.2 entryId = sha256 of canonical JSON of the core fields — revised content
@@ -176,12 +266,16 @@ module.exports = {
 	GAMMA_WINDOW_MS,
 	AUTO_ABANDON_THRESHOLD,
 	MEMORY_MD,
+	REFRESH_ELIGIBLE_STATUSES,
 	SIGNAL_REQUIRED_CHANNELS,
 	SIGNAL_CLOSED_SET,
 	nowIso,
 	readMemoryMd,
 	surfaceUsage,
 	gammaWindow,
+	gammaExemptTarget,
+	partitionGammaAdmission,
+	gammaPartitionProblem,
 	computeEntryIdFor,
 	withEntryId,
 	candidateK1,

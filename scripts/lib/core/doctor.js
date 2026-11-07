@@ -33,7 +33,7 @@ const { remedyFor } = require("./lifecycle");
 
 const memoryStore = require("./memory-store");
 const { hashFile } = require("./context-hash");
-const { gammaWindow, GAMMA_QUOTA } = require("./memory-policy");
+const { gammaWindow, gammaPartitionProblem, GAMMA_QUOTA } = require("./memory-policy");
 const { sha256, canonicalJson } = require("./context-hash");
 
 const { CLI_VERSION } = require("./constants");
@@ -302,13 +302,23 @@ function doctorMemoryRules(targetRoot) {
 	}
 
 	// Rule 5 — 限速合规: recompute γ consumption from the ledger; an over-quota
-	// ledger is an error (tamper / drift between ledger and quota). F086 retired
-	// the α total cap, so physical surface size is reported elsewhere, not judged.
+	// charged ledger is an error (tamper / drift between ledger and quota). F086
+	// retired the α total cap, so physical surface size is reported elsewhere,
+	// not judged. F087: only charged admissions consume quota, and a recorded
+	// partition must reconstruct the admitted identities it claims to split.
 	const gamma = gammaWindow(targetRoot);
 	if (gamma.windowAdmitted > GAMMA_QUOTA) {
 		errors.push(
-			`Memory γ ledger admits ${gamma.windowAdmitted} entries in the 168h window but the quota is ${GAMMA_QUOTA} — ledger and budget disagree (fail-closed).`,
+			`Memory γ ledger charges ${gamma.windowAdmitted} entries in the 168h window but the quota is ${GAMMA_QUOTA} — ledger and budget disagree (fail-closed).`,
 		);
+	}
+	for (const event of events) {
+		const problem = gammaPartitionProblem(event);
+		if (problem) {
+			errors.push(
+				`Memory γ ledger event ${event.requestId || "(no request)"} does not reconstruct its charged/exempt partition: ${problem} (fail-closed).`,
+			);
+		}
 	}
 
 	// Rule 7 — ratification-class 告警 (#173 追认强化 2): book with no prior approve.
