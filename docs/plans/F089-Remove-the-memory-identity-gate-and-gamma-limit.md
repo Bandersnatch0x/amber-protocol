@@ -1,7 +1,7 @@
 # Plan: Remove the memory identity gate and the gamma admission limit
 
 Feature: F089
-Status: verified
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -53,10 +53,10 @@ ordering, exemption or partition. The human `approve` gate and every non-γ admi
 
 ## Resume Checkpoint
 
-- Resume Point: all slices implemented; focused suites pass.
-- Blockers: full root suite, independent review and merge remain.
-- Next Action: run the full suite, then the two-axis review and delivery.
-- Recovery Instructions: re-open this plan and the F089 spec; do not restore the retired code paths.
+- Resume Point: implemented and delivered in PR #404, merged as `adb375e9`; both review axes passed and the learning review is booked.
+- Blockers: none.
+- Next Action: none. The T2 nomination was closed as skipped without `--yes`, which also demonstrates the retired gate.
+- Recovery Instructions: verify `adb375e9` is an ancestor of `origin/master`; do not restore the retired code paths.
 
 ## Acceptance Criteria
 
@@ -64,6 +64,8 @@ ordering, exemption or partition. The human `approve` gate and every non-γ admi
 - One ingest admits a request with more than five candidates.
 - `memory status --json` contains no `gamma` key; doctor reports no γ rule.
 - Every non-γ admission gate and the human approve step keep their existing behavior.
+- Existing Amber guardrails and the phase boundary remain intact: Amber still never writes
+  `MEMORY.md`, never dispatches agents, and never executes target-repo code.
 
 ## Verification
 
@@ -76,3 +78,11 @@ ordering, exemption or partition. The human `approve` gate and every non-γ admi
 - Command: focused node tests, full root suite, manifests, doctor, generated checks, wiki validation.
 - Result: exit codes and failing-test names recorded before merge.
 - Date: 2026-11-07
+
+## Closeout Log
+
+- Delivery: PR #404, merged as `adb375e997b15d2821a585820c3215f6dac8828c` on `master`; every applicable CI check passed. Reviewed head: `49f4d08d`.
+- Independent Standards and Spec: PASS. The first round required two changes: a six-entry admission regression (the retained test sat exactly at the retired five-entry limit) and documentation corrections. Both were applied and re-reviewed.
+- Verification: full root suite 4297 tests (4293 passed, 4 skipped because `sh` is unavailable, 0 failed); focused memory suites 44 passed; manifests, doctor, generated checks, wiki validation, documentation gates and the public-docs seam exited 0.
+- The knowledge corpus was re-synced after the ADR amendment, and the generated public CLI reference was regenerated, so the projection and public docs match the new surface.
+- The memory layer now has no non-TTY gate on `request`/`ingest`/`book` and no γ quota, ordering, exemption or partition. The entry-level human `approve` and the typed approve/abandon `--yes` gate remain.
