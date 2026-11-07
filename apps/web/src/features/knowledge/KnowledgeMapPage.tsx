@@ -900,6 +900,7 @@ export function KnowledgeMapPage() {
     retry: false,
   });
   const recentQuery = trpc.knowledge.recentChanges.useQuery(undefined, {
+    enabled: Boolean(dto),
     refetchInterval: false,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,

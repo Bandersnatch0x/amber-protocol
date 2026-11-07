@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- render the knowledge map before requesting the initial recent-change feed (F088), so a slow
+  feed cannot hold the graph in the same non-streaming response batch. Graph freshness, recent
+  refresh controls, semantic consent and existing test timeouts are preserved.
 - `amber doctor` now runs the memory-layer checks for product repositories instead of returning
   before them, so source drift and ledger inconsistencies are visible. The command is no longer
   purely read-only: when an active entry's provenance or booked surface has drifted, it marks that

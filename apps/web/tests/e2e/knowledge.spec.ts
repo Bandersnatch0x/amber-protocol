@@ -79,6 +79,48 @@ async function getSubtitleCounts(
 }
 
 test.describe('Knowledge Map (/knowledge)', () => {
+  test('renders real graph counts while the initial recent-change request is held', async ({
+    page,
+  }) => {
+    let releaseRecent = () => {};
+    const recentHeld = new Promise<void>((resolve) => {
+      releaseRecent = resolve;
+    });
+    let recentRequests = 0;
+    await page.route('**/api/trpc/**', async (route) => {
+      if (new URL(route.request().url()).pathname.includes('knowledge.recentChanges')) {
+        recentRequests += 1;
+        await recentHeld;
+      }
+      await route.continue();
+    });
+
+    const panel = page.getByTestId('recent-drift-panel');
+    try {
+      await page.goto('/knowledge');
+      await expect.poll(() => recentRequests).toBe(1);
+      await waitForGraph(page);
+
+      const { visible, total, edges } = await getSubtitleCounts(page);
+      expect(total).toBeGreaterThanOrEqual(100);
+      expect(visible).toBeGreaterThanOrEqual(80);
+      expect(visible).toBeLessThan(total);
+      expect(edges).toBeGreaterThanOrEqual(80);
+      await expect(page.locator('.react-flow__node').first()).toBeVisible();
+      await expect(panel.getByRole('status')).toContainText(/loading recent/i);
+      await expect(panel.getByTestId('recent-change')).toHaveCount(0);
+      await expect(panel.getByRole('button', { name: /refreshing/i })).toBeDisabled();
+    } finally {
+      releaseRecent();
+      await page.unrouteAll({ behavior: 'wait' });
+    }
+
+    await expect(panel.getByTestId('recent-change')).toHaveCount(50);
+    await expect(panel.getByRole('status')).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: /^refresh$/i })).toBeEnabled();
+    expect(recentRequests).toBe(1);
+  });
+
   test('renders the graph with real node/edge counts — assertions are mandatory', async ({
     page,
   }) => {
@@ -277,7 +319,7 @@ test.describe('Knowledge Map (/knowledge)', () => {
   }) => {
     let recentRequests = 0;
     page.on('request', (request) => {
-      if (request.url().includes('/api/trpc/knowledge.recentChanges')) recentRequests += 1;
+      if (new URL(request.url()).pathname.includes('knowledge.recentChanges')) recentRequests += 1;
     });
 
     await page.goto('/knowledge');

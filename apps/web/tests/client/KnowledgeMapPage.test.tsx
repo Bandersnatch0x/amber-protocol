@@ -250,12 +250,82 @@ describe('KnowledgeMapPage recent changes query', () => {
     renderPage();
     expect(screen.getByTestId('recent-drift-panel')).toBeDefined();
     expect(trpcMocks.recentUseQuery).toHaveBeenCalledWith(undefined, {
+      enabled: true,
       refetchInterval: false,
       refetchOnReconnect: false,
       refetchOnWindowFocus: false,
       retry: false,
       staleTime: Infinity,
     });
+  });
+
+  it('defers the feed until graph data exists and renders the graph while the feed loads', () => {
+    trpcMocks.graphUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+      refetch: trpcMocks.graphRefetch,
+    });
+    const { rerender } = renderPage();
+
+    expect(screen.getByRole('status').textContent).toContain('Loading knowledge graph');
+    expect(screen.queryByTestId('react-flow')).toBeNull();
+    expect(trpcMocks.recentUseQuery).toHaveBeenLastCalledWith(
+      undefined,
+      expect.objectContaining({ enabled: false }),
+    );
+
+    trpcMocks.graphUseQuery.mockReturnValue({
+      data: graph,
+      isLoading: false,
+      error: null,
+      refetch: trpcMocks.graphRefetch,
+    });
+    trpcMocks.recentUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      error: null,
+      refetch: trpcMocks.recentRefetch,
+    });
+    rerender(
+      <I18nProvider initialLanguage="en">
+        <KnowledgeMapPage />
+      </I18nProvider>,
+    );
+
+    expect(trpcMocks.recentUseQuery).toHaveBeenLastCalledWith(
+      undefined,
+      expect.objectContaining({ enabled: true }),
+    );
+    expect(screen.getByTestId('flow-node-feature:F059')).toBeDefined();
+    expect(screen.getByText(/3\/3 nodes/)).toBeDefined();
+    expect(screen.getByTestId('recent-drift-panel').textContent).toContain('Loading recent');
+    expect(screen.getByRole('button', { name: /refreshing/i }).hasAttribute('disabled')).toBe(true);
+    expect(trpcMocks.semanticUseQuery).toHaveBeenLastCalledWith(
+      undefined,
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it('keeps the graph error and retry available without enabling the feed', () => {
+    trpcMocks.graphUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('AMBER_E_KNOWLEDGE_SOURCE_STALE'),
+      refetch: trpcMocks.graphRefetch,
+    });
+    renderPage();
+
+    expect(screen.getByRole('alert').textContent).toContain('AMBER_E_KNOWLEDGE_SOURCE_STALE');
+    expect(screen.queryByTestId('recent-drift-panel')).toBeNull();
+    expect(trpcMocks.recentUseQuery).toHaveBeenLastCalledWith(
+      undefined,
+      expect.objectContaining({ enabled: false }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(trpcMocks.graphRefetch).toHaveBeenCalledOnce();
+    expect(trpcMocks.recentRefetch).not.toHaveBeenCalled();
   });
 });
 
