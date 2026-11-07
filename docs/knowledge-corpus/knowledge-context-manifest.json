@@ -220,8 +220,8 @@
       "sourcePath": "docs/adr/0018-governed-memory-layer.md",
       "title": "Governed Memory Layer — Registry-Backed Memory with Governed Promotion",
       "source": {
-        "rawHash": "sha256:b50807b030cb40f422e06e3f32103a70db98ed07daf7aa48cf9d210f332772ce",
-        "normHash": "sha256:e47f2de135c61f0196136021479d5962d45a65116c19e679d7054fec75690aa1"
+        "rawHash": "sha256:c6c1bd6bb990c46000b740ad7f298eb9387bbf86c602a283375ebdf9a116e3a6",
+        "normHash": "sha256:7705a74939b2e260349343b00ccb3f3eb8ced372cd45f697424ea39dc23a90bf"
       }
     },
     {
@@ -717,5 +717,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:19e0694301beaa2a6c45adf35e4e3edb1ea909f4b79342d42a786d42ccf13550"
+  "manifestHash": "sha256:5fe21795b0eafd3018d164fb0a7f823700dd1ccb801de997ba9f4d6425a3fb37"
 }

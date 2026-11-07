@@ -82,8 +82,10 @@ an existing claim is necessarily a new entry plus a supersession — but the ide
 nothing by itself: an untouched resubmission carrying the pointer is also "new". It consumed the same
 five slots as new knowledge, while doctor designates supersede/abandon as the only durable exits for
 source drift. A refresh that names a real `active`/`needs-re-review` predecessor, preserves `claim`,
-`knowledgeKind` and `targetSurface` byte-for-byte, **and actually changes its source binding**
-(multiset over `(kind, ref, rawHash, normHash, excerptHash)`) now consumes no quota; it still passes
+`knowledgeKind` and `targetSurface` byte-for-byte, **and actually changes its source binding** (the set of unique
+signatures over `(kind, ref, rawHash, normHash, excerptHash)` must differ — order and duplicate
+sources do not count; this is a provenance-set rule, not the entry-accounting multiset in §9) now
+consumes no quota; it still passes
 every other gate and still needs a human `approve`. A changed claim, an unchanged binding, a missing
 or retired predecessor and a repeat admission stay charged; the exemption is derived from registry
 content, never asserted by a payload. The ledger partition records the split under one contract

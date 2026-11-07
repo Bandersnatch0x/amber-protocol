@@ -37,10 +37,11 @@ An entry `E` is a **provenance-only refresh** of its predecessor `T` if and only
 4. `E.claim === T.claim`, `E.knowledgeKind === T.knowledgeKind`, and
    `E.targetSurface === T.targetSurface` — **exact, byte-for-byte string equality** (no trimming,
    no case folding, no normalization);
-5. **the source binding actually changed**: the ordered, de-duplicated multiset of
-   `(kind, ref, rawHash, normHash, excerptHash)` tuples over `E.provenance.sources` differs from
-   `T`'s. Identical bindings (ignoring order) are a **no-op resubmission**, not maintenance, and
-   stay charged;
+5. **the source binding actually changed**: the **set of unique** source-binding signatures over
+   `(kind, ref, rawHash, normHash, excerptHash)` differs from `T`'s. Order is irrelevant and
+   repeating an identical source is not a change; only the unique signature set matters. This is
+   the provenance-set rule, deliberately distinct from the entry-accounting multiset rule in §3.3
+   (admission accounting still permits same-side duplicates);
 6. `E` is a distinct identity from `T` (`E.entryId !== T.entryId`), checked explicitly.
 
 > **Identity is not evidence.** `entryId` hashes `supersedeTarget` as well as the core fields
@@ -66,10 +67,13 @@ exist, be in an eligible state, and match the three core fields exactly.
 place γ is computed. For each `memory-ingest` event with `outcome === "admitted"` in
 `[T−168h, T]`:
 
-- if the event carries `gammaChargedEntryIds` (array), charged += its length and exempt +=
-  `gammaExemptEntryIds.length` (absent treated as `[]`);
-- otherwise the event is **legacy** and charged += `entryIds.length` — the prior accounting,
-  unchanged, so historical windows keep their meaning without rewriting a single event.
+- only an event with **neither** partition property is **legacy**: charged += `entryIds.length` —
+  the prior accounting, unchanged, so historical windows keep their meaning without rewriting a
+  single event;
+- an event carrying **either** property is a partitioned record: both properties must be present,
+  both must be entry-id arrays, and the pair must satisfy §3.3. Only then does it contribute
+  charged/exempt lengths. A malformed or incomplete partition is excluded from both counts,
+  reported in `problems`, and refuses admission — it is **never** treated as legacy.
 
 `quotaRemaining = max(0, 5 − charged)`. Exempt admissions never reduce it.
 
@@ -149,12 +153,13 @@ partition check and keep prior accounting.
 ## 6. Verification obligations
 
 Focused tests must cover: zero-quota refresh admitted; zero-quota changed-claim supersession
-refused; **an identical source binding with a `supersedeTarget` pointer charged, not exempt**;
-mixed batch charging only its non-exempt subset; queued refreshes neither displacing charged
-candidates nor blocked by exhausted quota; repeat admission after the predecessor is already
-superseded (charged, not exempt); invalid/missing predecessor (charged); legacy events keeping
-prior accounting; doctor and status agreeing with the ledger; the partition consistency check
-(malformed field types, one-field-only records, non-string identities, cross-side duplicates
-rejected; same-side duplicates legal with an exact multiset); and the **real CLI writer** against
-the Web reader under a deterministic partial-write overlap (the Web-helper-only regression is
-insufficient — production publishes through `scripts/lib/runner-ack.js`).
+refused; **a pointer-only resubmission, a duplicate-only source list and a reordered-only source
+list all charged, while a real hash change is admitted**; mixed batch charging only its non-exempt
+subset; queued refreshes neither displacing charged candidates nor blocked by exhausted quota;
+repeat admission after the predecessor is already superseded (charged, not exempt); invalid/missing
+predecessor (charged); legacy events keeping prior accounting; doctor and status agreeing with the
+ledger; the partition consistency check (malformed field types, one-field-only records, non-string
+identities, cross-side duplicates rejected; same-side duplicates legal with an exact multiset);
+and the **real CLI writer** against the Web reader under a deterministic parent/child handshake —
+the child reports its half-write and blocks until the parent has performed one real reader
+observation and releases it (no fixed sleep window).

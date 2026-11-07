@@ -141,7 +141,7 @@ function withOptionalWarning(baseResult, warning) {
 // the lock helper's fail-closed stale-takeover behavior.
 async function withSessionLock(projectRoot, sessionId, fn) {
 	const lock = acquireLock(projectRoot, sessionId);
-	if (!lock.success) return result(`Error: ${lock.error} [${lock.code}]`, 1);
+	if (!lock.success) return result(`${lock.error} [${lock.code}]`, 1);
 	try {
 		return await fn();
 	} finally {
@@ -173,7 +173,7 @@ async function startSession(projectRoot, options) {
 	let goal = requestedGoal;
 
 	if (goal === undefined && !feature) {
-		return result('Error: Pass --goal "..." or --feature <id> to derive the session goal.', 1);
+		return result('Pass --goal "..." or --feature <id> to derive the session goal.', 1);
 	}
 
 	let registeredFeature;
@@ -181,17 +181,17 @@ async function startSession(projectRoot, options) {
 		try {
 			registeredFeature = findFeatureById(projectRoot, feature);
 		} catch (error) {
-			return result(`Error: Cannot read feature_list.json: ${error.message}`, 1);
+			return result(`Cannot read feature_list.json: ${error.message}`, 1);
 		}
 		if (!registeredFeature) {
 			return result(
-				`Error: Feature ${feature} was not found in feature_list.json. Add it with: amber feature add --id ${feature} --title "..."`,
+				`Feature ${feature} was not found in feature_list.json. Add it with: amber feature add --id ${feature} --title "..."`,
 				1,
 			);
 		}
 		if (typeof registeredFeature.title !== "string" || !registeredFeature.title.trim()) {
 			return result(
-				`Error: Feature ${feature} in feature_list.json has no non-empty title; pass --goal or fix the feature title.`,
+				`Feature ${feature} in feature_list.json has no non-empty title; pass --goal or fix the feature title.`,
 				1,
 			);
 		}
@@ -232,11 +232,11 @@ async function startSession(projectRoot, options) {
 	if (decision.status === "invalid") {
 		if (routeId) {
 			const routeList = routes.map((r) => `  ${r.routeId}`).join("\n");
-			return result(`Error: Route "${routeId}" not found.\n\nAvailable routes:\n${routeList}`, 1);
+			return result(`Route "${routeId}" not found.\n\nAvailable routes:\n${routeList}`, 1);
 		}
 		const availableRoutes = routes.map((r) => `  ${r.routeId}`).join("\n");
 		return result(
-			`Error: No route matched goal "${goal}" and the default route "feature-standard" is missing.\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
+			`No route matched goal "${goal}" and the default route "feature-standard" is missing.\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
 			1,
 		);
 	}
@@ -380,7 +380,7 @@ function statusSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	const loaded = requireSession(projectRoot, sessionId);
@@ -458,7 +458,7 @@ async function abortSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	return withSessionLock(projectRoot, sessionId, async () => {
@@ -515,7 +515,7 @@ async function completeSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	return withSessionLock(projectRoot, sessionId, async () => {
@@ -598,7 +598,7 @@ async function continueSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	return withSessionLock(projectRoot, sessionId, async () => {
@@ -746,7 +746,7 @@ async function verifySession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	return withSessionLock(projectRoot, sessionId, async () => {
@@ -792,7 +792,7 @@ async function verifySession(projectRoot, options) {
 			const command = options.command || (verifyStage && verifyStage.target);
 			if (!command) {
 				return result(
-					'Error: --execute needs a command. Pass --command "<cmd>" or use a route whose verify stage declares one.',
+					'--execute needs a command. Pass --command "<cmd>" or use a route whose verify stage declares one.',
 					1,
 				);
 			}
@@ -804,7 +804,7 @@ async function verifySession(projectRoot, options) {
 				try {
 					budgetMinutes = resolveBudgetMinutes(Number(options.budgetMinutes));
 				} catch (error) {
-					return result(`Error: --budget-minutes ${error.message}`, 1);
+					return result(`--budget-minutes ${error.message}`, 1);
 				}
 			}
 			execResult = await runEvidenceCommand({
@@ -930,7 +930,7 @@ async function approveSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	return withSessionLock(projectRoot, sessionId, async () => {
@@ -956,10 +956,10 @@ async function approveSession(projectRoot, options) {
 		const gateIds = [...new Set([...declaredGates.map((g) => g.id), ...stageGateIds])];
 		if (!gateId && gateIds.length !== 1) {
 			if (gateIds.length === 0) {
-				return result(`Error: route "${manifest.route.id}" has no gates to approve.`, 1);
+				return result(`route "${manifest.route.id}" has no gates to approve.`, 1);
 			}
 			return result(
-				`Error: route has ${gateIds.length} gates — specify one with --gate <id>.\n` +
+				`route has ${gateIds.length} gates — specify one with --gate <id>.\n` +
 					`Available: ${gateIds.join(", ")}`,
 				1,
 			);
@@ -967,7 +967,7 @@ async function approveSession(projectRoot, options) {
 
 		if (gateId && !gateIds.includes(gateId)) {
 			return result(
-				`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
+				`gate "${gateId}" not found in route "${manifest.route.id}".\n` +
 					`Available: ${gateIds.join(", ") || "(none)"}`,
 				1,
 			);
@@ -989,7 +989,7 @@ async function approveSession(projectRoot, options) {
 			approvedBy = "user (interactive)";
 		} else {
 			return result(
-				`Error: gate "${resolvedGateId}" needs human approval.\n` +
+				`gate "${resolvedGateId}" needs human approval.\n` +
 					"Run this in an interactive terminal, or pass --yes to approve non-interactively.",
 				1,
 			);
@@ -1060,7 +1060,7 @@ async function approveSession(projectRoot, options) {
 function verifyLedgerSession(projectRoot, sessionId) {
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
@@ -1084,7 +1084,7 @@ async function runSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	// Session existence, terminal-state, and lease refusals are all owned by the
@@ -1152,7 +1152,7 @@ async function settleSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	if (!requestId) {
@@ -1214,7 +1214,7 @@ async function leaseSession(projectRoot, options) {
 
 	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
-		return result(`Error: ${validation.error}`, 1);
+		return result(`${validation.error}`, 1);
 	}
 
 	if (!ownerId || !tokenHash) {
@@ -1226,7 +1226,7 @@ async function leaseSession(projectRoot, options) {
 
 	const lock = acquireLock(projectRoot, sessionId);
 	if (!lock.success) {
-		return result(`Error: ${lock.error} [${lock.code}]`, 1);
+		return result(`${lock.error} [${lock.code}]`, 1);
 	}
 	try {
 		const loaded = requireSession(projectRoot, sessionId);

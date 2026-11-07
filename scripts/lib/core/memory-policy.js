@@ -141,19 +141,22 @@ const SOURCE_SIGNATURE_FIELDS = Object.freeze([
 	"excerptHash",
 ]);
 
+// The source binding is compared as a SET of signature strings: order is not a
+// change, and neither is repeating an identical source. (This is deliberately
+// not the entryIds multiset rule: admission accounting keeps same-side
+// duplicates, but provenance identity is a set.)
 function sourceBindingSignatures(entry) {
 	const sources =
 		entry && entry.provenance && Array.isArray(entry.provenance.sources)
 			? entry.provenance.sources
 			: [];
-	return sources
-		.map((source) => {
-			const signature = {};
-			for (const field of SOURCE_SIGNATURE_FIELDS)
-				signature[field] = source ? source[field] : undefined;
-			return JSON.stringify(signature);
-		})
-		.sort();
+	const signatures = sources.map((source) => {
+		const signature = {};
+		for (const field of SOURCE_SIGNATURE_FIELDS)
+			signature[field] = source ? source[field] : undefined;
+		return JSON.stringify(signature);
+	});
+	return [...new Set(signatures)].sort();
 }
 
 function sourceBindingsEqual(left, right) {

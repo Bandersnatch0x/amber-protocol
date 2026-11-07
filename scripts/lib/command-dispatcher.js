@@ -142,7 +142,7 @@ function sessionBody(sessionResult) {
 function sessionRunSettleGuard(action) {
 	return {
 		text:
-			`Error: session ${action} takes no --stage or --command. ` +
+			`session ${action} takes no --stage or --command. ` +
 			"Stage selection, capability, and adapter come from the session's own state (F062 closed seam).",
 		exitCode: 1,
 	};
@@ -288,7 +288,7 @@ const sessionDispatch = defineCliCommand({
 				try {
 					parsedResult = JSON.parse(args.result);
 				} catch (error) {
-					parseError = `Error: --result must be a JSON object: ${error.message}`;
+					parseError = `--result must be a JSON object: ${error.message}`;
 				}
 			} else {
 				parsedResult = args.result;

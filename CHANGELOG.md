@@ -16,11 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - exempt provenance-only memory refreshes from the γ admission limit (F087): a replacement that names
   a real `active`/`needs-re-review` predecessor, preserves its claim, knowledge kind and target
   surface exactly, and actually changes its source binding is admitted without consuming one of the
-  five 168-hour slots. Changed claims, unchanged bindings, missing or retired predecessors and repeat
-  admissions stay charged, and every other admission gate is unchanged. The `memory-ingest` event
-  gains `gammaChargedEntryIds` / `gammaExemptEntryIds` (with `ranking[].exempt`), and `amber memory
-status` gains the additive `gamma.windowExempt` count and `gamma.problems`; legacy events keep
-  their prior accounting and are never rewritten.
+  five 168-hour slots. The source binding is compared as a set of unique signatures, so reordering or
+  repeating an existing source is not a change. Changed claims, unchanged bindings, missing or
+  retired predecessors and repeat admissions stay charged, and every other admission gate is
+  unchanged. The `memory-ingest` event gains `gammaChargedEntryIds` / `gammaExemptEntryIds` (with
+  `ranking[].exempt`), and `amber memory status` gains the additive `gamma.windowExempt` count and
+  `gamma.problems`; legacy events keep their prior accounting and are never rewritten.
 
 ### Fixed
 

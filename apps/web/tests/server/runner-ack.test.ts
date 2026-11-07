@@ -247,11 +247,13 @@ describe('runner-ack', () => {
     }
   });
 
-  it('publishes atomically from the real CLI writer (cross-boundary)', async () => {
+  it('publishes atomically from the real CLI writer (cross-boundary handshake)', async () => {
     // The production ACK writer is scripts/lib/runner-ack.js, called by
-    // `amber session ...`; the Web reader polls the same path. Drive the real
-    // CLI writer in a child process that holds the write open after half the
-    // bytes, so the reader can only succeed if the publication is atomic.
+    // `amber session ...`; the Web reader polls the same path. The child holds
+    // its write open after half the bytes and BLOCKS on stdin until this
+    // process has performed one real reader observation, then releases it. No
+    // fixed sleep window: the partial state is held for exactly as long as the
+    // observation takes.
     const sessionId = '00000000-0000-0000-0000-000000000018';
     fs.mkdirSync(sessionDir(sessionId), { recursive: true });
     const request = createRunnerControlRequest({
@@ -263,7 +265,7 @@ describe('runner-ack', () => {
     const cliWriterPath = fileURLToPath(
       new URL('../../../../scripts/lib/runner-ack.js', import.meta.url),
     );
-    const helperPath = path.join(testRoot, 'slow-cli-writer.cjs');
+    const helperPath = path.join(testRoot, 'gated-cli-writer.cjs');
     fs.writeFileSync(
       helperPath,
       [
@@ -278,7 +280,8 @@ describe('runner-ack', () => {
         '    const text = String(data);',
         '    realWriteFileSync(file, text.slice(0, Math.floor(text.length / 2)));',
         "    process.stdout.write('HALF\\n');",
-        '    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 800);',
+        '    const release = Buffer.alloc(1);',
+        '    fs.readSync(0, release, 0, 1, null);',
         '    realWriteFileSync(file, text);',
         '    return;',
         '  }',
@@ -299,44 +302,56 @@ describe('runner-ack', () => {
     const child = spawn(
       process.execPath,
       [helperPath, testRoot, sessionId, request.requestId, cliWriterPath],
-      { stdio: ['ignore', 'pipe', 'inherit'] },
+      { stdio: ['pipe', 'pipe', 'inherit'] },
     );
-    // Attach the exit listener before anything can await, so a quick child is
-    // never missed (a listener added after exit never fires).
-    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error('CLI helper never reported its partial write')),
+    const exited = new Promise<number | null>((resolve) =>
+      child.once('exit', (code) => resolve(code)),
+    );
+    const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+      ]);
+
+    try {
+      // 1. Wait (bounded) for the child to report its half-write.
+      await withTimeout(
+        new Promise<void>((resolve, reject) => {
+          let buffer = '';
+          child.stdout?.on('data', (chunk) => {
+            buffer += chunk.toString();
+            if (buffer.includes('HALF')) resolve();
+          });
+          child.once('exit', (code) =>
+            reject(new Error(`CLI helper exited with ${code} before its half-write`)),
+          );
+        }),
         10_000,
+        'CLI helper never reported its partial write',
       );
-      let buffer = '';
-      child.stdout?.on('data', (chunk) => {
-        buffer += chunk.toString();
-        if (buffer.includes('HALF')) {
-          clearTimeout(timer);
-          resolve();
-        }
-      });
-      child.once('exit', (code) => {
-        if (code !== 0) {
-          clearTimeout(timer);
-          reject(new Error(`CLI helper exited with ${code}`));
-        }
-      });
-    });
 
-    const pendingAck = waitForRunnerAck(request, { pollMs: 5, timeoutMs: 5_000 });
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    const ack = await pendingAck;
-    await exited;
+      // 2. One real reader observation while the writer is provably open. An
+      // atomic publish leaves the destination absent (timeout outcome); a
+      // direct write exposes half-written JSON and comes back as a terminal
+      // `rejected` — the assertion below is the regression.
+      const observed = await waitForRunnerAck(request, { timeoutMs: 0 });
+      expect(observed.status).toBe('timeout');
 
-    expect(ack).toMatchObject({
-      requestId: 'resume-request-cli',
-      action: 'resume',
-      status: 'acked',
-      requestedStatus: 'executing',
-      source: 'cli-runner',
-    });
+      // 3. Explicit release, then the reader must see the complete ACK.
+      child.stdin?.write('R');
+      const ack = await waitForRunnerAck(request, { pollMs: 5, timeoutMs: 5_000 });
+      expect(await withTimeout(exited, 10_000, 'CLI helper did not exit')).toBe(0);
+      expect(ack).toMatchObject({
+        requestId: 'resume-request-cli',
+        action: 'resume',
+        status: 'acked',
+        requestedStatus: 'executing',
+        source: 'cli-runner',
+      });
+    } finally {
+      child.stdin?.destroy();
+      child.kill();
+    }
   });
 
   it('does not let request ids escape the runner ACK directory', async () => {

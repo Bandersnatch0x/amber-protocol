@@ -209,3 +209,45 @@ test("session failure messages carry the error label exactly once", () => {
 		assert.doesNotMatch(combined, /Error: Error:/, args.join(" "));
 	}
 });
+
+// C1 (spec closure): the prefix removal must cover every session return path,
+// not just the missing-argument literals — validation, the F062 stage guard and
+// the settle JSON parse all reach the same envelope.
+test("session validation, stage guard and JSON parse paths keep one error label", () => {
+	const cases = [
+		{
+			args: ["session", "abort", "--session", "../bad"],
+			expected: "Invalid session ID format",
+		},
+		{
+			args: ["session", "run", "--stage", "capture", "--yes"],
+			expected: "session run takes no --stage or --command",
+		},
+		{
+			args: [
+				"session",
+				"settle",
+				"--session",
+				"00000000-0000-4000-8000-000000000000",
+				"--request-id",
+				"probe",
+				"--result",
+				"not-json",
+				"--yes",
+			],
+			expected: "--result must be a JSON object",
+		},
+	];
+	for (const { args, expected } of cases) {
+		const result = runHarness(args);
+		assert.equal(result.status, 1, args.join(" "));
+		const combined = `${result.stdout}${result.stderr}`;
+		assert.match(
+			combined,
+			new RegExp(`ERROR: ${expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+			args.join(" "),
+		);
+		assert.doesNotMatch(combined, /ERROR: Error:/, args.join(" "));
+		assert.doesNotMatch(combined, /Error: Error:/, args.join(" "));
+	}
+});

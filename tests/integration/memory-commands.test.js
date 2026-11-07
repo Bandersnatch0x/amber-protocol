@@ -325,6 +325,28 @@ function refreshSource(target, name) {
 	return ref;
 }
 
+// Entry bound to several files, so source-set semantics can be exercised.
+function entryWithSources(target, claim, refs, overrides = {}) {
+	const sources = refs.map((ref) => {
+		const hashed = hashFile(path.join(target, ref));
+		return {
+			kind: "file",
+			ref,
+			rawHash: hashed.rawHash,
+			normHash: hashed.normHash,
+			mutable: true,
+		};
+	});
+	return {
+		schemaVersion: "1.0.0",
+		claim,
+		knowledgeKind: "pattern",
+		targetSurface: "MEMORY.md",
+		provenance: { sources },
+		...overrides,
+	};
+}
+
 test("F087: a provenance-only refresh is admitted at zero quota and consumes no γ", () => {
 	const target = mkTarget();
 	const predecessor = fillWindow(target)[0];
@@ -621,6 +643,73 @@ test("F087: legacy events keep prior accounting and a tampered partition fails c
 // `entryId` hashes supersedeTarget too, so adding the pointer changes the id
 // even when the sources are untouched. Identity difference is therefore not a
 // refresh signal: the binding itself must have changed.
+
+test("F087: duplicate-only and order-only source lists are not a refresh", () => {
+	const target = mkTarget();
+	fs.writeFileSync(path.join(target, "src-a.js"), "// source A\nexport const A = 1;\n");
+	fs.writeFileSync(path.join(target, "src-b.js"), "// source B\nexport const B = 1;\n");
+	// Two predecessors: a single-source one for the duplicate case and a
+	// two-source one for the reorder case.
+	const single = promote(
+		target,
+		"mreq-f087-set-single",
+		entryWithSources(target, "f087 single-source", ["src-a.js"]),
+	);
+	const pair = promote(
+		target,
+		"mreq-f087-set-pair",
+		entryWithSources(target, "f087 multi-source", ["src-a.js", "src-b.js"]),
+	);
+	// Fill the remaining three slots so the window is exhausted.
+	for (let i = 1; i <= 3; i += 1) {
+		promote(target, `mreq-f087-set-fill-${i}`, entryFor(target, `set filler ${i}`));
+	}
+	assert.equal(gammaOf(target).quotaRemaining, 0);
+
+	// Repeating an identical source is not a change: the unique signature set
+	// is unchanged, so the entry stays charged.
+	const duplicated = entryWithSources(target, "f087 single-source", ["src-a.js", "src-a.js"], {
+		supersedeTarget: single,
+	});
+	let ingest = run(target, "ingest", {
+		payload: writePayload(
+			target,
+			"f087-duplicated",
+			requestFor("mreq-f087-duplicated", [duplicated]),
+		),
+	});
+	assert.equal(ingest.exitCode, 1, JSON.stringify(ingest.result));
+	assert.equal(ingest.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.equal(ingest.result.ranking[0].exempt, false, "duplicate-only sources are not a refresh");
+
+	// Order alone is not a change either.
+	const reordered = entryWithSources(target, "f087 multi-source", ["src-b.js", "src-a.js"], {
+		supersedeTarget: pair,
+	});
+	ingest = run(target, "ingest", {
+		payload: writePayload(target, "f087-reordered", requestFor("mreq-f087-reordered", [reordered])),
+	});
+	assert.equal(ingest.exitCode, 1, JSON.stringify(ingest.result));
+	assert.equal(ingest.result.code, "AMBER_E_MEMORY_RATE_LIMITED");
+	assert.equal(ingest.result.ranking[0].exempt, false, "source order alone is not a refresh");
+
+	// A real hash change is a refresh and is admitted at zero quota.
+	fs.writeFileSync(path.join(target, "src-b.js"), "// source B changed\nexport const B = 2;\n");
+	const changed = entryWithSources(target, "f087 multi-source", ["src-a.js", "src-b.js"], {
+		supersedeTarget: pair,
+	});
+	ingest = run(target, "ingest", {
+		payload: writePayload(
+			target,
+			"f087-real-change",
+			requestFor("mreq-f087-real-change", [changed]),
+		),
+	});
+	assert.equal(ingest.exitCode, 0, JSON.stringify(ingest.result));
+	assert.equal(ingest.result.gammaChargedEntryIds.length, 0);
+	assert.equal(ingest.result.gammaExemptEntryIds.length, 1);
+	fs.rmSync(target, { recursive: true, force: true });
+});
 
 test("F087: an identical source binding with a pointer is charged, not exempt", () => {
 	const target = mkTarget();
