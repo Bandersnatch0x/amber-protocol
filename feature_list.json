@@ -3502,7 +3502,7 @@
 			"area": "memory",
 			"title": "Remove the memory identity gate and the gamma admission limit",
 			"user_visible_behavior": "Agents can run amber memory request, ingest and book without a terminal or --yes, and ingest admits every eligible candidate with no gamma quota, pool ordering, provenance exemption or charged/exempt ledger partition. The human approve gate and all non-gamma admission checks are unchanged.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"Non-TTY request, ingest, approve and book complete without --yes",
 				"A request with more than five candidates is admitted in one ingest",
@@ -3540,7 +3540,13 @@
 				"docs/knowledge-corpus/knowledge-context-manifest.json",
 				"CHANGELOG.md"
 			],
-			"updated": "2026-11-07"
+			"updated": "2026-11-08",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-08",
+				"surfaces": ["docs/specs/F089-memory-ungated-admission.md"],
+				"owner": "standard"
+			}
 		}
 	]
 }
