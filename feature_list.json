@@ -3405,8 +3405,8 @@
 			"priority": 87,
 			"area": "memory",
 			"title": "Exempt provenance-only memory refreshes from the gamma admission limit",
-			"user_visible_behavior": "A memory entry that names a real active/needs-re-review predecessor and exactly preserves its claim, knowledgeKind and targetSurface is admitted without consuming the five-per-168h gamma quota, while changed claims, invalid targets and ordinary admissions keep the existing limit and every other admission gate.",
-			"status": "passing",
+			"user_visible_behavior": "A memory entry that names a real active/needs-re-review predecessor, preserves its claim, knowledgeKind and targetSurface exactly, and changes its unique source bindings is admitted without consuming the five-per-168h gamma quota. Unchanged, repeated or reordered bindings, changed claims, invalid targets and ordinary admissions keep the existing limit and every other admission gate.",
+			"status": "accepted",
 			"verification": [
 				"targeted memory policy/command tests green",
 				"npm test full suite green",
@@ -3415,21 +3415,21 @@
 			"evidence": [
 				{
 					"command": "node scripts/run-tests.js",
-					"result": "4307 passed, 0 failed",
+					"result": "4312 passed, 0 failed",
 					"date": "2026-11-07",
-					"notes": "Definitive root suite on the final tree; F087 report evidence."
+					"notes": "Final reviewed implementation 8d186ad0; delivered in PR #398 as a147a941."
 				},
 				{
 					"command": "npm --prefix apps/web run test",
-					"result": "86 files, 809 tests passed",
+					"result": "86 files, 810 tests passed",
 					"date": "2026-11-07",
-					"notes": "Web viewer suite (runner ACK atomic publish, F-01)."
+					"notes": "Final tree, including the real CLI-to-Web ACK handshake regression."
 				},
 				{
-					"command": "amber memory ingest --target .scratch/claude-project-audit/full-target",
-					"result": "exit 0 — '0 charged, 1 provenance refresh'; approve supersedes 239a; doctor 7 pre-existing errors, 0 gamma-ledger",
+					"command": "amber memory status --target .; amber doctor --target .",
+					"result": "exit 0; 10 active, 0 needs-re-review, 0 pending requests; gamma 5 charged / 6 exempt; doctor 0 errors",
 					"date": "2026-11-07",
-					"notes": "Isolated full-target proof: real ledger copied, real checkout untouched."
+					"notes": "Six real source-only supersessions completed under explicit user delegation; four existing entries re-booked. Independent Standards and Spec both PASS."
 				}
 			],
 			"notes": [],
@@ -3437,6 +3437,7 @@
 				"scripts/lib/core/memory-policy.js",
 				"scripts/lib/memory-commands.js",
 				"scripts/lib/core/doctor.js",
+				"scripts/lib/runner-ack.js",
 				"docs/specs/2026-08-21-governed-memory-layer.md",
 				"docs/adr/0018-governed-memory-layer.md",
 				"docs/specs/F087-provenance-refresh-gamma-exemption.md",
@@ -3444,7 +3445,14 @@
 				"scripts/lib/session-commands.js",
 				"scripts/lib/command-dispatcher.js",
 				"apps/web/server/lib/runner-ack.ts"
-			]
+			],
+			"updated": "2026-11-07",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-07",
+				"surfaces": ["docs/specs/F087-provenance-refresh-gamma-exemption.md"],
+				"owner": "standard"
+			}
 		}
 	]
 }
