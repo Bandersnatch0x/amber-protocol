@@ -411,3 +411,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`
 - Review status: ready
 - Feature: F086 status → accepted in feature_list.json
+
+## 2026-11-07 docs/plans/F087-Provenance-only-memory-refresh-exemption.md
+
+- Plan: `docs/plans/F087-Provenance-only-memory-refresh-exemption.md`
+- Review status: ready
+- Feature: F087 status → accepted in feature_list.json
