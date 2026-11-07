@@ -417,3 +417,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F087-Provenance-only-memory-refresh-exemption.md`
 - Review status: ready
 - Feature: F087 status → accepted in feature_list.json
+
+## 2026-11-07 docs/plans/F088-Render-knowledge-map-before-recent-changes.md
+
+- Plan: `docs/plans/F088-Render-knowledge-map-before-recent-changes.md`
+- Review status: ready
+- Feature: F088 status → accepted in feature_list.json

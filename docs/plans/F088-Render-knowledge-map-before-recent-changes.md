@@ -1,7 +1,7 @@
 # Plan: Render knowledge map before recent changes
 
 Feature: F088
-Status: verified
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -39,10 +39,10 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 
 ## Resume Checkpoint
 
-- Resume Point: the query-option fix and regressions are implemented. Root tests, Web unit tests, production build, full browser suite and separate semantic cases pass. Delivery is pending publication.
-- Blockers: independent Standards and Spec review and merge into the default branch remain required.
-- Next Action: resolve independent review findings, publish and merge the implementation, then accept and book the learning review.
-- Recovery Instructions: reopen this plan and the retained evidence under `.scratch/knowledge-timeout/`; verify the reviewed revision before publishing.
+- Resume Point: the query-option fix, regressions and delivery are complete. PR #402 merged as `af49ffd9` on `master`; both independent review axes passed and the learning review is booked.
+- Blockers: none.
+- Next Action: none for this feature. The open memory write-back nomination awaits a human decision.
+- Recovery Instructions: verify `af49ffd9` is an ancestor of `origin/master`, then re-open the retained evidence under `.scratch/knowledge-timeout/`; do not re-run the cold-browser helpers without deleting their owned temp trees.
 
 ## Acceptance Criteria
 
@@ -70,3 +70,12 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 - Complete logs and hashes are in `.scratch/knowledge-timeout/complete-gate-evidence.json`. Independent evidence review returned PASS+NOTES. Scratch artifacts are local and not version controlled.
 - The failed cold wrapper's original inventory included preexisting process identities. The corrected receipt proves eligible recorded descendants absent and ports free; it cannot establish whether unrelated historical processes were affected. The scratch helper now excludes preexisting identities and terminates individual verified PIDs.
 - The historical mobile timeout remains untraced and unreproduced after six focused passes and the complete suite. Follow-up: https://github.com/Bandersnatch0x/amber-protocol/issues/401.
+
+## Closeout Log
+
+- Delivery: PR #402, merged as `af49ffd9e2647ed8bb724e869c373191a72ba3eb` on `master`; all applicable CI checks passed (Node 20/22, Coverage, Web viewer, Security, Performance, Fresh-target governance loop, Public Documentation Site, Commit identity). Reviewed implementation HEAD: `5faa7742`.
+- Independent Standards and Spec: PASS, zero blocking findings. Standards notes are P3 only (`Boolean(dto)` versus `dto !== undefined`, option ordering, a duplicated test provider wrapper, the broadened E2E matcher, and a feature-evidence typo that was fixed). Spec covered all five contract clauses and all five verification obligations with 0 contradicted and 0 absent.
+- Verification before merge: root suite 4312 tests (4308 passed, 4 skipped for unavailable `sh`); Web unit 812 passed; real browser suite 73 passed / 3 semantic-only skipped; separate semantic cases 3 passed; production build exited 0; plan gate, manifests, doctor, generated checks and wiki validation exited 0. Fix-then-revert failed the blocked-feed assertion at the unchanged 15-second timeout and passed only after restoring the change.
+- CI caught one documentation-gate defect the local run had not covered: the spec header read `implemented`, outside the closed lifecycle vocabulary. It was corrected to `proposed (implementation shipped; spec acceptance pending)` in `5faa7742`, which re-ran every check green.
+- Review reports live under `.scratch/knowledge-timeout/review/`; the full logs, profiles, API comparisons and traces live under `.scratch/knowledge-timeout/`. They are not version controlled; the durable conclusions and numbers are recorded above.
+- Residual limits: the historical mobile timeout remains unresolved in #401; the failed cold-run wrapper's original cleanup inventory cannot establish whether unrelated historical processes were affected.
