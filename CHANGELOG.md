@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- remove the memory identity gate and the γ admission limit (F089): `amber memory request`, `ingest`
+  and `book` no longer refuse a non-TTY invocation, and `ingest` admits every eligible candidate in
+  the request. The five-per-168-hour quota, the K1/K2/K3 mixed-pool ordering, the provenance-only
+  refresh exemption (F087), the charged/exempt ledger partition, the `gamma` object in
+  `memory status` and doctor rule 5 are retired, together with
+  `AMBER_E_MEMORY_RATE_LIMITED` and `AMBER_E_MEMORY_APPROVAL_REQUIRED`. `status` still reports
+  `entries` and `surface`; the entry-level human `approve`, `abandon`, schema/binding/signal gates
+  and the "Amber never writes MEMORY.md" boundary are unchanged. This is a breaking change to the
+  status JSON and to the `memory-ingest` event payload.
 - retire the memory α budget (F086): `amber memory status` reports `surface` (physical entry count
   and normalized byte size) in place of the `alpha` object, `ingest` no longer refuses a batch because
   `MEMORY.md` is large, and `AMBER_E_MEMORY_BUDGET_EXCEEDED` is retired — a breaking change to the

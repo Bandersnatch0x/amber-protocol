@@ -739,13 +739,6 @@ const CATALOG = {
 	},
 	// --- Governed Memory Layer (spec 2026-08-21 §12; extends, never rebuilds) ---
 	// layer is Context for the whole family, inheriting the AMBER_E_CONTEXT_* tier.
-	AMBER_E_MEMORY_RATE_LIMITED: {
-		title: "168h 窗口内 memory-ingest 准入已达 5 条上限，提交整体拒绝",
-		cause: "entries[] 超剩余配额（γ 168h 滚动窗口内 memory-ingest 准入事件 ≥ 5）。",
-		remedy: "缩减后重交，或待窗口滚动（request 保留）。",
-		layer: "Context",
-		related: [],
-	},
 	AMBER_E_MEMORY_SOURCE_STALE: {
 		title: "条目 provenance 源 normHash 漂移或源失效",
 		cause: "源被修改或清除，登记哈希与当前源不符。",
@@ -780,13 +773,6 @@ const CATALOG = {
 		remedy: "引用闭集信号 id 之一。",
 		layer: "Context",
 		related: ["AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID"],
-	},
-	AMBER_E_MEMORY_APPROVAL_REQUIRED: {
-		title: "非 TTY 调用人判定动词且无 --yes",
-		cause: "非交互环境执行 request/ingest/book 或 approve/abandon。",
-		remedy: "由人在 TTY 执行或显式 --yes（agent 永不传）。",
-		layer: "Context",
-		related: [],
 	},
 	AMBER_E_MEMORY_ENTRY_NOT_FOUND: {
 		title: "entryId 不在 registry",

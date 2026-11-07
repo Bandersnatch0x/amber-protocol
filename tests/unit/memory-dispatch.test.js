@@ -9,7 +9,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { memoryDispatch, GAMMA_QUOTA } = require("../../scripts/lib/memory-commands");
+const { memoryDispatch } = require("../../scripts/lib/memory-commands");
 
 function tmpRoot(label) {
 	const dir = trackTempDir(
@@ -43,14 +43,6 @@ test("status envelope: projection payload, defaulted errors/warnings, exit 0, by
 				abandoned: 0,
 				pendingRequests: 0,
 			},
-			gamma: {
-				windowAdmitted: 0,
-				windowExempt: 0,
-				quotaRemaining: GAMMA_QUOTA,
-				windowStart: envelope.result.gamma.windowStart,
-				windowEnd: envelope.result.gamma.windowEnd,
-				problems: [],
-			},
 			surface: {
 				entries: 0,
 				bytes: Buffer.byteLength(MEMORY_MD_FIXTURE, "utf8"),
@@ -64,14 +56,14 @@ test("status envelope: projection payload, defaulted errors/warnings, exit 0, by
 	});
 });
 
-test("identity-gate failure body: exit 1, bypassPrint false, coded envelope", () => {
+test("request without a payload fails on schema, not on a retired identity gate", () => {
 	const root = tmpRoot("gate");
 	const envelope = memoryDispatch("request", { target: root, json: true }, root);
 	assert.equal(envelope.exitCode, 1);
 	assert.equal(envelope.bypassPrint, false);
-	assert.equal(envelope.result.code, "AMBER_E_MEMORY_APPROVAL_REQUIRED");
+	assert.equal(envelope.result.code, "AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID");
 	assert.equal(envelope.result.errors.length, 1);
-	assert.ok(envelope.result.errors[0].includes("AMBER_E_MEMORY_APPROVAL_REQUIRED"));
+	assert.ok(envelope.result.errors[0].includes("AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID"));
 	assert.deepEqual(envelope.result.warnings, []);
 });
 

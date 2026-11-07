@@ -72,7 +72,7 @@ one-in-one-out obligation it triggered are retired. The gate did not measure wha
 text left the file, admission reserved no space for pending proposals, and §6.3 and §6.4 contradicted
 each other at exhaustion. Growth is now curated: the `MEMORY.md` creed, entry-level human approval, and
 the **γ** admission rate limit of 5 entries per 168-hour rolling window with K1/K2/K3 ordering
-(staleness, supersession pressure, content-hash tiebreak). Supersession remains an independent
+(staleness, supersession pressure, content-hash tiebreak; retired by F089). Supersession remains an independent
 capability; it is no longer a budget duty. The accepted cost is that there is no automatic total
 ceiling. → spec §6, `docs/plans/F086-Retire-the-memory-alpha-budget-and-keep-surface-usage-observable.md`
 
@@ -95,6 +95,16 @@ presence is decided by property ownership, and a present-but-malformed partition
 ledger** — doctor errors, status errors, admission is refused — never silently re-read as legacy. The
 5-per-168h limit and its atomic all-or-nothing enforcement are unchanged. → spec §5.3, §6.3, §6.5,
 §8.2, §9, §11-5, `docs/plans/F087-Provenance-only-memory-refresh-exemption.md`
+
+*Amended by F089 (2026-11-07).* The **γ** admission limit is retired, together with everything that
+existed only to serve it: the 168-hour window, the K1/K2/K3 mixed-pool ordering, the provenance-only
+exemption and its charged/exempt ledger partition, the `status.gamma` projection, doctor rule 5 and
+the `AMBER_E_MEMORY_RATE_LIMITED` code. `ingest` admits every eligible candidate in a request. The
+non-TTY identity gate on `request`/`ingest`/`book` is retired as well (`AMBER_E_MEMORY_APPROVAL_REQUIRED`).
+Unchanged: entry-level human `approve`, `abandon`, schema/binding/signal checks, the single event
+ledger, and the rule that Amber never writes `MEMORY.md`. Intake is now bounded only by human approval
+at entry granularity, not by a rate limit. → `docs/specs/F089-memory-ungated-admission.md`,
+`docs/plans/F089-Remove-the-memory-identity-gate-and-gamma-limit.md`
 
 ### D4 — One event ledger: the `memory-*` closed set
 
@@ -138,10 +148,10 @@ The verb surface is `amber memory request | ingest | approve | book | abandon`, 
 enters the MCP surface if and only if its legal invocation does not depend on local pipeline presence or
 local ceremony. Registration is single-track (session-style): `memory` joins the typed command family
 with exactly three capabilities and three action-type JSONs; the three CLI-only verbs ride the existing
-`KNOWN_UNTYPED_SUBCOMMANDS` whitelist with inline identity gates as the price. Approval ceremony is
-bounded for new knowledge (γ = 5 approvals + 1 book per window; F087 exempts provenance-only
-refreshes, which still require an `approve` each) but non-zero. Evidence kinds reuse the existing
-`approval-record` / `ingest-record` vocabulary; side effects reuse `ledger-append`. → spec §8, §13
+`KNOWN_UNTYPED_SUBCOMMANDS` whitelist. Approval ceremony needs one `approve` per entry plus one
+`book`; F089 retired the non-TTY identity gate and the γ rate limit, so no per-window bound remains.
+Evidence kinds reuse the existing `approval-record` / `ingest-record` vocabulary; side effects reuse
+`ledger-append`. → spec §8, §13
 
 ## Considered and rejected
 

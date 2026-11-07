@@ -12,6 +12,13 @@ tags: [memory, governance, promotion, dreaming, registry, mcp]
 
 > 本 spec 将 wayfinder map #169 六轮终审裁决固化为实现级机械定义：四层记忆模型（L1–L4）、条目对象与 entry registry、写回闸门（T1/T2 双触发 + ingest→approve→book 晋升序列）、γ 限速与物理用量观测（α/β 预算已于 F086 退役；F087 起 γ 只计费新知识，既有条目的纯来源刷新不占配额）、dreaming 维护 loop 契约、五动词表面与 MCP 恰 3 工具、memory-* 事件账本、schema 与错误码族、单一实施批次（批次 A）与验收标准。撰写纪律：只综合不决策——一切治理取舍以裁决书为准；裁决留白的落地项由本 spec 给出最简可执行定义并标注 **Spec-defined（裁决留白落地）**；本 spec 与裁决冲突时以裁决为准并记入偏差表（#174-M13；当前偏差表为空）。
 
+> **F089 修订（2026-11-07）**：本 spec 保留原始裁决记录。F089 已退役以下机械面：§5.5-M12 的
+> 非 TTY 身份门（`request`/`ingest`/`book`）、§6.5 的 γ 准入限速及其 K1/K2/K3 排序与纯来源刷新
+> 豁免、§9 的 charged/exempt 事件分区、§8.2 的 `gamma` 投影段、§11 的规则 5（γ 合规），以及
+> §12 的 `AMBER_E_MEMORY_RATE_LIMITED` / `AMBER_E_MEMORY_APPROVAL_REQUIRED` 错误码。现行契约见
+> `docs/specs/F089-memory-ungated-admission.md`；两者冲突时以 F089 为准。其余闸门（schema、逐源
+> 哈希绑定、signal 闭集、条目级人工 `approve`、`book` 登记）不变。
+
 **Date:** 2026-08-21 ｜ **Status:** accepted（与 ADR-0018 Accepted、F033/F034 accepted 对齐；批次 A + T1/T2 已落地）｜ **ADR:** [ADR-0018 Governed Memory Layer](../adr/0018-governed-memory-layer.md)
 
 **Tracker:** map [#169](https://github.com/Bandersnatch0x/amber-protocol/issues/169) · #171 业界调研 · [#170](https://github.com/Bandersnatch0x/amber-protocol/issues/170) 对象模型 · [#172](https://github.com/Bandersnatch0x/amber-protocol/issues/172) 写回闸门 · [#173](https://github.com/Bandersnatch0x/amber-protocol/issues/173) 晋升规则 · [#174](https://github.com/Bandersnatch0x/amber-protocol/issues/174) dreaming loop · [#175](https://github.com/Bandersnatch0x/amber-protocol/issues/175) 动词表面
