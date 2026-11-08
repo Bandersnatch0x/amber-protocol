@@ -8,49 +8,35 @@
 // explicit delegation, and the immutable policy outcome ledger.
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	invalidArg,
+	missingValueFlag,
+	resolveTarget,
+	readFailure,
+	writeFailure,
+} = require("./command-helpers");
 const { parseTimestamp } = require("./core/principal-registry");
 
 const READ_FAILURE_CODE = "AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT";
 const POLICY_OUTCOME_NOT_FOUND_CODE = "AMBER_E_POLICY_OUTCOME_NOT_FOUND";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
-}
-
-function missingValueFlag(args) {
-	const valueFlags = [
-		["orgPolicy", "--org-policy"],
-		["tenantPolicy", "--tenant-policy"],
-		["repoPolicy", "--repo-policy"],
-		["playPolicy", "--play-policy"],
-		["gatePolicy", "--gate-policy"],
-		["subject", "--subject"],
-		["submitter", "--submitter"],
-		["capability", "--capability"],
-		["approval", "--approval"],
-		["gateOutcomeIndex", "--gate-outcome-index"],
-		["delegator", "--delegator"],
-		["now", "--now"],
-		["index", "--index"],
-		["verdict", "--verdict"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["orgPolicy", "--org-policy"],
+	["tenantPolicy", "--tenant-policy"],
+	["repoPolicy", "--repo-policy"],
+	["playPolicy", "--play-policy"],
+	["gatePolicy", "--gate-policy"],
+	["subject", "--subject"],
+	["submitter", "--submitter"],
+	["capability", "--capability"],
+	["approval", "--approval"],
+	["gateOutcomeIndex", "--gate-outcome-index"],
+	["delegator", "--delegator"],
+	["now", "--now"],
+	["index", "--index"],
+	["verdict", "--verdict"],
+	["target", "--target"],
+];
 
 function targetFlagValue(args) {
 	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
@@ -128,7 +114,7 @@ const policyDispatch = defineCliCommand({
 	handlers: {
 		evaluate: (args) => {
 			const { evaluatePolicy } = require("./core/policy-evaluation");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared input would otherwise be dropped silently`,
@@ -187,7 +173,7 @@ const policyDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showPolicyOutcome } = require("./core/policy-evaluation");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -222,7 +208,7 @@ const policyDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listPolicyOutcomes } = require("./core/policy-evaluation");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

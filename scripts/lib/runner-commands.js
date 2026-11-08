@@ -9,7 +9,7 @@
 const fs = require("node:fs");
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const { invalidArg, missingValueFlag, resolveTarget, readFailure } = require("./command-helpers");
 const { resolvePathWithin } = require("./core/fs-utils");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
@@ -18,50 +18,40 @@ const REQUEST_READ_FAILURE_CODE = "AMBER_E_RUNNER_REQUEST_CORRUPT";
 const EXECUTION_READ_FAILURE_CODE = "AMBER_E_RUNNER_EXECUTION_CORRUPT";
 const MAX_RECEIPT_FILE_BYTES = 512 * 1024;
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["runnerVersion", "--runner-version"],
-		["integrity", "--integrity"],
-		["runnerOwner", "--runner-owner"],
-		["capability", "--capability"],
-		["capabilityVersion", "--capability-version"],
-		["effectVal", "--effect"],
-		["pathPrefixVal", "--path-prefix"],
-		["timeoutMs", "--timeout-ms"],
-		["credential", "--credential"],
-		["rollback", "--rollback"],
-		["decisionIdentity", "--decision-identity"],
-		["revision", "--revision"],
-		["repository", "--repository"],
-		["path", "--path"],
-		["scope", "--scope"],
-		["environment", "--environment"],
-		["inputHashVal", "--input-hash"],
-		["requestHash", "--request-hash"],
-		["receipt", "--receipt"],
-		["reason", "--reason"],
-		["evidence", "--evidence"],
-		["credentialHandle", "--credential-handle"],
-		["credentialPurpose", "--credential-purpose"],
-		["credentialScope", "--credential-scope"],
-		["credentialExpires", "--credential-expires"],
-		["rehearsal", "--rehearsal"],
-		["approval", "--approval"],
-		["body", "--body"],
-		["traceVal", "--trace"],
-		["status", "--status"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["runnerVersion", "--runner-version"],
+	["integrity", "--integrity"],
+	["runnerOwner", "--runner-owner"],
+	["capability", "--capability"],
+	["capabilityVersion", "--capability-version"],
+	["effectVal", "--effect"],
+	["pathPrefixVal", "--path-prefix"],
+	["timeoutMs", "--timeout-ms"],
+	["credential", "--credential"],
+	["rollback", "--rollback"],
+	["decisionIdentity", "--decision-identity"],
+	["revision", "--revision"],
+	["repository", "--repository"],
+	["path", "--path"],
+	["scope", "--scope"],
+	["environment", "--environment"],
+	["inputHashVal", "--input-hash"],
+	["requestHash", "--request-hash"],
+	["receipt", "--receipt"],
+	["reason", "--reason"],
+	["evidence", "--evidence"],
+	["credentialHandle", "--credential-handle"],
+	["credentialPurpose", "--credential-purpose"],
+	["credentialScope", "--credential-scope"],
+	["credentialExpires", "--credential-expires"],
+	["rehearsal", "--rehearsal"],
+	["approval", "--approval"],
+	["body", "--body"],
+	["traceVal", "--trace"],
+	["status", "--status"],
+	["target", "--target"],
+];
 
 function targetValue(args) {
 	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
@@ -170,7 +160,7 @@ const runnerDispatch = defineCliCommand({
 	handlers: {
 		register: (args) => {
 			const { registerRunner } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -200,7 +190,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		capability: (args) => {
 			const { registerRunnerCapability } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -244,7 +234,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		request: (args) => {
 			const { submitRunnerRequest } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -319,7 +309,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		authorize: (args) => {
 			const { authorizeRunnerRequest } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -354,7 +344,7 @@ const runnerDispatch = defineCliCommand({
 				ENVIRONMENTS,
 				REQUEST_STATUSES,
 			} = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -384,7 +374,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		prepare: (args) => {
 			const { prepareRunnerExecution } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -413,7 +403,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		settle: (args) => {
 			const { settleRunnerExecution } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -433,7 +423,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		abort: (args) => {
 			const { abortRunnerExecution } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -456,7 +446,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		"rolled-back": (args) => {
 			const { markRunnerExecutionRolledBack } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -481,7 +471,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		executions: (args) => {
 			const { listRunnerExecutions, EXECUTION_OUTCOMES } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -505,7 +495,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showRunner } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -533,7 +523,7 @@ const runnerDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listRunners } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

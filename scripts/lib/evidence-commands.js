@@ -9,33 +9,22 @@
 // code.
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	invalidArg,
+	missingValueFlag,
+	resolveTarget,
+	readFailure,
+	writeFailure,
+} = require("./command-helpers");
 
 // The readFailure FALLBACK for untyped crashes at the show/list seams, not a
 // corruption verdict (same naming discipline as the principal command).
 const READ_FAILURE_CODE = "AMBER_E_EVIDENCE_NOT_FOUND";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-/**
- * The evidence writers (record/verify) propagate typed throws for
- * environment-level misconfiguration — a garbage AMBER_EVIDENCE_MAX_REGISTRY_BYTES
- * override is resolvePositiveIntCeiling's typed AMBER_E_INVALID_ARG, never a
- * silent default. The CLI seam converts a typed throw into the standard
- * result envelope so the public surface keeps its stable code and exit code.
- */
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
-}
-
+// Environment-level misconfiguration (e.g. a garbage AMBER_EVIDENCE_MAX_REGISTRY_BYTES
+// override) surfaces from resolvePositiveIntCeiling as a typed
+// AMBER_E_INVALID_ARG and converts through the shared writeFailure — never a
+// silent default.
 /**
  * A value flag as the LAST argv token parses to `undefined`, which is
  * indistinguishable from "not declared" further down — a trailing `--id` or
@@ -45,27 +34,21 @@ function writeFailure(err) {
  * AMBER_E_INVALID_ARG here at the evidence command seam (same discipline as
  * the principal command, ticket-03 review finding F-4).
  */
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["producer", "--producer"],
-		["assurance", "--assurance"],
-		["scope", "--scope"],
-		["subject", "--subject"],
-		["status", "--status"],
-		["replayOf", "--replay-of"],
-		["verifier", "--verifier"],
-		["inputVal", "--input"],
-		["toolVal", "--tool"],
-		["envVal", "--env"],
-		["outputVal", "--outputs"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["producer", "--producer"],
+	["assurance", "--assurance"],
+	["scope", "--scope"],
+	["subject", "--subject"],
+	["status", "--status"],
+	["replayOf", "--replay-of"],
+	["verifier", "--verifier"],
+	["inputVal", "--input"],
+	["toolVal", "--tool"],
+	["envVal", "--env"],
+	["outputVal", "--outputs"],
+	["target", "--target"],
+];
 
 /**
  * An explicitly passed-but-empty --target ("", or whitespace) is a malformed
@@ -134,7 +117,7 @@ const evidenceDispatch = defineCliCommand({
 	handlers: {
 		record: (args) => {
 			const { recordEvidence } = require("./core/evidence-receipts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared input would otherwise be dropped silently`,
@@ -182,7 +165,7 @@ const evidenceDispatch = defineCliCommand({
 		},
 		verify: (args) => {
 			const { verifyEvidence } = require("./core/evidence-receipts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -213,7 +196,7 @@ const evidenceDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showEvidence } = require("./core/evidence-receipts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -243,7 +226,7 @@ const evidenceDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listEvidence } = require("./core/evidence-receipts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

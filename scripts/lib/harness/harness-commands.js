@@ -8,22 +8,8 @@
 // by registration; the default seven-verb help surface is unchanged.
 
 const { defineCliCommand } = require("../subcommand-dispatcher");
-const { resolveTarget, parseRevisionPin } = require("../command-helpers");
+const { invalidArg, resolveTarget, parseRevisionPin, writeFailure } = require("../command-helpers");
 const { resolvePathWithin } = require("../core/fs-utils");
-
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
-}
 
 // A value flag as the LAST argv token parses to `undefined` (parseArgs only
 // sets the key when the flag appears), so present-but-undefined names the
