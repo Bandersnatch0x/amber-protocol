@@ -4,7 +4,7 @@
 // Envelope, routing, and exit codes are owned by defineCommand (F039).
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget } = require("./command-helpers");
+const { invalidArg, missingValueFlag, resolveTarget, writeFailure } = require("./command-helpers");
 const {
 	SUITE_ID,
 	runInstructionSurfaceEvals,
@@ -12,26 +12,16 @@ const {
 	showInstructionSurfaceEval,
 } = require("./core/instruction-surface-evals");
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["suite", "--suite"],
-		["producer", "--producer"],
-		["definitionIdentity", "--definition-id"],
-		["outcomeIdentity", "--outcome-id"],
-		["evidenceId", "--evidence-id"],
-		["subject", "--subject"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["suite", "--suite"],
+	["producer", "--producer"],
+	["definitionIdentity", "--definition-id"],
+	["outcomeIdentity", "--outcome-id"],
+	["evidenceId", "--evidence-id"],
+	["subject", "--subject"],
+	["target", "--target"],
+];
 
 function optionalString(value) {
 	return value === undefined ? null : String(value);
@@ -45,16 +35,6 @@ function requiredString(args, key, flag, example) {
 		};
 	}
 	return { value };
-}
-
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
 }
 
 function formatSuite(suite) {
@@ -82,7 +62,7 @@ const evalDispatch = defineCliCommand({
 	handlers: {
 		admit: (args) => {
 			const { admitInstructionSurfaceEval } = require("./core/canonical-eval-admission");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

@@ -9,47 +9,37 @@
 const fs = require("node:fs");
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const { invalidArg, missingValueFlag, resolveTarget, readFailure } = require("./command-helpers");
 const { resolvePathWithin } = require("./core/fs-utils");
 
 const READ_FAILURE_CODE = "AMBER_E_ADAPTER_REGISTRY_CORRUPT";
 const MAX_COMPARISON_FIXTURE_BYTES = 512 * 1024;
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["adapterOwner", "--adapter-owner"],
-		["adapterVersion", "--adapter-version"],
-		["recordType", "--record-type"],
-		["recordVersion", "--record-version"],
-		["scope", "--scope"],
-		["identityMap", "--identity-map"],
-		["freshnessMs", "--freshness-ms"],
-		["allowPath", "--allow-path"],
-		["source", "--source"],
-		["recordId", "--record-id"],
-		["expectedSourceHash", "--expected-source-hash"],
-		["fixture", "--fixture"],
-		["cutoverId", "--cutover-id"],
-		["artifactType", "--artifact-type"],
-		["generation", "--generation"],
-		["comparisonIndex", "--comparison-index"],
-		["decisionIdentity", "--decision-identity"],
-		["revision", "--revision"],
-		["confirmedBy", "--confirmed-by"],
-		["rollbackEvidence", "--rollback-evidence"],
-		["evidence", "--evidence"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["adapterOwner", "--adapter-owner"],
+	["adapterVersion", "--adapter-version"],
+	["recordType", "--record-type"],
+	["recordVersion", "--record-version"],
+	["scope", "--scope"],
+	["identityMap", "--identity-map"],
+	["freshnessMs", "--freshness-ms"],
+	["allowPath", "--allow-path"],
+	["source", "--source"],
+	["recordId", "--record-id"],
+	["expectedSourceHash", "--expected-source-hash"],
+	["fixture", "--fixture"],
+	["cutoverId", "--cutover-id"],
+	["artifactType", "--artifact-type"],
+	["generation", "--generation"],
+	["comparisonIndex", "--comparison-index"],
+	["decisionIdentity", "--decision-identity"],
+	["revision", "--revision"],
+	["confirmedBy", "--confirmed-by"],
+	["rollbackEvidence", "--rollback-evidence"],
+	["evidence", "--evidence"],
+	["target", "--target"],
+];
 
 function targetValue(args) {
 	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
@@ -160,7 +150,7 @@ function readFixture(target, fixture) {
 // Shared list handler for scoped adapter ledgers (comparisons, cutovers):
 // optional non-empty --id/--scope filters over a fail-closed core read.
 function listScopedLedger(args, fallbackCode, listFn) {
-	const truncated = missingValueFlag(args);
+	const truncated = missingValueFlag(args, VALUE_FLAGS);
 	if (truncated)
 		return invalidArg(`${truncated} requires a value; it was the last token on the command line`);
 	const target = targetValue(args);
@@ -199,7 +189,7 @@ const adapterDispatch = defineCliCommand({
 	handlers: {
 		register: (args) => {
 			const { registerAdapter } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -219,7 +209,7 @@ const adapterDispatch = defineCliCommand({
 		},
 		read: (args) => {
 			const { readAdapterRecord } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -256,7 +246,7 @@ const adapterDispatch = defineCliCommand({
 		},
 		candidate: (args) => {
 			const { prepareMigrationCandidate } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -302,7 +292,7 @@ const adapterDispatch = defineCliCommand({
 		},
 		compare: (args) => {
 			const { compareAdapterShadow } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -339,7 +329,7 @@ const adapterDispatch = defineCliCommand({
 		},
 		cutover: (args) => {
 			const { recordCutover } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -383,7 +373,7 @@ const adapterDispatch = defineCliCommand({
 		},
 		rollback: (args) => {
 			const { recordCutoverRollback } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -421,7 +411,7 @@ const adapterDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showAdapter } = require("./core/adapter-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

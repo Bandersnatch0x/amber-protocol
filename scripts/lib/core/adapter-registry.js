@@ -26,6 +26,7 @@ const {
 	isNonEmptyString,
 	closedFieldProblem,
 	unknownFieldProblem,
+	isPositiveInt,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 
@@ -314,10 +315,6 @@ function comparisonCorrupt(message) {
 
 function cutoverCorrupt(message) {
 	return typedError(CUTOVER_CORRUPT_CODE, message);
-}
-
-function isPositiveInt(value) {
-	return Number.isInteger(value) && value > 0;
 }
 
 function stringArrayProblem(value, label) {

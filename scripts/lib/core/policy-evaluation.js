@@ -17,6 +17,7 @@ const {
 	isPlainObject,
 	quotedList,
 	closedFieldProblem,
+	isPositiveInt,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { defineVerdictSurface } = require("./verdict-surface");
@@ -119,10 +120,6 @@ function outcomeCorrupt(message) {
 
 function isNonEmptyString(value) {
 	return typeof value === "string" && value.length > 0;
-}
-
-function isPositiveInt(value) {
-	return Number.isInteger(value) && value > 0;
 }
 
 function isNonNegativeInt(value) {

@@ -95,7 +95,10 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: `http://127.0.0.1:${clientPort}`,
-    trace: 'on-first-retry',
+    // Local runs use retries: 0, so 'on-first-retry' never records a trace and
+    // a failed run leaves no evidence (issue #401). Keep CI's cheaper mode
+    // because its retries produce a trace on the first failure already.
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },

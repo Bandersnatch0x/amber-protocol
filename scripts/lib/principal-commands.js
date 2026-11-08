@@ -8,34 +8,22 @@
 // corruption) as a stable AMBER_E_* code.
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	invalidArg,
+	missingValueFlag,
+	resolveTarget,
+	readFailure,
+	writeFailure,
+} = require("./command-helpers");
 
 // The readFailure FALLBACK for untyped crashes/misses at the show/list seams,
 // not a corruption verdict (same naming discipline as the artifact command).
 const READ_FAILURE_CODE = "AMBER_E_PRINCIPAL_NOT_FOUND";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-/**
- * The registry writers (register/revoke) propagate typed throws for
- * environment-level misconfiguration — a garbage AMBER_PRINCIPAL_MAX_REGISTRY_BYTES
- * override is resolvePositiveIntCeiling's typed AMBER_E_INVALID_ARG, never a
- * silent default. The CLI seam converts a typed throw into the standard
- * result envelope so the public surface keeps its stable code and exit code
- * (the same discipline the show/list handlers apply to typed read throws).
- */
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
-}
-
+// Environment-level misconfiguration (e.g. a garbage AMBER_PRINCIPAL_MAX_REGISTRY_BYTES
+// override) surfaces from resolvePositiveIntCeiling as a typed
+// AMBER_E_INVALID_ARG and converts through the shared writeFailure — never a
+// silent default.
 /**
  * A value flag as the LAST argv token parses to `undefined`, which is
  * indistinguishable from "not declared" further down — a trailing `--id` or
@@ -45,25 +33,19 @@ function writeFailure(err) {
  * AMBER_E_INVALID_ARG here at the principal command seam (ticket-03 review
  * finding F-4 / finding F5 discipline, applied to this surface).
  */
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["kind", "--kind"],
-		["role", "--role"],
-		["membership", "--membership"],
-		["capability", "--capability"],
-		["scope", "--scope"],
-		["validFrom", "--valid-from"],
-		["validTo", "--valid-to"],
-		["issuer", "--issuer"],
-		["reason", "--reason"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["kind", "--kind"],
+	["role", "--role"],
+	["membership", "--membership"],
+	["capability", "--capability"],
+	["scope", "--scope"],
+	["validFrom", "--valid-from"],
+	["validTo", "--valid-to"],
+	["issuer", "--issuer"],
+	["reason", "--reason"],
+	["target", "--target"],
+];
 
 /**
  * An explicitly passed-but-empty --target ("", or whitespace) is a malformed
@@ -107,7 +89,7 @@ const principalDispatch = defineCliCommand({
 	handlers: {
 		register: (args) => {
 			const { registerPrincipal } = require("./core/principal-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared input would otherwise be dropped silently`,
@@ -141,7 +123,7 @@ const principalDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showPrincipal } = require("./core/principal-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -171,7 +153,7 @@ const principalDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listPrincipals } = require("./core/principal-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -190,7 +172,7 @@ const principalDispatch = defineCliCommand({
 		},
 		revoke: (args) => {
 			const { revokePrincipal } = require("./core/principal-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
