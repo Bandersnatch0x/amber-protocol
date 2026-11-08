@@ -35,6 +35,7 @@ const path = require("node:path");
 
 const { sha256Hex } = require("./context-hash");
 const { typedError } = require("./error-catalog");
+const { toPortablePath } = require("./fs-utils");
 
 const ERROR_CODES = Object.freeze({
 	toolchain: "AMBER_E_KNOWLEDGE_TOOLCHAIN_MISSING",
@@ -97,10 +98,6 @@ function loadTypeScript() {
 /** The exact compiler version recorded in graph provenance (`toolchain.typescript`). */
 function typescriptVersion() {
 	return loadTypeScript().version;
-}
-
-function toPosix(p) {
-	return String(p).replace(/\\/g, "/");
 }
 
 function isTestFile(name) {
@@ -171,7 +168,7 @@ function readAliasConfigs(targetRoot, tsconfigs) {
 		});
 		const options = parsed.config && parsed.config.compilerOptions;
 		if (!options || !options.paths || typeof options.paths !== "object") continue;
-		const dir = toPosix(path.dirname(rel));
+		const dir = toPortablePath(path.dirname(rel));
 		configs.push({
 			dir: dir === "." ? "" : dir,
 			fileName: rel,

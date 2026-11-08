@@ -9,7 +9,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { readJson, resolvePathWithin, writeJson } = require("./fs-utils");
+const { readJson, resolvePathWithin, writeJson, ensureDir } = require("./fs-utils");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 
@@ -90,10 +90,6 @@ function readCanonicalPages(targetRoot) {
 			}
 		})
 		.filter(Boolean);
-}
-
-function ensureDir(dir) {
-	fs.mkdirSync(dir, { recursive: true });
 }
 
 /** Persist a page, synchronize the generated index, and emit a page-write event. */

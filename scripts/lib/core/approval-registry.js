@@ -44,6 +44,7 @@ const {
 	chainHash,
 	appendWithinCeiling: sharedAppendWithinCeiling,
 	isPlainObject,
+	isNullableNonEmptyString,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { resolveActivePrincipal, parseTimestamp } = require("./principal-registry");
@@ -158,10 +159,6 @@ const PRINCIPAL_SNAPSHOT_FIELDS = Object.freeze([
 
 function approvalCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
-}
-
-function isNullableNonEmptyString(value) {
-	return value === null || (typeof value === "string" && value.length > 0);
 }
 
 // Issue #340 — the stored confirmation proof: null (no proof claimed —

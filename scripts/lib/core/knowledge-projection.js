@@ -9,7 +9,7 @@ const { verifyPages } = require("./context-verify");
 const { readPage } = require("./context-store");
 const { hashFile, sha256 } = require("./context-hash");
 const { rebuildProjection, projectionsDir } = require("./projection-registry");
-const { resolvePathWithin } = require("./fs-utils");
+const { resolvePathWithin, toPortablePath } = require("./fs-utils");
 const { typedError } = require("./error-catalog");
 
 const MANIFEST_SCHEMA_VERSION = "1.0.0";
@@ -29,10 +29,6 @@ const ERROR_CODES = Object.freeze({
 	projection: "AMBER_E_PROJECTION_DRIFT",
 	staleSource: "AMBER_E_KNOWLEDGE_SOURCE_STALE",
 });
-
-function toPosix(value) {
-	return String(value).replace(/\\/g, "/");
-}
 
 function firstHeading(text) {
 	const match = /^#\s+(.+)$/m.exec(text);
@@ -336,7 +332,7 @@ function pageRowFromProjectionPage(page) {
 	const source = page.sources && page.sources.source;
 	if (!source || typeof source.ref !== "string") return null;
 	if (typeof page.sourceNodeId !== "string") return null;
-	const sourcePath = toPosix(source.ref).replace(/#L\d+(?:-L\d+)?$/, "");
+	const sourcePath = toPortablePath(source.ref).replace(/#L\d+(?:-L\d+)?$/, "");
 	const category =
 		page.sourceCategory ||
 		(page.sourceNodeId.split(":")[0] === "adr" ? "adr" : page.sourceNodeId.split(":")[0]);

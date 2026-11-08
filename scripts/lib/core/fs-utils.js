@@ -36,6 +36,12 @@ function toPortablePath(value) {
 	return String(value).replace(/\\/g, "/");
 }
 
+// Create a state directory and any missing parents. Kept next to the other
+// path helpers so callers do not each re-declare the same two-line wrapper.
+function ensureDir(dir) {
+	fs.mkdirSync(dir, { recursive: true });
+}
+
 function lstatIfPresent(filePath) {
 	try {
 		return fs.lstatSync(filePath);
@@ -407,6 +413,7 @@ module.exports = {
 	assertExclusiveLeaf,
 	realPathForPotential,
 	toPortablePath,
+	ensureDir,
 	pathExists,
 	readText,
 	isMissingPath,
