@@ -213,7 +213,8 @@ function ensurePlanReady(target, planRel) {
 			"## Resume Checkpoint\n\n- Resume Point: e2e\n- Blockers: none\n- Next Action: implement\n- Recovery Instructions: reopen plan\n\n",
 		);
 	}
-	// F027: gate/accept refuse `<fill:>` context-manifest placeholders.
+	// F027/F084: gate/accept refuse `<fill:>` placeholders in context manifests
+	// and in vertical slice metadata (the plan template emits both).
 	c = c
 		.replace(
 			"- implement: <fill: knowledge-surface paths the implementer needs>",
@@ -222,7 +223,9 @@ function ensurePlanReady(target, planRel) {
 		.replace(
 			"- review: <fill: knowledge-surface paths the reviewer needs>",
 			"- review: docs/wiki/engineering/runbook.md",
-		);
+		)
+		.replace("  - paths: <fill: repo-relative paths this slice touches>", `  - paths: ${planRel}`)
+		.replace("  - verify: <fill: one command that proves this slice>", "  - verify: npm test");
 	fs.writeFileSync(planPath, c);
 }
 
@@ -1233,8 +1236,15 @@ function main(argv = process.argv.slice(2)) {
 	return code;
 }
 
+// main() returns the summary code; the CLI boundary is what makes it an exit
+// status. Without this assignment a high-finding run exits 0 and CI stays green.
+function runCli(argv) {
+	process.exitCode = main(argv);
+	return process.exitCode;
+}
+
 if (require.main === module) {
-	main();
+	runCli();
 }
 
 function matchGolden(runtimeSummary, golden) {
@@ -1409,6 +1419,7 @@ function reportFixtureCoverage(paths) {
 
 module.exports = {
 	main,
+	runCli,
 	parseRunnerArgs,
 	snapshotProduct,
 	detectProductMutation,

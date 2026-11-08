@@ -10,6 +10,7 @@ const { spawnSync } = require("node:child_process");
 const RUNNER = path.join(__dirname, "..", "..", "scripts", "demo", "e2e-governance-loop-verify.js");
 const {
 	exitCodeFromSummary,
+	runCli,
 	snapshotProduct,
 	detectProductMutation,
 	parseRunnerArgs,
@@ -50,6 +51,20 @@ test("exitCodeFromSummary is 0 only when every path closed with no high findings
 	assert.equal(exitCodeFromSummary({ ...passingSummary(), verifyFailRecovered: false }), 1);
 	assert.equal(exitCodeFromSummary({ ...passingSummary(), crossSessionHandoff: false }), 1);
 	assert.equal(exitCodeFromSummary({ ...passingSummary(), highFindings: ["S1"] }), 1);
+});
+
+test("runCli assigns the summary code to process.exitCode", () => {
+	// A high-finding run must fail CI. The `--help` path is the only cheap
+	// main() exit; the sentinel proves the assignment happens even when the
+	// code matches the default 0.
+	const prev = process.exitCode;
+	try {
+		process.exitCode = 42;
+		assert.equal(runCli(["--help"]), 0);
+		assert.equal(process.exitCode, 0);
+	} finally {
+		process.exitCode = prev ?? 0;
+	}
 });
 
 test("detectProductMutation reports leaked sessions and dirty product files", () => {
