@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Harness Run core (F065 H0; ADR-0101).
 //
@@ -48,10 +49,6 @@ function runFileForCreate(targetRoot, runId) {
 
 function runFileForRead(targetRoot, runId) {
 	return statePath(targetRoot, "harness", "runs", `${safeId(runId)}.json`);
-}
-
-function safeId(runId) {
-	return String(runId).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
 function runLockFile(targetRoot, runId) {

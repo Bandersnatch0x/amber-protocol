@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Harness Replay core (F073 H5; proposal §7/§26/§34/§43/§46.5).
 //
@@ -59,10 +60,6 @@ const AXIS_VERDICT = defineVerdictSurface({
 	notRunValue: "unevaluated",
 });
 const AXIS_VERDICTS = AXIS_VERDICT.outcomes;
-
-function safeId(id) {
-	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
-}
 
 function replayDirForCreate(targetRoot, runId) {
 	return statePathForCreate(targetRoot, "harness", "replays", safeId(runId));

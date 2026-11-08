@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Execution Adapter + boundary comparison (F068 H2a; F070 H2b wiring).
 //
@@ -78,10 +79,6 @@ function executionRecordFile(targetRoot, runId) {
 
 function executionRecordFileForRead(targetRoot, runId) {
 	return statePath(targetRoot, "harness", "executions", `${safeId(runId)}.json`);
-}
-
-function safeId(id) {
-	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
 // The effective report mirrors the declared shape (defaults applied the same

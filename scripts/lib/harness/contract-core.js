@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Harness Contract admission core (F065 H0; ADR-0100).
 //
@@ -40,9 +41,6 @@ function contractFileForRead(targetRoot, contractId) {
 
 // Metadata ids are validated by the schema; the file name keeps the same
 // closed character set so an id can never escape the contracts directory.
-function safeId(contractId) {
-	return String(contractId).replace(/[^A-Za-z0-9._-]/g, "-");
-}
 
 function readContractFile(file) {
 	let raw;
