@@ -3563,16 +3563,18 @@
 			"user_visible_behavior": "amber session approve --return-to <stage> records a return ruling instead of an approval: the session ledger cursor rewinds to before the named stage (the gate's owning stage or earlier), the gate goes back to pending so the rerun cannot pass on a stale approval, the manifest projection follows, and complete-check treats approval evidence as voided until the gate re-approves. The route schema is unchanged; the ruling is made by the human at the gate.",
 			"status": "passing",
 			"verification": [
-				"A settle, return, re-approve, redo, next sequence converges: node --test tests/unit/session-gate-return.test.js (12 tests)",
+				"A settle, return, re-approve, redo, next sequence converges: node --test tests/unit/session-gate-return.test.js (18 tests)",
+				"Per-ruling convergence pinned: a second gate return is recorded when the cursor does not move, a replayed identical ruling appends nothing (session-gate-return.test.js)",
+				"Guidance surfaces see a returned gate as pending again (resolvePendingGate fold, session-gate-return.test.js)",
 				"Pre-return gate rules unchanged: node --test tests/unit/session-stage-runner.test.js (42 tests)",
 				"Web schema parity and gate status rendering: npm run test --prefix apps/web (812 tests)"
 			],
 			"evidence": [
 				{
-					"command": "node --test tests/unit/session-gate-return.test.js tests/unit/session-stage-runner.test.js",
-					"result": "54 tests passed, 0 failed",
+					"command": "node --test tests/unit/session-gate-return.test.js tests/unit/session-stage-runner.test.js tests/unit/session-commands.test.js tests/unit/lifecycle.test.js tests/unit/session-timeline.test.js",
+					"result": "148 tests passed, 0 failed",
 					"date": "2026-11-17",
-					"notes": "Behavior suite for the return ruling plus the adjacent stage-runner regression suite."
+					"notes": "Return ruling behavior plus adjacent stage-runner, approve, lifecycle, and timeline suites after the landing-verification fixes."
 				}
 			],
 			"notes": [],

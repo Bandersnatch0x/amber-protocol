@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   voided until the gate re-approves. The ledger stays append-only; the rewind is derived from the
   `gate_returned` record. The route schema is unchanged; the ruling is made by the human at the
   gate. The web viewer renders the `returned` gate status and accepts its timeline event.
+  Convergence is per ruling: a replayed identical return appends nothing, while a different gate's
+  return is always recorded even when the cursor does not move. A gate id outside the route gate
+  charset is refused before any filesystem or ledger effect, `amber next` and the breadcrumb count
+  a returned gate as pending again, and legacy `session verify` keeps `currentStage` consistent
+  with `completedStages` after a redo.
 - remove the memory identity gate and the γ admission limit (F089): `amber memory request`, `ingest`
   and `book` no longer refuse a non-TTY invocation, and `ingest` admits every eligible candidate in
   the request. The five-per-168-hour quota, the K1/K2/K3 mixed-pool ordering, the provenance-only

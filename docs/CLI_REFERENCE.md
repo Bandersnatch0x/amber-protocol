@@ -235,7 +235,7 @@ ledger. `verify` and `approve` also mirror the event into a hash-chain ledger
 ```bash
 node scripts/amber.js session verify   --session <id> --command "npm test" --result pass  --target . --confirm
 node scripts/amber.js session verify   --session <id> --command "npm test" --execute --budget-minutes 15 --target . --confirm
-node scripts/amber.js session approve  --session <id> [--gate <gate-id>] --yes            --target .
+node scripts/amber.js session approve  --session <id> [--gate <gate-id>] [--return-to <stage>] --yes --target .
 node scripts/amber.js session verify-ledger --session <id>                                --target .
 ```
 
