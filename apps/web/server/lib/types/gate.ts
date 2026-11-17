@@ -1,4 +1,4 @@
-export type GateStatus = 'pending' | 'approved' | 'rejected';
+export type GateStatus = 'pending' | 'approved' | 'rejected' | 'returned';
 
 // Audit-identity constants for web gate decisions (ADR-0007 amendment (c)).
 // Shared by the server router/reader and the gates UI via the `@server` alias,
@@ -30,7 +30,7 @@ export interface GateFilters {
 }
 
 export interface GateDecision {
-  decision: 'approved' | 'rejected';
+  decision: 'approved' | 'rejected' | 'returned';
   reason?: string;
   resolvedAt: string;
   resolvedBy: string;

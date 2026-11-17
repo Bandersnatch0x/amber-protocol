@@ -118,6 +118,7 @@ function writeGateDecision(sessionDir, gateId, decision, reason, resolvedAt) {
 
 module.exports = {
 	buildGateStageMap,
+	isValidGateId,
 	writeGateDefinition,
 	writeRouteGates,
 	writeGateDecision,

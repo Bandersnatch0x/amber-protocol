@@ -30,18 +30,21 @@ const statusOptions: { value: GateStatus | ''; labelKey: I18nKey }[] = [
   { value: 'pending', labelKey: 'gates.filter.pending' },
   { value: 'approved', labelKey: 'gates.filter.approved' },
   { value: 'rejected', labelKey: 'gates.filter.rejected' },
+  { value: 'returned', labelKey: 'gates.filter.returned' },
 ];
 
 const statusLabelKeys: Record<GateStatus, I18nKey> = {
   pending: 'gates.status.pending',
   approved: 'gates.status.approved',
   rejected: 'gates.status.rejected',
+  returned: 'gates.status.returned',
 };
 
 const statusStyles: Record<GateStatus, string> = {
   pending: 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   approved: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
   rejected: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  returned: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
 };
 
 function getGateKey(gate: Pick<Gate, 'sessionId' | 'gateId'>): string {

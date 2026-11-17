@@ -26,6 +26,7 @@
 				"gate_triggered",
 				"gate_passed",
 				"gate_failed",
+				"gate_returned",
 				"checkpoint_created",
 				"session_paused",
 				"session_resumed",

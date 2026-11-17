@@ -240,6 +240,7 @@ const sessionDispatch = defineCliCommand({
 				await require("./session-commands").approveSession(sessionTarget(args), {
 					sessionId: args.session,
 					gate: args.gate || args._?.[1],
+					returnTo: args.returnTo,
 					yes: args.yes,
 				}),
 			);

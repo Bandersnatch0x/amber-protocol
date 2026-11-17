@@ -10,7 +10,7 @@ const {
 	writeSessionManifest,
 } = require("./session-manifest");
 const { findFeatureById } = require("./core/validators");
-const { appendSessionEvent, readSessionEvents } = require("./session-timeline");
+const { appendSessionEvent, readSessionEvents, resolvePassedGates } = require("./session-timeline");
 const { SessionStateMachine, STATES } = require("./session-state-machine");
 const { loadLatestCheckpoint, loadCheckpointByStage } = require("./checkpoint-manager");
 const { checkSchemaVersion, SCHEMA_VERSION } = require("./schema-version-checker");
@@ -20,7 +20,7 @@ const { decideRouteJourney, JOURNEYS } = require("./route-journey-decision");
 const { result } = require("./result");
 const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
-const { writeRouteGates, writeGateDecision } = require("./gate-writer");
+const { writeRouteGates, writeGateDecision, isValidGateId } = require("./gate-writer");
 const { appendLedgerRecord, readLedger, verifyLedgerOutcome } = require("./core/loop-ledger");
 const { runEvidenceCommand, resolveBudgetMinutes } = require("./core/evidence-runner");
 const { recordFeatureEvidence } = require("./feature-commands");
@@ -872,14 +872,23 @@ async function verifySession(projectRoot, options) {
 			});
 		}
 
-		// Update the manifest's completedStages so complete-check also finds it there.
+		// Update the manifest's completedStages so complete-check also finds it
+		// there, and keep the twin projection honest: currentStage is the first
+		// stage the derived cursor has not completed (null when all are done).
+		// After a gate return rewound the cursor, a redo must advance it again —
+		// leaving it at the rewound stage contradicts completedStages.
 		const completedStages = Array.isArray(manifest.completedStages)
 			? [...manifest.completedStages]
 			: [];
 		if (!completedStages.includes(actualStageName)) {
 			completedStages.push(actualStageName);
 		}
-		writeSessionManifest(sessionDir, { ...manifest, completedStages });
+		const remainingStage = stages.find((s) => s && !completedStages.includes(s.name));
+		writeSessionManifest(sessionDir, {
+			...manifest,
+			completedStages,
+			...(remainingStage ? { currentStage: remainingStage.name } : {}),
+		});
 
 		// Evidence reflux: a real (--execute) verification is the session's proof of
 		// work. When the session is bound to a feature, mirror that proof into
@@ -919,6 +928,155 @@ async function verifySession(projectRoot, options) {
 		);
 		return result(lines.join("\n"), 0);
 	});
+}
+
+// F090 gate return: the human ruling at a gate may send work back instead of
+// approving it. The target is the gate's owning stage or any earlier one; the
+// ledger record rewinds the cursor by derivation (append-only, so history is
+// never edited) and the gate goes back to pending — a later gate_passed
+// re-arms it. Convergence is per ruling, not per cursor: a replay of the same
+// ruling (same gate, same target, cursor already rewound) appends nothing and
+// says so; a different gate's return is always recorded, because dropping it
+// would leave its stale gate_passed governing the route.
+async function returnFromGate(projectRoot, manifest, sessionDir, route, ruling) {
+	let { gateId, returnTo, decidedBy, gateOwnerOf } = ruling;
+	// The gate id is route data (stages[].gateAfter) and is joined into the
+	// decision-file path below, so only the route gate charset may reach the
+	// filesystem — the same rule gate-writer applies to every write there.
+	if (!isValidGateId(gateId)) {
+		return result(
+			`gate "${gateId}" is not a valid gate id (allowed: letters, digits, "_", "-"); ` +
+				`a return refuses it instead of touching the gates directory.`,
+			1,
+		);
+	}
+	const stages = (route && Array.isArray(route.stages) ? route.stages : []).filter(Boolean);
+	const owner = gateOwnerOf(gateId);
+	if (!owner) {
+		return result(
+			`gate "${gateId}" is not attached to a stage (no stage declares gateAfter "${gateId}"); ` +
+				`a return needs an owning stage.`,
+			1,
+		);
+	}
+	const ownerIndex = stages.findIndex((s) => s.name === owner.name);
+	const targetIndex = stages.findIndex((s) => s.name === returnTo);
+	// Returning to the gate's own stage is legal: that stage is redone and the
+	// gate sees its new output. Anything after it, or an unknown stage, is not.
+	if (targetIndex < 0 || targetIndex > ownerIndex) {
+		const before = stages
+			.slice(0, ownerIndex + 1)
+			.map((s) => s.name)
+			.filter(Boolean);
+		return result(
+			`--return-to must name the gate's stage "${owner.name}" or an earlier stage.\n` +
+				`Valid targets: ${before.join(", ") || "(none)"}`,
+			1,
+		);
+	}
+
+	// A return is a human ruling, same identity gate as an approval: interactive
+	// shells confirm with a prompt, non-interactive ones need --yes.
+	if (!decidedBy) {
+		if (process.stdin.isTTY) {
+			const ok = await promptYesNo(
+				`Return session to stage "${returnTo}" (gate "${gateId}" goes back to pending)? [y/N] `,
+			);
+			if (!ok) {
+				return result(`Return declined for gate "${gateId}".`, 1);
+			}
+			decidedBy = "user (interactive)";
+		} else {
+			return result(
+				`gate "${gateId}" return needs human decision.\n` +
+					"Run this in an interactive terminal, or pass --yes to record it non-interactively.",
+				1,
+			);
+		}
+	}
+
+	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+	const records = readLedger(ledgerPath);
+	// The cursor source follows the session's own convention: verb sessions own
+	// their cursor in the ledger; legacy sessions keep it in manifest
+	// completedStages and their ledger starts empty at the first ruling. A
+	// legacy ledger that already carries records (a prior return) derives from
+	// it like a verb session's.
+	const { cursorFromLedger } = require("./session-stage-runner");
+	const ledgerHasCompletions = records.some((record) => record.kind === "stage_completed");
+	const current = ledgerHasCompletions
+		? cursorFromLedger(records)
+		: Array.isArray(manifest.completedStages)
+			? manifest.completedStages
+			: [];
+	const returnIndex = current.indexOf(returnTo);
+	const projected = returnIndex >= 0 ? current.slice(0, returnIndex) : current;
+	const cursorUnmoved =
+		projected.length === current.length && projected.every((s, i) => s === current[i]);
+	// A replay of the same ruling is a no-op; a first return (or a different
+	// gate's return) must be recorded even when the cursor is already at or
+	// before the target — the record is what re-arms the gate.
+	const priorReturn = [...records]
+		.reverse()
+		.find((record) => record.kind === "gate_returned" && record.gateId === gateId);
+	const converged = Boolean(priorReturn) && priorReturn.returnTo === returnTo && cursorUnmoved;
+
+	const decidedAt = new Date().toISOString();
+	const decidedByLabel = decidedBy === "flag (--yes)" ? "flag (--yes)" : "user (interactive)";
+
+	if (!converged) {
+		// The ledger record is the authority: cursorFromLedger derives the rewind
+		// from it, so a crash between appends converges on replay.
+		appendLedgerRecord(ledgerPath, {
+			schemaVersion: 2,
+			kind: "gate_returned",
+			sessionId: manifest.sessionId,
+			gateId,
+			returnTo,
+			decidedBy: decidedByLabel,
+			recordedAt: decidedAt,
+		});
+
+		appendSessionEvent(sessionDir, {
+			type: "gate_returned",
+			data: { gateId, returnTo, decidedBy: decidedByLabel },
+		});
+	}
+
+	// Reconciled on every invocation so a crash after the ledger append but
+	// before these steps converges on replay: the decision file is cleared so
+	// the web viewer shows the gate as pending again (a fresh approval writes a
+	// new one), and the manifest projection is rebuilt from the cursor.
+	const decisionPath = path.join(sessionDir, "gates", `${gateId}.decision.json`);
+	let decisionWarning = null;
+	try {
+		fs.rmSync(decisionPath, { force: true });
+	} catch (error) {
+		decisionWarning = `Warning: could not clear the decision file for gate "${gateId}": ${error.message}`;
+	}
+
+	const next = { ...manifest, completedStages: projected };
+	const nextStage = stages[projected.length];
+	if (nextStage) {
+		next.currentStage = nextStage.name;
+	}
+	writeSessionManifest(sessionDir, next);
+
+	if (converged) {
+		return withOptionalWarning(
+			result(`already returned: gate "${gateId}" is already returned to "${returnTo}".`, 0),
+			decisionWarning,
+		);
+	}
+
+	const lines = [
+		`Returned to stage ${returnTo}`,
+		`Gate: ${gateId} (pending again)`,
+		`Completed stages: ${projected.join(", ") || "none"}`,
+		"",
+		"Redo the returned stages, then re-run: amber session verify / run as usual; the gate re-approves with amber session approve.",
+	];
+	return withOptionalWarning(result(lines.join("\n"), 0), decisionWarning);
 }
 
 async function approveSession(projectRoot, options) {
@@ -975,6 +1133,21 @@ async function approveSession(projectRoot, options) {
 
 		const resolvedGateId = gateId || gateIds[0];
 
+		// A return ruling (`--return-to <stage>`) rewinds the session instead of
+		// approving the gate. Target validation lives in returnFromGate.
+		if (options.returnTo) {
+			const ruling = await returnFromGate(projectRoot, manifest, sessionDir, route, {
+				gateId: resolvedGateId,
+				returnTo: options.returnTo,
+				decidedBy: options.yes ? "flag (--yes)" : null,
+				gateOwnerOf: (id) =>
+					(route && Array.isArray(route.stages) ? route.stages : []).find(
+						(s) => s && s.gateAfter === id,
+					),
+			});
+			return ruling;
+		}
+
 		// Identity gate: a "user-approval" gate must be approved by a human, not by an
 		// agent piping commands. In a non-interactive shell we refuse unless --yes is
 		// explicitly passed; templates/CLAUDE.md instructs agents never to pass --yes.
@@ -1023,13 +1196,14 @@ async function approveSession(projectRoot, options) {
 			}
 		}
 
-		// Report whether all route gates are approved. Approval is evidence for
-		// completion, not a terminal-state transition; completeSession owns the only
-		// normal path to STATES.COMPLETED after strict completion evidence passes.
-		const gateEvents = readSessionEvents(sessionDir).filter((e) => e.type === "gate_passed");
-		const allGatesPassed =
-			gateIds.length > 0 &&
-			gateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
+		// Report whether all route gates are approved. The newest ruling wins: a
+		// gate_returned puts its gate back among the pending ones, so a stale
+		// gate_passed cannot read as "all gates passed". Approval is evidence for
+		// completion, not a terminal-state transition; completeSession owns the
+		// only normal path to STATES.COMPLETED after strict completion evidence
+		// passes.
+		const passedGates = resolvePassedGates(readSessionEvents(sessionDir));
+		const allGatesPassed = gateIds.length > 0 && gateIds.every((id) => passedGates.has(id));
 		// Approval is still Session activity even though it does not change status.
 		// Refresh updatedAt so activity ordering remains accurate for readers.
 		writeSessionManifest(sessionDir, manifest);
@@ -1040,9 +1214,7 @@ async function approveSession(projectRoot, options) {
 				"All gates passed — approval requirements satisfied; session remains active pending verification and explicit completion.",
 			);
 		} else if (gateIds.length > 1) {
-			const pending = gateIds.filter(
-				(id) => !gateEvents.some((e) => e.data && e.data.gateId === id),
-			);
+			const pending = gateIds.filter((id) => !passedGates.has(id));
 			lines.push(`Pending gates: ${pending.join(", ")}`);
 		}
 		if (gateWarning) {

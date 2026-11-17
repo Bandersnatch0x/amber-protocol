@@ -105,6 +105,14 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     gateId: z.string().optional(),
     reason: z.string().optional(),
   }),
+  // F090 gate return: the human ruling at a gate sent work back to a stage.
+  // data carries { gateId, returnTo, decidedBy }.
+  SessionEventBaseSchema.extend({
+    type: z.literal('gate_returned'),
+    sessionId: z.string().optional(),
+    gateId: z.string().optional(),
+    returnTo: z.string().optional(),
+  }),
   // Budget signals. data carries { used, total, percentage }.
   SessionEventBaseSchema.extend({
     type: z.literal('budget_warning'),

@@ -149,7 +149,22 @@ function evaluateCompletion(projectRoot, sessionId, options = {}) {
 		{
 			reason: "approval present",
 			missing: "approval",
-			satisfied: eventTypes.has("gate_passed") || manifest.status === "completed",
+			// The newest ruling for each gate wins: a gate_returned voids the
+			// earlier gate_passed, so a returned gate no longer counts as
+			// approval evidence until a later approval re-arms it.
+			satisfied:
+				!timelineEvents.some(
+					(event) =>
+						event.type === "gate_returned" &&
+						event.data?.gateId &&
+						!timelineEvents.some(
+							(later) =>
+								later.type === "gate_passed" &&
+								later.data?.gateId === event.data.gateId &&
+								timelineEvents.indexOf(later) > timelineEvents.indexOf(event),
+						),
+				) &&
+				(eventTypes.has("gate_passed") || manifest.status === "completed"),
 		},
 		{
 			reason: "work present",

@@ -40,7 +40,7 @@ amber session <start|status|list|abort|continue|complete-check|complete|verify|a
 | Subcommand | Description |
 | --- | --- |
 | <code>abort</code> | Set session status to aborted, write abort event, cleanup worktree. |
-| <code>approve</code> | Record a gate_passed event so complete-check sees approval evidence. |
+| <code>approve</code> | Record a gate_passed event so complete-check sees approval evidence. A return ruling (--return-to &lt;stage&gt;) instead rewinds the session to before the named stage (the gate's own stage or earlier), the gate goes back to pending, and the returned stages are redone before the gate re-approves. |
 | <code>complete</code> | Mark a session completed (governance terminal state). Requires complete-check to pass. |
 | <code>complete-check</code> | Report whether a session has enough evidence to be treated as complete. |
 | <code>continue</code> | Continue a paused or incomplete session from its current stage. |
@@ -78,8 +78,11 @@ Subcommands:
       Record verification evidence. Without --execute, records a self-reported claim.
       With --execute, runs --command and records the real exit code (default 5-minute
       budget; raise it for long suites, capped at 60).
-  approve --session <id> [--gate <gate-id>]
-      Record a gate_passed event so complete-check sees approval evidence.
+  approve --session <id> [--gate <gate-id>] [--return-to <stage>]
+      Record a gate_passed event so complete-check sees approval evidence. A
+      return ruling (--return-to <stage>) instead rewinds the session to before
+      the named stage (the gate's own stage or earlier), the gate goes back to
+      pending, and the returned stages are redone before the gate re-approves.
   lease --session <id> --owner-id <agent> --token-hash <hash>
       Reacquire the session lease for the current owner: a fresh token and a
       new fence (explicit, owner-bound; ADR-0029 §8.1).
@@ -119,6 +122,7 @@ Examples:
   amber session complete-check --session <session-id>
   amber session verify --session <session-id> --confirm
   amber session approve --session <session-id>
+  amber session approve --session <session-id> --gate <gate-id> --return-to <stage>
   amber session run --session <session-id> --dry-run
   amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{"status":"succeeded"}'
 ```
@@ -163,6 +167,10 @@ amber session verify --session <session-id> --confirm
 
 ```bash
 amber session approve --session <session-id>
+```
+
+```bash
+amber session approve --session <session-id> --gate <gate-id> --return-to <stage>
 ```
 
 ```bash

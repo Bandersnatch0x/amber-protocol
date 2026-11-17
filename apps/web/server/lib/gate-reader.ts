@@ -68,7 +68,17 @@ async function readGateFile(gatePath: string, decisionPath: string): Promise<Gat
     type: str(gateData.type, 'user-approval'),
     stage: str(gateData.stage, 'unknown'),
     description: str(gateData.description, ''),
-    status: decision ? (decision.decision === 'approved' ? 'approved' : 'rejected') : 'pending',
+    // A return ruling rewinds the session; the CLI clears the decision file,
+    // so a returned gate usually reads as pending again. A persisted
+    // `returned` decision (older snapshot taken before the clear) still
+    // renders distinctly instead of collapsing into rejected.
+    status: decision
+      ? decision.decision === 'approved'
+        ? 'approved'
+        : decision.decision === 'returned'
+          ? 'returned'
+          : 'rejected'
+      : 'pending',
     triggeredAt: str(gateData.triggeredAt, ''),
     resolvedAt: decision?.resolvedAt,
     // Read the recorded identity instead of hardcoding: legacy decision files

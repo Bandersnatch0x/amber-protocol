@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 41,
+    "adr": 42,
     "wiki": 9,
     "architecture": 9,
-    "total": 59
+    "total": 60
   },
   "rows": [
     {
@@ -501,6 +501,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0111",
+      "category": "adr",
+      "sourceNodeId": "adr:0111",
+      "pageId": "knowledge-adr-0111",
+      "sourcePath": "docs/adr/0111-gate-return-rewinds-the-session.md",
+      "title": "A Gate Return Rewinds the Session by Derivation",
+      "source": {
+        "rawHash": "sha256:0cd40026cd3c93a85eaca2ca99bb99777c06f36e6c426f29c7a70840db9186f9",
+        "normHash": "sha256:25cd4f86917d175d48fbf12d3089b9af03eaa52694a96f4674a953ca859cc1ae"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -717,5 +729,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:5ae8686dcaf0addd1aab30c103cbd251e94de0af4617e4e8e4d8166ec588daaa"
+  "manifestHash": "sha256:6f3270a89e5a54d7a755fd7036cb67d3deb115eb6a1aca703905cdd7fc46e01b"
 }
