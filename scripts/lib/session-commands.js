@@ -922,11 +922,11 @@ async function verifySession(projectRoot, options) {
 }
 
 // F090 gate return: the human ruling at a gate may send work back instead of
-// approving it. The target must be a stage strictly before the gate's owning
-// stage; the ledger record rewinds the cursor by derivation (append-only, so
-// history is never edited) and the gate goes back to pending — a later
-// gate_passed re-arms it. Repeated returns converge: a second return to the
-// same stage finds the projection already rewound and says so.
+// approving it. The target is the gate's owning stage or any earlier one; the
+// ledger record rewinds the cursor by derivation (append-only, so history is
+// never edited) and the gate goes back to pending — a later gate_passed
+// re-arms it. Repeated returns converge: a second return whose projection
+// equals the current cursor appends nothing and says so.
 function returnFromGate(projectRoot, manifest, sessionDir, route, ruling) {
 	const { gateId, returnTo, decidedBy, gateOwnerOf } = ruling;
 	const stages = (route && Array.isArray(route.stages) ? route.stages : []).filter(Boolean);
@@ -1093,11 +1093,8 @@ async function approveSession(projectRoot, options) {
 
 		const resolvedGateId = gateId || gateIds[0];
 
-		// A return ruling (`--return-to <stage>`) rewinds the session to before
-		// the named stage instead of approving the gate. Valid targets are the
-		// stages strictly before the gate's owning stage — returning forward or
-		// to the gate's own stage would re-enter work the gate has already seen,
-		// and an unknown stage names nothing.
+		// A return ruling (`--return-to <stage>`) rewinds the session instead of
+		// approving the gate. Target validation lives in returnFromGate.
 		if (options.returnTo) {
 			const ruling = returnFromGate(projectRoot, manifest, sessionDir, route, {
 				gateId: resolvedGateId,
