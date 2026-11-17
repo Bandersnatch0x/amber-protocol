@@ -44,6 +44,7 @@ const TIMELINE_EVENT_TYPES = Object.freeze({
 	GATE_TRIGGERED: "gate_triggered",
 	GATE_PASSED: "gate_passed",
 	GATE_FAILED: "gate_failed",
+	GATE_RETURNED: "gate_returned",
 	CHECKPOINT_CREATED: "checkpoint_created",
 	SESSION_PAUSED: "session_paused",
 	SESSION_RESUMED: "session_resumed",

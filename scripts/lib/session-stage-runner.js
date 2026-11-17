@@ -211,10 +211,20 @@ function readCursorLedger(sessionDir) {
 /**
  * The cursor: the ordered, contiguous prefix of stages the ledger records as
  * completed. Duplicates collapse; a stage recorded twice is still one step.
+ *
+ * A `gate_returned` record rewinds the cursor to its declared stage. The
+ * ledger is append-only, so a return never edits history: derivation simply
+ * truncates at the first return after that point, replaying work re-derives
+ * the same state, and a later re-completion re-extends the prefix.
  */
 function cursorFromLedger(records) {
 	const completed = [];
 	for (const record of records) {
+		if (record.kind === "gate_returned") {
+			const index = completed.indexOf(record.returnTo);
+			if (index >= 0) completed.length = index;
+			continue;
+		}
 		if (record.kind !== "stage_completed") continue;
 		if (!completed.includes(record.stage)) completed.push(record.stage);
 	}
@@ -442,8 +452,13 @@ function gateBindingOf(request) {
 
 /**
  * Resolve the current stage from the ledger cursor. Returns null when every
- * stage is complete. `gateAfter` on the last completed stage blocks the next
- * one until a gate_passed record exists for that gate.
+ * stage is complete. A gate blocks the cursor at its owning stage until its
+ * latest ruling is a gate_passed.
+ *
+ * The latest ruling wins: a gate_returned rewinds the cursor and puts the
+ * gate back to pending, so redoing the returned stage always re-arms its
+ * gate — even when the cursor rewound to or before the owning stage, where
+ * the "previous stage" check alone would never fire.
  */
 function resolveCurrentStage(route, records) {
 	const completed = cursorFromLedger(records);
@@ -451,24 +466,43 @@ function resolveCurrentStage(route, records) {
 	const index = completed.length;
 	if (index >= stages.length) return { done: true, stage: null, stageIndex: stages.length };
 
-	// gateAfter blocks the NEXT stage; the completed stage itself is recorded first.
-	if (index > 0) {
-		const previous = stages[index - 1];
-		if (previous && previous.gateAfter) {
-			// A gate is satisfied only by a real gate_passed record — an approval a
-			// human wrote. A `risk` tier is declared inside the route file, which
-			// the governed party can author, so it can never substitute for it.
-			const passed = records.some(
-				(record) => record.kind === "gate_passed" && record.gateId === previous.gateAfter,
-			);
-			if (!passed) {
-				return {
-					done: false,
-					blocked: previous.gateAfter,
-					stage: null,
-					stageIndex: index,
-				};
-			}
+	// A gate is satisfied only by a real gate_passed record — an approval a
+	// human wrote. A `risk` tier is declared inside the route file, which the
+	// governed party can author, so it can never substitute for it. The newest
+	// ruling for a gate wins, so a return voids the earlier pass.
+	const gateOf = (stageIndex) => stages[stageIndex]?.gateAfter || null;
+	const latestRulingPassed = (gateId) => {
+		let passed = false;
+		for (const record of records) {
+			if (record.gateId !== gateId) continue;
+			if (record.kind === "gate_returned") passed = false;
+			else if (record.kind === "gate_passed") passed = true;
+		}
+		return passed;
+	};
+
+	// A gate blocks when its owning stage has produced output that no passed
+	// ruling covers. Two shapes: the cursor just moved past the owner (the
+	// original pre-return rule — the next stage waits for the gate), and the
+	// owner has any stage_completed on record while the cursor sits at or
+	// before it (a return rewound the run onto redone output — the rerun
+	// waits for the gate again). A never-run owner does not block its own
+	// first execution; the gate fires after it completes.
+	for (const stageIndex of [index, index - 1]) {
+		if (stageIndex < 0 || stageIndex >= stages.length) continue;
+		const gateId = gateOf(stageIndex);
+		if (!gateId || latestRulingPassed(gateId)) continue;
+		const ownerRan = records.some(
+			(record) => record.kind === "stage_completed" && record.stage === stages[stageIndex].name,
+		);
+		const behindCursor = stageIndex < index;
+		if (behindCursor || (stageIndex === index && ownerRan)) {
+			return {
+				done: false,
+				blocked: gateId,
+				stage: null,
+				stageIndex: index,
+			};
 		}
 	}
 	return { done: false, blocked: null, stage: stages[index], stageIndex: index };
