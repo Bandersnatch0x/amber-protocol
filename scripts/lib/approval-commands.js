@@ -10,7 +10,13 @@
 // AMBER_E_* code.
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	invalidArg,
+	missingValueFlag,
+	resolveTarget,
+	readFailure,
+	writeFailure,
+} = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 const { promptYesNo } = require("./prompt");
 
@@ -22,27 +28,10 @@ const READ_FAILURE_CODE = "AMBER_E_APPROVAL_NOT_FOUND";
 // refused with this stable code, never silently granted.
 const CONFIRMATION_REQUIRED_CODE = "AMBER_E_APPROVAL_CONFIRMATION_REQUIRED";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-/**
- * The approval writers (grant/revoke/consume) propagate typed throws for
- * environment-level misconfiguration — a garbage AMBER_APPROVAL_MAX_REGISTRY_BYTES
- * override is resolvePositiveIntCeiling's typed AMBER_E_INVALID_ARG, never a
- * silent default. The CLI seam converts a typed throw into the standard
- * result envelope so the public surface keeps its stable code and exit code.
- */
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
-}
-
+// Environment-level misconfiguration (e.g. a garbage AMBER_APPROVAL_MAX_REGISTRY_BYTES
+// override) surfaces from resolvePositiveIntCeiling as a typed
+// AMBER_E_INVALID_ARG and converts through the shared writeFailure — never a
+// silent default.
 /**
  * A value flag as the LAST argv token parses to `undefined`, which is
  * indistinguishable from "not declared" further down — a trailing `--id` or
@@ -52,24 +41,18 @@ function writeFailure(err) {
  * AMBER_E_INVALID_ARG here at the approval command seam (same discipline as
  * the principal and evidence commands).
  */
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["approver", "--approver"],
-		["subject", "--subject"],
-		["scope", "--scope"],
-		["validUntil", "--valid-until"],
-		["revoker", "--revoker"],
-		["decisionIdentity", "--decision-identity"],
-		["body", "--body"],
-		["traceVal", "--trace"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["approver", "--approver"],
+	["subject", "--subject"],
+	["scope", "--scope"],
+	["validUntil", "--valid-until"],
+	["revoker", "--revoker"],
+	["decisionIdentity", "--decision-identity"],
+	["body", "--body"],
+	["traceVal", "--trace"],
+	["target", "--target"],
+];
 
 /**
  * An explicitly passed-but-empty --target ("", or whitespace) is a malformed
@@ -151,7 +134,7 @@ const approvalDispatch = defineCliCommand({
 	handlers: {
 		grant: async (args) => {
 			const { grantApproval } = require("./core/approval-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared input would otherwise be dropped silently`,
@@ -192,7 +175,7 @@ const approvalDispatch = defineCliCommand({
 		},
 		revoke: (args) => {
 			const { revokeApproval } = require("./core/approval-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -223,7 +206,7 @@ const approvalDispatch = defineCliCommand({
 		},
 		consume: async (args) => {
 			const { consumeApproval } = require("./core/approval-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared input would otherwise be dropped silently`,
@@ -273,7 +256,7 @@ const approvalDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showApproval } = require("./core/approval-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -303,7 +286,7 @@ const approvalDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listApprovals } = require("./core/approval-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

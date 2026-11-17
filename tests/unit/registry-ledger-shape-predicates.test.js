@@ -2,7 +2,12 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { isPlainObject, isStrictPlainObject } = require("../../scripts/lib/core/registry-ledger");
+const {
+	isPlainObject,
+	isStrictPlainObject,
+	isPositiveInt,
+	isNullableNonEmptyString,
+} = require("../../scripts/lib/core/registry-ledger");
 
 test("isPlainObject accepts any non-array object; isStrictPlainObject only literal-shaped ones", () => {
 	const inherited = Object.create({ a: 1 });
@@ -21,6 +26,32 @@ test("isPlainObject accepts any non-array object; isStrictPlainObject only liter
 		true,
 		true,
 		false,
+		false,
+		false,
+		false,
+		false,
+	]);
+});
+
+test("isPositiveInt accepts integers above zero only", () => {
+	assert.deepEqual([1, 2, 100].map(isPositiveInt), [true, true, true]);
+	assert.deepEqual([0, -1, 1.5, NaN, Infinity, "1", null].map(isPositiveInt), [
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+	]);
+});
+
+test("isNullableNonEmptyString accepts null and non-empty strings, not the empty string", () => {
+	// Whitespace-only is accepted: this predicate checks length, not trim
+	// (unlike isNonEmptyString). Pinning it keeps the three merged registries
+	// on the behavior they had before the guard was shared.
+	assert.deepEqual([null, "x", " "].map(isNullableNonEmptyString), [true, true, true]);
+	assert.deepEqual([undefined, "", 0, false].map(isNullableNonEmptyString), [
 		false,
 		false,
 		false,

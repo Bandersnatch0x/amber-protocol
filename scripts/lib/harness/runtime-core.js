@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // F080 H7 — bounded repository-local maintenance runtime.
 //
@@ -53,10 +54,6 @@ const MAX_EVERY_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_VALIDITY_MS = 30 * 24 * 60 * 60 * 1_000;
 const MIN_POLL_MS = 250;
 const MAX_POLL_MS = 60_000;
-
-function safeId(value) {
-	return String(value).replace(/[^A-Za-z0-9._-]/g, "-");
-}
 
 function scheduleDirCreate(targetRoot) {
 	return statePathForCreate(targetRoot, "harness", "runtime", "schedules");

@@ -16,7 +16,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { appendEvent, readEvents } = require("./context-store");
 const { sha256 } = require("./context-hash");
-const { resolvePathWithin } = require("./fs-utils");
+const { resolvePathWithin, ensureDir } = require("./fs-utils");
 const { statePathForCreate } = require("../state-dir-resolver");
 
 // Event kind closed set (§2.2 / §9 — 5 values, never extended).
@@ -31,10 +31,6 @@ const MEMORY_EVENT_KIND_SET = new Set(MEMORY_EVENT_KINDS);
 
 const ENTRY_ID_RE = /^sha256:[0-9a-f]{64}$/;
 const REQUEST_ID_RE = /^[a-z0-9-]+$/;
-
-function ensureDir(dir) {
-	fs.mkdirSync(dir, { recursive: true });
-}
 
 // Memory-layer state is a post-rename state kind (ADR-0018, 2026-08-21): it
 // never existed under .harness, so reads and creates both target the canonical

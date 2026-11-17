@@ -55,6 +55,7 @@ const {
 	GENESIS_HASH,
 	chainHash,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	isNullableNonEmptyString,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 
@@ -139,10 +140,6 @@ function parseTimestamp(value) {
 	if (typeof value !== "string" || !ISO_TIMESTAMP_PATTERN.test(value)) return null;
 	const parsed = Date.parse(value);
 	return Number.isNaN(parsed) ? null : parsed;
-}
-
-function isNullableNonEmptyString(value) {
-	return value === null || (typeof value === "string" && value.length > 0);
 }
 
 /**

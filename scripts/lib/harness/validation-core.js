@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Harness Validation core (F073 H5; proposal §16/§17/§34/§51C).
 //
@@ -136,10 +137,6 @@ const PEP_CEILINGS = Object.freeze({
 	E4: "unavailable", // unobservable host actions — no record point, not even a claim
 });
 const PEP_POINTER = "docs/adr/0001-governance-first-artifact-first.md#amendment-0047-2026-09-16";
-
-function safeId(id) {
-	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
-}
 
 function validationDirForCreate(targetRoot, runId) {
 	return statePathForCreate(targetRoot, "harness", "validations", safeId(runId));

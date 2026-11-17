@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // F081 — truthful cancellation of a live governed execution.
 //
@@ -50,10 +51,6 @@ const CODE_CORRUPT = "AMBER_E_HARNESS_EXEC_CANCEL_CORRUPT";
 const SIGNAL = "SIGTERM";
 const SETTLE_BOUND_MS = 10_000;
 const POLL_MS = 50;
-
-function safeId(value) {
-	return String(value).replace(/[^A-Za-z0-9._-]/g, "-");
-}
 
 function cancellationDirCreate(targetRoot) {
 	return statePathForCreate(targetRoot, "harness", "executions", "cancellations");
