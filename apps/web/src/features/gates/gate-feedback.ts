@@ -31,7 +31,9 @@ type Translate = (key: I18nKey, params?: Record<string, string | number>) => str
  * the empty string so the page falls back to "all gates".
  */
 export function parseStatusFilter(value: unknown): GateStatus | '' {
-  return value === 'pending' || value === 'approved' || value === 'rejected' ? value : '';
+  return value === 'pending' || value === 'approved' || value === 'rejected' || value === 'returned'
+    ? value
+    : '';
 }
 
 function appendWarning(message: string, warning?: string): string {

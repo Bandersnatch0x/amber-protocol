@@ -122,7 +122,7 @@ export const gateRouter = router({
       z
         .object({
           sessionId: z.string().optional(),
-          status: z.enum(['pending', 'approved', 'rejected']).optional(),
+          status: z.enum(['pending', 'approved', 'rejected', 'returned']).optional(),
         })
         .optional(),
     )
