@@ -102,7 +102,7 @@ function gatherState(targetRoot) {
 /** Resolve next unapproved gate id for a session (N2). */
 function resolvePendingGate(targetRoot, sessionId) {
 	const { loadSessionManifest } = require("../session-commands");
-	const { readSessionEvents } = require("../session-timeline");
+	const { readSessionEvents, resolvePassedGates } = require("../session-timeline");
 	const { loadTargetRoutes } = require("../route-loader");
 	const loaded = loadSessionManifest(targetRoot, sessionId);
 	if (!loaded || !loaded.manifest) {
@@ -114,12 +114,10 @@ function resolvePendingGate(targetRoot, sessionId) {
 	const route = routes.find((r) => r.routeId === routeId);
 	const gates = route && Array.isArray(route.gates) ? route.gates : [];
 	const events = readSessionEvents(loaded.sessionDir);
-	const passed = new Set(
-		events
-			.filter((e) => e && e.type === "gate_passed" && e.data)
-			.map((e) => e.data.gateId || e.data.gate)
-			.filter(Boolean),
-	);
+	// resolvePassedGates folds the newest ruling per gate: a gate_returned
+	// puts the gate back among the pending ones, so `amber next` and the
+	// breadcrumb point at the re-approval a return requires.
+	const passed = resolvePassedGates(events);
 	const pending = gates.filter((g) => !passed.has(g.id));
 	// Null when nothing is pending: an all-approved route must not advertise an
 	// already-passed gate as "next" (#119) — consumers render a placeholder.

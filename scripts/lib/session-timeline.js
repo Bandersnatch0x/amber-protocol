@@ -86,8 +86,26 @@ function readSessionEvents(sessionDir, { strict = false } = {}) {
 	return readJSONL(filePath, { onCorrupt: strict ? "throw" : "skip" });
 }
 
+// Gates whose newest ruling is a gate_passed, folded in timeline order (the
+// file order is chronological): a gate_returned removes the gate, a later
+// gate_passed re-adds it. Everything absent from the set is pending — never
+// approved, or sent back by a return whose stale pass no longer counts.
+// Mirrors the ledger-side newest-ruling rule in
+// session-stage-runner.resolveCurrentStage.
+function resolvePassedGates(events) {
+	const passed = new Set();
+	for (const event of events) {
+		const gateId = event && event.data && (event.data.gateId || event.data.gate);
+		if (!gateId) continue;
+		if (event.type === "gate_passed") passed.add(gateId);
+		else if (event.type === "gate_returned") passed.delete(gateId);
+	}
+	return passed;
+}
+
 module.exports = {
 	TIMELINE_EVENT_TYPES,
 	appendSessionEvent,
 	readSessionEvents,
+	resolvePassedGates,
 };

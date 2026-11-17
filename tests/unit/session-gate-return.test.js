@@ -357,6 +357,143 @@ describe("gate return — ledger cursor derivation", () => {
 	});
 });
 
+describe("gate return — ruling integrity", () => {
+	before(() => stageRunner._setAdapterTableForTest([HOST_AGENT]));
+	after(() => stageRunner._restoreAdapterTableForTest());
+
+	const TWO_GATES = {
+		gates: [
+			{ id: "gate-one", type: "user-approval" },
+			{ id: "gate-two", type: "user-approval" },
+		],
+		stages: [
+			{ name: "s1", type: "verb", target: PIN, gateAfter: "gate-one" },
+			{ name: "s2", type: "verb", target: PIN, gateAfter: "gate-two" },
+		],
+	};
+
+	async function completeBothStages(root) {
+		for (const gate of ["gate-one", "gate-two"]) {
+			const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+			assert.equal(run.success, true);
+			await settleSessionRequest(
+				root,
+				"s1",
+				run.request.requestId,
+				{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+				bindOf(run),
+			);
+			const approved = await approveSession(root, { sessionId: "s1", gate, yes: true });
+			assert.equal(approved.exitCode, 0);
+		}
+	}
+
+	it("a gate id outside the route charset is refused and deletes nothing", async () => {
+		const { root, sessionDir } = makeVerbTarget({
+			gates: [{ id: "user-approval-check", type: "user-approval" }],
+			stages: [
+				{ name: "check", type: "verb", target: PIN, gateAfter: "../../../OUTSIDE" },
+				{ name: "second", type: "verb", target: PIN },
+			],
+		});
+		const sentinel = path.join(root, ".amber", "OUTSIDE.decision.json");
+		fs.mkdirSync(path.dirname(sentinel), { recursive: true });
+		fs.writeFileSync(sentinel, JSON.stringify({ decision: "approved" }));
+
+		const refused = await approveSession(root, {
+			sessionId: "s1",
+			gate: "../../../OUTSIDE",
+			returnTo: "check",
+			yes: true,
+		});
+		assert.equal(refused.exitCode, 1);
+		assert.match(refused.text, /valid gate id/);
+		assert.ok(fs.existsSync(sentinel), "the sentinel decision file must survive");
+		const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+		const kinds = fs.existsSync(ledgerPath)
+			? readLedgerRecords(sessionDir).map((record) => record.kind)
+			: [];
+		assert.ok(!kinds.includes("gate_returned"));
+	});
+
+	it("a second gate's return is recorded even when the cursor does not move", async () => {
+		const { root, sessionDir } = makeVerbTarget(TWO_GATES);
+		await completeBothStages(root);
+
+		const first = await approveSession(root, {
+			sessionId: "s1",
+			gate: "gate-one",
+			returnTo: "s1",
+			yes: true,
+		});
+		assert.equal(first.exitCode, 0);
+		const second = await approveSession(root, {
+			sessionId: "s1",
+			gate: "gate-two",
+			returnTo: "s1",
+			yes: true,
+		});
+		assert.equal(second.exitCode, 0);
+		assert.doesNotMatch(second.text, /already returned/);
+
+		const rulings = readLedgerRecords(sessionDir).filter(
+			(record) => record.kind === "gate_returned",
+		);
+		assert.deepStrictEqual(
+			rulings.map((record) => record.gateId).sort(),
+			["gate-one", "gate-two"],
+			"both rulings must be recorded",
+		);
+
+		// Re-approve only gate-one and redo s1: the rerun of s2 must stop at
+		// gate-two, whose recorded return voided its earlier pass.
+		const reapprove = await approveSession(root, {
+			sessionId: "s1",
+			gate: "gate-one",
+			yes: true,
+		});
+		assert.equal(reapprove.exitCode, 0);
+		assert.match(reapprove.text, /Pending gates: gate-two/);
+		const redo = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.equal(redo.success, true);
+		await settleSessionRequest(
+			root,
+			"s1",
+			redo.request.requestId,
+			{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+			bindOf(redo),
+		);
+		const next = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.equal(next.success, false);
+		assert.match(next.message, /gate-two/);
+	});
+
+	it("a replayed identical ruling converges to exactly one record", async () => {
+		const { root, sessionDir } = makeVerbTarget(TWO_GATES);
+		await completeBothStages(root);
+
+		const first = await approveSession(root, {
+			sessionId: "s1",
+			gate: "gate-two",
+			returnTo: "s1",
+			yes: true,
+		});
+		assert.equal(first.exitCode, 0);
+		const replay = await approveSession(root, {
+			sessionId: "s1",
+			gate: "gate-two",
+			returnTo: "s1",
+			yes: true,
+		});
+		assert.equal(replay.exitCode, 0);
+		assert.match(replay.text, /already returned/);
+		const rulings = readLedgerRecords(sessionDir).filter(
+			(record) => record.kind === "gate_returned" && record.gateId === "gate-two",
+		);
+		assert.equal(rulings.length, 1);
+	});
+});
+
 describe("gate return — legacy session path", () => {
 	it("verify works after a return on a non-verb route", async () => {
 		const dir = tmpRepo();
@@ -392,6 +529,49 @@ describe("gate return — legacy session path", () => {
 		});
 		assert.equal(returned.exitCode, 1);
 		assert.match(returned.text, /return-to/);
+	});
+
+	it("guidance surfaces see the returned gate as pending again", async () => {
+		const dir = tmpRepo();
+		const s = await startSession(dir, { goal: "add login feature", route: "feature-standard" });
+		const sid = s.sessionId;
+		await verifySession(dir, { sessionId: sid, stage: "capture" });
+		await approveSession(dir, { sessionId: sid, gate: "user-approval-plan", yes: true });
+		await approveSession(dir, {
+			sessionId: sid,
+			gate: "user-approval-plan",
+			returnTo: "capture",
+			yes: true,
+		});
+
+		const { resolvePendingGate } = require("../../scripts/lib/core/lifecycle");
+		const info = resolvePendingGate(dir, sid);
+		assert.equal(info.pendingGateId, "user-approval-plan");
+		assert.equal(info.pendingCount, 2);
+	});
+
+	it("a legacy redo advances currentStage instead of leaving it rewound", async () => {
+		const dir = tmpRepo();
+		const s = await startSession(dir, { goal: "add login feature", route: "feature-standard" });
+		const sid = s.sessionId;
+		const sessionDir = path.join(dir, ".amber", "sessions", sid);
+		const manifest = readManifest(sessionDir);
+		manifest.completedStages = ["capture", "plan"];
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(manifest));
+
+		await approveSession(dir, {
+			sessionId: sid,
+			gate: "user-approval-implement",
+			returnTo: "capture",
+			yes: true,
+		});
+		assert.equal(readManifest(sessionDir).currentStage, "capture");
+
+		const redo = await verifySession(dir, { sessionId: sid, stage: "capture" });
+		assert.equal(redo.exitCode, 0);
+		const after = readManifest(sessionDir);
+		assert.deepStrictEqual(after.completedStages, ["capture"]);
+		assert.equal(after.currentStage, "plan");
 	});
 });
 
