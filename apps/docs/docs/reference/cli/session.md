@@ -40,7 +40,7 @@ amber session <start|status|list|abort|continue|complete-check|complete|verify|a
 | Subcommand | Description |
 | --- | --- |
 | <code>abort</code> | Set session status to aborted, write abort event, cleanup worktree. |
-| <code>approve</code> | Record a gate_passed event so complete-check sees approval evidence. With the named stage (the gate's own stage or earlier), the gate goes back to pending, and the returned stages are redone before the gate re-approves. |
+| <code>approve</code> | Record a gate_passed event so complete-check sees approval evidence. A return ruling (--return-to &lt;stage&gt;) instead rewinds the session to before the named stage (the gate's own stage or earlier), the gate goes back to pending, and the returned stages are redone before the gate re-approves. |
 | <code>complete</code> | Mark a session completed (governance terminal state). Requires complete-check to pass. |
 | <code>complete-check</code> | Report whether a session has enough evidence to be treated as complete. |
 | <code>continue</code> | Continue a paused or incomplete session from its current stage. |
@@ -79,8 +79,8 @@ Subcommands:
       With --execute, runs --command and records the real exit code (default 5-minute
       budget; raise it for long suites, capped at 60).
   approve --session <id> [--gate <gate-id>] [--return-to <stage>]
-      Record a gate_passed event so complete-check sees approval evidence. With
-      --return-to, record a return ruling instead: the session rewinds to before
+      Record a gate_passed event so complete-check sees approval evidence. A
+      return ruling (--return-to <stage>) instead rewinds the session to before
       the named stage (the gate's own stage or earlier), the gate goes back to
       pending, and the returned stages are redone before the gate re-approves.
   lease --session <id> --owner-id <agent> --token-hash <hash>

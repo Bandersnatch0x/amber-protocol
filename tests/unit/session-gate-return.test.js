@@ -395,6 +395,28 @@ describe("gate return — legacy session path", () => {
 	});
 });
 
+describe("gate return — interactive ruling", () => {
+	before(() => stageRunner._setAdapterTableForTest([HOST_AGENT]));
+	after(() => stageRunner._restoreAdapterTableForTest());
+
+	it("a return without --yes in a non-interactive shell is refused", async () => {
+		const { root } = makeVerbTarget({
+			gates: [{ id: "user-approval-check", type: "user-approval" }],
+			stages: [
+				{ name: "check", type: "verb", target: PIN, gateAfter: "user-approval-check" },
+				{ name: "second", type: "verb", target: PIN },
+			],
+		});
+		const returned = await approveSession(root, {
+			sessionId: "s1",
+			gate: "user-approval-check",
+			returnTo: "check",
+		});
+		assert.equal(returned.exitCode, 1);
+		assert.match(returned.text, /needs human decision/);
+	});
+});
+
 describe("gate return — completion check", () => {
 	it("a gate_returned after gate_passed voids the approval evidence", async () => {
 		const { root, sessionDir } = makeVerbTarget();

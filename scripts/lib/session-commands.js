@@ -927,8 +927,8 @@ async function verifySession(projectRoot, options) {
 // never edited) and the gate goes back to pending — a later gate_passed
 // re-arms it. Repeated returns converge: a second return whose projection
 // equals the current cursor appends nothing and says so.
-function returnFromGate(projectRoot, manifest, sessionDir, route, ruling) {
-	const { gateId, returnTo, decidedBy, gateOwnerOf } = ruling;
+async function returnFromGate(projectRoot, manifest, sessionDir, route, ruling) {
+	let { gateId, returnTo, decidedBy, gateOwnerOf } = ruling;
 	const stages = (route && Array.isArray(route.stages) ? route.stages : []).filter(Boolean);
 	const owner = gateOwnerOf(gateId);
 	if (!owner) {
@@ -954,19 +954,24 @@ function returnFromGate(projectRoot, manifest, sessionDir, route, ruling) {
 		);
 	}
 
-	// A return is a human ruling, same identity gate as an approval.
+	// A return is a human ruling, same identity gate as an approval: interactive
+	// shells confirm with a prompt, non-interactive ones need --yes.
 	if (!decidedBy) {
 		if (process.stdin.isTTY) {
+			const ok = await promptYesNo(
+				`Return session to stage "${returnTo}" (gate "${gateId}" goes back to pending)? [y/N] `,
+			);
+			if (!ok) {
+				return result(`Return declined for gate "${gateId}".`, 1);
+			}
+			decidedBy = "user (interactive)";
+		} else {
 			return result(
-				`Interactive return is not supported yet; pass --yes to record the return ruling.`,
+				`gate "${gateId}" return needs human decision.\n` +
+					"Run this in an interactive terminal, or pass --yes to record it non-interactively.",
 				1,
 			);
 		}
-		return result(
-			`gate "${gateId}" return needs human decision.\n` +
-				"Run this in an interactive terminal, or pass --yes to record it non-interactively.",
-			1,
-		);
 	}
 
 	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
@@ -1096,7 +1101,7 @@ async function approveSession(projectRoot, options) {
 		// A return ruling (`--return-to <stage>`) rewinds the session instead of
 		// approving the gate. Target validation lives in returnFromGate.
 		if (options.returnTo) {
-			const ruling = returnFromGate(projectRoot, manifest, sessionDir, route, {
+			const ruling = await returnFromGate(projectRoot, manifest, sessionDir, route, {
 				gateId: resolvedGateId,
 				returnTo: options.returnTo,
 				decidedBy: options.yes ? "flag (--yes)" : null,
