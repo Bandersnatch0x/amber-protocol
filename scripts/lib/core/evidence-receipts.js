@@ -29,6 +29,7 @@ const {
 	chainHash,
 	appendWithinCeiling: sharedAppendWithinCeiling,
 	isPlainObject,
+	isNullableNonEmptyString,
 } = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { defineVerdictSurface } = require("./verdict-surface");
@@ -164,10 +165,6 @@ const PRINCIPAL_SNAPSHOT_FIELDS = Object.freeze([
 
 function evidenceCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
-}
-
-function isNullableNonEmptyString(value) {
-	return value === null || (typeof value === "string" && value.length > 0);
 }
 
 /**

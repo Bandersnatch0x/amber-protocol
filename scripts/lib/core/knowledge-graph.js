@@ -59,7 +59,7 @@ const path = require("node:path");
 
 const { compileSchema, formatErrors } = require("./schema-contract");
 const { typedError } = require("./error-catalog");
-const { resolvePathWithin } = require("./fs-utils");
+const { resolvePathWithin, toPortablePath } = require("./fs-utils");
 const { extractCodeCorpus, typescriptVersion } = require("./code-graph");
 
 const SCHEMA_VERSION = "2";
@@ -87,10 +87,6 @@ function readTextIfPresent(file) {
 		if (err.code === "ENOENT") return null;
 		throw typedError(ERROR_CODES.source, `could not read ${file}: ${err.message}`);
 	}
-}
-
-function toPosix(p) {
-	return String(p).replace(/\\/g, "/");
 }
 
 function slugify(text) {
@@ -267,7 +263,7 @@ function parseFeatures(targetRoot) {
 			featureId: feature.id,
 			title: feature.title || feature.id,
 			status: feature.status || null,
-			paths: Array.isArray(feature.paths) ? feature.paths.filter(Boolean).map(toPosix) : [],
+			paths: Array.isArray(feature.paths) ? feature.paths.filter(Boolean).map(toPortablePath) : [],
 			// The declaring text scanned for ADR references: the entry's own
 			// human-authored fields, never evidence timestamps.
 			text: [
@@ -516,7 +512,7 @@ function detectActualPath(targetRoot, declared) {
 	if (!fs.existsSync(parentAbs)) return null;
 	const base = path.basename(trimmed);
 	const siblings = fs.readdirSync(parentAbs).sort();
-	const parentRel = toPosix(path.dirname(trimmed));
+	const parentRel = toPortablePath(path.dirname(trimmed));
 	const relOf = (name) => (parentRel === "." ? name : `${parentRel}/${name}`);
 
 	if (declared.endsWith("/")) {
@@ -688,7 +684,7 @@ function committedContextPagesBySource(targetRoot) {
 	}
 	const bySource = new Map();
 	for (const row of manifest.rows || []) {
-		if (row.sourcePath && row.pageId) bySource.set(toPosix(row.sourcePath), row.pageId);
+		if (row.sourcePath && row.pageId) bySource.set(toPortablePath(row.sourcePath), row.pageId);
 	}
 	return bySource;
 }

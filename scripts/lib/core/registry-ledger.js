@@ -332,6 +332,17 @@ function isNonEmptyString(value) {
 	return typeof value === "string" && value.trim().length > 0;
 }
 
+// Null is a legitimate "not set" value in registry records; an empty string
+// is not. Whitespace-only is accepted — this mirrors the three registries
+// that previously each declared this guard.
+function isNullableNonEmptyString(value) {
+	return value === null || (typeof value === "string" && value.length > 0);
+}
+
+function isPositiveInt(value) {
+	return Number.isInteger(value) && value > 0;
+}
+
 function quotedList(values) {
 	return values.map((value) => JSON.stringify(value)).join(", ");
 }
@@ -484,6 +495,8 @@ module.exports = {
 	isPlainObject,
 	isStrictPlainObject,
 	isNonEmptyString,
+	isNullableNonEmptyString,
+	isPositiveInt,
 	quotedList,
 	closedFieldProblem,
 	unknownFieldProblem,

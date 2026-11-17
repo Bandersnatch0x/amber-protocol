@@ -147,6 +147,19 @@ function readFailureEnvelope(args, err, fallbackCode) {
 	return { ...failure.result, exitCode: failure.exitCode };
 }
 
+// The write-path sibling of readFailureEnvelope. A write has no read target
+// to report, and it omits `code` entirely when the error carries no
+// amberCode, so it is not readFailureEnvelope under another name.
+function writeFailure(err) {
+	return {
+		text: "",
+		errors: [err.message || String(err)],
+		warnings: [],
+		exitCode: 1,
+		...(err.amberCode ? { code: err.amberCode } : {}),
+	};
+}
+
 // Grammar: <identity>@<revision> — one committed artifact revision pin.
 function parseRevisionPin(raw, flag, example) {
 	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
@@ -173,5 +186,6 @@ module.exports = {
 	missingValueFlag,
 	missingValueFlagError,
 	readFailureEnvelope,
+	writeFailure,
 	parseRevisionPin,
 };

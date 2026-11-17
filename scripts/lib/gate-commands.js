@@ -14,33 +14,22 @@
 // the Envelope's extensions carrier; this command only evaluates and reads.
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	invalidArg,
+	missingValueFlag,
+	resolveTarget,
+	readFailure,
+	writeFailure,
+} = require("./command-helpers");
 
 // The readFailure FALLBACK for untyped crashes at the show/list seams, not
 // a corruption verdict (same naming discipline as the approval command).
 const READ_FAILURE_CODE = "AMBER_E_GATE_NOT_FOUND";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-/**
- * The evaluate writer propagates typed throws for environment-level
- * misconfiguration — a garbage AMBER_GATE_MAX_OUTCOME_BYTES override is
- * resolvePositiveIntCeiling's typed AMBER_E_INVALID_ARG, never a silent
- * default. The CLI seam converts a typed throw into the standard result
- * envelope so the public surface keeps its stable code and exit code.
- */
-function writeFailure(err) {
-	return {
-		text: "",
-		errors: [err.message || String(err)],
-		warnings: [],
-		exitCode: 1,
-		...(err.amberCode ? { code: err.amberCode } : {}),
-	};
-}
-
+// Environment-level misconfiguration (e.g. a garbage AMBER_GATE_MAX_OUTCOME_BYTES
+// override) surfaces from resolvePositiveIntCeiling as a typed
+// AMBER_E_INVALID_ARG and converts through the shared writeFailure — never a
+// silent default.
 /**
  * A value flag as the LAST argv token parses to `undefined`, which is
  * indistinguishable from "not declared" further down — a trailing `--gate`
@@ -50,21 +39,15 @@ function writeFailure(err) {
  * AMBER_E_INVALID_ARG here at the gate command seam (same discipline as
  * the approval and evidence commands).
  */
-function missingValueFlag(args) {
-	const valueFlags = [
-		["gate", "--gate"],
-		["subject", "--subject"],
-		["revision", "--revision"],
-		["now", "--now"],
-		["index", "--index"],
-		["verdict", "--verdict"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["gate", "--gate"],
+	["subject", "--subject"],
+	["revision", "--revision"],
+	["now", "--now"],
+	["index", "--index"],
+	["verdict", "--verdict"],
+	["target", "--target"],
+];
 
 /**
  * An explicitly passed-but-empty --target ("", or whitespace) is a malformed
@@ -154,7 +137,7 @@ const gateDispatch = defineCliCommand({
 	handlers: {
 		evaluate: (args) => {
 			const { evaluateGate } = require("./core/gate-evaluation");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared input would otherwise be dropped silently`,
@@ -199,7 +182,7 @@ const gateDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showGateOutcome } = require("./core/gate-evaluation");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -242,7 +225,7 @@ const gateDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listGateOutcomes } = require("./core/gate-evaluation");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

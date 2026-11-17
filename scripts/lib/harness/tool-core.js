@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Harness Tool registry core (F067 H1; Harness v2 §12/§25/§30).
 //
@@ -53,10 +54,6 @@ function toolFileForCreate(targetRoot, toolId) {
 
 function toolFileForRead(targetRoot, toolId) {
 	return statePath(targetRoot, "harness", "tools", `${safeId(toolId)}.json`);
-}
-
-function safeId(toolId) {
-	return String(toolId).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
 // The capability pin resolves ONLY through the registries the existing gates

@@ -4,7 +4,7 @@
 // Envelope, routing, and exit codes are owned by defineCommand (F039).
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const { invalidArg, missingValueFlag, resolveTarget, readFailure } = require("./command-helpers");
 const {
 	ARTIFACT_TYPES,
 	DECISION_KINDS,
@@ -52,29 +52,23 @@ function parseRevisionFlag(raw, flag) {
  * would otherwise parse as undefined and silently fall back to the CWD at
  * resolveTarget — the same present-but-undefined check catches it.
  */
-function missingValueFlag(args) {
-	const valueFlags = [
-		["type", "--type"],
-		["id", "--id"],
-		["body", "--body"],
-		["provenance", "--provenance"],
-		["expectedHead", "--expected-head"],
-		["supersedesRevision", "--supersedes-revision"],
-		["idempotencyKey", "--idempotency-key"],
-		["transition", "--transition"],
-		["scope", "--scope"],
-		["traceVal", "--trace"],
-		["extensionVal", "--extension"],
-		["revision", "--revision"],
-		["target", "--target"],
-		["decisionKind", "--decision-kind"],
-		["principal", "--principal"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["type", "--type"],
+	["id", "--id"],
+	["body", "--body"],
+	["provenance", "--provenance"],
+	["expectedHead", "--expected-head"],
+	["supersedesRevision", "--supersedes-revision"],
+	["idempotencyKey", "--idempotency-key"],
+	["transition", "--transition"],
+	["scope", "--scope"],
+	["traceVal", "--trace"],
+	["extensionVal", "--extension"],
+	["revision", "--revision"],
+	["target", "--target"],
+	["decisionKind", "--decision-kind"],
+	["principal", "--principal"],
+];
 
 /**
  * Parse repeatable --trace flags (ticket 03, #220):
@@ -166,10 +160,6 @@ function parseTraceFlags(rawList) {
 		});
 	}
 	return { value: traces };
-}
-
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
 }
 
 /**
@@ -289,7 +279,7 @@ const artifactDispatch = defineCliCommand({
 	handlers: {
 		admit: (args) => {
 			const { admitArtifact } = require("./core/canonical-artifacts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated) {
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line, so the declared precondition would otherwise be dropped silently`,
@@ -358,7 +348,7 @@ const artifactDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showArtifact } = require("./core/canonical-artifacts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -395,7 +385,7 @@ const artifactDispatch = defineCliCommand({
 		},
 		list: (args) => {
 			const { listArtifacts } = require("./core/canonical-artifacts");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,

@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Context Firewall core (F069 H3a; Harness v2 §11/§32).
 //
@@ -56,10 +57,6 @@ function grantFileForCreate(targetRoot, grantId) {
 
 function grantFileForRead(targetRoot, grantId) {
 	return statePath(targetRoot, "harness", "context-grants", `${safeId(grantId)}.json`);
-}
-
-function safeId(id) {
-	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
 function prefixProblem(prefix) {

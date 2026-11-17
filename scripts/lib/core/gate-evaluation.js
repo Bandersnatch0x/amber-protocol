@@ -65,7 +65,13 @@
 
 const { typedError } = require("./error-catalog");
 const { deletionTombstones } = require("./retention-registry");
-const { GENESIS_HASH, chainHash, isPlainObject, quotedList } = require("./registry-ledger");
+const {
+	GENESIS_HASH,
+	chainHash,
+	isPlainObject,
+	quotedList,
+	isPositiveInt,
+} = require("./registry-ledger");
 const { defineLedgerFamily } = require("./ledger-family");
 const { defineVerdictSurface } = require("./verdict-surface");
 const { parseTimestamp } = require("./principal-registry");
@@ -210,10 +216,6 @@ function outcomeCorrupt(message) {
 
 function isNonEmptyString(value) {
 	return typeof value === "string" && value.length > 0;
-}
-
-function isPositiveInt(value) {
-	return Number.isInteger(value) && value > 0;
 }
 
 function evaluationClockValue(input, opts) {

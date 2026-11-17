@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Harness Attempt core (F072 H4; proposal §4.4/§33/§49).
 //
@@ -32,10 +33,6 @@ const CODE_INVALID_ARG = "AMBER_E_INVALID_ARG";
 // F070 distinction carried verbatim; both are terminal.
 const ATTEMPT_STATES = Object.freeze(["running", "completed", "failed", "refused"]);
 const FINAL_ATTEMPT_STATES = new Set(["completed", "failed", "refused"]);
-
-function safeId(id) {
-	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
-}
 
 function attemptsDirForCreate(targetRoot, runId) {
 	return statePathForCreate(targetRoot, "harness", "attempts", safeId(runId));

@@ -5,51 +5,41 @@
 // and touches no git state — preparation is a pure governance write.
 
 const { defineCliCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const { invalidArg, missingValueFlag, resolveTarget, readFailure } = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
 const READ_FAILURE_CODE = "AMBER_E_RELEASE_CORRUPT";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
-
-function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["commit", "--commit"],
-		["changeArtifactVal", "--change-artifact"],
-		["evidenceItemVal", "--evidence-item"],
-		["reviewLogic", "--review-logic"],
-		["reviewSecurity", "--review-security"],
-		["reviewSpec", "--review-spec"],
-		["environment", "--environment"],
-		["releasePolicy", "--release-policy"],
-		["runner", "--runner"],
-		["runnerVersion", "--runner-version"],
-		["capability", "--capability"],
-		["capabilityVersion", "--capability-version"],
-		["credential", "--credential"],
-		["rollback", "--rollback"],
-		["approval", "--approval"],
-		["decisionIdentity", "--decision-identity"],
-		["body", "--body"],
-		["traceVal", "--trace"],
-		["scope", "--scope"],
-		["rehearsal", "--rehearsal"],
-		["branchProtection", "--branch-protection"],
-		["codeOwner", "--code-owner"],
-		["releaseManager", "--release-manager"],
-		["releaseGateIndex", "--release-gate-index"],
-		["environmentGateIndex", "--environment-gate-index"],
-		["requestHash", "--request-hash"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["commit", "--commit"],
+	["changeArtifactVal", "--change-artifact"],
+	["evidenceItemVal", "--evidence-item"],
+	["reviewLogic", "--review-logic"],
+	["reviewSecurity", "--review-security"],
+	["reviewSpec", "--review-spec"],
+	["environment", "--environment"],
+	["releasePolicy", "--release-policy"],
+	["runner", "--runner"],
+	["runnerVersion", "--runner-version"],
+	["capability", "--capability"],
+	["capabilityVersion", "--capability-version"],
+	["credential", "--credential"],
+	["rollback", "--rollback"],
+	["approval", "--approval"],
+	["decisionIdentity", "--decision-identity"],
+	["body", "--body"],
+	["traceVal", "--trace"],
+	["scope", "--scope"],
+	["rehearsal", "--rehearsal"],
+	["branchProtection", "--branch-protection"],
+	["codeOwner", "--code-owner"],
+	["releaseManager", "--release-manager"],
+	["releaseGateIndex", "--release-gate-index"],
+	["environmentGateIndex", "--environment-gate-index"],
+	["requestHash", "--request-hash"],
+	["target", "--target"],
+];
 
 function targetValue(args) {
 	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
@@ -107,7 +97,7 @@ const releaseDispatch = defineCliCommand({
 	handlers: {
 		prepare: (args) => {
 			const { prepareReleaseCandidate } = require("./core/release-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -178,7 +168,7 @@ const releaseDispatch = defineCliCommand({
 		},
 		authorize: (args) => {
 			const { authorizeRelease } = require("./core/release-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -238,7 +228,7 @@ const releaseDispatch = defineCliCommand({
 		rollback: (args) => transactionHandler(args, "rollbackRelease"),
 		transactions: (args) => {
 			const { listReleaseTransactions } = require("./core/release-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -260,7 +250,7 @@ const releaseDispatch = defineCliCommand({
 		},
 		status: (args) => {
 			const { releaseStatus } = require("./core/release-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -288,7 +278,7 @@ const releaseDispatch = defineCliCommand({
 		},
 		receipts: (args) => {
 			const { releaseReceipt } = require("./core/release-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -308,7 +298,7 @@ const releaseDispatch = defineCliCommand({
 		},
 		show: (args) => {
 			const { showReleaseCandidate } = require("./core/release-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -337,7 +327,7 @@ const releaseDispatch = defineCliCommand({
 		list: (args) => {
 			const { listReleaseCandidates } = require("./core/release-registry");
 			const { ENVIRONMENTS } = require("./core/runner-registry");
-			const truncated = missingValueFlag(args);
+			const truncated = missingValueFlag(args, VALUE_FLAGS);
 			if (truncated)
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
@@ -366,7 +356,7 @@ const releaseDispatch = defineCliCommand({
 // lifecycle rules apply per operation.
 function transactionHandler(args, verb) {
 	const core = require("./core/release-registry");
-	const truncated = missingValueFlag(args);
+	const truncated = missingValueFlag(args, VALUE_FLAGS);
 	if (truncated)
 		return invalidArg(`${truncated} requires a value; it was the last token on the command line`);
 	const target = targetValue(args);

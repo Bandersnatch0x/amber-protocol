@@ -1,6 +1,7 @@
 "use strict";
 
 const { typedError } = require("../core/error-catalog");
+const { safeId } = require("./ids");
 
 // Execution Contract registry core (F068 H2a; Harness v2 §13/§31).
 //
@@ -59,10 +60,6 @@ function contractFileForCreate(targetRoot, contractId) {
 
 function contractFileForRead(targetRoot, contractId) {
 	return statePath(targetRoot, "harness", "execution-contracts", `${safeId(contractId)}.json`);
-}
-
-function safeId(id) {
-	return String(id).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
 // A prefix can never escape the repository: relative, posix-style, no
