@@ -205,13 +205,22 @@ function doctorMemoryRules(targetRoot) {
 	}
 	for (const entry of entries) {
 		if (!["proposal", "active", "superseded"].includes(entry.status)) continue;
-		if (!ingestedIds.has(entry.entryId)) {
+		// §5.5: the ratification track enters the ledger with no prior
+		// request/ingest/approve, so the ingest and approval trails cannot
+		// exist for it. Its book event is the whole trail.
+		const ratified =
+			entry.origin === "human-direct-ratification" &&
+			bookedEntryIds.has(entry.entryId) &&
+			entry.bookedSurface &&
+			entry.bookedSurface.path === "MEMORY.md";
+		if (!ingestedIds.has(entry.entryId) && !ratified) {
 			errors.push(
 				`Memory entry ${entry.entryId} (${entry.status}) has no memory-ingest trail in events.jsonl — registry and ledger disagree (fail-closed).`,
 			);
 		}
 		if (
 			entry.status === "active" &&
+			!ratified &&
 			(!approvedEntryIds.has(entry.entryId) || !bookedEntryIds.has(entry.entryId))
 		) {
 			errors.push(
