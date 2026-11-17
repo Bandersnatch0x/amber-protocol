@@ -671,7 +671,10 @@ function bookRatified(targetRoot, args, surfacePath, normHash, now, warnings) {
 		);
 	}
 	const knowledgeKind = args.knowledgeKind || "unspecified";
-	const raw = readMemoryMd(targetRoot);
+	// Provenance sources bind through context-hash, the normalizer ingest uses
+	// and doctor rule 2 re-hashes with. The surface registration below keeps
+	// the MEMORY.md normalization, which is a different contract.
+	const sourceHash = hashFile(path.join(targetRoot, surfacePath));
 	const candidate = withEntryId({
 		schemaVersion: SCHEMA_VERSION,
 		claim: String(claim),
@@ -682,8 +685,8 @@ function bookRatified(targetRoot, args, surfacePath, normHash, now, warnings) {
 				{
 					kind: "surface",
 					ref: MEMORY_MD,
-					rawHash: sha256(raw),
-					normHash,
+					rawHash: sourceHash.rawHash,
+					normHash: sourceHash.normHash,
 					mutable: true,
 				},
 			],

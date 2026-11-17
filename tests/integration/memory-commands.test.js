@@ -684,6 +684,15 @@ test("ratification track: book --ratify --claim creates an active entry directly
 	const status = run(target, "status");
 	assert.equal(status.result.entries.proposal, 0);
 
+	// Doctor rules 1 and 2 must accept the ratification track as specified:
+	// §5.5 says a ratified entry has no prior request/ingest/approve, and its
+	// provenance source binds through context-hash (the normalizer ingest uses).
+	// Booking the surface hash, or demanding an ingest trail, flags every
+	// ratified entry on the next doctor run.
+	const health = doctorMemoryRules(target);
+	assert.deepEqual(health.errors, [], health.errors.join("\n"));
+	assert.equal(entry.status, "active", "doctor must not demote a fresh ratification");
+
 	// Missing claim is refused; a duplicate claim is idempotent-refused.
 	const noClaim = run(target, "book", { ratify: true });
 	assert.equal(noClaim.exitCode, 1);
