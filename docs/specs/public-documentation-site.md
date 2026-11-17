@@ -16,9 +16,11 @@ tags: [documentation, public-docs, docusaurus, acceptance, verification]
 > `docs/specs/` records rather than only in the local issue store. The
 > implementation (the Docusaurus site under `apps/docs/` and its 12-gate
 > verifier `scripts/verify-public-docs.js`) is present and mechanically
-> verified (`npm run docs:verify` = 12/12). Layer-1 acceptance rows 8 and 9 are
-> real mechanical gates (issues/0063); rows 7 and 10 depend on a browser+axe CI
-> decision, and the Layer-2 reader trials remain human (issues/0062).
+> verified (`npm run docs:verify` = 14/14). Layer-1 acceptance rows 6–10 are
+> all real mechanical gates (issues/0063, closed: rows 7/10 landed as the
+> real-browser `docs:verify:browser` gate in both themes). The Layer-2 reader
+> trials remain human and unrun (issues/0062; protocol at
+> `docs/quality/0020-layer2-trial-protocol.md`).
 
 ## Problem Statement
 
