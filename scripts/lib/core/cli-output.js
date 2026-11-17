@@ -35,6 +35,7 @@ const FLAG_SPECS = {
 	"--token-hash": { key: "tokenHash" },
 	"--lease-fence": { key: "leaseFence" },
 	"--gate": { key: "gate" },
+	"--return-to": { key: "returnTo" },
 	"--stage": { key: "stage" },
 	"--command": { key: "command" },
 	"--result": { key: "result" },
