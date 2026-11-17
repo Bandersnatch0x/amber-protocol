@@ -1493,7 +1493,14 @@
 			"user_visible_behavior": "All JSON-schema validation routes through one cached, format-registered schema-contract adapter; no module instantiates Ajv directly",
 			"status": "accepted",
 			"verification": ["node --test tests/unit/schema-contract.test.js", "npm test"],
-			"evidence": [{ "command": "", "result": "", "date": "2026-08-25", "notes": "" }],
+			"evidence": [
+				{
+					"command": "",
+					"result": "",
+					"date": "2026-08-25",
+					"notes": ""
+				}
+			],
 			"notes": [],
 			"paths": [
 				"scripts/lib/core/schema-contract.js",
@@ -3547,6 +3554,54 @@
 				"surfaces": ["docs/specs/F089-memory-ungated-admission.md"],
 				"owner": "standard"
 			}
+		},
+		{
+			"id": "F090",
+			"priority": 90,
+			"area": "session",
+			"title": "Gate return: a gate ruling sends work back to a stage",
+			"user_visible_behavior": "amber session approve --return-to <stage> records a return ruling instead of an approval: the session ledger cursor rewinds to before the named stage (the gate's owning stage or earlier), the gate goes back to pending so the rerun cannot pass on a stale approval, the manifest projection follows, and complete-check treats approval evidence as voided until the gate re-approves. The route schema is unchanged; the ruling is made by the human at the gate.",
+			"status": "passing",
+			"verification": [
+				"A settle, return, re-approve, redo, next sequence converges: node --test tests/unit/session-gate-return.test.js (12 tests)",
+				"Pre-return gate rules unchanged: node --test tests/unit/session-stage-runner.test.js (42 tests)",
+				"Web schema parity and gate status rendering: npm run test --prefix apps/web (812 tests)"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/session-gate-return.test.js tests/unit/session-stage-runner.test.js",
+					"result": "54 tests passed, 0 failed",
+					"date": "2026-11-17",
+					"notes": "Behavior suite for the return ruling plus the adjacent stage-runner regression suite."
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/session-stage-runner.js",
+				"scripts/lib/session-commands.js",
+				"scripts/lib/completion-check.js",
+				"scripts/lib/session-timeline.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/core/cli-output.js",
+				"schemas/timeline-event.schema.json",
+				"tests/unit/session-gate-return.test.js",
+				"apps/web/server/types/session-events.ts",
+				"apps/web/server/lib/types/gate.ts",
+				"apps/web/server/lib/gate-reader.ts",
+				"apps/web/server/routers/gate.ts",
+				"apps/web/src/routes/gates.tsx",
+				"apps/web/src/lib/i18n.tsx",
+				"apps/web/src/features/gates/gate-feedback.ts",
+				"docs/specs/F090-gate-return.md",
+				"docs/plans/F090-gate-return.md",
+				"docs/adr/0111-gate-return-rewinds-the-session.md",
+				"docs/CLI_REFERENCE.md",
+				"apps/docs/docs/reference/cli/session.md",
+				"apps/docs/docs-manifest.json",
+				"CHANGELOG.md"
+			],
+			"updated": "2026-11-17"
 		}
 	]
 }

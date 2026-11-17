@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- gate return (F090): `amber session approve --return-to <stage>` records a return ruling instead of
+  an approval. The session ledger cursor rewinds to before the named stage (the gate's owning stage
+  or earlier), the gate goes back to pending — a rerun cannot pass on the stale `gate_passed` — the
+  manifest projection follows the derivation, and `complete-check` treats approval evidence as
+  voided until the gate re-approves. The ledger stays append-only; the rewind is derived from the
+  `gate_returned` record. The route schema is unchanged; the ruling is made by the human at the
+  gate. The web viewer renders the `returned` gate status and accepts its timeline event.
 - remove the memory identity gate and the γ admission limit (F089): `amber memory request`, `ingest`
   and `book` no longer refuse a non-TTY invocation, and `ingest` admits every eligible candidate in
   the request. The five-per-168-hour quota, the K1/K2/K3 mixed-pool ordering, the provenance-only
