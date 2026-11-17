@@ -429,3 +429,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F089-Remove-the-memory-identity-gate-and-gamma-limit.md`
 - Review status: ready
 - Feature: F089 status → accepted in feature_list.json
+
+## 2026-11-17 docs/plans/F090-gate-return.md
+
+- Plan: `docs/plans/F090-gate-return.md`
+- Review status: ready
+- Feature: F090 status → accepted in feature_list.json

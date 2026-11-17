@@ -1493,14 +1493,7 @@
 			"user_visible_behavior": "All JSON-schema validation routes through one cached, format-registered schema-contract adapter; no module instantiates Ajv directly",
 			"status": "accepted",
 			"verification": ["node --test tests/unit/schema-contract.test.js", "npm test"],
-			"evidence": [
-				{
-					"command": "",
-					"result": "",
-					"date": "2026-08-25",
-					"notes": ""
-				}
-			],
+			"evidence": [{ "command": "", "result": "", "date": "2026-08-25", "notes": "" }],
 			"notes": [],
 			"paths": [
 				"scripts/lib/core/schema-contract.js",
@@ -3561,7 +3554,7 @@
 			"area": "session",
 			"title": "Gate return: a gate ruling sends work back to a stage",
 			"user_visible_behavior": "amber session approve --return-to <stage> records a return ruling instead of an approval: the session ledger cursor rewinds to before the named stage (the gate's owning stage or earlier), the gate goes back to pending so the rerun cannot pass on a stale approval, the manifest projection follows, and complete-check treats approval evidence as voided until the gate re-approves. The route schema is unchanged; the ruling is made by the human at the gate.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"A settle, return, re-approve, redo, next sequence converges: node --test tests/unit/session-gate-return.test.js (18 tests)",
 				"Per-ruling convergence pinned: a second gate return is recorded when the cursor does not move, a replayed identical ruling appends nothing (session-gate-return.test.js)",
@@ -3603,7 +3596,13 @@
 				"apps/docs/docs-manifest.json",
 				"CHANGELOG.md"
 			],
-			"updated": "2026-11-17"
+			"updated": "2026-11-17",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-11-17",
+				"surfaces": ["docs/specs/F090-gate-return.md"],
+				"owner": "skill"
+			}
 		}
 	]
 }
