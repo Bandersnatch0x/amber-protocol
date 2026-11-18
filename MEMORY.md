@@ -34,10 +34,8 @@ An entry runs from one `### ` line to the next `### ` line (or end of file).
 `amber memory status` reports the `### ` lines **inside `## Entries`** and the
 whole file's normalized byte size (CRLF→LF, no BOM, no trailing whitespace) as
 observation only. Nothing caps those numbers: this creed and the approval gate
-curate growth, and gamma still limits **new knowledge** to five admissions per
-168 hours. Refreshing an existing entry's provenance is exempt: a replacement
-that keeps the same claim, knowledge kind and target surface as its real
-predecessor, and actually changes its source bindings, does not consume that
+curate growth. Admission is ungated since F089 — a non-interactive request, a
+single-request batch ingest, and provenance refreshes all pass without a rate
 budget — it still needs the human approve and book steps.
 
 After editing entries by hand, run `amber memory book` to ratify the change so

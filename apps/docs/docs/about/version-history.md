@@ -9,11 +9,19 @@ description: "Curated version history, breaking changes, support matrix, and not
 
 This page provides the canonical version identity, environment support matrix, and migration guidance for Amber Protocol releases.
 
-## Current Release: `v2.0.4`
+## Current Release: `v2.1.0`
 
-The current release line is **v2.0.4** — a patch release on the 2.0 line (2.0.0 was the breaking
-release: it removed the `agent`, `team`, and `adoption` command families; see the upgrade table
-in the repository README).
+The current release line is **v2.1.0** — a minor feature release on the 2.0 line. The headline
+change is gate return (F090): `amber session approve --return-to <stage>` records a return
+ruling that rewinds a governed session to a chosen stage, with the gate re-armed and guidance
+surfaces (`amber next`, the breadcrumb) counting a returned gate as pending again. The memory
+pipeline's admission gates are retired (F086/F089): `memory status` no longer reports the
+`alpha`/`gamma` objects and three memory error codes are gone — this is a breaking change to
+the memory status JSON and the `memory-ingest` event payload, published on the minor line
+under an explicit owner semver waiver recorded in the CHANGELOG. Hosts that parsed the retired
+objects or codes should read the F086/F089 notes in the CHANGELOG before upgrading. Context
+loads now enforce plan-declared required context (F084) and refuse an unbound `--plan`/`--role`
+pair (F085). The full list is in the repository CHANGELOG.
 
 ### Environment Compatibility Matrix
 

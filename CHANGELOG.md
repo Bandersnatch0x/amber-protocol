@@ -5,7 +5,7 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-18
 
 ### Changed
 
@@ -43,6 +43,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged. The `memory-ingest` event gains `gammaChargedEntryIds` / `gammaExemptEntryIds` (with
   `ranking[].exempt`), and `amber memory status` gains the additive `gamma.windowExempt` count and
   `gamma.problems`; legacy events keep their prior accounting and are never rewritten.
+  **Superseded later in this release by F089** (see above), which retires the γ admission limit
+  together with these fields; the two entries describe the net change, not the intermediate state.
+- enforce plan-declared required context at loadout (F084): a plan's required-tier Context
+  manifests are enforced when assembling a Loadout — a page the plan declares as required is
+  never omitted by `--since` delta filtering, and a loadout that cannot satisfy the plan's
+  declared context fails instead of silently shipping an unbound one
+- gate `context load`/`preview` behind an explicit plan-and-role binding (F085): `--plan` and
+  `--role` are a pair, declaring one without the other is a usage error rather than "no
+  requirements", so a caller that meant to bind the plan cannot get an unbound loadout by
+  mistyping a flag; the mismatch surfaces as `AMBER_E_CONTEXT_LOADOUT_REQUIRED`
+- fix(governance): wire the confidence summary to the rules the grader reads —
+  `collectConfidenceSummary` passed `collectRules`' bare rule array to
+  `computeConfidenceClasses`, which reads only the `.rules` member of a rules.json envelope;
+  the grader always saw an empty list and the report claimed "confidence gating: unavailable"
+  even with a fully populated policy. The summary now grades real policies
+- fix(memory): make the ratification track self-consistent with doctor — surface hashes are
+  written into provenance at book time and doctor rule 1 recognizes the ratification source,
+  so a ratification-class entry no longer reports "booked with no prior memory-approval event"
+
+### Semver waiver (owner, 2026-11-18)
+
+The memory status JSON (`alpha`/`gamma` objects) and the three retired memory error codes are
+treated as internal governance surface for this release line. The `memory` command family's
+operator-facing CLI grammar (`request`/`ingest`/`approve`/`book`/`status`) is unchanged; hosts
+that parsed the retired objects or codes should read the F086/F089/F087 notes above. The next
+breaking change to a `core`-stability command surface returns to MAJOR.
 
 ### Fixed
 
@@ -210,8 +236,6 @@ listed under 2.0.3 plus the fix below.
 - session: a crashed lock child reports as a crash, not a JSON defect
 - cli: the generated boundary line now names the confined set
 - deps: bump the npm-minor-and-patch group across 1 directory with 4 updates (#337)
-
-## [Unreleased]
 
 ## [2.0.1] - 2026-09-30
 

@@ -317,6 +317,16 @@ and commit failure as `executed` + `stopReason: "commit-failed"`, rather than in
 `unapproved` or `failed` kinds. No schema, code, or gate behavior changes in this correction; it
 makes the ADR's vocabulary match the implementation.
 
+## Amendment (2026-11-18) — memory identity gate retired by F089
+
+Gate item 3 cites `AMBER_E_MEMORY_APPROVAL_REQUIRED` as the memory pipeline's fail-closed
+identity-gate refusal. F089 (ungated memory admission) retired that gate and the error code:
+`amber memory request`, `ingest`, and `book` no longer refuse a non-TTY invocation, and the
+human approval boundary moved to the entry-level `approve`/`book` steps that still require an
+explicit human act. The ADR's point survives in amended form — agents still never pass `--yes`
+on a human approval slot — but the enforcement mechanism is no longer the memory pipeline's
+identity gate, and the code name in gate item 3 is historical.
+
 ## Related
 
 - [ADR-0001](0001-governance-first-artifact-first.md), [ADR-0003](0003-governance-gated-execution.md),
