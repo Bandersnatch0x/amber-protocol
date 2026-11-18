@@ -269,6 +269,16 @@ function collectRules(targetRoot) {
 	return value && typeof value === "object" ? value : [];
 }
 
+// computeConfidenceClasses consumes the rules.json envelope ({ rules: [...] }),
+// while collectRules returns the bare rule array — wrap it in the envelope
+// shape the grader expects (it reads only the .rules member). Before this
+// wrapper the array reached `rules?.rules` as undefined, the grader always saw
+// an empty list, and the report claimed "confidence gating: unavailable" even
+// with a fully populated policy.
+function rulesEnvelopeForGrader(rules) {
+	return Array.isArray(rules) ? { rules } : rules;
+}
+
 // Confidence-class summary (issue #110). computeConfidenceClasses lives in
 // governance-readiness.js and is owned by a parallel agent; guard both the
 // lookup and the call so this report keeps building if it is not merged yet.
@@ -278,7 +288,7 @@ function collectConfidenceSummary(targetRoot) {
 		if (typeof computeConfidenceClasses !== "function") {
 			return { available: false, summary: "confidence gating: unavailable" };
 		}
-		const classes = computeConfidenceClasses(collectRules(targetRoot));
+		const classes = computeConfidenceClasses(rulesEnvelopeForGrader(collectRules(targetRoot)));
 		if (!Array.isArray(classes) || classes.length === 0) {
 			return { available: false, summary: "confidence gating: unavailable" };
 		}

@@ -81,6 +81,41 @@ test("buildGovernanceReport returns scores and structured next actions", () => {
 	assert.ok(action.blocks.includes("handoff-readiness"));
 });
 
+test("repository rules.json makes the confidence summary available (wire shape)", () => {
+	const target = tempDir("confidence-wire");
+	scaffoldHarness(target);
+	// Write the rules file exactly as `governance rules init` does: an object
+	// whose `rules` member is the rule array.
+	const rulesPath = path.join(target, ".amber", "governance", "rules.json");
+	fs.mkdirSync(path.dirname(rulesPath), { recursive: true });
+	fs.writeFileSync(
+		rulesPath,
+		JSON.stringify({
+			schemaVersion: 1,
+			defaultAction: "deny",
+			rules: [
+				{
+					id: "allow-amber-cli",
+					action: "allow",
+					match: "prefix",
+					pattern: "node scripts/amber.js ",
+					mapsTo: ["ASI04"],
+				},
+			],
+		}),
+	);
+
+	const report = buildGovernanceReport(target);
+	const confidence = report.workflowEffectiveness.confidence;
+	assert.ok(
+		confidence.available,
+		"a populated rules.json must grade rules, not report unavailable",
+	);
+	assert.match(confidence.summary, /high 1/);
+	const markdown = renderGovernanceReportMarkdown(report);
+	assert.ok(!markdown.includes("confidence gating: unavailable"));
+});
+
 test("renderGovernanceReportMarkdown exposes the product loop", () => {
 	const target = tempDir("markdown");
 	scaffoldHarness(target);
