@@ -3603,6 +3603,27 @@
 				"surfaces": ["docs/specs/F090-gate-return.md"],
 				"owner": "skill"
 			}
+		},
+		{
+			"id": "F091",
+			"priority": 91,
+			"area": "docs",
+			"title": "docs: wiki knowledge surface for gate return",
+			"user_visible_behavior": "The operating manual section 5 and the schema spec timeline enum carry the F090 gate-return ruling semantics, so the wiki layer no longer contradicts the shipped behavior",
+			"status": "accepted",
+			"verification": ["node scripts/validate-wiki.js --target ."],
+			"evidence": [
+				{
+					"command": "node scripts/validate-wiki.js --target .",
+					"result": "passed (exit 0, 271ms)",
+					"date": "2026-11-18",
+					"notes": "session c7067c4f-63ac-41e5-9926-138add462f42 stage verify",
+					"sessionId": "c7067c4f-63ac-41e5-9926-138add462f42"
+				}
+			],
+			"notes": [],
+			"paths": ["docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md", "docs/wiki/SCHEMA_SPEC.md"],
+			"updated": "2026-11-18"
 		}
 	]
 }

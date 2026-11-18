@@ -435,3 +435,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F090-gate-return.md`
 - Review status: ready
 - Feature: F090 status → accepted in feature_list.json
+
+## 2026-11-18 docs/plans/F091-docs-wiki-knowledge-surface-for-gate-return.md
+
+- Plan: `docs/plans/F091-docs-wiki-knowledge-surface-for-gate-return.md`
+- Review status: ready
+- Feature: F091 status → accepted in feature_list.json
