@@ -1,6 +1,6 @@
 # Amber Agent Operating Manual
 
-Last Reviewed: 2026-07-08
+Last Reviewed: 2026-11-18
 
 Operating rules for agents working on Amber Protocol (this repo). Command syntax lives in
 `docs/CLI_REFERENCE.md`; this manual covers boundaries, gates, evidence, and routing.
@@ -89,6 +89,24 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 - Bugfix (`bugfix-quick`): reproduce -> [approve fix] -> fix -> verify. Reproduce BEFORE fixing.
 - Refactor (`refactor-safe`): characterize behavior -> [approve refactor] -> refactor ->
   [approve merge] -> verify. No restructuring without a green characterization net.
+- A gate has three outcomes, not two: pass, block, or **return**. A return ruling is made by the
+  human at the gate: `amber session approve --session <id> --gate <gate-id> --return-to <stage>`
+  records the ruling instead of an approval. Valid targets are the gate's owning stage (the stage
+  that declares `gateAfter`) and any earlier stage; a later stage, an unknown stage, or a gate
+  with no owning stage is refused. The route schema is unchanged — the route author does not
+  pre-declare fallback edges, and the operator decides at run time.
+- A return appends a `gate_returned` record to the session ledger and a `gate_returned` event to
+  the timeline; the ledger stays append-only. The cursor is *derived* as the completed prefix
+  truncated at the return, so re-completed stages re-extend it and a replay converges. The
+  returned gate goes back to pending: a `gate_passed` recorded before the return no longer
+  satisfies it, and redoing the returned stage re-arms the gate — the rerun cannot flow past it on
+  a stale pass. A replay of the same ruling reports `already returned` and appends nothing;
+  a different gate's return is always recorded.
+- Guidance surfaces count a returned gate as pending again: `amber next` and the per-turn
+  breadcrumb both surface it. `complete-check` treats approval evidence as voided while the
+  newest ruling for any gate is a return; a later re-approval restores it. Legacy sessions
+  (cursor in the manifest, empty ledger) rewind the manifest directly and carry the ruling in
+  their ledger from then on.
 - A stage of type `verb` advances only through the governed seam. A route carrying one refuses
   `session verify` (`contains verb stages, whose cursor advances only through the governed seam`,
   exit 1) and requires `session run` then `session settle`. No packaged route has a verb stage, so

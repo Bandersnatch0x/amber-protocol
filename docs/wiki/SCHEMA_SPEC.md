@@ -1,6 +1,6 @@
 # Schema 定义规范
 
-Last Reviewed: 2026-06-29
+Last Reviewed: 2026-11-18
 
 **版本**: 1.0.0  
 **状态**: 冻结（Alpha 期间不允许破坏性变更）
@@ -403,6 +403,7 @@ Timeline (审计日志)
         "gate_triggered",
         "gate_passed",
         "gate_failed",
+        "gate_returned",
         "checkpoint_created",
         "session_paused",
         "session_resumed",
