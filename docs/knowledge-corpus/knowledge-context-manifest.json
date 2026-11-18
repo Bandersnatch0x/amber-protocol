@@ -424,8 +424,8 @@
       "sourcePath": "docs/adr/0104-provider-enforcement-level.md",
       "title": "Provider Enforcement Level Is a Tri-State on the Declared/Effective Boundary",
       "source": {
-        "rawHash": "sha256:6a95224444a5447be96c2935a21a5162d9006be65c41f156fbe6d875b6c3fefa",
-        "normHash": "sha256:62e562dbf00a1066f043683e81139d568991e1309e68f1ae22fdcbec4d391497"
+        "rawHash": "sha256:a84d8402e0186edcbd282e3165beba3734a9e1eba497f78a9015e80e58363eac",
+        "normHash": "sha256:121c740c3e1c806032f097d3247f3b6332e6b1394f499c2b03a9cdcffe2c4726"
       }
     },
     {
@@ -436,8 +436,8 @@
       "sourcePath": "docs/adr/0105-held-out-evaluation-set-boundary.md",
       "title": "Held-Out Evaluation Sets Live Outside the Run Workspace as Pinned Governed Artifacts",
       "source": {
-        "rawHash": "sha256:08a74f678ed43251c2b0ea832419c37c3965afb173540742dcffd9bd502ee7c0",
-        "normHash": "sha256:17320f5d81c38f0b70bd7f836a5b1dd2f48fe80b677ceed095a2370c198edf19"
+        "rawHash": "sha256:4663075404ecdb7d95804f15a2aa46e965b47d145293aa94a041cf19eefcf140",
+        "normHash": "sha256:5eeceaca6ac4fcd4dd1a0ce345f49a1eaf62347afdc2ff017e612e3e2690b841"
       }
     },
     {
@@ -729,5 +729,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:6f3270a89e5a54d7a755fd7036cb67d3deb115eb6a1aca703905cdd7fc46e01b"
+  "manifestHash": "sha256:d5c2a3b5136f1bcd9535446a116cd03fb6a214715356d8d1d02b6feb8d43d0bb"
 }
