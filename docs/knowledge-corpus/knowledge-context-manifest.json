@@ -244,8 +244,8 @@
       "sourcePath": "docs/adr/0020-governed-live-git-transport.md",
       "title": "Governed Live Git Transport for the Sync Runtime",
       "source": {
-        "rawHash": "sha256:f016aed37a76e87a0e5fd2b060929280af5b1252671cb5f3af7f3d80cbdf0deb",
-        "normHash": "sha256:327d2d14b11dbade81f462cb8f059dd0821748fb1b15b3682d32b3a10fe1e8af"
+        "rawHash": "sha256:0012bed596cd61bd605058e16f336210e329081fda7d2ae7a6357e43d13d0830",
+        "normHash": "sha256:a29e4543372559d426be34982a9df7839eec96f66a9e2566051ac5d3b0e7b048"
       }
     },
     {
@@ -729,5 +729,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:d5c2a3b5136f1bcd9535446a116cd03fb6a214715356d8d1d02b6feb8d43d0bb"
+  "manifestHash": "sha256:3f70e398bcdc95dda35d272a462ae617b2857b645e91b4ed0dfb29c5dac4c4b6"
 }
