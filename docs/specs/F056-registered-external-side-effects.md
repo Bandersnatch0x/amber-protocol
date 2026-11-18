@@ -1,6 +1,6 @@
 # F056: Registered External Side Effects
 
-**Status:** proposed (implementation shipped; spec acceptance pending)
+**Status:** accepted (2026-11-18, feature registry accepted; implementation verified)
 **Depends on:** F055  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#216](https://github.com/Bandersnatch0x/amber-protocol/issues/216)

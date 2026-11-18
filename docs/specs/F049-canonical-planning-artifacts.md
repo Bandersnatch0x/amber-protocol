@@ -1,6 +1,6 @@
 # F049: Canonical Planning Artifacts
 
-**Status:** proposed (implementation shipped; spec acceptance pending)
+**Status:** accepted (2026-11-18, feature registry accepted; implementation verified)
 **Depends on:** None  
 **Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)  
 **GitHub mirror:** [#209](https://github.com/Bandersnatch0x/amber-protocol/issues/209)

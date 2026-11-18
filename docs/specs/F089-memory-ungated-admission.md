@@ -1,6 +1,6 @@
 # F089: Ungated memory admission
 
-Status: proposed (implementation shipped; spec acceptance pending)
+Status: accepted (2026-11-18, feature registry accepted; implementation verified)
 Date: 2026-11-07
 Related: `docs/adr/0018-governed-memory-layer.md`, `docs/specs/2026-08-21-governed-memory-layer.md`, `docs/specs/F087-provenance-refresh-gamma-exemption.md`
 

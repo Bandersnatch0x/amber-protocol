@@ -66,6 +66,32 @@ it("every spec declares a lifecycle status from the closed vocabulary", () => {
 	assert.deepEqual(offenders, []);
 });
 
+// A spec may legitimately sit in a pending state, but the pending wording must
+// name its evidence: a tracked issue or document that says who owes the ruling
+// and when it landed. The 2026-11-18 status audit found 21 specs whose status
+// line said "acceptance pending" / "coordinator re-review pending" after the
+// pending thing had already happened — the vocabulary gate above cannot see
+// that drift because the token itself was valid.
+const PENDING_EVIDENCE_RE =
+	/issues\/\d{4}|docs\/(?:adr|specs|wiki|agents)\/[^\s`)]+|commit [0-9a-f]{7,}/i;
+
+it("a pending status line names its evidence (tracked issue, doc, or commit)", () => {
+	const dir = path.join(REPO_ROOT, "docs", "specs");
+	const offenders = [];
+	for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".md"))) {
+		const head = fs.readFileSync(path.join(dir, file), "utf8").split("\n").slice(0, 18).join("\n");
+		const match = head.match(SPEC_STATUS_RE);
+		if (!match) continue;
+		if (!/pending/i.test(match[1])) continue;
+		if (!PENDING_EVIDENCE_RE.test(match[1])) {
+			offenders.push(
+				`${file}: status ${JSON.stringify(match[1].trim())} says pending without naming a tracked issue, doc, or commit`,
+			);
+		}
+	}
+	assert.deepEqual(offenders, []);
+});
+
 function tmpProductRepo() {
 	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), "amber-doc-gate-")));
 	// Product-repo signature: SPEC.md + ROADMAP.md + scripts/amber.js + templates/

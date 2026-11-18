@@ -1,6 +1,6 @@
 # ADR-0104: Provider Enforcement Level Is a Tri-State on the Declared/Effective Boundary
 
-**Status:** Proposed (2026-10-19; implemented — no approval ruling recorded)
+**Status:** Accepted (2026-11-18; ruling recorded via the F083 plan gate and amber accept in commit 7f2630e7, issues/0171-0177 all closed)
 **Date:** 2026-10-19
 **Builds on:** [ADR-0100](0100-harness-contract.md) (HarnessContract is the immutable total
 contract), [ADR-0101](0101-run-unit-of-auditable-execution.md) (the Run unit),

@@ -1,6 +1,6 @@
 # F088: Render the knowledge map before recent changes
 
-Status: proposed (implementation shipped; spec acceptance pending)
+Status: accepted (2026-11-18, feature registry accepted; implementation verified)
 Date: 2026-11-07
 Issue: https://github.com/Bandersnatch0x/amber-protocol/issues/400
 Related: `docs/specs/F059-knowledge-decision-map.md`, `docs/specs/F060-knowledge-map-v2-code-graph.md`

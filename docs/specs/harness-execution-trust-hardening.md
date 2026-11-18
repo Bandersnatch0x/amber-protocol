@@ -2,7 +2,7 @@
 
 **Spec ID:** `harness-execution-trust-hardening`
 **Feature:** F083
-**Status:** proposed (implementation shipped; spec acceptance pending)
+**Status:** accepted (2026-11-18; ruling = F083 plan-gate confirm + amber accept in commit 7f2630e7, issues/0171-0177 all closed)
 **Updated:** 2026-10-21
 **Provenance:** audit of `AMBER_V4_SPEC_AND_PLAN_REVISED.md` (2026-10-19, user-requested, version numbers deliberately ignored); `docs/plans/harness-execution-trust-hardening.md`; ADR-0104 and ADR-0105 (2026-10-19); `issues/0044` (boundary map), `issues/0047` (runtime-interception ruling A), `issues/0053` (ContextSnapshot ≡ Loadout), `issues/0054` (provenance/assurance mapping), `issues/0059` (generic runtime adapter).
 **Depends on:** F065–F082 (Harness H0–H7, implemented), ADR-0100 (contract), ADR-0101 (Run unit), ADR-0102 (event ledger), ADR-0103 (bounded runtime), ADR-0022 (no runner spawning), F068 (execution boundary), F069/F071 (context firewall), F073/F077 (validation receipt, eval-result binding), F081 (settlement and cancellation).

@@ -1,7 +1,7 @@
 # Trusted Control Context / Runtime Boundary Contract (0047 · 0053 · 0058 · 0059)
 
 **Spec ID:** `trusted-control-context-runtime-contract`
-**Status:** proposed (implementation shipped; coordinator re-review pending)
+**Status:** accepted (2026-11-18; coordinator ACCEPT recorded in issues/0044 Log 2026-09-20)
 **Updated:** 2026-09-16
 **Review:** coordinator contract review 2026-09-16 (C0R) found three defects — F056 payloadHash overclaim, incomplete session lease binding, classification default/legacy contradiction — all repaired same day; full Standards/Spec review still pending, and runtime implementation has not started.
 **Adoption authority:** Goal packet `.scratch/orchestration/all-tickets-0044-0060-2026-09-16-5HXix4` (user-approved objective); this spec converts the four boundary tickets' verified rulings plus the audit corrections into canonical text. Residual choices are recorded as implementation choices with their source.

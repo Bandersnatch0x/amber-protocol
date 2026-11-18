@@ -1,6 +1,6 @@
 # ADR-0105: Held-Out Evaluation Sets Live Outside the Run Workspace as Pinned Governed Artifacts
 
-**Status:** Proposed (2026-10-19; implemented — no approval ruling recorded)
+**Status:** Accepted (2026-11-18; ruling recorded via the F083 plan gate and amber accept in commit 7f2630e7, issues/0171-0177 all closed)
 **Date:** 2026-10-19
 **Builds on:** [ADR-0100](0100-harness-contract.md) (contract as the immutable boundary),
 [ADR-0104](0104-provider-enforcement-level.md) (provider enforcement level),
