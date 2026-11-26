@@ -1,6 +1,6 @@
 "use strict";
 
-const { test, describe, it, before, after } = require("node:test");
+const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -22,8 +22,6 @@ const {
 	registerRunnerCapability,
 } = require("../../scripts/lib/core/runner-registry");
 const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
-const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
-const { readSessionEvents } = require("../../scripts/lib/session-timeline");
 
 const PIN = "runner/ci@1.0.0#diagnose.check@1";
 const RUNNER_DIGEST = `sha256:${"a".repeat(64)}`;

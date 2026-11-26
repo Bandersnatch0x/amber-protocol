@@ -50,10 +50,23 @@ function claudeFailureJsonl(tool: string, error: string, cwd: string): string {
 describe('Instruction-surface planner extension (Slice 6)', () => {
   let root: string;
   let claudeHome: string;
+  let codexHome: string;
+  let cursorHome: string;
+  let savedCodexHome: string | undefined;
+  let savedCursorHome: string | undefined;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-suggest-instr-'));
     claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-suggest-instr-claude-'));
+    codexHome = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-suggest-instr-codex-'));
+    cursorHome = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-suggest-instr-cursor-'));
+    // Hermetic host homes: listSuggestions falls back to defaultHomes() for any
+    // home it was not given, and the real ~/.codex (~2.8GB of sessions on this
+    // machine) made the Apply/Undo tests scan until they hit the timeout.
+    savedCodexHome = process.env.AMBER_CODEX_HOME;
+    savedCursorHome = process.env.AMBER_CURSOR_HOME;
+    process.env.AMBER_CODEX_HOME = codexHome;
+    process.env.AMBER_CURSOR_HOME = cursorHome;
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'amber-protocol' }));
     fs.mkdirSync(path.join(root, 'routes'));
   });
@@ -61,6 +74,12 @@ describe('Instruction-surface planner extension (Slice 6)', () => {
   afterEach(() => {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(claudeHome, { recursive: true, force: true });
+    fs.rmSync(codexHome, { recursive: true, force: true });
+    fs.rmSync(cursorHome, { recursive: true, force: true });
+    if (savedCodexHome === undefined) delete process.env.AMBER_CODEX_HOME;
+    else process.env.AMBER_CODEX_HOME = savedCodexHome;
+    if (savedCursorHome === undefined) delete process.env.AMBER_CURSOR_HOME;
+    else process.env.AMBER_CURSOR_HOME = savedCursorHome;
   });
 
   function seedClaudePair(): void {
@@ -192,9 +211,8 @@ describe('Instruction-surface planner extension (Slice 6)', () => {
     expect(card).toHaveLength(3);
   });
 
-  // End-to-end Apply/Undo are I/O-bound and sit near the 5s default timeout
-  // under full-suite parallel load (1.8s isolated); the explicit budget keeps
-  // the assertions intact without weakening them.
+  // Apply/Undo run against the temp host homes set in beforeEach; the explicit
+  // budget keeps the assertions intact on slow machines without weakening them.
   it(
     'Apply accepts the instruction-surface operations under the allowlist; Undo restores them',
     { timeout: 20000 },
