@@ -22,7 +22,7 @@
     "@tanstack/react-query": "^5.108.1",
     "@tanstack/react-virtual": "^3.14.2",
     "@trpc/client": "^11.29.5",
-    "@trpc/react-query": "^11.28.5",
+    "@trpc/react-query": "^11.29.5",
     "@trpc/server": "^11.29.5",
     "@xyflow/react": "^12.11.5",
     "d3-force": "^3.0.0",
