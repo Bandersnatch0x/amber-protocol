@@ -140,7 +140,8 @@ function* walk(dir) {
 				entry.name === ".docusaurus" ||
 				entry.name === "build" ||
 				entry.name === "dist" ||
-				entry.name === "coverage"
+				entry.name === "coverage" ||
+				entry.name === "playwright-report"
 			)
 				continue;
 			yield* walk(full);
