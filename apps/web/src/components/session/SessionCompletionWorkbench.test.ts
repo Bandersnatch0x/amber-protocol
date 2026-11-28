@@ -234,9 +234,14 @@ describe('completion next-actions mapping', () => {
   });
 
   it('degrades unknown payloads instead of throwing', () => {
-    expect(normalizeCompletionNextActions(null)).toEqual({ status: 'unknown', actions: [] });
+    expect(normalizeCompletionNextActions(null)).toEqual({
+      status: 'unknown',
+      sessionCompleted: false,
+      actions: [],
+    });
     expect(normalizeCompletionNextActions({ status: 'weird', actions: [42, 'x'] })).toEqual({
       status: 'unknown',
+      sessionCompleted: false,
       actions: [],
     });
   });

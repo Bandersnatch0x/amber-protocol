@@ -166,12 +166,13 @@ export interface CompletionNextAction {
 
 export interface CompletionNextActionsView {
   status: 'pass' | 'fail' | 'unknown';
+  sessionCompleted: boolean;
   actions: CompletionNextAction[];
 }
 
 /** Defensive normalization — unknown fields degrade instead of throwing. */
 export function normalizeCompletionNextActions(value: unknown): CompletionNextActionsView {
-  if (!isRecord(value)) return { status: 'unknown', actions: [] };
+  if (!isRecord(value)) return { status: 'unknown', sessionCompleted: false, actions: [] };
 
   const rawStatus = typeof value.status === 'string' ? value.status.toLowerCase() : '';
   const status = rawStatus === 'pass' ? 'pass' : rawStatus === 'fail' ? 'fail' : 'unknown';
@@ -187,7 +188,7 @@ export function normalizeCompletionNextActions(value: unknown): CompletionNextAc
     actions.push({ key: `${item}-${index}`, item, action, command, hint });
   });
 
-  return { status, actions };
+  return { status, sessionCompleted: value.sessionCompleted === true, actions };
 }
 
 export function isInPageVerificationAction(action: CompletionNextAction): boolean {
@@ -633,13 +634,23 @@ export function SessionCompletionWorkbench({
             {!nextActionsLoading &&
               !nextActionsError &&
               nextActionsView.status === 'pass' &&
-              closingAction && (
+              (nextActionsView.sessionCompleted || closingAction) && (
                 <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
-                  <p className="font-medium">{t('sessions.completion.closing.title')}</p>
-                  <p className="mt-1 text-xs leading-5">
-                    {t('sessions.completion.closing.detail')}
+                  <p className="font-medium">
+                    {t(
+                      nextActionsView.sessionCompleted
+                        ? 'sessions.completion.completed.title'
+                        : 'sessions.completion.closing.title',
+                    )}
                   </p>
-                  {closingAction.command && (
+                  <p className="mt-1 text-xs leading-5">
+                    {t(
+                      nextActionsView.sessionCompleted
+                        ? 'sessions.completion.completed.detail'
+                        : 'sessions.completion.closing.detail',
+                    )}
+                  </p>
+                  {!nextActionsView.sessionCompleted && closingAction?.command && (
                     <CommandCopyBlock command={closingAction.command} className="mt-2" />
                   )}
                 </div>

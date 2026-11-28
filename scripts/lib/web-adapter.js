@@ -368,30 +368,38 @@ const COMPLETION_ACTION_FALLBACKS = {
 /**
  * Fold getCompletionStatus into actionable web next-steps: each missing item
  * maps to an in-page action or an exact CLI command. When everything passes,
- * the single closing action is `amber session complete --session <id>`.
+ * a non-completed Session gets `amber session complete --session <id>`.
+ * Session lifecycle never promotes failed completion evidence to pass.
  *
  * @param {string} targetRoot
  * @param {string} sessionId
  * @returns {{
  *   status: "pass" | "fail",
+ *   sessionCompleted: boolean,
  *   missing: string[],
  *   actions: Array<{ item: string, action: "in-page" | "cli-command", command?: string, hint: string }>,
  * }}
  */
 function getCompletionNextActions(targetRoot, sessionId) {
 	const completion = getCompletionStatus(targetRoot, sessionId);
+	const sessionDir = resolveSessionDirWithin(targetRoot, sessionId);
+	const loaded = sessionDir ? readSessionManifest(sessionDir) : null;
+	const sessionCompleted = loaded?.manifest?.status === STATES.COMPLETED;
 	if (completion.status === "pass") {
 		return {
 			status: "pass",
+			sessionCompleted,
 			missing: [],
-			actions: [
-				{
-					item: "session-complete",
-					action: "cli-command",
-					command: `amber session complete --session ${sessionId}`,
-					hint: "All completion checks pass — close the session.",
-				},
-			],
+			actions: sessionCompleted
+				? []
+				: [
+						{
+							item: "session-complete",
+							action: "cli-command",
+							command: `amber session complete --session ${sessionId}`,
+							hint: "All completion checks pass — close the session.",
+						},
+					],
 		};
 	}
 	const actions = completion.missing.map((item) => {
@@ -402,7 +410,7 @@ function getCompletionNextActions(targetRoot, sessionId) {
 		};
 		return { item, action: "cli-command", ...fallback };
 	});
-	return { status: "fail", missing: completion.missing, actions };
+	return { status: "fail", sessionCompleted, missing: completion.missing, actions };
 }
 
 /**
