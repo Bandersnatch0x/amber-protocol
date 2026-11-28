@@ -40,6 +40,7 @@ export const continuityRouter = router({
   }),
 
   governance: router({
+    board: publicProcedure.input(z.void()).query(() => adapter.getFeatureBoard(resolveRepoRoot())),
     summary: publicProcedure.input(governanceSummaryInputSchema).query(({ input }) => {
       const repoRoot = resolveRepoRoot();
       return adapter.getGovernanceSummary(repoRoot, input);
