@@ -1,9 +1,10 @@
 # Plan: Read-only feature delivery board
 
 Feature: F092
-Status: reviewed-pending-publish
+Status: accepted
 User Confirmation: confirmed
-Delivery: pending-publish
+Delivery: merged-to-default-branch (e215979d; PR #414)
+Acceptance: accepted on 2026-11-28; automation evidence and user continuation authorization
 Session: ffae7bbd-28bc-4bc9-905e-038ca9cdeacf
 
 ## Goal
@@ -15,7 +16,7 @@ Session: ffae7bbd-28bc-4bc9-905e-038ca9cdeacf
 - Context: `docs/specs/F092-feature-delivery-board.md` 为规范；沿用既有 web-adapter、continuity router、i18n 和治理页，不新建工作台。
 - Proposed approach: 读取模块返回 `{ generatedAt, statuses, features: { state, items, errors }, sessions: { state, items, errors } }`。页面保留原五状态，用状态筛选与原生 details 展示完整记录。只按 manifest.feature 关联 Session，不提高原状态和 evidence 的可信度。
 - Risks: 损坏来源被误报为空、符号链接越界、错绑 Session、刷新后显示失效快照。用独立来源状态、既有路径约束与校验、显式关联和失效提示处理。
-- 本人实施同一条耦合链，避免共享工作区并发写入。独立评审只读执行。禁止提交、推送和自动验收。
+- 本人实施同一条耦合链，避免共享工作区并发写入。独立评审只读执行。实施阶段的禁止发布约束已由用户后续“检查CI 通过后合入”授权解除；接受登记单独记录依据。
 
 ## Context manifests
 
@@ -47,17 +48,19 @@ Session: ffae7bbd-28bc-4bc9-905e-038ca9cdeacf
 
 ## Resume Checkpoint
 
-- Resume Point: 用户已选择时间语义A并完成实施。最终Web89文件836/836、typecheck/build/format通过，lint 0 error、33既有warning；真实Chrome5/5。根测试前轮4326项：4322通过、4跳过、0失败；其余四项根检查exit0，doctor有11项memory warning。本次仅5个既有前端文件变化，根运行时和服务端测试hash未变，未重复根全量。详见 `.scratch/feature-delivery-board-2026-11-27/final-verification.md`。
+- Resume Point: F092 已通过 PR #414 squash 合入默认分支，提交 `e215979d7559f84c1ff08168e286562e35a48bab`。本地 master 已对齐该提交。合入后真实 Chrome 5/5，CI run `46138561851` 为 success（9项成功、2项标签发布任务按配置跳过）。当前仅登记状态与交接，不修改产品代码。
 - Preview exception: 用户选择“使用聊天授权（推荐）”，明确豁免本次G5工具确认记录要求。实施A的授权有效；不改插件，不伪造confirm-round，不把两轮timeout改为通过。
 - Review: 缺失Session目录、聚焦、排序与离线暂停问题已修复。原L6.3 undecidable为历史裁决；用户A已同步正式规范L5并补实现及回归。A修订后的全量Web绿后独立Standards、Spec均通过，L6.3 implemented、其余四项增量未退化，结果登记 `.scratch/feature-delivery-board-2026-11-27/stage7-review.md`。原生合规工作流不可用，采用等价隔离审查，不把静态阅读算运行测试。
-- Blockers: L6.3时间歧义已由用户A解决。发布证据仍缺失。根完整测试在8个新文件临时intent-to-add条件下通过；标记已撤销。恢复为未跟踪后直接重跑仍会触发F063放置守卫，不能宣称当前索引状态无条件全绿。
-- Next Action: A后的独立两轴与合规检查已收束，保留pending-publish并等待后续发布指令。四条exact允许规则已获用户授权并应用，default-deny保留，不需再次申请。不提交、不推送、不代为验收。
+- Blockers: 无产品交付阻塞。此前未跟踪文件触发F063守卫的条件已随提交合入消除；发布前完整根测试4322通过、4跳过，五项根门禁exit0。Session账本中两次npm test超时保留，不改写为成功；完整成功输出在本地交付报告，合入CI独立成功。
+- Next Action: 功能闭环已完成：Feature与计划accepted，Session completed，strict complete-check通过。产品代码已在默认分支；本次状态与文档收尾另走文档PR，经检查后合入。不新增产品能力或执行npm发版。
 - Documentation checks: G2/G4、G6、G8、G10此前通过；最新收尾结果见 `.scratch/feature-delivery-board-2026-11-27/document-checks-final-20261128.json`。保留G5.stale_round、聊天授权例外与原超时历史，不补造工具确认。
-- Recovery Instructions: 不重复已完成后端实施与历史评审；保留预览超时和回归 RED 证据。不再询问 A/B 或重开预览弹窗。不复制模拟原型，不提交推送，不自行接受 Feature 或 Session。
+- Recovery Instructions: 不重复已完成实施和历史评审；保留预览超时和回归 RED 证据。原本地提交 `f5736c9e` 保存在 `archive/f092-before-master-sync-20261128`；同步前passing补丁保存在本地delivery目录。状态收尾仅通过治理CLI完成，不手改Session账本。
 
 ## Acceptance Criteria
 
 `docs/specs/F092-feature-delivery-board.md` L6.1–L6.5 全部有证据。保持原五状态、显式关联、独立会话可见、错误与合法空区分、无查询写入及既有续接入口。设计审查和测试不等于人工验收。
+
+Guardrails: 保持当前只读 phase boundary；看板不执行命令、不写仓库、不批准或验收、不派发Agent或调度任务，不增加拖拽状态变更或新的任务实体。
 
 ## Verification
 
@@ -76,9 +79,15 @@ Session: ffae7bbd-28bc-4bc9-905e-038ca9cdeacf
 - Root evidence: `.scratch/feature-delivery-board-2026-11-27/root-tests-final-20261128.log`及同名JSON保存完整输出和575.598秒墙钟；`root-other-gates-authorized-20261128.json`保存三项新增根检查，wiki另在会话账本。`final-state-check.json`记录产品hash未变、策略与已授权候选语义一致、8个临时索引标记已撤销和暂存区为空。根最终完整日志直接捕获，未冒充新增账本成功记录。
 - Current Web evidence: 同run目录 `decision-a/web-final-checks.json`与四个完整日志，`evidence/decision-a-browser-verified.json`与附件记录A后的最终结果；`decision-a/revert-proof.json`及RED/GREEN日志证明时间回归有效。历史`web-post-review.json`不再作为最新结果。
 - Review evidence: 同run目录 `compliance/L6.1.json`至`L6.5.json`、`post-green-standards.md`、`post-green-spec.md`、`stage7-review.md`。这些报告留在未版本控制的.scratch，不保证随仓库迁移；本计划已记入关键裁决与限制。
-- Pending: 发布证据及整体验收。Delivery维持pending-publish；不因本地审查通过关闭阶段7的交付出口。
-- Notes: 用户授权采用 A、实施及本次完整界面检查；只豁免本次 G5 工具确认记录，不授权提交、推送、自动批准或最终验收。
+- Delivery evidence: PR #414 已合入master，`git merge-base --is-ancestor e215979d origin/master` exit0；源码树与被测提交相同。合入CI run `46138561851` success；浏览器原始报告 `.scratch/feature-delivery-board-2026-11-27/evidence/post-merge-acceptance-20261128.json` 记录5/5、0 skipped/unexpected/flaky，日志exit0。原始本地报告不保证随仓库迁移。
+- Notes: 用户早期授权限于A及实施；后续明确要求CI通过后合入，并在状态收尾说明后要求“继续”。本次据此完成接受登记，不把自动化检查标为用户亲自执行的人工验收，不执行包发布。
 
 ## Log — 2026-11-28 A裁决后复核
 
 用户明确选择A：两来源均ok才推进本页健康时间；error/partial/transport失败保留健康时间、标stale，首次失败无时间；恢复时更新。规范L5、实现和回归已同步。Web836/836、Chrome5/5、build含类型/format/lint exit0，lint保留33既有warning；最终字节撤修2失败/11通过，精确恢复后13/13。全量后独立Standards与Spec发现0，L6.3 implemented，另外四项未发现增量退化。本地审查已完成；未发布，阶段7交付出口未关闭，delivery=pending-publish。报告和原始证据位于未版本控制的`.scratch/feature-delivery-board-2026-11-27/decision-a/`，不保证随仓库迁移。G5仅保留聊天授权例外，不伪造工具确认。
+
+## Log — 2026-11-28 合入后收尾
+
+以上A裁决日志为合入前历史。后续PR #414已合入master（`e215979d`），完整根测试4322通过、4跳过，合入CI成功，浏览器复验5/5。此前独立Standards、Spec及L6.1–L6.5合规结论均已收束，本次只更新治理状态和交接。用户在明确列出接受、Session完成与交接步骤后要求“继续”，本次据此登记接受；未声称用户亲自操作页面。静态计划review发现验收段缺少显式只读边界，已补Guardrails，与既有规范L1/L4一致。
+
+CLI收尾结果：两项Session门禁于本次登记；`session complete-check --strict` pass，`session complete`和`accept --session ... --strict`均exit0，Feature与计划accepted。Session账本10条校验完整，历史失败保留。manifests、doctor、gen:agents:check、wiki及修改文件格式检查均exit0；doctor保留11条既有Memory警告。本轮无产品代码变化，未重复全量根/Web测试，沿用源码未变与合入CI证据。learnings未命中强制写回；T1提名`trig-mx0fhysr-f14ca3`通过CLI明确skipped，本次没有新增持久知识，不改MEMORY.md。交接与原始收尾回执位于本地，不保证随仓库迁移。
