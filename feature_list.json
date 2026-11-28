@@ -3631,7 +3631,7 @@
 			"area": "observability",
 			"title": "只读 Feature 交付看板与续接导航",
 			"user_visible_behavior": "治理页按原交付状态展示 Feature、显式关联 Session、未绑定会话和读取错误；只提供刷新、筛选与已有续接导航。",
-			"status": "not_started",
+			"status": "accepted",
 			"verification": ["只读接口和页面不写入文件或执行命令；关联、错误和五状态语义有回归测试。"],
 			"evidence": [
 				{
@@ -3661,6 +3661,19 @@
 					"date": "2026-11-28",
 					"notes": "session ffae7bbd-28bc-4bc9-905e-038ca9cdeacf stage verify",
 					"sessionId": "ffae7bbd-28bc-4bc9-905e-038ca9cdeacf"
+				},
+				{
+					"command": "node .scratch/feature-delivery-board-2026-11-27/run-board-e2e.cjs post-merge-acceptance-20261128",
+					"result": "passed: 5/5 local-chrome tests, 0 skipped, 0 unexpected, 0 flaky; merged tree e215979d",
+					"date": "2026-11-28",
+					"notes": "Post-merge browser evidence: .scratch/feature-delivery-board-2026-11-27/evidence/post-merge-acceptance-20261128.json and .log; covers filters, expansion, Session continuation, source/transport failures and recovery, narrow layout, and keyboard focus. Raw reports are local and unversioned."
+				},
+				{
+					"command": "node scripts/validate-wiki.js --target .",
+					"result": "passed (exit 0, 170ms)",
+					"date": "2026-11-28",
+					"notes": "session ffae7bbd-28bc-4bc9-905e-038ca9cdeacf stage verify",
+					"sessionId": "ffae7bbd-28bc-4bc9-905e-038ca9cdeacf"
 				}
 			],
 			"notes": [],
@@ -3673,7 +3686,8 @@
 				"apps/web/src/lib/i18n.tsx",
 				"apps/web/tests/server/continuity-router.test.ts",
 				"apps/web/tests/e2e"
-			]
+			],
+			"updated": "2026-11-28"
 		}
 	]
 }

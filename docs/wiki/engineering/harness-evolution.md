@@ -441,3 +441,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F091-docs-wiki-knowledge-surface-for-gate-return.md`
 - Review status: ready
 - Feature: F091 status → accepted in feature_list.json
+
+## 2026-11-28 docs/plans/F092-Read-only-feature-delivery-board.md
+
+- Plan: `docs/plans/F092-Read-only-feature-delivery-board.md`
+- Review status: ready
+- Feature: F092 status → accepted in feature_list.json
