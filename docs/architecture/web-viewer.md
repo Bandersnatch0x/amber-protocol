@@ -125,9 +125,13 @@ and timeline audit apply as with the previous synchronous execution.
 - **SessionCompletionWorkbench**: consumes `continuity.completion.nextActions`
   and renders each missing item as actionable guidance — in-page verification
   (the verify form), in-page approval (link to `/gates`), or a copy-only CLI
-  command block. When everything passes it shows the closing command
-  `amber session complete --session <id>` as a copy block, never an execute
-  button.
+  command block. When every check passes, unfinished Sessions show
+  `amber session complete --session <id>` as a copy block. Completed Sessions
+  instead show an explicit completion message in English and Chinese, without
+  a repeated closing command. Failed checks retain their missing items and
+  remediation actions regardless of lifecycle. These queries never execute
+  the displayed commands. An unready HandoffCard still offers its existing
+  `amber handoff --target .` fallback when no next-action command is available.
 - **Governance page** (`/governance`): on-demand read-only rendering of
   `continuity.governance.summary` (decision badge, scores, findings,
   next-action commands, learnings). It opts out of the global refresh interval

@@ -3688,6 +3688,68 @@
 				"apps/web/tests/e2e"
 			],
 			"updated": "2026-11-28"
+		},
+		{
+			"id": "F093",
+			"priority": 91,
+			"area": "observability",
+			"title": "Completed Session guidance respects terminal state",
+			"user_visible_behavior": "Completed sessions show an explicit completion message without a repeated completion command; the next-action projection preserves the strict check result.",
+			"status": "passing",
+			"verification": ["node --test tests/unit/web-adapter-folds.test.js"],
+			"evidence": [
+				{
+					"command": "npm run doctor",
+					"result": "passed (exit 0, 714ms)",
+					"date": "2026-11-28",
+					"notes": "session d9fcc58e-c38e-44c8-aea9-cedfb0e4c16d stage verify",
+					"sessionId": "d9fcc58e-c38e-44c8-aea9-cedfb0e4c16d"
+				},
+				{
+					"command": "npm test",
+					"result": "passed: 4302 passed, 27 skipped, 0 failed",
+					"date": "2026-11-28",
+					"notes": "Full root recheck exit 0; entire 6609-line log inspected; stderr empty. Initial placement-only failure and its resolution retained in .scratch/f093. Delivery pending-publish; not human acceptance."
+				},
+				{
+					"command": "npm test",
+					"result": "passed: 89 files, 839 tests",
+					"date": "2026-11-28",
+					"notes": "Executed in apps/web; full-web.log exit 0. Web typecheck, lint, build and changed-file formatting also passed. Browser EN/ZH completed guidance passed; original F092 Session eight-file hashes unchanged. Local artifacts in .scratch/f093 are not versioned."
+				},
+				{
+					"command": "npm test",
+					"result": "passed: 89 files, 840 tests",
+					"date": "2026-11-28",
+					"notes": "Executed in apps/web after review follow-up and knowledge corpus regeneration; review-final-full-web.log exit 0. Final render assertion recheck: 7/7. Previous stale-source failure retained in review-followup-full-web.log. Local artifacts unversioned; delivery pending-publish."
+				},
+				{
+					"command": "node --test tests/unit/web-adapter-folds.test.js",
+					"result": "passed: 17 tests, 0 failed",
+					"date": "2026-11-28",
+					"notes": "review-followup-folds.log exit 0; completed/fail file-byte assertions retained. Backend and frontend fix-removal regression failures plus residual-command guard-removal failure retained in .scratch/f093."
+				},
+				{
+					"command": "node --test tests/unit/knowledge-projection.test.js tests/unit/knowledge-graph.test.js tests/unit/knowledge-base.test.js",
+					"result": "passed: 84 tests, 0 failed",
+					"date": "2026-11-28",
+					"notes": "review-final-knowledge.log exit 0 after generated corpus update; 152699ms, includes archive and projection parity checks. No production knowledge behavior was modified."
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/web-adapter.js",
+				"scripts/lib/web-adapter.d.ts",
+				"apps/web/src/components/session/SessionCompletionWorkbench.tsx",
+				"apps/web/src/components/session/SessionCompletionWorkbench.render.test.tsx",
+				"apps/web/src/components/session/SessionCompletionWorkbench.test.ts",
+				"apps/web/src/lib/i18n.tsx",
+				"tests/unit/web-adapter-folds.test.js",
+				"docs/specs/F093-completed-session-guidance.md",
+				"docs/architecture/web-viewer.md",
+				"docs/knowledge-corpus/knowledge-context-manifest.json",
+				"docs/knowledge-corpus/knowledge-base.output.json"
+			]
 		}
 	]
 }

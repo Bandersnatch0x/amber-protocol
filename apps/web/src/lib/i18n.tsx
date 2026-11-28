@@ -540,6 +540,9 @@ const en = {
   'sessions.completion.action.cliCommand': 'CLI command',
   'sessions.completion.action.gotoVerify': 'Go to verification form',
   'sessions.completion.closing.title': 'Ready to close',
+  'sessions.completion.completed.title': 'Session completed',
+  'sessions.completion.completed.detail':
+    'This session is already completed. No further closing command is needed.',
   'sessions.completion.closing.detail':
     'All completion checks pass. Copy the command below and run it in the repository — the web console never completes sessions itself.',
   'sessions.completion.detailsShow': 'Show evidence details',
@@ -1694,6 +1697,8 @@ const zh: Record<TranslationKey, string> = {
   'sessions.completion.action.cliCommand': 'CLI \u547d\u4ee4',
   'sessions.completion.action.gotoVerify': '\u524d\u5f80\u9a8c\u8bc1\u8868\u5355',
   'sessions.completion.closing.title': '\u53ef\u4ee5\u6536\u5c3e',
+  'sessions.completion.completed.title': '会话已完成',
+  'sessions.completion.completed.detail': '该会话已完成，无需再次执行收尾命令。',
   'sessions.completion.closing.detail':
     '\u6240\u6709\u5b8c\u6210\u72b6\u6001\u68c0\u67e5\u5747\u5df2\u901a\u8fc7\u3002\u590d\u5236\u4ee5\u4e0b\u547d\u4ee4\u5e76\u5728\u4ed3\u5e93\u4e2d\u6267\u884c\u2014\u2014Web \u63a7\u5236\u53f0\u4e0d\u4f1a\u81ea\u884c\u5b8c\u6210\u4f1a\u8bdd\u3002',
   'sessions.completion.detailsShow': '\u5c55\u5f00\u8bc1\u636e\u8be6\u60c5',

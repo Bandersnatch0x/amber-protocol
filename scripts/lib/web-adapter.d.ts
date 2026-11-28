@@ -242,13 +242,15 @@ export type CompletionNextAction = {
 
 export type CompletionNextActionsResult = {
 	status: "pass" | "fail";
+	sessionCompleted: boolean;
 	missing: string[];
 	actions: CompletionNextAction[];
 };
 
 /**
  * Maps getCompletionStatus missing items to web-shaped next actions; all-pass
- * yields the single closing action `amber session complete --session <id>`.
+ * yields a closing action only for a non-completed Session. The projection
+ * preserves the strict completion result.
  */
 export function getCompletionNextActions(
 	targetRoot: string,

@@ -446,35 +446,96 @@ describe("getCompletionNextActions", () => {
 		cleanup(dir);
 	});
 
-	it("returns the session-complete closing action when all checks pass", () => {
+	for (const status of ["executing", "completed"]) {
+		it(`returns lifecycle-aware guidance for ${status} when all checks pass`, () => {
+			const adapter = loadAdapter();
+			const dir = tmpRepo();
+			seedMinimalProject(dir);
+			const sessionId = "sess-complete";
+			buildSession(
+				dir,
+				sessionId,
+				{
+					sessionId,
+					goal: "all checks pass",
+					status,
+					handoff: { path: "session-handoff.md" },
+					completedStages: ["verify"],
+				},
+				[
+					{ type: "session_created" },
+					{ type: "stage_completed", data: { stage: "verify", executed: true, exitCode: 0 } },
+					{ type: "gate_passed", data: { gate: "final" } },
+				],
+				{ handoffContent: LIVE_HANDOFF },
+			);
+
+			const manifestPath = path.join(dir, ".amber/sessions", sessionId, "manifest.json");
+			const before = fs.readFileSync(manifestPath, "utf8");
+			const result = adapter.getCompletionNextActions(dir, sessionId);
+			assert.equal(result.status, "pass");
+			assert.deepEqual(result.missing, []);
+			assert.equal(result.sessionCompleted, status === "completed");
+			if (status === "completed") {
+				assert.deepEqual(result.actions, []);
+			} else {
+				assert.equal(result.actions.length, 1);
+				assert.equal(result.actions[0].action, "cli-command");
+				assert.equal(result.actions[0].command, `amber session complete --session ${sessionId}`);
+			}
+			assert.equal(fs.readFileSync(manifestPath, "utf8"), before);
+			cleanup(dir);
+		});
+	}
+
+	it("does not promote a completed Session with missing evidence to pass", () => {
 		const adapter = loadAdapter();
 		const dir = tmpRepo();
 		seedMinimalProject(dir);
-		const sessionId = "sess-complete";
-		buildSession(
-			dir,
-			sessionId,
-			{
-				sessionId,
-				goal: "all checks pass",
-				status: "completed",
-				handoff: { path: "session-handoff.md" },
-				completedStages: ["verify"],
-			},
-			[
-				{ type: "session_created" },
-				{ type: "stage_completed", data: { stage: "verify", executed: true, exitCode: 0 } },
-				{ type: "gate_passed", data: { gate: "final" } },
-			],
-			{ handoffContent: LIVE_HANDOFF },
-		);
-
+		const sessionId = "completed-without-evidence";
+		buildSession(dir, sessionId, { sessionId, goal: "missing evidence", status: "completed" }, [
+			{ type: "session_created" },
+		]);
+		const sessionDir = path.join(dir, ".amber/sessions", sessionId);
+		const before = fs
+			.readdirSync(sessionDir)
+			.map((name) => [name, fs.readFileSync(path.join(sessionDir, name), "utf8")]);
 		const result = adapter.getCompletionNextActions(dir, sessionId);
-		assert.equal(result.status, "pass");
-		assert.deepEqual(result.missing, []);
-		assert.equal(result.actions.length, 1);
-		assert.equal(result.actions[0].action, "cli-command");
-		assert.equal(result.actions[0].command, `amber session complete --session ${sessionId}`);
+		assert.equal(result.status, "fail");
+		assert.equal(result.sessionCompleted, true);
+		assert.ok(result.missing.includes("verification"));
+		assert.deepEqual(
+			result.actions.map((row) => row.item),
+			result.missing,
+		);
+		assert.deepEqual(
+			fs
+				.readdirSync(sessionDir)
+				.map((name) => [name, fs.readFileSync(path.join(sessionDir, name), "utf8")]),
+			before,
+		);
+		cleanup(dir);
+	});
+
+	it("keeps missing and corrupt manifests visible without writing files", () => {
+		const adapter = loadAdapter();
+		const dir = tmpRepo();
+		seedMinimalProject(dir);
+		const missing = adapter.getCompletionNextActions(dir, "absent");
+		assert.equal(missing.status, "fail");
+		assert.deepEqual(missing.missing, ["manifest not found"]);
+		assert.equal(missing.sessionCompleted, false);
+		assert.equal(fs.existsSync(path.join(dir, ".amber/sessions/absent")), false);
+		const sessionDir = path.join(dir, ".amber/sessions/corrupt");
+		fs.mkdirSync(sessionDir, { recursive: true });
+		const manifestPath = path.join(sessionDir, "manifest.json");
+		fs.writeFileSync(manifestPath, "{bad");
+		const corrupt = adapter.getCompletionNextActions(dir, "corrupt");
+		assert.equal(corrupt.status, "fail");
+		assert.deepEqual(corrupt.missing, ["manifest is corrupt"]);
+		assert.equal(corrupt.sessionCompleted, false);
+		assert.equal(fs.readFileSync(manifestPath, "utf8"), "{bad");
+		assert.deepEqual(fs.readdirSync(sessionDir), ["manifest.json"]);
 		cleanup(dir);
 	});
 });

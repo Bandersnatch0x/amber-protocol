@@ -616,8 +616,8 @@
       "sourcePath": "docs/architecture/web-viewer.md",
       "title": "Web Viewer Architecture",
       "source": {
-        "rawHash": "sha256:741acc76ee4b6da4c9a6a25861e5d3577e58f57c4922493ecb6974352f05aec0",
-        "normHash": "sha256:1025be71907735d6358bcc6e9c4102baa49d87f840daadc0f52271dce92f61a5"
+        "rawHash": "sha256:c4ee8f3278139a532bf4a5ee7db99046dad9727a9ee603ffe07a38be3735a8df",
+        "normHash": "sha256:e74e43ead39aaad14d8221c03e2353a0b0a5781252b4f88daa1c84940310d4b8"
       }
     },
     {
@@ -729,5 +729,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:3f70e398bcdc95dda35d272a462ae617b2857b645e91b4ed0dfb29c5dac4c4b6"
+  "manifestHash": "sha256:332ea276ac69c098008c0a42fb0eb4c1e8b77808d5f2fae51e171696ccf8343f"
 }

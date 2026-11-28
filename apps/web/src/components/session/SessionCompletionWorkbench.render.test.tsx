@@ -10,9 +10,12 @@ import { SessionCompletionWorkbench } from './SessionCompletionWorkbench';
 // the raw evidence lists (missing/reasons/lifecycle/report) live in a
 // collapsed secondary region toggled via an aria-expanded control.
 
-function renderWorkbench(props: Partial<ComponentProps<typeof SessionCompletionWorkbench>> = {}) {
+function renderWorkbench(
+  props: Partial<ComponentProps<typeof SessionCompletionWorkbench>> = {},
+  language: 'en' | 'zh-CN' = 'en',
+) {
   return render(
-    <I18nProvider initialLanguage="en">
+    <I18nProvider initialLanguage={language}>
       <SessionCompletionWorkbench
         completion={{
           status: 'fail',
@@ -43,6 +46,63 @@ afterEach(() => {
 });
 
 describe('SessionCompletionWorkbench primary/secondary layering', () => {
+  it.each([
+    ['en', 'This session is already completed. No further closing command is needed.'],
+    ['zh-CN', '该会话已完成，无需再次执行收尾命令。'],
+  ] as const)('shows completed guidance without a closing command in %s', (language, message) => {
+    renderWorkbench(
+      {
+        completion: { status: 'pass', strict: true, missing: [] },
+        nextActions: { status: 'pass', sessionCompleted: true, actions: [] },
+      },
+      language,
+    );
+    expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.queryByText('Ready to close')).toBeNull();
+    expect(screen.queryByText('可以收尾')).toBeNull();
+    expect(screen.queryByText(/amber session complete/)).toBeNull();
+  });
+
+  it('hides a residual closing command when the Session is already completed', () => {
+    renderWorkbench({
+      completion: { status: 'pass', strict: true, missing: [] },
+      nextActions: {
+        status: 'pass',
+        sessionCompleted: true,
+        actions: [
+          {
+            item: 'session-complete',
+            action: 'cli-command',
+            command: 'amber session complete --session completed-session',
+            hint: 'Close the session.',
+          },
+        ],
+      },
+    });
+    expect(
+      screen.getByText('This session is already completed. No further closing command is needed.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/amber session complete/)).toBeNull();
+  });
+
+  it('retains missing-evidence guidance for a completed Session', () => {
+    renderWorkbench({
+      nextActions: {
+        status: 'fail',
+        sessionCompleted: true,
+        actions: [
+          { item: 'verification', action: 'in-page', hint: 'Run verification from the console.' },
+        ],
+      },
+    });
+    expect(screen.getByRole('button', { name: 'Go to verification form' })).toBeTruthy();
+    expect(
+      screen.queryByText(
+        'This session is already completed. No further closing command is needed.',
+      ),
+    ).toBeNull();
+  });
+
   it('shows the primary flow and keeps evidence details collapsed by default', () => {
     renderWorkbench();
 
@@ -78,7 +138,7 @@ describe('SessionCompletionWorkbench primary/secondary layering', () => {
     expect(screen.getByText(/Completion check status: fail/)).toBeTruthy();
   });
 
-  it('does not render the approval-missing banner for a completed (pass) session', () => {
+  it('retains the closing command without an approval-missing banner for an unfinished passing Session', () => {
     renderWorkbench({
       completion: {
         status: 'pass',
@@ -108,6 +168,8 @@ describe('SessionCompletionWorkbench primary/secondary layering', () => {
     });
 
     expect(screen.queryByText('Approval missing')).toBeNull();
+    expect(screen.getByText('Ready to close')).toBeTruthy();
+    expect(screen.getByText('amber session complete --session s1')).toBeTruthy();
     expect(screen.getAllByText('Ready').length).toBeGreaterThan(0);
   });
 });
