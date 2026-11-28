@@ -21,6 +21,7 @@ const { validateHandoff } = require("./core/audit");
 const { renderHandoff } = require("./handoff-command");
 const { findMostRecentSession } = require("./session-commands");
 const { buildGovernanceReport } = require("./core/governance-report");
+const { getFeatureBoard } = require("./core/feature-board");
 const { inspectLearningWriteBack } = require("./core/learning-writeback");
 const { readSessionManifest } = require("./session-manifest");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
@@ -682,6 +683,7 @@ module.exports = {
 	getHandoffStatus,
 	getHandoffPreview,
 	getGovernanceSummary,
+	getFeatureBoard,
 	getCompletionNextActions,
 	evaluateVerifyPolicy,
 	appendVerificationLedgerRecord,

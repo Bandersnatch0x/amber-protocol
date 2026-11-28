@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createClient = vi.fn((opts) => opts);
 const httpBatchLink = vi.fn((opts) => ({ type: 'httpBatchLink', opts }));
+const httpLink = vi.fn((opts) => ({ type: 'httpLink', opts }));
+const splitLink = vi.fn((opts) => ({ type: 'splitLink', opts }));
 
 vi.mock('@trpc/react-query', () => ({
   createTRPCReact: () => ({ createClient }),
@@ -9,6 +11,8 @@ vi.mock('@trpc/react-query', () => ({
 
 vi.mock('@trpc/client', () => ({
   httpBatchLink,
+  httpLink,
+  splitLink,
 }));
 
 vi.mock('superjson', () => ({
@@ -19,6 +23,8 @@ describe('getTRPCClient', () => {
   beforeEach(() => {
     createClient.mockClear();
     httpBatchLink.mockClear();
+    httpLink.mockClear();
+    splitLink.mockClear();
   });
 
   it('configures the transformer on the tRPC client', async () => {
@@ -31,5 +37,6 @@ describe('getTRPCClient', () => {
       expect.not.objectContaining({ transformer: expect.anything() }),
     );
     expect(httpBatchLink).toHaveBeenCalledWith(expect.objectContaining({ transformer: superjson }));
+    expect(httpLink).toHaveBeenCalledWith(expect.objectContaining({ transformer: superjson }));
   });
 });

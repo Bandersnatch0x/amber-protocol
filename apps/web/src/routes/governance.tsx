@@ -4,6 +4,7 @@ import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { CommandCopyBlock } from '@/components/code/CommandCopyBlock';
 import { localizeLifecycleCopy } from '@/features/backend-copy/backend-copy';
+import { FeatureBoard } from '@/features/governance/FeatureBoard';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -284,9 +285,14 @@ function GovernancePage() {
     { refetchInterval: false },
   );
 
-  // Feature candidates come from read-only lifecycle/governance folds only
-  // (ADR-0007): the lifecycle focus when it is a feature, plus whatever the
-  // current report already resolved. No dedicated listing endpoint exists.
+  const boardQuery = trpc.continuity.governance.board.useQuery(undefined, {
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    networkMode: 'always',
+    retry: false,
+    staleTime: Infinity,
+  });
   const lifecycleQuery = trpc.lifecycle.next.useQuery({}, { refetchInterval: false });
 
   const data = summaryQuery.data;
@@ -315,8 +321,9 @@ function GovernancePage() {
     if (isRecord(focus) && focus.type === 'feature') push(focus.id);
     push(featureId);
     if (learnings) push(learnings.featureId);
+    for (const feature of boardQuery.data?.features.items ?? []) push(feature.id);
     return candidates;
-  }, [lifecycleQuery.data, featureId, learnings]);
+  }, [lifecycleQuery.data, featureId, learnings, boardQuery.data]);
 
   const metricLabel = (key: string) => {
     const labelKey = METRIC_LABEL_KEYS[key];
@@ -397,6 +404,18 @@ function GovernancePage() {
           )}
         </div>
       </header>
+
+      <FeatureBoard
+        snapshot={boardQuery.data}
+        isLoading={boardQuery.isLoading}
+        isFetching={boardQuery.isFetching}
+        error={boardQuery.error?.message}
+        featureId={featureId}
+        onRefresh={() => void boardQuery.refetch()}
+        onFocus={(next) => {
+          void navigate({ to: '/governance', search: next ? { featureId: next } : {} });
+        }}
+      />
 
       {summaryQuery.isLoading && (
         <section aria-busy="true" className="space-y-6">

@@ -192,6 +192,33 @@ export type GovernanceSummaryResult = {
 	learnings: LearningsSummary;
 };
 
+export type FeatureBoardItem = {
+	id: string;
+	title: string;
+	status: string;
+	priority: number;
+	notes: string[];
+	evidence: string[];
+};
+
+export type FeatureBoardSession = {
+	sessionId: string;
+	feature: string | null;
+	goal: string;
+	status: string;
+	currentStage: string | null;
+};
+
+export type FeatureBoardResult = {
+	generatedAt: string;
+	statuses: string[];
+	features: { state: "ok" | "error"; items: FeatureBoardItem[]; errors: string[] };
+	sessions: { state: "ok" | "partial" | "error"; items: FeatureBoardSession[]; errors: string[] };
+};
+
+/** 固定仓库来源的只读快照，不触发运行或授权。 */
+export function getFeatureBoard(targetRoot: string): FeatureBoardResult;
+
 export type GovernanceSummaryOptions = {
 	featureId?: string;
 };
@@ -522,6 +549,7 @@ export type WebAdapter = {
 	getHandoffStatus: typeof getHandoffStatus;
 	getHandoffPreview: typeof getHandoffPreview;
 	getGovernanceSummary: typeof getGovernanceSummary;
+	getFeatureBoard: typeof getFeatureBoard;
 	getCompletionNextActions: typeof getCompletionNextActions;
 	evaluateVerifyPolicy: typeof evaluateVerifyPolicy;
 	appendVerificationLedgerRecord: typeof appendVerificationLedgerRecord;
