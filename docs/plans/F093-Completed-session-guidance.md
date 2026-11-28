@@ -1,9 +1,10 @@
 # Plan: Completed session guidance
 
 Feature: F093
-Status: locally-verified
+Status: delivered
 User Confirmation: confirmed
-delivery: pending-publish
+delivery: merged-to-default-branch (8cdd9ef0; PR #416)
+Acceptance: pending-human-review; feature remains passing
 
 ## Goal
 
@@ -42,9 +43,10 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 ## Resume Checkpoint
 
 - Resume Point: implementation and reverse-test proof complete; full root suite passed (4302 pass, 27 skipped, 0 failed); final full Web suite passed (840/840), adapter 17/17 and knowledge follow-up 84/84 passed. Typecheck, lint, build, manifests, doctor, generated-skills and wiki checks passed. Real F092 browser checks passed in both languages; all eight original Session files are unchanged.
-- Blockers: no implementation or review blocker. Publishing and human acceptance remain pending.
-- Next Action: local technical Session d9fcc58e-c38e-44c8-aea9-cedfb0e4c16d is completed; use the refreshed handoff for a separately authorized publishing step. Keep delivery pending-publish and human acceptance pending.
-- Recovery Instructions: reopen this plan and continue at the first unchecked vertical slice; do not regenerate unless the plan file is missing.
+- Delivery: PR [#416](https://github.com/Bandersnatch0x/amber-protocol/pull/416) merged on 2026-11-29 (Asia/Shanghai) as 8cdd9ef0268443d8f350924495541a65349798c3; ancestry verified on origin/master. Final committed source passed the full root suite again: 4302 pass, 27 skip, 0 fail; all 6610 log lines scanned, stderr empty. Remote head 65e8a8f4 passed 11 checks; two tag-only publishing jobs were skipped by configuration.
+- Blockers: no implementation, review or delivery blocker. Human acceptance remains pending.
+- Next Action: review F093 for human acceptance when ready; no further completion command is needed for the completed local technical Session d9fcc58e-c38e-44c8-aea9-cedfb0e4c16d.
+- Recovery Instructions: verify the merged delivery reference above before any acceptance review; retain the completed Session and its existing evidence.
 
 ## Acceptance Criteria
 
@@ -68,6 +70,8 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 - 2026-11-28: independent Standards review found no hard violations; kept the existing read seam and additive boolean instead of adding an abstraction. Spec review plus independent follow-up closed the test/documentation findings; the final wording-only follow-up was synchronized across spec, plan, feature behavior and type documentation. Five separate contract checks judged 5/5 implemented; existing CLI approval semantics and read-only git probes are outside the next-action presentation change. Reports: `.scratch/f093/review-standards.md`, `.scratch/f093/review-spec.md`, `.scratch/f093/spec-compliance/REPORT.md` (all unversioned).
 - 2026-11-28: local Session completed after strict check passed. Its own next-actions query now returns pass, sessionCompleted=true and actions=[]; native final-source assertions confirm exactly 13 scoped changed files and unchanged pre-F093 feature entries. Automatic T1 memory nomination remains for separate human curation; no MEMORY.md change, feature acceptance, commit, push or merge was performed.
 
+- 2026-11-29: delivered through PR #416, squash commit 8cdd9ef0268443d8f350924495541a65349798c3, after committed-source full root tests and all applicable CI passed. CI run [46162695169](https://github.com/Bandersnatch0x/amber-protocol/actions/runs/46162695169) passed Node 20/22, Coverage, Web and docs checks; governance-loop and branch-identity runs also passed (11 successful checks total). The owner PR used the documented single-maintainer squash/admin convention after checking the exact head; branch protection was unchanged. Raw publishing evidence is local and unversioned under .scratch/f093/ (publish-full-root-summary.json, pr-416-ci.json). This entry supersedes earlier pending-publish checkpoints; F093 remains passing, with no human acceptance claimed.
+
 ## Verification
 
 - node --test tests/unit/web-adapter-folds.test.js
@@ -85,5 +89,5 @@ A slice carries at most 5 paths and 2 subsystems (a scripts/lib/<name> module or
 
 - Command: full root and Web tests; targeted adapter, component and knowledge tests; typecheck, lint, build; manifests, doctor, generated-skills and wiki checks.
 - Result: passed. Reverting the backend and frontend fixes reproduced regression failures; the original implementation bytes were restored.
-- Date: 2026-11-28.
-- Notes: detailed logs, negative full-run evidence and browser report are local, unversioned artifacts under `.scratch/f093/`. No human acceptance or default-branch delivery is claimed. The local Session recorded a policy refusal for the targeted node command, then a genuine executed `npm run doctor` receipt; verification policy was not broadened.
+- Date: 2026-11-28 through 2026-11-29 (Asia/Shanghai).
+- Notes: delivery verified through PR #416 on origin/master; human acceptance remains pending. Detailed logs, negative full-run evidence and browser report are local, unversioned artifacts under `.scratch/f093/`. The local Session recorded a policy refusal for the targeted node command, then a genuine executed `npm run doctor` receipt; verification policy was not broadened.

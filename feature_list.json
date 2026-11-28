@@ -3734,6 +3734,18 @@
 					"result": "passed: 84 tests, 0 failed",
 					"date": "2026-11-28",
 					"notes": "review-final-knowledge.log exit 0 after generated corpus update; 152699ms, includes archive and projection parity checks. No production knowledge behavior was modified."
+				},
+				{
+					"command": "npm test",
+					"result": "passed: 4302 passed, 27 skipped, 0 failed",
+					"date": "2026-11-28",
+					"notes": "Final committed source 65e8a8f4: publish-full-root.log exit 0; all 6610 lines scanned, stderr empty. Summary under .scratch/f093 is local and unversioned."
+				},
+				{
+					"command": "gh pr view 416 --repo Bandersnatch0x/amber-protocol --json state,mergeCommit,statusCheckRollup",
+					"result": "merged: 8cdd9ef0268443d8f350924495541a65349798c3; 11 CI checks passed, 2 tag-only jobs skipped",
+					"date": "2026-11-29",
+					"notes": "PR https://github.com/Bandersnatch0x/amber-protocol/pull/416; ancestry verified on origin/master. CI evaluated head 65e8a8f4 before merge. Delivery supersedes previous pending-publish checkpoints; human acceptance remains pending."
 				}
 			],
 			"notes": [],
